@@ -1,0 +1,7 @@
+{
+  "version": "3.47.7",
+  "sha256": "c2c875da25a1a1448d18ee4e8f398b2f6fce888b4775d8f9130538e16d826cb4",
+  "revision": "abaf9c523780a608bd46686fd5e53740a07077f8",
+  "archive": "stable/windows/flutter_windows_3.47.7-stable.zip",
+  "source": "https://storage.googleapis.com/flutter_infra_release/releases/releases_windows.json"
+}

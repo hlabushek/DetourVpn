@@ -1,0 +1,25 @@
+{
+  "schema_version": 1,
+  "source": "live_staging_fixed_control",
+  "host": "staging-45-10-166-106",
+  "control_without_password_verified": true,
+  "sandbox_preflight": {"preflight_passed": true, "sandbox_exit": 0},
+  "invocation_id": "13f4088cbb724c3f99568acf53038ea5",
+  "endpoint_ready": true,
+  "forced_stop_result": {
+    "cleanup_complete": false,
+    "restored": {
+      "containers": true,
+      "filter_nat": false,
+      "ipv6_filter": true,
+      "links": true,
+      "namespaces": false,
+      "routes4": true,
+      "routes6": false
+    }
+  },
+  "post_stop_observation": {"service_state": "failed", "control_group": "", "test_namespace_present": true},
+  "android_connected": false,
+  "egress_verified": false,
+  "deadline_verified": false
+}

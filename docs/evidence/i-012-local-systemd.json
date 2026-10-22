@@ -1,0 +1,12 @@
+{
+  "scope": "LOCAL WSL ONLY; actual separate systemd units, AWG and nftables; no WAN",
+  "recorded_at": "2026-10-19T20:49:07.0527350Z",
+  "agent_sha256": "beb6faf117c780655e96fed5e3f70d38d9c329676e00a9f86f05a0cf733158f9",
+  "original_named_namespace_fails": true,
+  "verified_core_namespace_pinned": true,
+  "kernel_timeout_in_private_namespace": true,
+  "separate_agent_sandbox_verified": true,
+  "host_namespace_unchanged": true,
+  "cleanup_complete": true,
+  "host_routes_unchanged": true
+}

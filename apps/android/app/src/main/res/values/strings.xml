@@ -1,0 +1,6 @@
+<resources>
+    <string name="intro">I-011 · тестовая утилита\nКлюч живёт в памяти до завершения процесса.\nIPv4 через туннель; IPv6 блокируется при активном VPN.\nОтключение возвращает обычную сеть. Kill switch не заявляется.\n\nPublic key:</string>
+    <string name="load_profile">Выбрать staging profile (без PrivateKey)</string>
+    <string name="connect">Подключить</string>
+    <string name="disconnect">Отключить</string>
+</resources>

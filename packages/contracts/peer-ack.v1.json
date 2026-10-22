@@ -1,0 +1,47 @@
+{
+  "$id": "urn:project-vpn:peer-ack.v1.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "capability": {
+      "const": "peer-removal.v1",
+      "title": "Capability",
+      "type": "string"
+    },
+    "command_id": {
+      "format": "uuid",
+      "title": "Command Id",
+      "type": "string"
+    },
+    "contract_version": {
+      "title": "Contract Version",
+      "type": "integer"
+    },
+    "outcome": {
+      "const": "removed",
+      "title": "Outcome",
+      "type": "string"
+    },
+    "peer_id": {
+      "format": "uuid",
+      "title": "Peer Id",
+      "type": "string"
+    },
+    "peer_version": {
+      "maximum": 9223372036854775807,
+      "minimum": 1,
+      "title": "Peer Version",
+      "type": "integer"
+    }
+  },
+  "required": [
+    "contract_version",
+    "capability",
+    "command_id",
+    "peer_id",
+    "peer_version",
+    "outcome"
+  ],
+  "title": "PeerAckInput",
+  "type": "object"
+}

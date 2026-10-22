@@ -1,0 +1,42 @@
+---
+# Read-only probes inside the same privilege and mount constraints as the VPN unit.
+# No serve/start of the actual endpoint, no NAT, no keys/config output.
+- name: Probe read-only preflight inside the constrained systemd sandbox
+  ansible.builtin.command:
+    argv:
+      - /usr/bin/systemd-run
+      - --quiet
+      - --wait
+      - --pipe
+      - --collect
+      - --unit=project-vpn-i011-diagnostics
+      - --property=Type=exec
+      - --property=RuntimeMaxSec=45s
+      - --property=TimeoutStopSec=5s
+      - --property=KillMode=control-group
+      - --property=CapabilityBoundingSet=CAP_SYS_ADMIN CAP_NET_ADMIN CAP_NET_RAW
+      - --property=NoNewPrivileges=yes
+      - --property=PrivateTmp=yes
+      - --property=ProtectHome=yes
+      - --property=ProtectSystem=strict
+      - --property=ReadWritePaths=/run
+      - --property=LimitCORE=0
+      - /usr/bin/python3
+      - /opt/project-vpn/acceptance/android_staging_window.py
+      - preflight
+  register: vpn_i011_sandbox_probe
+  changed_when: false
+  failed_when: false
+
+- name: Display the fixed preflight diagnostic result without raw command errors
+  ansible.builtin.debug:
+    msg:
+      sandbox_exit: '{{ vpn_i011_sandbox_probe.rc }}'
+      diagnostic: '{{ vpn_i011_sandbox_probe.stdout | from_json }}'
+
+- name: Require diagnostics to pass before any future endpoint attempt
+  ansible.builtin.assert:
+    that:
+      - vpn_i011_sandbox_probe.rc == 0
+      - (vpn_i011_sandbox_probe.stdout | from_json).preflight_passed | default(false)
+    fail_msg: "Sandbox preflight failed; endpoint was not started. Share only the fixed diagnostic above."

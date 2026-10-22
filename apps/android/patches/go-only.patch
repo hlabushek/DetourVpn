@@ -1,0 +1,393 @@
+--- a/tunnel/src/main/java/org/amnezia/awg/util/SharedLibraryLoader.java
++++ b/tunnel/src/main/java/org/amnezia/awg/util/SharedLibraryLoader.java
+@@ -7,7 +7,7 @@
+ 
+ import android.content.Context;
+ import android.os.Build;
+-import android.util.Log;
++
+ 
+ import org.amnezia.awg.util.NonNullForAll;
+ 
+@@ -47,7 +47,7 @@
+                     final ZipEntry zipEntry = zipFile.getEntry(libZipPath);
+                     if (zipEntry == null)
+                         continue;
+-                    Log.d(TAG, "Extracting apk:/" + libZipPath + " to " + destination.getAbsolutePath());
++
+                     try (final FileOutputStream out = new FileOutputStream(destination);
+                          final InputStream in = zipFile.getInputStream(zipEntry)) {
+                         int len;
+@@ -70,7 +70,7 @@
+             System.loadLibrary(libName);
+             return;
+         } catch (final UnsatisfiedLinkError e) {
+-            Log.d(TAG, "Failed to load library normally, so attempting to extract from apk", e);
++
+             noAbiException = e;
+         }
+         File f = null;
+@@ -81,7 +81,7 @@
+                 return;
+             }
+         } catch (final Exception e) {
+-            Log.d(TAG, "Failed to load library apk:/" + libName, e);
++
+             noAbiException = e;
+         } finally {
+             if (f != null)
+--- a/tunnel/src/main/java/org/amnezia/awg/backend/GoBackend.java
++++ b/tunnel/src/main/java/org/amnezia/awg/backend/GoBackend.java
+@@ -10,7 +10,7 @@
+ import android.os.Build;
+ import android.os.ParcelFileDescriptor;
+ import android.system.OsConstants;
+-import android.util.Log;
++
+ 
+ import org.amnezia.awg.backend.BackendException.Reason;
+ import org.amnezia.awg.backend.Tunnel.State;
+@@ -98,7 +98,7 @@
+      * @return {@link State} associated with the given tunnel.
+      */
+     @Override
+-    public State getState(final Tunnel tunnel) {
++    public synchronized State getState(final Tunnel tunnel) {
+         return currentTunnel == tunnel ? State.UP : State.DOWN;
+     }
+ 
+@@ -109,7 +109,7 @@
+      * @return {@link Statistics} associated with the given tunnel.
+      */
+     @Override
+-    public Statistics getStatistics(final Tunnel tunnel) {
++    public synchronized Statistics getStatistics(final Tunnel tunnel) {
+         final Statistics stats = new Statistics();
+         if (tunnel != currentTunnel || currentTunnelHandle == -1)
+             return stats;
+@@ -179,12 +179,12 @@
+      * @return Last handshake time in seconds (>=0), -1 if no handshake found, -2 on error, -3 if tunnel not active.
+      */
+     @Override
+-    public long getLastHandshake(final Tunnel tunnel) {
++    public synchronized long getLastHandshake(final Tunnel tunnel) {
+         if (tunnel != currentTunnel || currentTunnelHandle == -1)
+             return -3; // Tunnel not active
+         final String config = awgGetConfig(currentTunnelHandle);
+         if (config == null) {
+-            Log.e(TAG, "Failed to get tunnel config");
++
+             return -2;
+         }
+ 
+@@ -193,13 +193,12 @@
+                 try {
+                     return Long.parseLong(line.substring(24));
+                 } catch (final NumberFormatException ignored) {
+-                    Log.e(TAG, "Failed to parse last_handshake_time_sec");
++
+                     return -2;
+                 }
+             }
+         }
+ 
+-        Log.e(TAG, "Failed to get last_handshake_time_sec");
+         return -1;
+     }
+ 
+@@ -218,14 +217,14 @@
+      */
+     private void launchStatusJob() {
+         stopStatusJob();
+-        Log.d(TAG, "Launch status job");
++
+         statusThread = new Thread(() -> {
+             while (!Thread.currentThread().isInterrupted()) {
+                 final long lastHandshake = getLastHandshake(currentTunnel);
+ 
+                 // Check if tunnel is no longer active (race condition protection)
+                 if (lastHandshake == -3L) {
+-                    Log.d(TAG, "Tunnel is no longer active, stopping status job");
++
+                     break;
+                 }
+ 
+@@ -294,7 +293,7 @@
+      * @throws Exception Exception raised while changing tunnel state.
+      */
+     @Override
+-    public State setState(final Tunnel tunnel, State state, @Nullable final Config config) throws Exception {
++    public synchronized State setState(final Tunnel tunnel, State state, @Nullable final Config config) throws Exception {
+         final State originalState = getState(tunnel);
+ 
+         if (state == State.TOGGLE)
+@@ -321,7 +320,7 @@
+ 
+     private void setStateInternal(final Tunnel tunnel, @Nullable final Config config, final State state)
+             throws Exception {
+-        Log.i(TAG, "Bringing tunnel " + tunnel.getName() + ' ' + state);
++
+ 
+         if (state == State.UP) {
+             if (config == null)
+@@ -332,7 +331,7 @@
+ 
+             final VpnService service;
+             if (!vpnService.isDone()) {
+-                Log.d(TAG, "Requesting to start VpnService");
++
+                 context.startService(new Intent(context, VpnService.class));
+             }
+ 
+@@ -346,7 +345,7 @@
+             service.setOwner(this);
+ 
+             if (currentTunnelHandle != -1) {
+-                Log.w(TAG, "Tunnel already up");
++
+                 return;
+             }
+ 
+@@ -359,7 +358,7 @@
+                         continue;
+                     if (ep.getResolved().orElse(null) == null) {
+                         if (i < DNS_RESOLUTION_RETRIES - 1) {
+-                            Log.w(TAG, "DNS host \"" + ep.getHost() + "\" failed to resolve; trying again");
++
+                             Thread.sleep(1000);
+                             continue dnsRetry;
+                         } else
+@@ -417,7 +416,7 @@
+             try (final ParcelFileDescriptor tun = builder.establish()) {
+                 if (tun == null)
+                     throw new BackendException(Reason.TUN_CREATION_ERROR);
+-                Log.d(TAG, "Go backend " + awgVersion());
++
+                 currentTunnelHandle = awgTurnOn(tunnel.getName(), tun.detachFd(), goConfig);
+             }
+             if (currentTunnelHandle < 0)
+@@ -426,13 +425,17 @@
+             currentTunnel = tunnel;
+             currentConfig = config;
+ 
+-            service.protect(awgGetSocketV4(currentTunnelHandle));
+-            service.protect(awgGetSocketV6(currentTunnelHandle));
+-
+-            launchStatusJob();
++            int socket4 = awgGetSocketV4(currentTunnelHandle);
++            int socket6 = awgGetSocketV6(currentTunnelHandle);
++            if (socket4 < 0 || !service.protect(socket4) || (socket6 >= 0 && !service.protect(socket6))) {
++                setStateInternal(tunnel, null, State.DOWN);
++                throw new IllegalStateException("socket_protection_failed");
++            }
++
++            // I-011 polls through a single serialized caller; no JNI status thread.
+         } else {
+             if (currentTunnelHandle == -1) {
+-                Log.w(TAG, "Tunnel already down");
++
+                 return;
+             }
+             stopStatusJob();
+@@ -498,13 +501,24 @@
+ 
+         @Override
+         public void onCreate() {
++            super.onCreate();
++            android.app.NotificationManager notifications = getSystemService(android.app.NotificationManager.class);
++            if (Build.VERSION.SDK_INT >= 26)
++                notifications.createNotificationChannel(new android.app.NotificationChannel(
++                    "i011", "VPN I-011 test", android.app.NotificationManager.IMPORTANCE_LOW));
++            android.app.Notification.Builder notification = Build.VERSION.SDK_INT >= 26
++                ? new android.app.Notification.Builder(this, "i011") : new android.app.Notification.Builder(this);
++            notification.setContentTitle("VPN I-011 · test service")
++                .setContentText("Native tunnel; handshake and egress checked separately")
++                .setSmallIcon(android.R.drawable.stat_sys_warning).setOngoing(true);
++            startForeground(11, notification.build());
+             vpnService.complete(this);
+-            super.onCreate();
+         }
+ 
+         @Override
+         public void onDestroy() {
+             if (owner != null) {
++              synchronized (owner) {
+                 final Tunnel tunnel = owner.currentTunnel;
+                 if (tunnel != null) {
+                     if (owner.currentTunnelHandle != -1)
+@@ -515,19 +529,21 @@
+                     tunnel.onStateChange(State.DOWN);
+                 }
+             }
++              }
+             vpnService = vpnService.newIncompleteFuture();
+             super.onDestroy();
+         }
+ 
+         @Override
+         public int onStartCommand(@Nullable final Intent intent, final int flags, final int startId) {
++            if (intent == null) { stopSelf(); return START_NOT_STICKY; }
+             vpnService.complete(this);
+             if (intent == null || intent.getComponent() == null || !intent.getComponent().getPackageName().equals(getPackageName())) {
+-                Log.d(TAG, "Service started by Always-on VPN feature");
++
+                 if (alwaysOnCallback != null)
+                     alwaysOnCallback.alwaysOnTriggered();
+             }
+-            return super.onStartCommand(intent, flags, startId);
++            return START_NOT_STICKY;
+         }
+ 
+         public void setOwner(final GoBackend owner) {
+--- a/tunnel/tools/libwg-go/api-android.go
++++ b/tunnel/tools/libwg-go/api-android.go
+@@ -10,121 +10,43 @@
+ import "C"
+ 
+ import (
+-	"fmt"
+ 	"math"
+-	"net"
+-	"os"
+-	"os/signal"
+-	"runtime"
+ 	"runtime/debug"
+ 	"strings"
+-	"unsafe"
+ 
+ 	"github.com/amnezia-vpn/amneziawg-go/v3/conn"
+ 	"github.com/amnezia-vpn/amneziawg-go/v3/device"
+-	"github.com/amnezia-vpn/amneziawg-go/v3/ipc"
+ 	"github.com/amnezia-vpn/amneziawg-go/v3/tun"
+ 	"golang.org/x/sys/unix"
+ )
+ 
+-type AndroidLogger struct {
+-	level C.int
+-	tag   *C.char
+-}
+-
+-func cstring(s string) *C.char {
+-	b, err := unix.BytePtrFromString(s)
+-	if err != nil {
+-		b := [1]C.char{}
+-		return &b[0]
+-	}
+-	return (*C.char)(unsafe.Pointer(b))
+-}
+-
+-func (l AndroidLogger) Printf(format string, args ...interface{}) {
+-	C.__android_log_write(l.level, l.tag, cstring(fmt.Sprintf(format, args...)))
+-}
+-
+-type TunnelHandle struct {
+-	device *device.Device
+-	uapi   net.Listener
+-}
+-
+-var tunnelHandles map[int32]TunnelHandle
+-
+-func init() {
+-	tunnelHandles = make(map[int32]TunnelHandle)
+-	signals := make(chan os.Signal)
+-	signal.Notify(signals, unix.SIGUSR2)
+-	go func() {
+-		buf := make([]byte, os.Getpagesize())
+-		for {
+-			select {
+-			case <-signals:
+-				n := runtime.Stack(buf, true)
+-				if n == len(buf) {
+-					n--
+-				}
+-				buf[n] = 0
+-				C.__android_log_write(C.ANDROID_LOG_ERROR, cstring("AmneziaWG/Stacktrace"), (*C.char)(unsafe.Pointer(&buf[0])))
+-			}
+-		}
+-	}()
+-}
++type TunnelHandle struct { device *device.Device }
++var tunnelHandles = make(map[int32]TunnelHandle)
+ 
+ //export awgTurnOn
+ func awgTurnOn(interfaceName string, tunFd int32, settings string) int32 {
+-	tag := cstring("AmneziaWG/" + interfaceName)
+-	logger := &device.Logger{
+-		Verbosef: AndroidLogger{level: C.ANDROID_LOG_DEBUG, tag: tag}.Printf,
+-		Errorf:   AndroidLogger{level: C.ANDROID_LOG_ERROR, tag: tag}.Printf,
+-	}
++	logger := device.NewLogger(device.LogLevelSilent, "")
+ 
+-	tun, name, err := tun.CreateUnmonitoredTUNFromFD(int(tunFd))
++	tun, _, err := tun.CreateUnmonitoredTUNFromFD(int(tunFd))
+ 	if err != nil {
+ 		unix.Close(int(tunFd))
+ 		logger.Errorf("CreateUnmonitoredTUNFromFD: %v", err)
+ 		return -1
+ 	}
+ 
+-	logger.Verbosef("Attaching to interface %v", name)
+ 	device := device.NewDevice(tun, conn.NewStdNetBind(), logger)
+ 
+ 	err = device.IpcSet(settings)
+ 	if err != nil {
+-		unix.Close(int(tunFd))
++		device.Close()
+ 		logger.Errorf("IpcSet: %v", err)
+ 		return -1
+ 	}
+ 	device.DisableSomeRoamingForBrokenMobileSemantics()
+ 
+-	var uapi net.Listener
+-
+-	uapiFile, err := ipc.UAPIOpen(name)
+-	if err != nil {
+-		logger.Errorf("UAPIOpen: %v", err)
+-	} else {
+-		uapi, err = ipc.UAPIListen(name, uapiFile)
+-		if err != nil {
+-			uapiFile.Close()
+-			logger.Errorf("UAPIListen: %v", err)
+-		} else {
+-			go func() {
+-				for {
+-					conn, err := uapi.Accept()
+-					if err != nil {
+-						return
+-					}
+-					go device.IpcHandle(conn)
+-				}
+-			}()
+-		}
+-	}
+-
+ 	err = device.Up()
+ 	if err != nil {
+ 		logger.Errorf("Unable to bring up device: %v", err)
+-		uapiFile.Close()
+ 		device.Close()
+ 		return -1
+ 	}
+@@ -138,11 +60,10 @@
+ 	}
+ 	if i == math.MaxInt32 {
+ 		logger.Errorf("Unable to find empty handle")
+-		uapiFile.Close()
+ 		device.Close()
+ 		return -1
+ 	}
+-	tunnelHandles[i] = TunnelHandle{device: device, uapi: uapi}
++	tunnelHandles[i] = TunnelHandle{device: device}
+ 	return i
+ }
+ 
+@@ -153,9 +74,6 @@
+ 		return
+ 	}
+ 	delete(tunnelHandles, tunnelHandle)
+-	if handle.uapi != nil {
+-		handle.uapi.Close()
+-	}
+ 	handle.device.Close()
+ }
+ 

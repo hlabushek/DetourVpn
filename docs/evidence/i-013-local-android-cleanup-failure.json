@@ -1,0 +1,15 @@
+{
+  "facts": {
+    "admission_closed_no_false_connected": true,
+    "flutter_auth_ui": true
+  },
+  "failed_at": "flutter_physical_test",
+  "flutter_test_exit_success": true,
+  "live_staging": false,
+  "measured_at": "2026-10-20T20:26:36.616949+00:00",
+  "passed": false,
+  "real_api": true,
+  "real_postgresql": true,
+  "remote_revoked_and_settled": true,
+  "telegram_delivery": "TEST FAKE ONLY"
+}

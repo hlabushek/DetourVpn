@@ -1,0 +1,19 @@
+{
+  "measured_at": "2026-10-21T14:06:39.058855+00:00",
+  "passed": true,
+  "package": "org.example.vpnclient",
+  "activity": "org.example.vpnpoc.ClientActivity",
+  "entrypoint": "lib/main.dart",
+  "build_mode": "debug",
+  "device_model": "Pixel 8 Pro",
+  "android_version": "17",
+  "apk_sha256": "2e980f4838497ec46c97fede29bf3ae5a6426bab95e3628bc2571aa02e27e5e2",
+  "installed_apk_hash_matches": true,
+  "debug_signature_verified": true,
+  "activity_resumed": true,
+  "process_alive_after_launch": true,
+  "ordinary_setup_screen_visible": true,
+  "api_origin_configured": false,
+  "vpn_connection_attempted": false,
+  "staging_rerun": false
+}

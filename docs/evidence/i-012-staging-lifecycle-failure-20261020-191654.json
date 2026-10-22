@@ -1,0 +1,56 @@
+{
+  "cleanup_complete": true,
+  "cleanup_receipt": {
+    "events": [
+      {
+        "egress_verified": false,
+        "endpoint_ready": true
+      },
+      {
+        "cleanup_complete": true,
+        "restored": {
+          "containers": true,
+          "filter_nat": true,
+          "ipv6_filter": true,
+          "links": true,
+          "namespaces": true,
+          "routes4": true,
+          "routes6": true
+        }
+      }
+    ],
+    "invocation_id": "dc96eae2fa554ecb9097db99a5ba18a2"
+  },
+  "control_grant_removed": true,
+  "failed_at": "physical_phone_api_revoke",
+  "lease_diagnostics": [
+    {
+      "budget_bytes": 16777216,
+      "charged_bytes": 103984,
+      "observed_bytes": 103984,
+      "settled": true,
+      "state": "revoked"
+    }
+  ],
+  "measured_at": "2026-10-20T19:15:42.250366+00:00",
+  "passed": false,
+  "phone_failure": {
+    "baseline_egress_differs_from_staging": true,
+    "config_after_node_ack": true,
+    "connect_button_clicked": true,
+    "device_key_proof_accepted": true,
+    "egress_http_status": 200,
+    "fresh_handshake": true,
+    "last_http_status": 200,
+    "native_interface_up": true,
+    "native_up_and_staging_egress": true,
+    "permission_required": false,
+    "profile_parsed": true,
+    "stage": "api_revoke"
+  },
+  "real_agent_negotiated": true,
+  "real_http_api": true,
+  "real_postgresql": true,
+  "scenarios": {},
+  "telegram_delivery": "TEST FAKE ONLY"
+}

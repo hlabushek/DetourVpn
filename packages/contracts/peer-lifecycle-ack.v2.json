@@ -1,0 +1,75 @@
+{
+  "$id": "urn:project-vpn:peer-lifecycle-ack.v2.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "applied": {
+      "default": true,
+      "title": "Applied",
+      "type": "boolean"
+    },
+    "command_id": {
+      "format": "uuid",
+      "title": "Command Id",
+      "type": "string"
+    },
+    "contract_version": {
+      "title": "Contract Version",
+      "type": "integer"
+    },
+    "counters_lost": {
+      "default": false,
+      "title": "Counters Lost",
+      "type": "boolean"
+    },
+    "operation": {
+      "enum": [
+        "add_peer",
+        "remove_peer"
+      ],
+      "title": "Operation",
+      "type": "string"
+    },
+    "peer_id": {
+      "format": "uuid",
+      "title": "Peer Id",
+      "type": "string"
+    },
+    "peer_version": {
+      "maximum": 9223372036854775807,
+      "minimum": 1,
+      "title": "Peer Version",
+      "type": "integer"
+    },
+    "rx_bytes": {
+      "default": 0,
+      "maximum": 9223372036854775807,
+      "minimum": 0,
+      "title": "Rx Bytes",
+      "type": "integer"
+    },
+    "server_public_key": {
+      "maxLength": 44,
+      "minLength": 44,
+      "title": "Server Public Key",
+      "type": "string"
+    },
+    "tx_bytes": {
+      "default": 0,
+      "maximum": 9223372036854775807,
+      "minimum": 0,
+      "title": "Tx Bytes",
+      "type": "integer"
+    }
+  },
+  "required": [
+    "contract_version",
+    "command_id",
+    "peer_id",
+    "peer_version",
+    "operation",
+    "server_public_key"
+  ],
+  "title": "LifecycleAck",
+  "type": "object"
+}

@@ -1,0 +1,19 @@
+﻿{
+    "facts":  {
+                  "admission_closed_no_false_connected":  true,
+                  "flutter_auth_ui":  true,
+                  "reward_history_and_replay":  true
+              },
+    "flutter_test_exit_success":  true,
+    "live_staging":  false,
+    "measured_at":  "2026-10-21T19:33:48.424317+00:00",
+    "passed":  true,
+    "phone_stopped_and_reverse_removed":  true,
+    "physical_android":  true,
+    "real_api":  true,
+    "real_postgresql":  true,
+    "remote_revoked_and_settled":  true,
+    "reward_database_consistent":  true,
+    "telegram_delivery":  "TEST FAKE ONLY",
+    "ordinary_apk_restored":  true
+}

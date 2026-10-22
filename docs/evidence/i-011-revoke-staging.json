@@ -1,0 +1,72 @@
+{
+  "schema_version": 1,
+  "recorded_at": "2026-10-19T14:09:53Z",
+  "scope": "approved_staging_and_physical_pixel_8_pro_api_37",
+  "mock": false,
+  "technical_i011_accepted": true,
+  "acceptance_boundary": "docs/adr/022-i011-acceptance-boundary.md",
+  "individual_revoke": {
+    "invocation_id": "1a370b728daf48429a66f679ea730d97",
+    "before_native_up": true,
+    "before_fresh_handshake": true,
+    "before_ipv4_egress_matches_staging": true,
+    "peer_removed": true,
+    "repeat_revoke_passed": true,
+    "engine_state_after_revoke": "active",
+    "engine_ready_after_revoke": true,
+    "after_native_up": true,
+    "after_ipv4_probe_succeeded": false,
+    "after_ipv6_probe_succeeded": false,
+    "physical_traffic_cutoff_observed": true,
+    "revoke_latency_bound_measured": false,
+    "cleanup_all_seven_baseline_checks_passed": true
+  },
+  "forced_doze": {
+    "deep_idle_state_observed": "IDLE",
+    "resume_native_up": true,
+    "resume_fresh_handshake": true,
+    "resume_egress_matches_staging": true,
+    "natural_hardware_suspend_measured": false,
+    "deviceidle_force_cleared": true,
+    "battery_simulation_reset": true
+  },
+  "physical_network_outage": {
+    "wifi_and_mobile_temporarily_disabled": true,
+    "during_outage_native_up": true,
+    "during_outage_ipv4_probe_succeeded": false,
+    "during_outage_ipv6_probe_succeeded": false,
+    "after_restore_native_up": true,
+    "after_restore_fresh_handshake": true,
+    "after_restore_egress_matches_staging": true
+  },
+  "node_loss_then_disconnect": {
+    "invocation_id": "e2d8254dbb994840b996e5fc849dfeb7",
+    "while_native_up_ipv4_probe_succeeded": false,
+    "while_native_up_ipv6_probe_succeeded": false,
+    "after_disconnect_native_up": false,
+    "after_disconnect_ipv4_probe_succeeded": true,
+    "after_disconnect_ipv6_probe_succeeded": true,
+    "after_disconnect_egress_matches_staging": false,
+    "cleanup_all_seven_baseline_checks_passed": true
+  },
+  "limits": {
+    "active_system_permission_revocation_verified": false,
+    "appops_denial_alone_did_not_stop_active_tunnel": true,
+    "first_disconnect_after_individual_revoke_ipv6_probe_succeeded": false,
+    "later_node_loss_disconnect_ipv6_probe_succeeded": true,
+    "dns_all_application_leaks_excluded": false,
+    "public_release_approved": false
+  },
+  "final_cleanup": {
+    "endpoint_stopped": true,
+    "ready": false,
+    "mutation_marker": false,
+    "phone_test_files_removed": true,
+    "instrumentation_apk_removed": true,
+    "poc_force_stopped": true,
+    "vpn_permission_denied": true,
+    "wifi_and_mobile_enabled": true,
+    "temporary_sudo_grant_removed": true,
+    "subsequent_sudo_n_rejected": true
+  }
+}

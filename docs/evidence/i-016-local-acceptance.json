@@ -1,0 +1,59 @@
+{
+  "issue": "I-016",
+  "date": "2026-10-21",
+  "scope": "local_disposable_postgresql_only",
+  "local_acceptance_passed": true,
+  "postgres_version": "17.11",
+  "suite": {
+    "passed": 443,
+    "skipped": 2,
+    "errors": 0,
+    "failures": 0,
+    "duration_seconds": 224.849
+  },
+  "i016_tests_passed": 26,
+  "quality": {
+    "ruff_format_files": 90,
+    "ruff_check_passed": true,
+    "mypy_files": 91,
+    "openapi_current": true
+  },
+  "verified": [
+    "authenticated_encryption",
+    "real_pg_dump_pg_restore",
+    "single_snapshot_with_writer",
+    "all_public_tables_rows_and_digests",
+    "ledger_reconciliation",
+    "concurrent_drills_cleanup",
+    "corrupt_archive_and_manifest_cleanup",
+    "wrong_key_rejected_before_create",
+    "original_database_preserved",
+    "reward_replay_restore",
+    "integer_bytes_above_2_pow_53",
+    "local_cli_exit_codes",
+    "read_only_alert_codes_and_recovery"
+  ],
+  "cleanup": {
+    "test_cluster_removed": true,
+    "test_listener_port_closed": true
+  },
+  "deployment": {
+    "vps_changed": false,
+    "scheduler_installed": false,
+    "external_notifications_sent": false,
+    "off_host_storage_configured": false,
+    "production_ready": false,
+    "vpn_traffic_verified": false
+  },
+  "limits": {
+    "max_dump_bytes": 33554432,
+    "backup_max_age_seconds": 86400,
+    "node_stale_seconds": 90,
+    "local_retention_days": 7
+  },
+  "source_sha256": {
+    "services/api/src/vpn_api/operations.py": "bb103d9db33926d4a2d2d96f302bbe5b5ea71f83668764eb71819aef7f15f4f3",
+    "scripts/operations.py": "9c2f3645d29cb03d1294d9ad4007971e4faf85f014a902c6e35e6465f175d824",
+    "services/api/tests/test_operations.py": "ded790705153bef2be5a7d4c1c1a08d667bf8f8cb68da53b27ba29f901b47a2b"
+  }
+}

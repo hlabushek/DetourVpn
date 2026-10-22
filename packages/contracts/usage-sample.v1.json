@@ -1,0 +1,62 @@
+{
+  "$id": "urn:project-vpn:usage-sample.v1.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "counter_epoch": {
+      "format": "uuid",
+      "title": "Counter Epoch",
+      "type": "string"
+    },
+    "idempotency_key": {
+      "format": "uuid",
+      "title": "Idempotency Key",
+      "type": "string"
+    },
+    "peer_id": {
+      "format": "uuid",
+      "title": "Peer Id",
+      "type": "string"
+    },
+    "rx_total_bytes": {
+      "maximum": 9223372036854775807,
+      "minimum": 0,
+      "title": "Rx Total Bytes",
+      "type": "integer"
+    },
+    "sampled_at": {
+      "format": "date-time",
+      "title": "Sampled At",
+      "type": "string"
+    },
+    "schema_version": {
+      "const": 1,
+      "title": "Schema Version",
+      "type": "integer"
+    },
+    "sequence": {
+      "maximum": 9223372036854775807,
+      "minimum": 1,
+      "title": "Sequence",
+      "type": "integer"
+    },
+    "tx_total_bytes": {
+      "maximum": 9223372036854775807,
+      "minimum": 0,
+      "title": "Tx Total Bytes",
+      "type": "integer"
+    }
+  },
+  "required": [
+    "schema_version",
+    "peer_id",
+    "counter_epoch",
+    "sequence",
+    "sampled_at",
+    "rx_total_bytes",
+    "tx_total_bytes",
+    "idempotency_key"
+  ],
+  "title": "UsageSampleInput",
+  "type": "object"
+}

@@ -1,0 +1,32 @@
+# I-011 staging acceptance only. Install/start solely after explicit WAN approval.
+[Unit]
+Description=Bounded Android AWG staging acceptance
+After=network-online.target
+
+[Service]
+Type=exec
+User=root
+UMask=0077
+RuntimeDirectory=project-vpn-i011
+RuntimeDirectoryMode=0700
+# Preserve the baseline on failed cleanup for operator retry; /run is still tmpfs.
+RuntimeDirectoryPreserve=yes
+ExecStart=/usr/bin/python3 /opt/project-vpn/acceptance/android_staging_window.py serve
+ExecStopPost=/usr/bin/python3 /opt/project-vpn/acceptance/android_staging_window.py cleanup
+RuntimeMaxSec=600
+TimeoutStopSec=180
+KillMode=control-group
+# No grace period in which a stalled AWG could continue forwarding at the deadline.
+KillSignal=SIGKILL
+Restart=no
+LimitCORE=0
+CapabilityBoundingSet=CAP_SYS_ADMIN CAP_NET_ADMIN CAP_NET_RAW
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectHome=yes
+ProtectSystem=strict
+ReadWritePaths=/run
+StandardOutput=journal
+StandardError=null
+Environment=PYTHONDONTWRITEBYTECODE=1
+# No Install section: no boot enablement or automatic restart.

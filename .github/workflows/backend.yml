@@ -1,0 +1,59 @@
+name: Backend foundation
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: backend-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  checks:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    env:
+      # Disposable loopback-only test service. No production credentials or user data.
+      VPN_TEST_DATABASE_URL: postgresql+psycopg://vpn_i004_test@127.0.0.1:15432/vpn_i004_admin
+    services:
+      postgres:
+        image: postgres:17-bookworm@sha256:3645570cccdfa447589da9f57dd740faa29b30938e861289a5574b6ca6b03826
+        env:
+          POSTGRES_USER: vpn_i004_test
+          POSTGRES_DB: vpn_i004_admin
+          POSTGRES_HOST_AUTH_METHOD: trust
+        ports:
+          - 127.0.0.1:15432:5432
+        options: >-
+          --health-cmd "pg_isready -U vpn_i004_test -d vpn_i004_admin"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7
+        with:
+          version: "0.11.17"
+          enable-cache: false
+      - run: uv python install 3.13
+      - run: uv lock --check
+      - run: uv sync --frozen
+      - run: uv run --frozen ruff format --check .
+      - run: uv run --frozen ruff check .
+      - run: uv run --frozen mypy
+      - run: uv run --frozen pytest
+      - run: uv run --frozen python scripts/export_openapi.py --check
+      - run: uv run --frozen python scripts/export_usage_contracts.py --check
+      - name: Validate optional dev Compose
+        run: docker compose --env-file .env.example -f infra/compose/compose.yaml config --quiet
+        env:
+          VPN_DEV_POSTGRES_PASSWORD: ci-validation-only-no-service-started
+      - name: Audit locked dependencies
+        run: |
+          uv export --frozen --no-emit-project --format requirements-txt --output-file /tmp/vpn-audit.txt --quiet
+          uv run --frozen pip-audit --requirement /tmp/vpn-audit.txt --disable-pip --require-hashes

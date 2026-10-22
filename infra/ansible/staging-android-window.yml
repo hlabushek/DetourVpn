@@ -1,0 +1,183 @@
+---
+# I-011 only. Explicit WAN approval; two bounded runs, no phone traffic yet.
+- name: Validate the Android staging acceptance request before SSH
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  any_errors_fatal: true
+  tasks:
+    - name: Require an explicit WAN approval and the single approved target
+      ansible.builtin.assert:
+        that:
+          - vpn_i011_wan_approved | default(false) | bool
+          - vpn_staging_approved | default(false) | bool
+          - vpn_environment | default('') == 'staging'
+          - vpn_approved_host_address | default('') == '45.10.166.106'
+          - groups['vpn_staging'] | default([]) | length == 1
+          - not ansible_check_mode
+        fail_msg: "I-011 requires explicit staging WAN approval and a real run."
+
+    - name: Reject root SSH, changed hosts and alternate connection transports
+      ansible.builtin.assert:
+        that:
+          - groups['vpn_staging'][0] == vpn_approved_inventory_name | default('')
+          - hostvars[groups['vpn_staging'][0]].ansible_host | default('') == '45.10.166.106'
+          - hostvars[groups['vpn_staging'][0]].ansible_user | default('') not in ['', 'root']
+          - hostvars[groups['vpn_staging'][0]].ansible_connection | default('ssh') == 'ssh'
+
+    - name: Read only the locally captured Android public key
+      ansible.builtin.set_fact:
+        vpn_i011_phone_public: >-
+          {{ lookup('ansible.builtin.file', playbook_dir ~ '/../../.cache/i-011/device-public-key') | trim }}
+      no_log: true
+
+    - name: Require a single canonical public key, never an imported private key
+      ansible.builtin.assert:
+        that:
+          - vpn_i011_phone_public is match('^[A-Za-z0-9+/]{43}=$')
+        fail_msg: "Capture the current POC public key locally before this run."
+      no_log: true
+
+- name: Install and exercise the bounded staging endpoint without connecting Android
+  hosts: vpn_staging
+  gather_facts: false
+  become: true
+  any_errors_fatal: true
+  tasks:
+    - name: Authenticate sudo before making any changes
+      ansible.builtin.command:
+        argv: [/usr/bin/true]
+      changed_when: false
+
+    - name: Require no existing active or starting I-011 service
+      ansible.builtin.command:
+        argv: [/usr/bin/systemctl, show, project-vpn-i011.service, --property=ActiveState, --value]
+      register: vpn_i011_prior_state
+      changed_when: false
+      failed_when: >-
+        vpn_i011_prior_state.rc != 0 or
+        vpn_i011_prior_state.stdout | trim not in ['inactive', 'failed']
+
+    - name: Create root-owned code and tmpfs input directories
+      ansible.builtin.file:
+        path: '{{ item.path }}'
+        state: directory
+        owner: root
+        group: root
+        mode: '{{ item.mode }}'
+      loop:
+        - {path: /opt/project-vpn/acceptance, mode: '0755'}
+        - {path: /run/project-vpn-i011, mode: '0700'}
+        - {path: /run/project-vpn-i011-input, mode: '0700'}
+
+    - name: Install reviewed source without modifying existing I-010 release
+      ansible.builtin.copy:
+        src: '../../scripts/{{ item }}'
+        dest: '/opt/project-vpn/acceptance/{{ item }}'
+        owner: root
+        group: root
+        mode: '0755'
+      loop: [android_staging_window.py, awg_local_smoke.py, i011_control.py]
+
+    - name: Verify the installed code against the local SHA-256
+      ansible.builtin.stat:
+        path: '/opt/project-vpn/acceptance/{{ item }}'
+        checksum_algorithm: sha256
+      loop: [android_staging_window.py, awg_local_smoke.py, i011_control.py]
+      register: vpn_i011_installed_sources
+
+    - name: Refuse code drift
+      ansible.builtin.assert:
+        that:
+          - item.stat.isreg | default(false)
+          - item.stat.uid == 0 and item.stat.gid == 0
+          - item.stat.checksum == lookup('ansible.builtin.file', playbook_dir ~ '/../../scripts/' ~ item.item, rstrip=false) | hash('sha256')
+      loop: '{{ vpn_i011_installed_sources.results }}'
+      loop_control:
+        label: '{{ item.item }}'
+
+    - name: Stage the current public phone key in private tmpfs input
+      ansible.builtin.copy:
+        content: "{{ hostvars['localhost'].vpn_i011_phone_public }}\n"
+        dest: /run/project-vpn-i011-input/public-key
+        owner: root
+        group: root
+        mode: '0600'
+      no_log: true
+
+    - name: Install the deadline unit without boot enablement
+      ansible.builtin.copy:
+        src: files/project-vpn-i011.service
+        dest: /etc/systemd/system/project-vpn-i011.service
+        owner: root
+        group: root
+        mode: '0644'
+
+    - name: Verify the unit on the actual staging systemd
+      ansible.builtin.command:
+        argv: [/usr/bin/systemd-analyze, verify, --man=no, /etc/systemd/system/project-vpn-i011.service]
+      changed_when: false
+
+    - name: Recover only owned failed-test resources before granting the updated controller
+      ansible.builtin.command:
+        argv: [/usr/bin/python3, /opt/project-vpn/acceptance/android_staging_window.py, recover]
+      when: vpn_i011_grant_control | default(false) | bool
+      changed_when: true
+
+    - name: Run fresh read-only preflight before starting the endpoint
+      ansible.builtin.command:
+        argv: [/usr/bin/python3, /opt/project-vpn/acceptance/android_staging_window.py, preflight]
+      changed_when: false
+
+    - name: Load the reviewed unit without starting it
+      ansible.builtin.systemd_service:
+        daemon_reload: true
+
+    - name: Grant the requested expiring fixed-action control without storing a password
+      ansible.builtin.include_tasks: tasks/android-window-grant.yml
+      when: vpn_i011_grant_control | default(false) | bool
+
+    - name: Diagnose the same sandbox without creating a VPN endpoint
+      ansible.builtin.include_tasks: tasks/android-window-diagnostics.yml
+
+    - name: Initialize non-secret evidence
+      ansible.builtin.set_fact:
+        vpn_i011_window_reports: []
+
+    - name: Exercise forced stop and the real ten-minute deadline
+      when: not (vpn_i011_diagnose_only | default(false) | bool)
+      block:
+        - name: Run each bounded acceptance case
+          ansible.builtin.include_tasks: tasks/android-window-case.yml
+          loop: [forced_stop, deadline]
+          loop_control:
+            loop_var: vpn_i011_case
+
+        - name: Save only checked non-secret evidence on the controller
+          ansible.builtin.copy:
+            dest: '{{ playbook_dir }}/../../docs/evidence/i-011-staging-window.json'
+            mode: '0644'
+            content: >-
+              {{ {
+                'schema_version': 1,
+                'source': 'live_staging_ansible_window_acceptance',
+                'host': inventory_hostname,
+                'port': 51892,
+                'android_connected': false,
+                'egress_verified': false,
+                'runs': vpn_i011_window_reports,
+                'code_sha256': dict(vpn_i011_installed_sources.results | map(attribute='item') |
+                                   zip(vpn_i011_installed_sources.results | map(attribute='stat.checksum')))
+              } | to_nice_json }}
+          delegate_to: localhost
+          become: false
+      always:
+        - name: Stop the test service even after a task failure
+          ansible.builtin.systemd_service:
+            name: project-vpn-i011.service
+            state: stopped
+
+    - name: Report the verified boundary
+      ansible.builtin.debug:
+        msg: "Staging window forced-stop/deadline cleanup checked. Endpoint stopped. Android/egress/DNS/IPv6 not yet verified."
+      when: not (vpn_i011_diagnose_only | default(false) | bool)

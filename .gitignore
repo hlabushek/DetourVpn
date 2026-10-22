@@ -1,0 +1,66 @@
+# Local configuration and credentials
+.env
+.env.*
+!.env.example
+infra/ansible/inventory.yml
+infra/ansible/release.yml
+*.pem
+*.key
+*.p12
+*.pfx
+*.crt
+*.cer
+*.der
+*.csr
+*.pub
+*.ovpn
+*.wg
+*.jks
+*.keystore
+secrets/
+credentials/
+.codex-remote-attachments/
+
+# Python and tooling
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.cache/
+.coverage*
+htmlcov/
+*.egg-info/
+build/
+dist/
+
+# Local data and artifacts
+*.db
+*.sqlite*
+*.dump
+*.fernet
+*.sql
+*.log
+*.zip
+backups/
+tmp/
+chessy_training_game.pgn
+
+# Future Flutter/Android and JS builds
+.dart_tool/
+.flutter-plugins*
+.metadata
+apps/client/android/gradlew
+apps/client/android/gradlew.bat
+apps/client/android/gradle/
+.gradle/
+local.properties
+key.properties
+node_modules/
+
+# Editors / OS
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db

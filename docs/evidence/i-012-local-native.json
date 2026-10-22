@@ -1,0 +1,13 @@
+{
+  "agent_sha256": "beb6faf117c780655e96fed5e3f70d38d9c329676e00a9f86f05a0cf733158f9",
+  "bidirectional_packets": true,
+  "cleanup_complete": true,
+  "host_routes_unchanged": true,
+  "kernel_budget_blocks_traffic": true,
+  "kernel_expiry_without_agent": true,
+  "measured_at": "2026-10-19T20:49:06.9825131Z",
+  "real_add_and_handshake": true,
+  "real_remove_blocks_traffic": true,
+  "replayed_add_stays_removed": true,
+  "scope": "LOCAL WSL ONLY; real AWG and nftables; no WAN"
+}

@@ -1,0 +1,31 @@
+repos:
+  - repo: local
+    hooks:
+      - id: ruff-format
+        name: Ruff format
+        entry: uv run --frozen ruff format --check
+        language: system
+        types: [python]
+      - id: ruff
+        name: Ruff lint
+        entry: uv run --frozen ruff check
+        language: system
+        types: [python]
+      - id: mypy
+        name: Strict type check
+        entry: uv run --frozen mypy
+        language: system
+        pass_filenames: false
+        types: [python]
+      - id: pytest
+        name: Backend tests
+        entry: uv run --frozen pytest
+        language: system
+        pass_filenames: false
+        always_run: true
+      - id: openapi
+        name: OpenAPI contract is current
+        entry: uv run --frozen python scripts/export_openapi.py --check
+        language: system
+        pass_filenames: false
+        always_run: true

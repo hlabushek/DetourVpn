@@ -1,0 +1,60 @@
+{
+  "cleanup_complete": true,
+  "cleanup_receipt": {
+    "events": [
+      {
+        "egress_verified": false,
+        "endpoint_ready": true
+      },
+      {
+        "cleanup_complete": true,
+        "restored": {
+          "containers": true,
+          "filter_nat": true,
+          "ipv6_filter": true,
+          "links": true,
+          "namespaces": true,
+          "routes4": true,
+          "routes6": true
+        }
+      }
+    ],
+    "invocation_id": "b19ff67358364c43a8b1ca86f836004c"
+  },
+  "control_grant_removed": true,
+  "failed_at": "physical_phone_api_revoke",
+  "lease_diagnostics": [
+    {
+      "budget_bytes": 16777216,
+      "charged_bytes": 248736,
+      "observed_bytes": 248736,
+      "settled": true,
+      "state": "revoked"
+    }
+  ],
+  "measured_at": "2026-10-20T19:25:35.497652+00:00",
+  "passed": false,
+  "phone_failure": {
+    "baseline_egress_differs_from_staging": true,
+    "config_after_node_ack": true,
+    "connect_button_clicked": true,
+    "device_key_proof_accepted": true,
+    "egress_result": "unavailable",
+    "fresh_handshake": true,
+    "last_http_status": 200,
+    "last_tunnel_state": "revoked",
+    "lease_valid_before_revoke": true,
+    "native_interface_up": true,
+    "native_up_and_staging_egress": true,
+    "native_up_at_cutoff": true,
+    "permission_required": false,
+    "profile_parsed": true,
+    "revoke_response_state": "revoke_pending",
+    "stage": "network_restore"
+  },
+  "real_agent_negotiated": true,
+  "real_http_api": true,
+  "real_postgresql": true,
+  "scenarios": {},
+  "telegram_delivery": "TEST FAKE ONLY"
+}

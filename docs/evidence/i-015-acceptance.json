@@ -1,0 +1,34 @@
+{
+  "issue": "I-015",
+  "accepted": true,
+  "accepted_date": "2026-10-21",
+  "recorded_at": "2026-10-21T19:36:05.521052+00:00",
+  "backend_suite": {
+    "passed": 417,
+    "skipped": 2,
+    "source": "owner-provided PostgreSQL runner log recorded in verification-i-015.md"
+  },
+  "flutter_tests_passed": 38,
+  "android_unit_tests_passed": 10,
+  "android_lint_clean": true,
+  "ordinary_debug_and_release_builds_passed": true,
+  "physical_test": {
+    "passed": 1,
+    "deselected": 418,
+    "seconds": 42.31,
+    "executed_by": "owner in normal Windows PowerShell"
+  },
+  "physical_receipt": {
+    "path": "docs/evidence/i-015-local-android.json",
+    "sha256": "a9e4bbcf305a2d8c285c783ff22142be8c0be4e21a7d72ad59b90b638ff871f5"
+  },
+  "build_receipt": {
+    "path": "docs/evidence/i-015-build.json",
+    "sha256": "1c8f7e6d65bccde018714e26d5ce36712d3e640934379b4b4c6ae2f818901703"
+  },
+  "ordinary_apk_restored": true,
+  "cleanup_confirmed": true,
+  "production_reward_rules_enabled": false,
+  "new_vpn_egress_acceptance_claimed": false,
+  "i016_started": false
+}

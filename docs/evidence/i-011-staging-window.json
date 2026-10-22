@@ -1,0 +1,128 @@
+{
+  "schema_version": 1,
+  "source": "live_staging_fixed_control_and_physical_android",
+  "host": "staging-45-10-166-106",
+  "forced_stop": {
+    "invocation_id": "6e6f5b86eeee48fa8cec6ca6061af474",
+    "events": [
+      {
+        "endpoint_ready": true,
+        "egress_verified": false
+      },
+      {
+        "cleanup_complete": true,
+        "restored": {
+          "containers": true,
+          "filter_nat": true,
+          "ipv6_filter": true,
+          "links": true,
+          "namespaces": true,
+          "routes4": true,
+          "routes6": true
+        }
+      }
+    ]
+  },
+  "deadline": {
+    "events": [
+      {
+        "egress_verified": false,
+        "endpoint_ready": true
+      },
+      {
+        "cleanup_complete": true,
+        "restored": {
+          "containers": true,
+          "filter_nat": true,
+          "ipv6_filter": true,
+          "links": true,
+          "namespaces": true,
+          "routes4": true,
+          "routes6": true
+        }
+      }
+    ],
+    "invocation_id": "e9650816359a4f428fb0ec99a9ec35f0",
+    "result": "timeout",
+    "started_at_utc": "2026-10-19T13:23:46Z",
+    "cleanup_at_utc": "2026-10-19T13:33:46Z",
+    "elapsed_seconds": 600
+  },
+  "android_connected": true,
+  "egress_verified": true,
+  "android_acceptance_complete": false,
+  "android_apk_sha256": "6af2ba815293443c03722dbdaf35961c8dd1df3b2acd23946d3d37ba529635b0",
+  "instrumentation_apk_sha256": "28e7c3edcbb71722f4c6d7b4c7a389fb35203ebac64794a218f23be25c2328a9",
+  "phone": {
+    "model": "Pixel 8 Pro",
+    "api": 37,
+    "baseline_ipv4_succeeded": true,
+    "baseline_ipv6_succeeded": true,
+    "baseline_matches_staging": false
+  },
+  "live_tunnel": {
+    "native_up": true,
+    "fresh_handshake": true,
+    "ipv4_probe_succeeded": true,
+    "egress_matches_staging": true,
+    "ipv6_probe_succeeded": false
+  },
+  "dns_sample": {
+    "generated_queries": 3,
+    "completed": true,
+    "expected_cloudflare_resolvers_only": true,
+    "all_application_dns_leaks_excluded": false,
+    "service": "https://bash.ws/dnsleak"
+  },
+  "network_switch": {
+    "wifi_to_cellular_egress_matches_staging": true,
+    "cellular_underlying_transport_observed": true,
+    "wifi_restored": true,
+    "screen_off_on_probe_succeeded": true,
+    "deep_suspend_verified": false
+  },
+  "normal_disconnect": {
+    "native_down": true,
+    "ipv4_available": true,
+    "ipv6_available": true,
+    "egress_matches_staging": false
+  },
+  "node_stop": {
+    "native_stayed_up": true,
+    "ipv4_probe_succeeded": false,
+    "ipv6_probe_succeeded": false,
+    "cleanup_complete": true
+  },
+  "permission": {
+    "revoked_for_test_package": true,
+    "permission_required": true,
+    "system_dialog_observed": true,
+    "denial_kept_tunnel_down": true,
+    "revocation_while_connected_tested": false
+  },
+  "known_failures": {
+    "individual_peer_remove_command": "i011_control_refused",
+    "immediate_network_recovery_after_node_loss_verified": false
+  },
+  "final_cleanup": {
+    "test_node_stopped": true,
+    "all_seven_baseline_checks_passed": true,
+    "test_namespace_absent": true,
+    "phone_profile_files_absent": true,
+    "instrumentation_apk_removed": true,
+    "poc_force_stopped": true,
+    "vpn_permission_denied": true,
+    "grant_revocation_manual": true,
+    "automatic_45_minute_grant_expiry_measured": false,
+    "wifi_enabled": true,
+    "mobile_data_enabled": true,
+    "control_grant_removed": true,
+    "subsequent_sudo_n_rejected": true
+  },
+  "i011_complete": false,
+  "required_next_work": [
+    "diagnose individual peer removal without claiming success",
+    "verify recovery after node loss and deep suspend",
+    "release licence inventory and SBOM gates"
+  ]
+}

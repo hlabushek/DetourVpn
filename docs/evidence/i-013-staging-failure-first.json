@@ -1,0 +1,14 @@
+{
+  "control_grant_removed": true,
+  "facts": {},
+  "failed_at": "flutter_physical_test",
+  "flutter_test_exit_success": false,
+  "live_staging": true,
+  "measured_at": "2026-10-20T20:48:11.542664+00:00",
+  "passed": false,
+  "phone_stopped_and_reverse_removed": true,
+  "real_api": true,
+  "real_postgresql": true,
+  "staging_cleanup_complete": true,
+  "telegram_delivery": "TEST FAKE ONLY"
+}

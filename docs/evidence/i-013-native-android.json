@@ -1,0 +1,17 @@
+{
+  "passed": true,
+  "test": "native_bridge_test.dart",
+  "measured_at": "2026-10-20T20:26:36.2882786Z",
+  "facts": {
+    "pending_permission_cancelled": true,
+    "invalid_proof_rejected": true,
+    "invalid_profile_rejected": true,
+    "native_down": true,
+    "device_public_key_32_bytes": true,
+    "oversized_lease_rejected": true
+  },
+  "android_version": "17",
+  "physical_device_model": "Pixel 8 Pro",
+  "external_tunnel_started": false,
+  "real_upstream_core": true
+}

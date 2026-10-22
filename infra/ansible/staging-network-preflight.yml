@@ -1,0 +1,78 @@
+---
+# Read-only metadata. No config dumps, container exec, packet capture or mutations.
+- name: Inspect the approved staging network before planning a test peer
+  hosts: vpn_staging
+  gather_facts: false
+  become: false
+  serial: 1
+
+  pre_tasks:
+    - name: Require one approved staging address and non-root SSH identity
+      ansible.builtin.assert:
+        that:
+          - groups['vpn_staging'] | length == 1
+          - vpn_staging_approved | default(false) | bool
+          - (vpn_environment | default('')) == 'staging'
+          - (vpn_approved_inventory_name | default('')) == inventory_hostname
+          - (ansible_user | default('')) not in ['', 'root']
+          - (vpn_approved_host_address | default('')) | length > 0
+          - (ansible_host | default(inventory_hostname)) == vpn_approved_host_address
+          - (ansible_connection | default('ssh')) == 'ssh'
+        fail_msg: "Require exactly one approved staging SSH target and explicit address."
+
+  tasks:
+    - name: Read only socket owners, route allocations and container metadata
+      ansible.builtin.command:
+        argv: "{{ item.argv }}"
+      loop:
+        - name: UDP listener owners
+          argv: [ss, -H, -lunp]
+        - name: IPv4 allocated routes
+          argv: [ip, -4, route, show, table, main]
+        - name: IPv6 allocated routes
+          argv: [ip, -6, route, show, table, main]
+        - name: Existing containers and published ports
+          argv:
+            - docker
+            - container
+            - ls
+            - --format
+            - !unsafe '{{.Names}} | {{.Image}} | {{.Ports}}'
+        - name: Existing Docker network names and drivers
+          argv:
+            - docker
+            - network
+            - ls
+            - --format
+            - !unsafe '{{.Name}} | {{.Driver}} | {{.Scope}}'
+      loop_control:
+        label: "{{ item.name }}"
+      become: true
+      changed_when: false
+      check_mode: false
+      register: vpn_network_probe
+
+    - name: Display selected operational metadata only
+      ansible.builtin.debug:
+        msg:
+          probe: "{{ item.item.name }}"
+          lines: "{{ item.stdout_lines }}"
+      loop: "{{ vpn_network_probe.results }}"
+      loop_control:
+        label: "{{ item.item.name }}"
+
+    - name: Read selected Docker subnet and namespace routing metadata
+      ansible.builtin.command:
+        argv:
+          - /usr/bin/python3
+          - -c
+          - "{{ lookup('ansible.builtin.file', playbook_dir ~ '/files/staging_network_inventory.py') }}"
+      become: true
+      changed_when: false
+      check_mode: false
+      register: vpn_container_network_probe
+      no_log: true
+
+    - name: Display complete selected network inventory
+      ansible.builtin.debug:
+        msg: "{{ vpn_container_network_probe.stdout | from_json }}"

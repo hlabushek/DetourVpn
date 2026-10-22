@@ -1,0 +1,90 @@
+---
+# One local sudo authentication. No passwords/tokens are written by these tasks.
+- name: Require the explicitly requested temporary controller grant
+  ansible.builtin.assert:
+    that:
+      - vpn_i011_grant_control | default(false) | bool
+      - vpn_i011_diagnose_only | default(false) | bool
+
+- name: Create the private tmpfs lease directory
+  ansible.builtin.file:
+    path: /run/project-vpn-i011-control
+    state: directory
+    owner: root
+    group: root
+    mode: '0700'
+
+- name: Stop a previous expiry timer before installing a fresh owner-approved lease
+  ansible.builtin.command:
+    argv: [/usr/bin/systemctl, stop, project-vpn-i011-control-expiry.timer]
+  register: vpn_i011_old_timer
+  failed_when: vpn_i011_old_timer.rc not in [0, 5]
+  changed_when: vpn_i011_old_timer.rc == 0
+
+- name: Build a host and boot bound 45-minute lease for the exact installed code
+  ansible.builtin.command:
+    argv:
+      - /usr/bin/python3
+      - -I
+      - -c
+      - |
+        import hashlib, json, pathlib, pwd, time
+        root = pathlib.Path('/opt/project-vpn/acceptance')
+        now = int(time.time())
+        ticks = int(time.monotonic())
+        print(json.dumps({
+            'schema_version': 1, 'owner': 'vpn-deploy',
+            'owner_uid': pwd.getpwnam('vpn-deploy').pw_uid,
+            'host': '45.10.166.106',
+            'boot_id': pathlib.Path('/proc/sys/kernel/random/boot_id').read_text().strip(),
+            'issued_at': now, 'issued_monotonic': ticks,
+            'expires_at': now + 2700, 'expires_monotonic': ticks + 2700,
+            'code_sha256': {name: hashlib.sha256((root/name).read_bytes()).hexdigest()
+                for name in ('android_staging_window.py', 'awg_local_smoke.py', 'i011_control.py')},
+            'unit_sha256': hashlib.sha256(pathlib.Path('/etc/systemd/system/project-vpn-i011.service').read_bytes()).hexdigest()
+        }, sort_keys=True))
+  register: vpn_i011_lease_data
+  changed_when: false
+
+- name: Save only lease metadata and code hashes, never the sudo password
+  ansible.builtin.copy:
+    content: '{{ vpn_i011_lease_data.stdout }}'
+    dest: /run/project-vpn-i011-control/lease.json
+    owner: root
+    group: root
+    mode: '0600'
+
+- name: Schedule automatic service stop and privilege revocation after 45 minutes
+  ansible.builtin.command:
+    argv:
+      - /usr/bin/systemd-run
+      - --quiet
+      - --unit=project-vpn-i011-control-expiry
+      - --on-active=45m
+      - --timer-property=AccuracySec=1s
+      - --property=Type=oneshot
+      - /opt/project-vpn/acceptance/i011_control.py
+      - expire
+  changed_when: true
+
+- name: Permit only the root-owned isolated fixed-action controller
+  ansible.builtin.copy:
+    content: |
+      # I-011 temporary owner-requested grant. Controller enforces 45m/boot/code hashes.
+      vpn-deploy ALL=(root) NOPASSWD: /opt/project-vpn/acceptance/i011_control.py
+    dest: /etc/sudoers.d/project-vpn-i011-control
+    owner: root
+    group: root
+    mode: '0440'
+    validate: /usr/sbin/visudo -cf %s
+
+- name: Verify noninteractive status under the actual SSH identity
+  ansible.builtin.command:
+    argv: [/usr/bin/sudo, -n, /opt/project-vpn/acceptance/i011_control.py, status]
+  become: false
+  register: vpn_i011_control_probe
+  changed_when: false
+
+- name: Display the bounded control state
+  ansible.builtin.debug:
+    msg: '{{ vpn_i011_control_probe.stdout | from_json }}'

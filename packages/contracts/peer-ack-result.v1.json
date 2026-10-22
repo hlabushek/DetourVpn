@@ -1,0 +1,28 @@
+{
+  "$id": "urn:project-vpn:peer-ack-result.v1.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "properties": {
+    "command_id": {
+      "format": "uuid",
+      "title": "Command Id",
+      "type": "string"
+    },
+    "contract_version": {
+      "const": 1,
+      "default": 1,
+      "title": "Contract Version",
+      "type": "integer"
+    },
+    "state": {
+      "const": "revoked",
+      "default": "revoked",
+      "title": "State",
+      "type": "string"
+    }
+  },
+  "required": [
+    "command_id"
+  ],
+  "title": "PeerAckResponse",
+  "type": "object"
+}

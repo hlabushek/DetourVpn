@@ -1,0 +1,76 @@
+{
+  "$defs": {
+    "LifecycleCommand": {
+      "properties": {
+        "budget_bytes": {
+          "title": "Budget Bytes",
+          "type": "integer"
+        },
+        "command_id": {
+          "format": "uuid",
+          "title": "Command Id",
+          "type": "string"
+        },
+        "lease_deadline": {
+          "format": "date-time",
+          "title": "Lease Deadline",
+          "type": "string"
+        },
+        "operation": {
+          "enum": [
+            "add_peer",
+            "remove_peer"
+          ],
+          "title": "Operation",
+          "type": "string"
+        },
+        "peer_id": {
+          "format": "uuid",
+          "title": "Peer Id",
+          "type": "string"
+        },
+        "peer_version": {
+          "title": "Peer Version",
+          "type": "integer"
+        },
+        "public_key": {
+          "title": "Public Key",
+          "type": "string"
+        }
+      },
+      "required": [
+        "command_id",
+        "peer_id",
+        "peer_version",
+        "operation",
+        "public_key",
+        "lease_deadline",
+        "budget_bytes"
+      ],
+      "title": "LifecycleCommand",
+      "type": "object"
+    }
+  },
+  "$id": "urn:project-vpn:peer-lifecycle-commands.v2.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "properties": {
+    "commands": {
+      "items": {
+        "$ref": "#/$defs/LifecycleCommand"
+      },
+      "title": "Commands",
+      "type": "array"
+    },
+    "contract_version": {
+      "const": 2,
+      "default": 2,
+      "title": "Contract Version",
+      "type": "integer"
+    }
+  },
+  "required": [
+    "commands"
+  ],
+  "title": "LifecycleCommands",
+  "type": "object"
+}

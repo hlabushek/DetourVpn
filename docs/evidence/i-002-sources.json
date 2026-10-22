@@ -1,0 +1,679 @@
+{
+  "observed_on": "2026-10-18",
+  "sources": [
+    {
+      "id": "awg-android:COPYING",
+      "repository": "amnezia-vpn/amneziawg-android",
+      "commit": "ff15093bf3856fea0947923474870b86efb682f0",
+      "path": "COPYING",
+      "url": "https://raw.githubusercontent.com/amnezia-vpn/amneziawg-android/ff15093bf3856fea0947923474870b86efb682f0/COPYING",
+      "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+      "bytes": 11358
+    },
+    {
+      "id": "awg-android:.gitmodules",
+      "repository": "amnezia-vpn/amneziawg-android",
+      "commit": "ff15093bf3856fea0947923474870b86efb682f0",
+      "path": ".gitmodules",
+      "url": "https://raw.githubusercontent.com/amnezia-vpn/amneziawg-android/ff15093bf3856fea0947923474870b86efb682f0/.gitmodules",
+      "sha256": "79f6d99d6fd77fa8e3d0ceccfab3f5a6560e413998c1df9e3bf3dcc47ee8d55a",
+      "bytes": 258
+    },
+    {
+      "id": "awg-android:gradle/libs.versions.toml",
+      "repository": "amnezia-vpn/amneziawg-android",
+      "commit": "ff15093bf3856fea0947923474870b86efb682f0",
+      "path": "gradle/libs.versions.toml",
+      "url": "https://raw.githubusercontent.com/amnezia-vpn/amneziawg-android/ff15093bf3856fea0947923474870b86efb682f0/gradle/libs.versions.toml",
+      "sha256": "0da7e24e2f7cf3301f297a2d0ba98eb4d52589ff24cbad4af5c3f63d7723356c",
+      "bytes": 1542
+    },
+    {
+      "id": "awg-android:gradle/wrapper/gradle-wrapper.properties",
+      "repository": "amnezia-vpn/amneziawg-android",
+      "commit": "ff15093bf3856fea0947923474870b86efb682f0",
+      "path": "gradle/wrapper/gradle-wrapper.properties",
+      "url": "https://raw.githubusercontent.com/amnezia-vpn/amneziawg-android/ff15093bf3856fea0947923474870b86efb682f0/gradle/wrapper/gradle-wrapper.properties",
+      "sha256": "cdab1ffb439219b1db125e3c99a86cf2424f8762b9b3faa404ed061e3635ecde",
+      "bytes": 251
+    },
+    {
+      "id": "awg-android:gradle.properties",
+      "repository": "amnezia-vpn/amneziawg-android",
+      "commit": "ff15093bf3856fea0947923474870b86efb682f0",
+      "path": "gradle.properties",
+      "url": "https://raw.githubusercontent.com/amnezia-vpn/amneziawg-android/ff15093bf3856fea0947923474870b86efb682f0/gradle.properties",
+      "sha256": "f69b8225c476b17bd9bc70da8a68b27398173f4c0bd7b02091a1b60a8ee8d785",
+      "bytes": 4635
+    },
+    {
+      "id": "awg-android:build.gradle.kts",
+      "repository": "amnezia-vpn/amneziawg-android",
+      "commit": "ff15093bf3856fea0947923474870b86efb682f0",
+      "path": "build.gradle.kts",
+      "url": "https://raw.githubusercontent.com/amnezia-vpn/amneziawg-android/ff15093bf3856fea0947923474870b86efb682f0/build.gradle.kts",
+      "sha256": "5dd6d7e0428e26d6df3e3fa1e5ec5b0bae52ec4223810b36f37378074d0faeda",
+      "bytes": 219
+    },
+    {
+      "id": "awg-android:tunnel/build.gradle.kts",
+      "repository": "amnezia-vpn/amneziawg-android",
+      "commit": "ff15093bf3856fea0947923474870b86efb682f0",
+      "path": "tunnel/build.gradle.kts",
+      "url": "https://raw.githubusercontent.com/amnezia-vpn/amneziawg-android/ff15093bf3856fea0947923474870b86efb682f0/tunnel/build.gradle.kts",
+      "sha256": "f053633a9b23024a43db460799ddb698d26fd1592fb40329e53142f9385f29ce",
+      "bytes": 1693
+    },
+    {
+      "id": "awg-android:tunnel/src/main/AndroidManifest.xml",
+      "repository": "amnezia-vpn/amneziawg-android",
+      "commit": "ff15093bf3856fea0947923474870b86efb682f0",
+      "path": "tunnel/src/main/AndroidManifest.xml",
+      "url": "https://raw.githubusercontent.com/amnezia-vpn/amneziawg-android/ff15093bf3856fea0947923474870b86efb682f0/tunnel/src/main/AndroidManifest.xml",
+      "sha256": "397b7812e68d809424c29cea018555436580d1a94c8bf46ec0d864459f1f7fb2",
+      "bytes": 572
+    },
+    {
+      "id": "awg-android:tunnel/src/main/java/org/amnezia/awg/backend/GoBackend.java",
+      "repository": "amnezia-vpn/amneziawg-android",
+      "commit": "ff15093bf3856fea0947923474870b86efb682f0",
+      "path": "tunnel/src/main/java/org/amnezia/awg/backend/GoBackend.java",
+      "url": "https://raw.githubusercontent.com/amnezia-vpn/amneziawg-android/ff15093bf3856fea0947923474870b86efb682f0/tunnel/src/main/java/org/amnezia/awg/backend/GoBackend.java",
+      "sha256": "a321f39660ee78c17a505e279c2fc73dcb5ecea179e4b17c173d56124079d3fd",
+      "bytes": 19954
+    },
+    {
+      "id": "awg-android:tunnel/tools/CMakeLists.txt",
+      "repository": "amnezia-vpn/amneziawg-android",
+      "commit": "ff15093bf3856fea0947923474870b86efb682f0",
+      "path": "tunnel/tools/CMakeLists.txt",
+      "url": "https://raw.githubusercontent.com/amnezia-vpn/amneziawg-android/ff15093bf3856fea0947923474870b86efb682f0/tunnel/tools/CMakeLists.txt",
+      "sha256": "378eea69e266ba0efe61c32467141b3d9a7edca4e6afa6aad20bc65aba4d71f8",
+      "bytes": 2597
+    },
+    {
+      "id": "awg-android:tunnel/tools/libwg-go/Makefile",
+      "repository": "amnezia-vpn/amneziawg-android",
+      "commit": "ff15093bf3856fea0947923474870b86efb682f0",
+      "path": "tunnel/tools/libwg-go/Makefile",
+      "url": "https://raw.githubusercontent.com/amnezia-vpn/amneziawg-android/ff15093bf3856fea0947923474870b86efb682f0/tunnel/tools/libwg-go/Makefile",
+      "sha256": "411cd58cfa642e28b1ab6f25d3cabee1076be4874c6b2c85885c90e7b6f2a6a9",
+      "bytes": 2144
+    },
+    {
+      "id": "awg-android:tunnel/tools/libwg-go/go.mod",
+      "repository": "amnezia-vpn/amneziawg-android",
+      "commit": "ff15093bf3856fea0947923474870b86efb682f0",
+      "path": "tunnel/tools/libwg-go/go.mod",
+      "url": "https://raw.githubusercontent.com/amnezia-vpn/amneziawg-android/ff15093bf3856fea0947923474870b86efb682f0/tunnel/tools/libwg-go/go.mod",
+      "sha256": "cde303cebd847b122373b4d714645b8480d48283570ab9b0bc6540c364724a16",
+      "bytes": 311
+    },
+    {
+      "id": "awg-android:tunnel/tools/libwg-go/go.sum",
+      "repository": "amnezia-vpn/amneziawg-android",
+      "commit": "ff15093bf3856fea0947923474870b86efb682f0",
+      "path": "tunnel/tools/libwg-go/go.sum",
+      "url": "https://raw.githubusercontent.com/amnezia-vpn/amneziawg-android/ff15093bf3856fea0947923474870b86efb682f0/tunnel/tools/libwg-go/go.sum",
+      "sha256": "f8de8667720b798be4a9f2db1dd5eff0cbf09d05409fa80bec8abc6049c79e3d",
+      "bytes": 1579
+    },
+    {
+      "id": "awg-android:tunnel/tools/libwg-go/api-android.go",
+      "repository": "amnezia-vpn/amneziawg-android",
+      "commit": "ff15093bf3856fea0947923474870b86efb682f0",
+      "path": "tunnel/tools/libwg-go/api-android.go",
+      "url": "https://raw.githubusercontent.com/amnezia-vpn/amneziawg-android/ff15093bf3856fea0947923474870b86efb682f0/tunnel/tools/libwg-go/api-android.go",
+      "sha256": "34bd3f4824c267b89f50f3306a6872d5464b058f22ccfe1d40a5cbd87d0ea86b",
+      "bytes": 4699
+    },
+    {
+      "id": "awg-tools:COPYING",
+      "repository": "amnezia-vpn/amneziawg-tools",
+      "commit": "ee0f0a9aa34ff0a0da4b3433b9512781cfe02843",
+      "path": "COPYING",
+      "url": "https://raw.githubusercontent.com/amnezia-vpn/amneziawg-tools/ee0f0a9aa34ff0a0da4b3433b9512781cfe02843/COPYING",
+      "sha256": "8177f97513213526df2cf6184d8ff986c675afb514d4e68a404010521b880643",
+      "bytes": 18092
+    },
+    {
+      "id": "awg-tools:src/wg-quick/android.c",
+      "repository": "amnezia-vpn/amneziawg-tools",
+      "commit": "ee0f0a9aa34ff0a0da4b3433b9512781cfe02843",
+      "path": "src/wg-quick/android.c",
+      "url": "https://raw.githubusercontent.com/amnezia-vpn/amneziawg-tools/ee0f0a9aa34ff0a0da4b3433b9512781cfe02843/src/wg-quick/android.c",
+      "sha256": "fe33da688563cbbf78d0d29bf9a5eb346a255044e70b02269aca81bee78332aa",
+      "bytes": 39997
+    },
+    {
+      "id": "wg-android:COPYING",
+      "repository": "WireGuard/wireguard-android",
+      "commit": "e7b3a3c118836e112620b1302a8ba1873ad4daac",
+      "path": "COPYING",
+      "url": "https://raw.githubusercontent.com/WireGuard/wireguard-android/e7b3a3c118836e112620b1302a8ba1873ad4daac/COPYING",
+      "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+      "bytes": 11358
+    },
+    {
+      "id": "wg-android:.gitmodules",
+      "repository": "WireGuard/wireguard-android",
+      "commit": "e7b3a3c118836e112620b1302a8ba1873ad4daac",
+      "path": ".gitmodules",
+      "url": "https://raw.githubusercontent.com/WireGuard/wireguard-android/e7b3a3c118836e112620b1302a8ba1873ad4daac/.gitmodules",
+      "sha256": "f0e38d23cdd449f06f0fefb65a4467dc62dcc907d3455d8549fc1d2f2d8d8239",
+      "bytes": 249
+    },
+    {
+      "id": "wg-android:gradle.properties",
+      "repository": "WireGuard/wireguard-android",
+      "commit": "e7b3a3c118836e112620b1302a8ba1873ad4daac",
+      "path": "gradle.properties",
+      "url": "https://raw.githubusercontent.com/WireGuard/wireguard-android/e7b3a3c118836e112620b1302a8ba1873ad4daac/gradle.properties",
+      "sha256": "52b175748da2af6ca7c0549f9e750f1a4a6bb82b30c93360c7dcbc4f0b47f4e3",
+      "bytes": 653
+    },
+    {
+      "id": "wg-android:gradle/libs.versions.toml",
+      "repository": "WireGuard/wireguard-android",
+      "commit": "e7b3a3c118836e112620b1302a8ba1873ad4daac",
+      "path": "gradle/libs.versions.toml",
+      "url": "https://raw.githubusercontent.com/WireGuard/wireguard-android/e7b3a3c118836e112620b1302a8ba1873ad4daac/gradle/libs.versions.toml",
+      "sha256": "661503bee6055685628f50e3df0140dbdfa390d9eb987bbf68e10bd422cdb668",
+      "bytes": 1440
+    },
+    {
+      "id": "wg-android:gradle/wrapper/gradle-wrapper.properties",
+      "repository": "WireGuard/wireguard-android",
+      "commit": "e7b3a3c118836e112620b1302a8ba1873ad4daac",
+      "path": "gradle/wrapper/gradle-wrapper.properties",
+      "url": "https://raw.githubusercontent.com/WireGuard/wireguard-android/e7b3a3c118836e112620b1302a8ba1873ad4daac/gradle/wrapper/gradle-wrapper.properties",
+      "sha256": "137a45811ade89eb5d35fc3df0441aa891a69c55ae65780f23303e5acaf597f7",
+      "bytes": 339
+    },
+    {
+      "id": "wg-android:tunnel/build.gradle.kts",
+      "repository": "WireGuard/wireguard-android",
+      "commit": "e7b3a3c118836e112620b1302a8ba1873ad4daac",
+      "path": "tunnel/build.gradle.kts",
+      "url": "https://raw.githubusercontent.com/WireGuard/wireguard-android/e7b3a3c118836e112620b1302a8ba1873ad4daac/tunnel/build.gradle.kts",
+      "sha256": "2e82edddfd2f8e298f43f56aa24a40efecc7b66275b9c65b6c488d08d8945e9d",
+      "bytes": 4403
+    },
+    {
+      "id": "wg-android:tunnel/tools/CMakeLists.txt",
+      "repository": "WireGuard/wireguard-android",
+      "commit": "e7b3a3c118836e112620b1302a8ba1873ad4daac",
+      "path": "tunnel/tools/CMakeLists.txt",
+      "url": "https://raw.githubusercontent.com/WireGuard/wireguard-android/e7b3a3c118836e112620b1302a8ba1873ad4daac/tunnel/tools/CMakeLists.txt",
+      "sha256": "e0600eb9b954348252f8e57c13b3e187ec4f1add8d54c9497d32890842e9f484",
+      "bytes": 2462
+    },
+    {
+      "id": "wg-android:tunnel/tools/libwg-go/go.mod",
+      "repository": "WireGuard/wireguard-android",
+      "commit": "e7b3a3c118836e112620b1302a8ba1873ad4daac",
+      "path": "tunnel/tools/libwg-go/go.mod",
+      "url": "https://raw.githubusercontent.com/WireGuard/wireguard-android/e7b3a3c118836e112620b1302a8ba1873ad4daac/tunnel/tools/libwg-go/go.mod",
+      "sha256": "0967ad9b3b9e28a0457fea1d96cfd8d5028bfa84864d5624bb256ea9c1106971",
+      "bytes": 319
+    },
+    {
+      "id": "wg-android:tunnel/tools/libwg-go/Makefile",
+      "repository": "WireGuard/wireguard-android",
+      "commit": "e7b3a3c118836e112620b1302a8ba1873ad4daac",
+      "path": "tunnel/tools/libwg-go/Makefile",
+      "url": "https://raw.githubusercontent.com/WireGuard/wireguard-android/e7b3a3c118836e112620b1302a8ba1873ad4daac/tunnel/tools/libwg-go/Makefile",
+      "sha256": "4b85a3bc286c00c5a360020d750dde3d0b6c3b21a0824eb50a60cc54b4f1db6d",
+      "bytes": 2135
+    },
+    {
+      "id": "awg-android:settings.gradle.kts",
+      "repository": "amnezia-vpn/amneziawg-android",
+      "commit": "ff15093bf3856fea0947923474870b86efb682f0",
+      "path": "settings.gradle.kts",
+      "url": "https://raw.githubusercontent.com/amnezia-vpn/amneziawg-android/ff15093bf3856fea0947923474870b86efb682f0/settings.gradle.kts",
+      "sha256": "bb04781e5fc35a533302305ef4b18af028ff7df898814bcafaf4e60384124cb0",
+      "bytes": 635
+    },
+    {
+      "id": "awg-android:tunnel/src/main/java/org/amnezia/awg/config/Interface.java",
+      "repository": "amnezia-vpn/amneziawg-android",
+      "commit": "ff15093bf3856fea0947923474870b86efb682f0",
+      "path": "tunnel/src/main/java/org/amnezia/awg/config/Interface.java",
+      "url": "https://raw.githubusercontent.com/amnezia-vpn/amneziawg-android/ff15093bf3856fea0947923474870b86efb682f0/tunnel/src/main/java/org/amnezia/awg/config/Interface.java",
+      "sha256": "16ef784ed734ad71869f556dd84822bd551f4f55ba1c9dea75d0d90fcd05d80b",
+      "bytes": 59902
+    },
+    {
+      "id": "awg-go:go.mod",
+      "repository": "amnezia-vpn/amneziawg-go",
+      "commit": "1b86b2ae0e493e7ea93f8c1a0f0cb6735b1551f1",
+      "path": "go.mod",
+      "url": "https://raw.githubusercontent.com/amnezia-vpn/amneziawg-go/1b86b2ae0e493e7ea93f8c1a0f0cb6735b1551f1/go.mod",
+      "sha256": "9fd0084da2acc4f96225daee85c0f866a0ec1079d5bdc4cf98c50e8a8fa0baf6",
+      "bytes": 1266
+    },
+    {
+      "id": "awg-go:go.sum",
+      "repository": "amnezia-vpn/amneziawg-go",
+      "commit": "1b86b2ae0e493e7ea93f8c1a0f0cb6735b1551f1",
+      "path": "go.sum",
+      "url": "https://raw.githubusercontent.com/amnezia-vpn/amneziawg-go/1b86b2ae0e493e7ea93f8c1a0f0cb6735b1551f1/go.sum",
+      "sha256": "eab202288b6f879fe1f6b0d9da0c528cfb310d74a7a4d409c7268c2b26b98a0a",
+      "bytes": 8690
+    },
+    {
+      "id": "awg-go:LICENSE",
+      "repository": "amnezia-vpn/amneziawg-go",
+      "commit": "1b86b2ae0e493e7ea93f8c1a0f0cb6735b1551f1",
+      "path": "LICENSE",
+      "url": "https://raw.githubusercontent.com/amnezia-vpn/amneziawg-go/1b86b2ae0e493e7ea93f8c1a0f0cb6735b1551f1/LICENSE",
+      "sha256": "9ec168d1f4af53f293be8bd2e882588f0e35af0334292d4ca4e5ede84408420e",
+      "bytes": 1084
+    },
+    {
+      "id": "awg-go:device/uapi.go",
+      "repository": "amnezia-vpn/amneziawg-go",
+      "commit": "1b86b2ae0e493e7ea93f8c1a0f0cb6735b1551f1",
+      "path": "device/uapi.go",
+      "url": "https://raw.githubusercontent.com/amnezia-vpn/amneziawg-go/1b86b2ae0e493e7ea93f8c1a0f0cb6735b1551f1/device/uapi.go",
+      "sha256": "7a88ac0cc50ea932336042d963183760e38a48fd8e055e0c0d00a4324cf1ef32",
+      "bytes": 23395
+    },
+    {
+      "id": "awg-go:Makefile",
+      "repository": "amnezia-vpn/amneziawg-go",
+      "commit": "1b86b2ae0e493e7ea93f8c1a0f0cb6735b1551f1",
+      "path": "Makefile",
+      "url": "https://raw.githubusercontent.com/amnezia-vpn/amneziawg-go/1b86b2ae0e493e7ea93f8c1a0f0cb6735b1551f1/Makefile",
+      "sha256": "a96f520d0cf0fab780d9120a05a532f88af94272020f90cfea481ac43f640573",
+      "bytes": 834
+    },
+    {
+      "id": "wg-android:settings.gradle.kts",
+      "repository": "WireGuard/wireguard-android",
+      "commit": "e7b3a3c118836e112620b1302a8ba1873ad4daac",
+      "path": "settings.gradle.kts",
+      "url": "https://raw.githubusercontent.com/WireGuard/wireguard-android/e7b3a3c118836e112620b1302a8ba1873ad4daac/settings.gradle.kts",
+      "sha256": "5cffd5ec5106d76bcd4cb2b462d8442013366cf7ab8318b4522efccda7ec5550",
+      "bytes": 389
+    },
+    {
+      "id": "wg-android:tunnel/src/main/java/com/wireguard/android/backend/GoBackend.java",
+      "repository": "WireGuard/wireguard-android",
+      "commit": "e7b3a3c118836e112620b1302a8ba1873ad4daac",
+      "path": "tunnel/src/main/java/com/wireguard/android/backend/GoBackend.java",
+      "url": "https://raw.githubusercontent.com/WireGuard/wireguard-android/e7b3a3c118836e112620b1302a8ba1873ad4daac/tunnel/src/main/java/com/wireguard/android/backend/GoBackend.java",
+      "sha256": "7a672d0fe6d5772eabd86f78ceca61e7d71f857518c41c688bf41142ebcab598",
+      "bytes": 16129
+    },
+    {
+      "id": "awg-tools:src/config.c",
+      "repository": "amnezia-vpn/amneziawg-tools",
+      "commit": "ee0f0a9aa34ff0a0da4b3433b9512781cfe02843",
+      "path": "src/config.c",
+      "url": "https://raw.githubusercontent.com/amnezia-vpn/amneziawg-tools/ee0f0a9aa34ff0a0da4b3433b9512781cfe02843/src/config.c",
+      "sha256": "2ae29ea09e94ca9c655643d667c54b2adfb4a2afaabc14dd4bc1501ddcbd47f4",
+      "bytes": 28260
+    },
+    {
+      "id": "awg-tools:src/config.h",
+      "repository": "amnezia-vpn/amneziawg-tools",
+      "commit": "ee0f0a9aa34ff0a0da4b3433b9512781cfe02843",
+      "path": "src/config.h",
+      "url": "https://raw.githubusercontent.com/amnezia-vpn/amneziawg-tools/ee0f0a9aa34ff0a0da4b3433b9512781cfe02843/src/config.h",
+      "sha256": "ef8016361bdcbf7e7ec90147a4574c541233cdc05fe9516f6208ea29d65dbf9d",
+      "bytes": 744
+    },
+    {
+      "id": "awg-tools:src/containers.h",
+      "repository": "amnezia-vpn/amneziawg-tools",
+      "commit": "ee0f0a9aa34ff0a0da4b3433b9512781cfe02843",
+      "path": "src/containers.h",
+      "url": "https://raw.githubusercontent.com/amnezia-vpn/amneziawg-tools/ee0f0a9aa34ff0a0da4b3433b9512781cfe02843/src/containers.h",
+      "sha256": "d53764a881ac2fc00ba7d03a13dde33767a978e291c5cda4a7368e80ed09bc07",
+      "bytes": 4108
+    },
+    {
+      "id": "awg-tools:src/ctype.h",
+      "repository": "amnezia-vpn/amneziawg-tools",
+      "commit": "ee0f0a9aa34ff0a0da4b3433b9512781cfe02843",
+      "path": "src/ctype.h",
+      "url": "https://raw.githubusercontent.com/amnezia-vpn/amneziawg-tools/ee0f0a9aa34ff0a0da4b3433b9512781cfe02843/src/ctype.h",
+      "sha256": "c81c97476c09727aa544b9e5b2e073a68a5a1d8a413d9e59cb92566bcbb9a2bf",
+      "bytes": 676
+    },
+    {
+      "id": "awg-tools:src/curve25519-fiat32.h",
+      "repository": "amnezia-vpn/amneziawg-tools",
+      "commit": "ee0f0a9aa34ff0a0da4b3433b9512781cfe02843",
+      "path": "src/curve25519-fiat32.h",
+      "url": "https://raw.githubusercontent.com/amnezia-vpn/amneziawg-tools/ee0f0a9aa34ff0a0da4b3433b9512781cfe02843/src/curve25519-fiat32.h",
+      "sha256": "a518948909aa7e99adad458783a1343a959c3f4010817291bebdf3880fb97438",
+      "bytes": 30164
+    },
+    {
+      "id": "awg-tools:src/curve25519-hacl64.h",
+      "repository": "amnezia-vpn/amneziawg-tools",
+      "commit": "ee0f0a9aa34ff0a0da4b3433b9512781cfe02843",
+      "path": "src/curve25519-hacl64.h",
+      "url": "https://raw.githubusercontent.com/amnezia-vpn/amneziawg-tools/ee0f0a9aa34ff0a0da4b3433b9512781cfe02843/src/curve25519-hacl64.h",
+      "sha256": "18e8106dcfdee7e2d89f7d1df10b5a5d88433f27854d800b3b7b1317efe20c7e",
+      "bytes": 17772
+    },
+    {
+      "id": "awg-tools:src/curve25519.c",
+      "repository": "amnezia-vpn/amneziawg-tools",
+      "commit": "ee0f0a9aa34ff0a0da4b3433b9512781cfe02843",
+      "path": "src/curve25519.c",
+      "url": "https://raw.githubusercontent.com/amnezia-vpn/amneziawg-tools/ee0f0a9aa34ff0a0da4b3433b9512781cfe02843/src/curve25519.c",
+      "sha256": "5e8dfcc8bb2cd917409873cdfe392e04d753f3e4d061b0f1e5fa85a837fcf751",
+      "bytes": 2504
+    },
+    {
+      "id": "awg-tools:src/curve25519.h",
+      "repository": "amnezia-vpn/amneziawg-tools",
+      "commit": "ee0f0a9aa34ff0a0da4b3433b9512781cfe02843",
+      "path": "src/curve25519.h",
+      "url": "https://raw.githubusercontent.com/amnezia-vpn/amneziawg-tools/ee0f0a9aa34ff0a0da4b3433b9512781cfe02843/src/curve25519.h",
+      "sha256": "cea50378c69a3f660fd711acf6b57e9be98b9b6c88b0873909d5f3d5d32aff40",
+      "bytes": 730
+    },
+    {
+      "id": "awg-tools:src/encoding.c",
+      "repository": "amnezia-vpn/amneziawg-tools",
+      "commit": "ee0f0a9aa34ff0a0da4b3433b9512781cfe02843",
+      "path": "src/encoding.c",
+      "url": "https://raw.githubusercontent.com/amnezia-vpn/amneziawg-tools/ee0f0a9aa34ff0a0da4b3433b9512781cfe02843/src/encoding.c",
+      "sha256": "b0589971fe800a844dfa19210e21ca4175e740cee8505a06be1f2b3e225f6299",
+      "bytes": 3767
+    },
+    {
+      "id": "awg-tools:src/encoding.h",
+      "repository": "amnezia-vpn/amneziawg-tools",
+      "commit": "ee0f0a9aa34ff0a0da4b3433b9512781cfe02843",
+      "path": "src/encoding.h",
+      "url": "https://raw.githubusercontent.com/amnezia-vpn/amneziawg-tools/ee0f0a9aa34ff0a0da4b3433b9512781cfe02843/src/encoding.h",
+      "sha256": "b638b820fb8c8261a658afbac14583f9df8489b6ce545995f5c7284cb642857d",
+      "bytes": 744
+    },
+    {
+      "id": "awg-tools:src/genkey.c",
+      "repository": "amnezia-vpn/amneziawg-tools",
+      "commit": "ee0f0a9aa34ff0a0da4b3433b9512781cfe02843",
+      "path": "src/genkey.c",
+      "url": "https://raw.githubusercontent.com/amnezia-vpn/amneziawg-tools/ee0f0a9aa34ff0a0da4b3433b9512781cfe02843/src/genkey.c",
+      "sha256": "01f7a7955d70e4050a536edd655f8944178e24b5e12408e4466f7e4b8176e8a0",
+      "bytes": 2320
+    },
+    {
+      "id": "awg-tools:src/ipc-freebsd.h",
+      "repository": "amnezia-vpn/amneziawg-tools",
+      "commit": "ee0f0a9aa34ff0a0da4b3433b9512781cfe02843",
+      "path": "src/ipc-freebsd.h",
+      "url": "https://raw.githubusercontent.com/amnezia-vpn/amneziawg-tools/ee0f0a9aa34ff0a0da4b3433b9512781cfe02843/src/ipc-freebsd.h",
+      "sha256": "7ee38c20f9c2ad9d427a225b6daf3f2d832747d998d37b8c225ae43c1fc796d0",
+      "bytes": 16690
+    },
+    {
+      "id": "awg-tools:src/ipc-linux.h",
+      "repository": "amnezia-vpn/amneziawg-tools",
+      "commit": "ee0f0a9aa34ff0a0da4b3433b9512781cfe02843",
+      "path": "src/ipc-linux.h",
+      "url": "https://raw.githubusercontent.com/amnezia-vpn/amneziawg-tools/ee0f0a9aa34ff0a0da4b3433b9512781cfe02843/src/ipc-linux.h",
+      "sha256": "7a2462eecf59a342fee24c612e7d1ff9edf12e86075ada4981a6c08fd4309528",
+      "bytes": 26394
+    },
+    {
+      "id": "awg-tools:src/ipc-openbsd.h",
+      "repository": "amnezia-vpn/amneziawg-tools",
+      "commit": "ee0f0a9aa34ff0a0da4b3433b9512781cfe02843",
+      "path": "src/ipc-openbsd.h",
+      "url": "https://raw.githubusercontent.com/amnezia-vpn/amneziawg-tools/ee0f0a9aa34ff0a0da4b3433b9512781cfe02843/src/ipc-openbsd.h",
+      "sha256": "e1d1c40f99184d4932558f9f89afb8a2bf58110e321d0612e3bffb055479d9ba",
+      "bytes": 14264
+    },
+    {
+      "id": "awg-tools:src/ipc-uapi-unix.h",
+      "repository": "amnezia-vpn/amneziawg-tools",
+      "commit": "ee0f0a9aa34ff0a0da4b3433b9512781cfe02843",
+      "path": "src/ipc-uapi-unix.h",
+      "url": "https://raw.githubusercontent.com/amnezia-vpn/amneziawg-tools/ee0f0a9aa34ff0a0da4b3433b9512781cfe02843/src/ipc-uapi-unix.h",
+      "sha256": "311dbbfb5831cb8a515a0a0dc9aeb21ab2fe2dc12ccecd533cc8c1fff02b5f3a",
+      "bytes": 2663
+    },
+    {
+      "id": "awg-tools:src/ipc-uapi-windows.h",
+      "repository": "amnezia-vpn/amneziawg-tools",
+      "commit": "ee0f0a9aa34ff0a0da4b3433b9512781cfe02843",
+      "path": "src/ipc-uapi-windows.h",
+      "url": "https://raw.githubusercontent.com/amnezia-vpn/amneziawg-tools/ee0f0a9aa34ff0a0da4b3433b9512781cfe02843/src/ipc-uapi-windows.h",
+      "sha256": "6617576953cc9265c6f90d7224ff95a76a6de74ab23c3c3f55794663e326c112",
+      "bytes": 2822
+    },
+    {
+      "id": "awg-tools:src/ipc-uapi.h",
+      "repository": "amnezia-vpn/amneziawg-tools",
+      "commit": "ee0f0a9aa34ff0a0da4b3433b9512781cfe02843",
+      "path": "src/ipc-uapi.h",
+      "url": "https://raw.githubusercontent.com/amnezia-vpn/amneziawg-tools/ee0f0a9aa34ff0a0da4b3433b9512781cfe02843/src/ipc-uapi.h",
+      "sha256": "14fd380b87e794b5e572091f2b1677d5e19b04b924327f59a34bf24ef5d77fcc",
+      "bytes": 14756
+    },
+    {
+      "id": "awg-tools:src/ipc-windows.h",
+      "repository": "amnezia-vpn/amneziawg-tools",
+      "commit": "ee0f0a9aa34ff0a0da4b3433b9512781cfe02843",
+      "path": "src/ipc-windows.h",
+      "url": "https://raw.githubusercontent.com/amnezia-vpn/amneziawg-tools/ee0f0a9aa34ff0a0da4b3433b9512781cfe02843/src/ipc-windows.h",
+      "sha256": "23b1c8ade85938cf67df38e0b63cc79654ebe3ce009d3faffb1acafc8134f265",
+      "bytes": 13275
+    },
+    {
+      "id": "awg-tools:src/ipc.c",
+      "repository": "amnezia-vpn/amneziawg-tools",
+      "commit": "ee0f0a9aa34ff0a0da4b3433b9512781cfe02843",
+      "path": "src/ipc.c",
+      "url": "https://raw.githubusercontent.com/amnezia-vpn/amneziawg-tools/ee0f0a9aa34ff0a0da4b3433b9512781cfe02843/src/ipc.c",
+      "sha256": "9b2721dbde815cb3ecfc9aa2d6c88bd6a87b27b0a5a50eb2e52e30afd908c84f",
+      "bytes": 2051
+    },
+    {
+      "id": "awg-tools:src/ipc.h",
+      "repository": "amnezia-vpn/amneziawg-tools",
+      "commit": "ee0f0a9aa34ff0a0da4b3433b9512781cfe02843",
+      "path": "src/ipc.h",
+      "url": "https://raw.githubusercontent.com/amnezia-vpn/amneziawg-tools/ee0f0a9aa34ff0a0da4b3433b9512781cfe02843/src/ipc.h",
+      "sha256": "e7136b86367bba067083931b25bf9fa0d8c3ed8bbb446d991548bc460fbaadd7",
+      "bytes": 355
+    },
+    {
+      "id": "awg-tools:src/netlink.h",
+      "repository": "amnezia-vpn/amneziawg-tools",
+      "commit": "ee0f0a9aa34ff0a0da4b3433b9512781cfe02843",
+      "path": "src/netlink.h",
+      "url": "https://raw.githubusercontent.com/amnezia-vpn/amneziawg-tools/ee0f0a9aa34ff0a0da4b3433b9512781cfe02843/src/netlink.h",
+      "sha256": "d0e6756c82a72ee2ef11f5c862b477e92b52335d26fef44c82a9b198fcda1afa",
+      "bytes": 19167
+    },
+    {
+      "id": "awg-tools:src/pubkey.c",
+      "repository": "amnezia-vpn/amneziawg-tools",
+      "commit": "ee0f0a9aa34ff0a0da4b3433b9512781cfe02843",
+      "path": "src/pubkey.c",
+      "url": "https://raw.githubusercontent.com/amnezia-vpn/amneziawg-tools/ee0f0a9aa34ff0a0da4b3433b9512781cfe02843/src/pubkey.c",
+      "sha256": "e930bf12f94d2cf76473c34989a86010ec6b75f4e090b95d961a3a002d70739b",
+      "bytes": 1223
+    },
+    {
+      "id": "awg-tools:src/set.c",
+      "repository": "amnezia-vpn/amneziawg-tools",
+      "commit": "ee0f0a9aa34ff0a0da4b3433b9512781cfe02843",
+      "path": "src/set.c",
+      "url": "https://raw.githubusercontent.com/amnezia-vpn/amneziawg-tools/ee0f0a9aa34ff0a0da4b3433b9512781cfe02843/src/set.c",
+      "sha256": "6b81ec48845f55e02f382b409958b836c115ad4f3c9f78d1ed02d52aed3dda69",
+      "bytes": 1692
+    },
+    {
+      "id": "awg-tools:src/setconf.c",
+      "repository": "amnezia-vpn/amneziawg-tools",
+      "commit": "ee0f0a9aa34ff0a0da4b3433b9512781cfe02843",
+      "path": "src/setconf.c",
+      "url": "https://raw.githubusercontent.com/amnezia-vpn/amneziawg-tools/ee0f0a9aa34ff0a0da4b3433b9512781cfe02843/src/setconf.c",
+      "sha256": "8d27f5de0d5cec0b975dca16a15414cb95e3786bb68831804bde533aa22a96fa",
+      "bytes": 3453
+    },
+    {
+      "id": "awg-tools:src/show.c",
+      "repository": "amnezia-vpn/amneziawg-tools",
+      "commit": "ee0f0a9aa34ff0a0da4b3433b9512781cfe02843",
+      "path": "src/show.c",
+      "url": "https://raw.githubusercontent.com/amnezia-vpn/amneziawg-tools/ee0f0a9aa34ff0a0da4b3433b9512781cfe02843/src/show.c",
+      "sha256": "ac16838f754dd67d09963bfbf6cc2a4284eb07197d4c1fdfd7897185ff625b06",
+      "bytes": 24242
+    },
+    {
+      "id": "awg-tools:src/showconf.c",
+      "repository": "amnezia-vpn/amneziawg-tools",
+      "commit": "ee0f0a9aa34ff0a0da4b3433b9512781cfe02843",
+      "path": "src/showconf.c",
+      "url": "https://raw.githubusercontent.com/amnezia-vpn/amneziawg-tools/ee0f0a9aa34ff0a0da4b3433b9512781cfe02843/src/showconf.c",
+      "sha256": "3dfa3ab971fc76e5339f28f806f694b223af6710d8358a035e4d7a90b28b083c",
+      "bytes": 5720
+    },
+    {
+      "id": "awg-tools:src/subcommands.h",
+      "repository": "amnezia-vpn/amneziawg-tools",
+      "commit": "ee0f0a9aa34ff0a0da4b3433b9512781cfe02843",
+      "path": "src/subcommands.h",
+      "url": "https://raw.githubusercontent.com/amnezia-vpn/amneziawg-tools/ee0f0a9aa34ff0a0da4b3433b9512781cfe02843/src/subcommands.h",
+      "sha256": "8bdcc3bf1c3140857f3fd4d0ae970410cb96e55879291dec524dbad1bb4aecfe",
+      "bytes": 503
+    },
+    {
+      "id": "awg-tools:src/terminal.c",
+      "repository": "amnezia-vpn/amneziawg-tools",
+      "commit": "ee0f0a9aa34ff0a0da4b3433b9512781cfe02843",
+      "path": "src/terminal.c",
+      "url": "https://raw.githubusercontent.com/amnezia-vpn/amneziawg-tools/ee0f0a9aa34ff0a0da4b3433b9512781cfe02843/src/terminal.c",
+      "sha256": "81297b63486fc74441c54b39086e6812435111fe7fcb578679ae2030b189fef8",
+      "bytes": 1373
+    },
+    {
+      "id": "awg-tools:src/terminal.h",
+      "repository": "amnezia-vpn/amneziawg-tools",
+      "commit": "ee0f0a9aa34ff0a0da4b3433b9512781cfe02843",
+      "path": "src/terminal.h",
+      "url": "https://raw.githubusercontent.com/amnezia-vpn/amneziawg-tools/ee0f0a9aa34ff0a0da4b3433b9512781cfe02843/src/terminal.h",
+      "sha256": "e23795fa26e68fd243da2e784bc6b4894d810ec59c6b70cd35c4070da253c3ae",
+      "bytes": 1617
+    },
+    {
+      "id": "awg-tools:src/type.c",
+      "repository": "amnezia-vpn/amneziawg-tools",
+      "commit": "ee0f0a9aa34ff0a0da4b3433b9512781cfe02843",
+      "path": "src/type.c",
+      "url": "https://raw.githubusercontent.com/amnezia-vpn/amneziawg-tools/ee0f0a9aa34ff0a0da4b3433b9512781cfe02843/src/type.c",
+      "sha256": "11dfcef9e8c83e11621385abe9efc1bf08858ebb0b2119d3ff7c107f81b9d27d",
+      "bytes": 1617
+    },
+    {
+      "id": "awg-tools:src/type.h",
+      "repository": "amnezia-vpn/amneziawg-tools",
+      "commit": "ee0f0a9aa34ff0a0da4b3433b9512781cfe02843",
+      "path": "src/type.h",
+      "url": "https://raw.githubusercontent.com/amnezia-vpn/amneziawg-tools/ee0f0a9aa34ff0a0da4b3433b9512781cfe02843/src/type.h",
+      "sha256": "6c13294c4fecbb50e10e7350c9c58ffac1b415fae9c4657ac0813c36af42a688",
+      "bytes": 1539
+    },
+    {
+      "id": "awg-tools:src/version.h",
+      "repository": "amnezia-vpn/amneziawg-tools",
+      "commit": "ee0f0a9aa34ff0a0da4b3433b9512781cfe02843",
+      "path": "src/version.h",
+      "url": "https://raw.githubusercontent.com/amnezia-vpn/amneziawg-tools/ee0f0a9aa34ff0a0da4b3433b9512781cfe02843/src/version.h",
+      "sha256": "a2632ea06d9c5f59fbc8512d3e3ed962becba90a69bf522edc1d8e54719bb3b0",
+      "bytes": 86
+    },
+    {
+      "id": "awg-tools:src/wg.c",
+      "repository": "amnezia-vpn/amneziawg-tools",
+      "commit": "ee0f0a9aa34ff0a0da4b3433b9512781cfe02843",
+      "path": "src/wg.c",
+      "url": "https://raw.githubusercontent.com/amnezia-vpn/amneziawg-tools/ee0f0a9aa34ff0a0da4b3433b9512781cfe02843/src/wg.c",
+      "sha256": "5624f068c750e37eb244b1839be84c8c7c2d6f3d3140aceb3de1d9749e066ed0",
+      "bytes": 2424
+    },
+    {
+      "id": "elf-cleaner:COPYING",
+      "repository": "termux/termux-elf-cleaner",
+      "commit": "7efc05090675ec6161b7def862728086a26c3b1f",
+      "path": "COPYING",
+      "url": "https://raw.githubusercontent.com/termux/termux-elf-cleaner/7efc05090675ec6161b7def862728086a26c3b1f/COPYING",
+      "sha256": "589ed823e9a84c56feb95ac58e7cf384626b9cbf4fda2a907bc36e103de1bad2",
+      "bytes": 35141
+    },
+    {
+      "id": "xray:LICENSE",
+      "repository": "XTLS/Xray-core",
+      "commit": "92ccc939aaf4f8965f369cf0b142e005aeaa11d5",
+      "path": "LICENSE",
+      "url": "https://raw.githubusercontent.com/XTLS/Xray-core/92ccc939aaf4f8965f369cf0b142e005aeaa11d5/LICENSE",
+      "sha256": "1f256ecad192880510e84ad60474eab7589218784b9a50bc7ceee34c2b91f1d5",
+      "bytes": 16725
+    },
+    {
+      "id": "wg-go:LICENSE",
+      "repository": "WireGuard/wireguard-go",
+      "commit": "f333402bd9cbe0f3eeb02507bd14e23d7d639280",
+      "path": "LICENSE",
+      "url": "https://raw.githubusercontent.com/WireGuard/wireguard-go/f333402bd9cbe0f3eeb02507bd14e23d7d639280/LICENSE",
+      "sha256": "91276db973f25602d1aa43491f59cbc84cb88e6f151e1d0cc82a755563ce0195",
+      "bytes": 1023
+    }
+  ],
+  "module_archive": {
+    "module": "github.com/amnezia-vpn/amneziawg-go/v3",
+    "version": "v3.1.20260814",
+    "commit": "1b86b2ae0e493e7ea93f8c1a0f0cb6735b1551f1",
+    "url": "https://proxy.golang.org/github.com/amnezia-vpn/amneziawg-go/v3/@v/v3.1.20260814.zip",
+    "sha256": "a28fb9e0d1a560afd0cf396cc15370825799d66a1cf4079d644bcdf66a06bcfa",
+    "bytes": 197264,
+    "go_sum_h1": "github.com/amnezia-vpn/amneziawg-go/v3 v3.1.20260814 h1:l2AhBD+sFycU8Im81n/bZORMxW7fWtlZJEuJ4Hh0+z0="
+  },
+  "reference_wireguard_module": {
+    "Version": "v0.0.0-20250521234502-f333402bd9cb",
+    "Time": "2025-05-21T23:45:02Z",
+    "Origin": {
+      "VCS": "git",
+      "URL": "https://git.zx2c4.com/wireguard-go",
+      "Hash": "f333402bd9cbe0f3eeb02507bd14e23d7d639280"
+    }
+  },
+  "authlib_candidate": {
+    "name": "Authlib",
+    "version": "1.9.1",
+    "spdx": null,
+    "metadata_url": "https://pypi.org/pypi/Authlib/1.9.1/json",
+    "sdist": {
+      "url": "https://files.pythonhosted.org/packages/c9/dc/087c08741a98d234c9b98beef8a28d3c309f814d14b6156422c5815bf6d6/authlib-1.9.1.tar.gz",
+      "sha256": "5c7d9848f47cac340f060f76ae0bc09b59f5c8e89cc1bb032d4370a0c55b5974"
+    },
+    "installed": false
+  },
+  "purpose": "I-002 source evidence only; no native build, SBOM or compatibility certification",
+  "gitlinks": [
+    {
+      "parent_commit": "ff15093bf3856fea0947923474870b86efb682f0",
+      "path": "tunnel/tools/amneziawg-tools",
+      "repository": "amnezia-vpn/amneziawg-tools",
+      "commit": "ee0f0a9aa34ff0a0da4b3433b9512781cfe02843"
+    },
+    {
+      "parent_commit": "ff15093bf3856fea0947923474870b86efb682f0",
+      "path": "tunnel/tools/elf-cleaner",
+      "repository": "termux/termux-elf-cleaner",
+      "commit": "7efc05090675ec6161b7def862728086a26c3b1f"
+    }
+  ]
+}

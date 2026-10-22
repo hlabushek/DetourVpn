@@ -1,0 +1,9 @@
+{
+  "adb_reverse_cleanup_confirmed": true,
+  "phone_http_probe_timed_out": true,
+  "measured_at": "2026-10-21T19:10:46.4172708+00:00",
+  "own_loopback_tcp": true,
+  "adb_device_available": true,
+  "windows_accepted_phone_tcp": false,
+  "scope": "current restricted execution session"
+}

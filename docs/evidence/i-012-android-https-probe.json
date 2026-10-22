@@ -1,0 +1,9 @@
+{
+  "recorded_at": "2026-10-20T19:23:24.6468338Z",
+  "scope": "Physical Android HTTPS probes over normal network ONLY; no VPN or staging acceptance",
+  "fresh_egress_probes": true,
+  "probe_count": 2,
+  "http_status": 200,
+  "test_apk_sha256": "c7e413b27b5c4e4bea5f2fcc14003160390ae863d5a2a6b943908080d9ad8df9",
+  "stage": "complete"
+}

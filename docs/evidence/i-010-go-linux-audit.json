@@ -1,0 +1,103 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-19",
+  "artifact_sha256": "84a3913e432b12850ae19873953b0d25b4aa2f13480453af04422d5910d86ffe",
+  "scanner": {
+    "protocol_version": "v1.0.0",
+    "scanner_name": "govulncheck",
+    "scanner_version": "v1.9.0",
+    "db": "https://vuln.go.dev",
+    "db_last_modified": "2026-10-08T22:31:09Z",
+    "scan_level": "symbol",
+    "scan_mode": "binary"
+  },
+  "scanner_license": "BSD-3-Clause; standalone local admin tool, not bundled",
+  "scanner_sha256": "eff17af133509fc8fc1b2357b5877f22e932449049693bbd4bd066a2e2560465",
+  "scanner_toolchain": "go1.26.9",
+  "scanner_toolchain_archive_sha256": "42d158b4d8f7b61ac0a830567c940a86098fb7aac52e467a5ebec03ef5cc2f8d",
+  "binary_toolchain": "go1.25.14",
+  "finding_trace_levels": {
+    "module": 52
+  },
+  "unique_module_advisory_ids": [
+    "GO-2025-4116",
+    "GO-2025-4134",
+    "GO-2025-4135",
+    "GO-2026-4440",
+    "GO-2026-4441",
+    "GO-2026-4918",
+    "GO-2026-5005",
+    "GO-2026-5006",
+    "GO-2026-5013",
+    "GO-2026-5014",
+    "GO-2026-5015",
+    "GO-2026-5016",
+    "GO-2026-5017",
+    "GO-2026-5018",
+    "GO-2026-5019",
+    "GO-2026-5020",
+    "GO-2026-5021",
+    "GO-2026-5023",
+    "GO-2026-5025",
+    "GO-2026-5026",
+    "GO-2026-5027",
+    "GO-2026-5028",
+    "GO-2026-5029",
+    "GO-2026-5030",
+    "GO-2026-5033",
+    "GO-2026-5932",
+    "GO-2026-5942",
+    "GO-2026-6303",
+    "GO-2026-6354",
+    "GO-2026-6355",
+    "GO-2026-6599",
+    "GO-2026-6600",
+    "GO-2026-6603",
+    "GO-2026-6605",
+    "GO-2026-6607",
+    "GO-2026-6608",
+    "GO-2026-6609",
+    "GO-2026-6610",
+    "GO-2026-6611",
+    "GO-2026-6612",
+    "GO-2026-6613",
+    "GO-2026-6617"
+  ],
+  "binary_sbom": {
+    "go_version": "go1.25.14",
+    "modules": [
+      {
+        "path": "github.com/amnezia-vpn/amneziawg-go/v3",
+        "version": "v3.1.20260814"
+      },
+      {
+        "path": "golang.org/x/crypto",
+        "version": "v0.42.0"
+      },
+      {
+        "path": "golang.org/x/net",
+        "version": "v0.44.0"
+      },
+      {
+        "path": "golang.org/x/sys",
+        "version": "v0.36.0"
+      },
+      {
+        "path": "stdlib",
+        "version": "go1.25.14"
+      }
+    ],
+    "roots": [
+      "github.com/amnezia-vpn/amneziawg-go/v3"
+    ]
+  },
+  "exit_code": 0,
+  "isolated_staging_candidate": true,
+  "release_security_clearance": false,
+  "android_verified": false,
+  "limitations": [
+    "Binary-mode symbol/package scan, not formal security audit or exact call-path proof",
+    "Go vulnerability database snapshot timestamp retained in scanner metadata",
+    "Native C/musl tool and Android package are outside this Go binary scan"
+  ]
+}

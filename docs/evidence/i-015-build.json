@@ -1,0 +1,18 @@
+{
+  "measured_at": "2026-10-21T19:30:37.432531+00:00",
+  "command": "scripts/build_flutter_client.ps1",
+  "flutter_tests_passed": 38,
+  "android_unit_tests_passed": 10,
+  "android_unit_failures_errors_skips": 0,
+  "android_lint": "No issues found.",
+  "debug_and_release_build_success": true,
+  "ordinary_debug_apk_reinstalled_and_stopped": true,
+  "release_registrant_excludes_integration_test": true,
+  "source_dart_files_matched": 15,
+  "gradle_config_and_pub_lock_matched": true,
+  "flutter_revision": "abaf9c523780a608bd46686fd5e53740a07077f8",
+  "debug_apk_sha256": "282d11df8263630c7db8a23b293aed0e22afb60b9b727f8937cad89de0f1ffca",
+  "release_apk_sha256": "f8644d15aec0f0937a997a439ac5fe3180d177a889e545c1076ce1986f16efe7",
+  "physical_rewards_acceptance": false,
+  "external_infrastructure_changed": false
+}

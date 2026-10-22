@@ -1,0 +1,42 @@
+{
+  "cleanup_receipt": {
+    "events": [
+      {
+        "egress_verified": false,
+        "endpoint_ready": true
+      },
+      {
+        "cleanup_complete": true,
+        "restored": {
+          "containers": true,
+          "filter_nat": true,
+          "ipv6_filter": true,
+          "links": true,
+          "namespaces": true,
+          "routes4": true,
+          "routes6": true
+        }
+      }
+    ],
+    "invocation_id": "7ea73e14eaae4d41a19ab6f684eb0751"
+  },
+  "control_grant_removed": true,
+  "facts": {
+    "background_foreground_preserves_lease": true,
+    "disconnect_restores_network": true,
+    "flutter_auth_ui": true,
+    "flutter_handshake_and_staging_egress": true,
+    "lease_expiry_stops_flutter_vpn": true,
+    "remote_revoke_stops_flutter_vpn": true
+  },
+  "flutter_test_exit_success": true,
+  "live_staging": true,
+  "measured_at": "2026-10-21T13:35:28.102642+00:00",
+  "passed": true,
+  "phone_stopped_and_reverse_removed": true,
+  "real_api": true,
+  "real_postgresql": true,
+  "remote_revoked_and_settled": true,
+  "staging_cleanup_complete": true,
+  "telegram_delivery": "TEST FAKE ONLY"
+}

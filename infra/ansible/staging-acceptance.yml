@@ -1,0 +1,118 @@
+---
+# I-010 only: install twice, then exercise the real binaries on the approved VPS.
+# No public listener, NAT, default route, existing container or firewall changes.
+- name: Validate the single approved staging inventory on the controller
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  any_errors_fatal: true
+  tasks:
+    - name: Reject missing, empty or multiple staging targets before SSH
+      ansible.builtin.assert:
+        that:
+          - groups['vpn_staging'] | default([]) | length == 1
+          - vpn_staging_approved | default(false) | bool
+          - vpn_environment | default('') == 'staging'
+          - vpn_approved_host_address | default('') == '45.10.166.106'
+          - not ansible_check_mode
+        fail_msg: "Acceptance requires the approved staging target and a real run."
+
+    - name: Reject changed address, identity or transport before SSH
+      ansible.builtin.assert:
+        that:
+          - groups['vpn_staging'][0] == vpn_approved_inventory_name | default('')
+          - hostvars[groups['vpn_staging'][0]].ansible_host | default('') == vpn_approved_host_address
+          - hostvars[groups['vpn_staging'][0]].ansible_user | default('') not in ['', 'root']
+          - hostvars[groups['vpn_staging'][0]].ansible_connection | default('ssh') == 'ssh'
+        fail_msg: "Only the named staging SSH identity/address is authorized."
+
+    - name: Record the start time for this acceptance attempt
+      ansible.builtin.set_fact:
+        vpn_acceptance_started_at: '{{ now(utc=true, fmt="%Y-%m-%dT%H:%M:%SZ") }}'
+
+- import_playbook: staging-node.yml
+- import_playbook: staging-node.yml
+
+- name: Run bounded AWG acceptance on the real staging node
+  hosts: vpn_staging
+  gather_facts: false
+  become: true
+  any_errors_fatal: true
+  tasks:
+    - name: Create the root-owned acceptance code directory
+      ansible.builtin.file:
+        path: /opt/project-vpn/acceptance
+        state: directory
+        owner: root
+        group: root
+        mode: '0755'
+
+    - name: Install the reviewed namespace acceptance runner
+      ansible.builtin.copy:
+        src: ../../scripts/awg_local_smoke.py
+        dest: /opt/project-vpn/acceptance/awg_namespace_smoke.py
+        owner: root
+        group: root
+        mode: '0755'
+
+    - name: Initialize checked acceptance evidence
+      ansible.builtin.set_fact:
+        vpn_acceptance_reports: []
+
+    - name: Exercise two positive runs and two real failure cleanup paths
+      ansible.builtin.include_tasks: tasks/staging-acceptance-run.yml
+      loop:
+        - {name: first, flags: [], expected_rc: 0, expected_pass: true}
+        - {name: repeat, flags: [], expected_rc: 0, expected_pass: true}
+        - name: fail-setup
+          flags: [--inject-failure-after-setup]
+          expected_rc: 1
+          expected_pass: false
+          expected_stage: isolated_network_setup
+        - name: fail-key-file
+          flags: [--inject-failure-with-key-file]
+          expected_rc: 1
+          expected_pass: false
+          expected_stage: ephemeral_keys_and_config
+      loop_control:
+        loop_var: acceptance_case
+        label: '{{ acceptance_case.name }}'
+
+    - name: Require the transient acceptance services to be gone
+      ansible.builtin.command:
+        argv:
+          - /usr/bin/systemctl
+          - list-units
+          - --all
+          - --no-legend
+          - --plain
+          - project-vpn-i010-acceptance-*.service
+      register: vpn_remaining_units
+      changed_when: false
+      until: vpn_remaining_units.stdout | trim == ''
+      retries: 5
+      delay: 1
+
+    - name: Save only the non-secret acceptance evidence on the controller
+      ansible.builtin.copy:
+        dest: '{{ playbook_dir }}/../../docs/evidence/i-010-staging-acceptance.json'
+        mode: '0644'
+        content: >-
+          {{ {
+            'schema_version': 1,
+            'source': 'live_staging_ansible_acceptance',
+            'started_at_utc': hostvars['localhost'].vpn_acceptance_started_at,
+            'completed_at_utc': now(utc=true, fmt='%Y-%m-%dT%H:%M:%SZ'),
+            'host': inventory_hostname,
+            'external_ingress_tested': false,
+            'android_verified': false,
+            'egress_verified': false,
+            'transient_units_removed': true,
+            'runs': vpn_acceptance_reports
+          } | to_nice_json }}
+      delegate_to: localhost
+      become: false
+
+    - name: Display the bounded staging acceptance result
+      ansible.builtin.debug:
+        msg: "I-010 acceptance passed: two real AWG exchanges, peer removal, two failure cleanups; existing network preserved. Android/egress/production not verified."

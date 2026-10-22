@@ -1,0 +1,47 @@
+---
+- name: Run one bounded acceptance service
+  ansible.builtin.command:
+    argv: >-
+      {{ [
+        '/usr/bin/systemd-run', '--quiet', '--wait', '--pipe', '--collect',
+        '--unit=project-vpn-i010-acceptance-' ~ acceptance_case.name,
+        '--property=Type=exec', '--property=RuntimeMaxSec=75s',
+        '--property=TimeoutStopSec=20s', '--property=KillMode=mixed',
+        '--property=CapabilityBoundingSet=CAP_SYS_ADMIN CAP_NET_ADMIN CAP_NET_RAW',
+        '--property=NoNewPrivileges=yes', '--property=PrivateTmp=yes',
+        '--property=ProtectHome=yes', '--property=ProtectSystem=strict',
+        '--property=ReadWritePaths=/run',
+        '--property=NoExecPaths=/run',
+        '/usr/bin/python3', '/opt/project-vpn/acceptance/awg_namespace_smoke.py',
+        '--artifacts-dir', '/opt/project-vpn/current',
+        '--approved-staging-address', vpn_approved_host_address
+      ] + acceptance_case.flags }}
+  register: vpn_acceptance
+  changed_when: false
+  failed_when: vpn_acceptance.rc != acceptance_case.expected_rc
+
+- name: Require real packet results and restoration of pre-existing state
+  ansible.builtin.assert:
+    that:
+      - result.scope == 'approved_staging_isolated_sandbox'
+      - result.passed == acceptance_case.expected_pass
+      - result.cleanup_complete
+      - result.host_ipv4_routes_unchanged
+      - result.host_ipv6_routes_unchanged
+      - result.host_links_unchanged
+      - result.preexisting_namespaces_unchanged
+      - result.firewall_v4_unchanged
+      - result.firewall_v6_unchanged
+      - result.existing_containers_unchanged
+      - not result.external_ingress_tested
+      - not acceptance_case.expected_pass or result.handshake | default(false)
+      - not acceptance_case.expected_pass or result.bidirectional_ping | default(false)
+      - not acceptance_case.expected_pass or result.peer_removal_blocks_ping | default(false)
+      - acceptance_case.expected_pass or result.failed_stage | default('') == acceptance_case.expected_stage
+    fail_msg: "Acceptance incomplete: do not mark I-010 verified."
+  vars:
+    result: '{{ vpn_acceptance.stdout | trim | from_json }}'
+
+- name: Retain only the checked non-secret result
+  ansible.builtin.set_fact:
+    vpn_acceptance_reports: '{{ vpn_acceptance_reports + [vpn_acceptance.stdout | trim | from_json] }}'

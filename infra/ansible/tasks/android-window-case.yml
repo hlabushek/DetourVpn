@@ -1,0 +1,108 @@
+---
+- name: Start exactly one bounded I-011 service
+  ansible.builtin.systemd_service:
+    name: project-vpn-i011.service
+    state: started
+
+- name: Record this invocation, never reuse earlier journal evidence
+  ansible.builtin.command:
+    argv: [/usr/bin/systemctl, show, project-vpn-i011.service, --property=InvocationID, --value]
+  register: vpn_i011_invocation
+  changed_when: false
+
+- name: Require a valid systemd invocation ID
+  ansible.builtin.assert:
+    that:
+      - vpn_i011_invocation.stdout | trim is match('^[a-f0-9]{32}$')
+
+- name: Wait for endpoint readiness and fail immediately if the process stopped
+  ansible.builtin.command:
+    argv:
+      - /usr/bin/python3
+      - -c
+      - |
+        import json, pathlib, subprocess, time
+        for _ in range(25):
+            state = subprocess.check_output([
+                '/usr/bin/systemctl', 'show', 'project-vpn-i011.service',
+                '--property=ActiveState', '--value'
+            ], text=True).strip()
+            if state not in ('activating', 'active'):
+                print(json.dumps({'error': 'endpoint_stopped_before_ready', 'state': state}))
+                raise SystemExit(1)
+            if pathlib.Path('/run/project-vpn-i011/ready.json').is_file():
+                print('{"endpoint_ready":true}')
+                raise SystemExit(0)
+            time.sleep(1)
+        print('{"error":"endpoint_readiness_timeout"}')
+        raise SystemExit(1)
+  register: vpn_i011_profile
+  changed_when: false
+
+- name: Force-stop the first case
+  ansible.builtin.systemd_service:
+    name: project-vpn-i011.service
+    state: stopped
+  when: vpn_i011_case == 'forced_stop'
+
+- name: Wait for the deadline and cleanup marker removal
+  ansible.builtin.wait_for:
+    path: /run/project-vpn-i011/baseline.json
+    state: absent
+    timeout: 810
+    sleep: 2
+  when: vpn_i011_case == 'deadline'
+
+- name: Read selected service outcome only
+  ansible.builtin.command:
+    argv: [/usr/bin/systemctl, show, project-vpn-i011.service, --property=ActiveState, --property=Result]
+  register: vpn_i011_outcome
+  changed_when: false
+
+- name: Read only this test invocation journal, suppress raw output
+  ansible.builtin.command:
+    argv:
+      - /usr/bin/journalctl
+      - '_SYSTEMD_INVOCATION_ID={{ vpn_i011_invocation.stdout | trim }}'
+      - --output=cat
+      - --no-pager
+  register: vpn_i011_journal
+  changed_when: false
+  no_log: true
+
+- name: Extract only fixed runner cleanup results
+  ansible.builtin.set_fact:
+    vpn_i011_cleanup_lines: >-
+      {{ vpn_i011_journal.stdout_lines | select('match', '^\{"cleanup_complete":') | list }}
+    vpn_i011_ready_seen: '{{ ''"endpoint_ready":true'' in vpn_i011_journal.stdout }}'
+  no_log: true
+
+- name: Require one successful cleanup result from this invocation
+  ansible.builtin.assert:
+    that:
+      - vpn_i011_cleanup_lines | length == 1
+      - vpn_i011_ready_seen | bool
+      - vpn_i011_case != 'deadline' or 'Result=timeout' in vpn_i011_outcome.stdout
+      - "'ActiveState=inactive' in vpn_i011_outcome.stdout or 'ActiveState=failed' in vpn_i011_outcome.stdout"
+    fail_msg: "Staging window incomplete; inspect only fixed errors and preserve baseline for cleanup."
+
+- name: Require restoration of existing network and containers
+  ansible.builtin.assert:
+    that:
+      - result.cleanup_complete
+      - result.restored | length == 7
+      - result.restored.values() | reject('equalto', true) | list | length == 0
+    fail_msg: "Cleanup drift: do not start another endpoint or restore чужой firewall."
+  vars:
+    result: '{{ vpn_i011_cleanup_lines[0] | from_json }}'
+
+- name: Record only checked cleanup data and non-secret identifiers
+  ansible.builtin.set_fact:
+    vpn_i011_window_reports: >-
+      {{ vpn_i011_window_reports + [{
+        'case': vpn_i011_case,
+        'invocation_id': vpn_i011_invocation.stdout | trim,
+        'endpoint_ready': vpn_i011_ready_seen | bool,
+        'service_outcome': vpn_i011_outcome.stdout_lines,
+        'cleanup': vpn_i011_cleanup_lines[0] | from_json
+      }] }}

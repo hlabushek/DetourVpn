@@ -1,0 +1,97 @@
+{
+  "issue": "I-017",
+  "date": "2026-10-21",
+  "scope": "local_only",
+  "live_telegram_verified": false,
+  "deployed": false,
+  "backend_regression": {
+    "passed": 469,
+    "skipped": 2,
+    "seconds": 272.31
+  },
+  "final_mini_app_migrations": {
+    "passed": 42,
+    "skipped": 1,
+    "deselected": 434,
+    "seconds": 18.01
+  },
+  "browser_qa": {
+    "passed": 1,
+    "seconds": 134.38,
+    "telegram_sdk": "TEST FAKE ONLY",
+    "database": "real disposable PostgreSQL",
+    "observed_balances_bytes": [
+      12400000000,
+      12700000000,
+      12700000017
+    ],
+    "themes": [
+      "dark",
+      "light"
+    ],
+    "widths_checked": [
+      390,
+      320
+    ],
+    "logout_cleared_ui": true
+  },
+  "client_tests_passed": 4,
+  "typescript_vite_build": "passed",
+  "ruff": "passed",
+  "mypy": {
+    "passed": true,
+    "files": 97
+  },
+  "openapi": "current",
+  "npm_audit_vulnerabilities": 0,
+  "production_bundle_excludes_test_markers": {
+    "test-only-sdk": true,
+    "TEST ONLY": true,
+    "LocalTestLoginBot": true,
+    "DO_NOT_ECHO_RAW_PAYLOAD": true
+  },
+  "build_files": {
+    "apps/telegram-mini-app/dist/index.html": {
+      "sha256": "d26120c235a6c1848dc683eca455f479b39ba8d8a0a1d61c7288258d38e07440",
+      "bytes": 639
+    },
+    "apps/telegram-mini-app/dist/assets/index-9W5uwKKB.css": {
+      "sha256": "aadcb5af41b6c64b1be8b2d804476639ee0bf22903cb5c6bc8f85b9d780b55f4",
+      "bytes": 7075
+    },
+    "apps/telegram-mini-app/dist/assets/index-BOuG-tk5.js": {
+      "sha256": "324042d289052507c75daaf677a2252b76e96a13cf506a59d1d2cb7788b73ddc",
+      "bytes": 233662
+    }
+  },
+  "direct_dependencies": {
+    "react": {
+      "version": "19.3.1",
+      "license": "MIT"
+    },
+    "react-dom": {
+      "version": "19.3.1",
+      "license": "MIT"
+    },
+    "vite": {
+      "version": "8.3.5",
+      "license": "MIT"
+    },
+    "typescript": {
+      "version": "7.0.2",
+      "license": "Apache-2.0"
+    },
+    "@types/react": {
+      "version": "19.3.0",
+      "license": "MIT"
+    },
+    "@types/react-dom": {
+      "version": "19.3.0",
+      "license": "MIT"
+    }
+  },
+  "cleanup": {
+    "disposable_postgres_stopped_removed": true,
+    "ports_5173_18767_listening": false
+  }
+}

@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "scope": "real_local_wsl_pinned_awg_private_mount_namespace",
+  "mock": false,
+  "external_ingress_tested": false,
+  "old_external_netns_command_failed": true,
+  "updated_runner_direct_uapi_peer_removed": true,
+  "updated_runner_repeat_revoke_passed": true,
+  "cleanup_complete": true,
+  "separate_two_namespace_handshake_passed": true,
+  "separate_two_namespace_peer_removal_blocks_ping": true,
+  "python_tests_passed": 174,
+  "python_database_tests_skipped": 166,
+  "ruff_passed": true,
+  "mypy_60_files_passed": true,
+  "ansible_syntax_passed": true,
+  "updated_code_deployed_to_staging": false,
+  "physical_android_peer_revoke_passed": false
+}

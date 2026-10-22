@@ -1,0 +1,62 @@
+{
+  "$defs": {
+    "PeerRemoval": {
+      "properties": {
+        "command_id": {
+          "format": "uuid",
+          "title": "Command Id",
+          "type": "string"
+        },
+        "operation": {
+          "const": "remove_peer",
+          "default": "remove_peer",
+          "title": "Operation",
+          "type": "string"
+        },
+        "peer_id": {
+          "format": "uuid",
+          "title": "Peer Id",
+          "type": "string"
+        },
+        "peer_version": {
+          "title": "Peer Version",
+          "type": "integer"
+        },
+        "public_key": {
+          "title": "Public Key",
+          "type": "string"
+        }
+      },
+      "required": [
+        "command_id",
+        "peer_id",
+        "peer_version",
+        "public_key"
+      ],
+      "title": "PeerRemoval",
+      "type": "object"
+    }
+  },
+  "$id": "urn:project-vpn:peer-commands.v1.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "properties": {
+    "commands": {
+      "items": {
+        "$ref": "#/$defs/PeerRemoval"
+      },
+      "title": "Commands",
+      "type": "array"
+    },
+    "contract_version": {
+      "const": 1,
+      "default": 1,
+      "title": "Contract Version",
+      "type": "integer"
+    }
+  },
+  "required": [
+    "commands"
+  ],
+  "title": "PeerPollResponse",
+  "type": "object"
+}

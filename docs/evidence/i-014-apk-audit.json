@@ -1,0 +1,31 @@
+{
+  "measured_at": "2026-10-21T14:32:23.368630+00:00",
+  "entrypoint": "lib/main.dart",
+  "artifacts": {
+    "debug": {
+      "sha256": "d7d77c6ff6cb9755c56a609dfa4ba3494fc2e5d4fab5275a0338ab0dc9a7411c",
+      "native_abis": [
+        "arm64-v8a",
+        "x86_64"
+      ],
+      "test_markers_present": false,
+      "backup_disabled": true,
+      "integration_test_native_plugin_present": true,
+      "release_cleartext_disabled": null,
+      "release_debug_policy_absent": null
+    },
+    "release": {
+      "sha256": "339328e1cc9ab2f6f1947504f1ec76456e11c5b5f70b50a37992a995d7bf748c",
+      "native_abis": [
+        "arm64-v8a",
+        "x86_64"
+      ],
+      "test_markers_present": false,
+      "backup_disabled": true,
+      "integration_test_native_plugin_present": false,
+      "release_cleartext_disabled": true,
+      "release_debug_policy_absent": true
+    }
+  },
+  "passed": true
+}

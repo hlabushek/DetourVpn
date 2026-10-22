@@ -1,0 +1,45 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-19",
+  "source": "operator_supplied_ansible_output",
+  "source_sha256": "33c984f19dc535e8cee71b9515fda25c87aa7c1e608c03dba43a7e7a43434f94",
+  "recap": {
+    "ok": 5,
+    "changed": 0,
+    "unreachable": 0,
+    "failed": 0
+  },
+  "existing_containers": [
+    {
+      "name": "amnezia-awg2",
+      "udp_port": 34053,
+      "tunnel_interface": "awg0",
+      "routed_subnet": "10.8.1.0/24"
+    },
+    {
+      "name": "amnezia-wireguard",
+      "udp_port": 34610,
+      "tunnel_interface": "wg0",
+      "routed_subnet": "10.8.1.0/24"
+    }
+  ],
+  "docker_ipam_subnets": [
+    "172.17.0.0/16",
+    "172.29.172.0/24"
+  ],
+  "existing_tunnel_health_verified": false,
+  "local_wsl_smoke": {
+    "positive_runs": 2,
+    "handshake": true,
+    "bidirectional_ping": true,
+    "peer_removal_blocks_ping": true,
+    "cleanup_complete": true,
+    "host_ipv4_routes_unchanged": true,
+    "injected_setup_failure_cleanup": true,
+    "injected_key_file_failure_cleanup": true,
+    "changed_binary_rejected": true
+  },
+  "new_staging_tunnel_deployed": false,
+  "android_verified": false,
+  "external_egress_verified": false
+}

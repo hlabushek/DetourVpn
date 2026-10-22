@@ -1,0 +1,55 @@
+[project]
+name = "project-vpn-foundation"
+version = "0.1.0"
+description = "Local control-plane foundation; no VPN data plane"
+requires-python = ">=3.13,<3.14"
+dependencies = [
+    "alembic==1.20.0",
+    "fastapi==0.143.2",
+    "pydantic==2.14.1",
+    "pydantic-settings==2.16.0",
+    "psycopg[binary]==3.3.6",
+    "SQLAlchemy==2.1.5",
+    "uvicorn==0.54.0",
+    "cryptography==50.0.2",
+]
+
+[dependency-groups]
+dev = [
+    "httpx2==2.13.1",
+    "mypy==2.4.0",
+    "pip-audit==2.10.1",
+    "pre-commit==4.7.0",
+    "pytest==9.1.1",
+    "ruff==0.17.0",
+]
+
+[tool.uv]
+package = false
+required-version = "==0.11.17"
+
+[tool.ruff]
+target-version = "py313"
+line-length = 100
+src = ["services/api/src"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "S"]
+
+[tool.ruff.lint.per-file-ignores]
+"services/api/tests/**" = ["S101"]
+"infra/ansible/tests/**" = ["S101"]
+
+[tool.mypy]
+python_version = "3.13"
+strict = true
+mypy_path = "services/api/src"
+files = ["services/api/src", "services/api/tests", "services/api/migrations", "services/node-agent/agent.py", "scripts", "infra/ansible/files"]
+plugins = ["pydantic.mypy"]
+
+[tool.pytest.ini_options]
+testpaths = ["services/api/tests", "infra/ansible/tests"]
+pythonpath = ["services/api/src"]
+addopts = "-ra --strict-config --strict-markers"
+filterwarnings = ["error"]
+markers = ["postgres: requires an explicitly supplied local test PostgreSQL server"]

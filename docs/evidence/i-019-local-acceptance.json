@@ -1,0 +1,100 @@
+{
+  "issue": "I-019",
+  "measured_at": "2026-10-22T13:27:44.433083+00:00",
+  "branch": "codex/i-019-node-failover",
+  "scope": "local API/PostgreSQL and Flutter/Android build validation",
+  "passed": true,
+  "issue_complete": false,
+  "live_staging": false,
+  "node_transport": "TEST ONLY synthetic",
+  "telegram_delivery": "TEST ONLY fake",
+  "physical_device_test_run": false,
+  "infrastructure_changed": false,
+  "backend_full_regression": {
+    "passed": 506,
+    "skipped": 3,
+    "seconds": 289.19,
+    "note": "Before final grace adjustment; final affected regression below.",
+    "skips": [
+      "I-012 live staging",
+      "I-013 physical Android",
+      "Mini App browser opt-in"
+    ]
+  },
+  "final_affected_regression": {
+    "passed": 63,
+    "deselected": 446,
+    "seconds": 59.81,
+    "selection": "node_failover or operations or tunnel"
+  },
+  "flutter": {
+    "tests_passed": 44,
+    "analyze_passed": true,
+    "format_passed": true
+  },
+  "android": {
+    "debug_built": true,
+    "unsigned_release_built": true,
+    "lint_passed": true,
+    "unit": {
+      "tests": 10,
+      "failures": 0,
+      "errors": 0
+    },
+    "apk_limited_archive_checks": {
+      "debug": {
+        "sha256": "0c109522a110d7c688125d5306f299e3a4c8b96ca7833b2fa087e2adf5a32363",
+        "test_markers_present": false,
+        "native_abis": [
+          "arm64-v8a",
+          "x86_64"
+        ]
+      },
+      "release": {
+        "sha256": "079289388aefe1c08ee2454773620d8b4b58dbd8c32aea81bca05c6e951535b4",
+        "test_markers_present": false,
+        "native_abis": [
+          "arm64-v8a",
+          "x86_64"
+        ]
+      }
+    }
+  },
+  "python": {
+    "ruff_format_passed": true,
+    "ruff_check_passed": true,
+    "mypy_passed": true,
+    "mypy_files": 105,
+    "openapi_current": true
+  },
+  "cleanup": {
+    "owned_temporary_postgres_clusters_stopped_removed": true,
+    "phone_unchanged": true,
+    "vps_unchanged": true
+  },
+  "recovery_policy": {
+    "grace_seconds": 10,
+    "max_verified_staging_clock_skew_seconds": 1,
+    "max_gate_operation_seconds": 5,
+    "lost_counters_charge": "full reservation",
+    "observed_bytes": null,
+    "peer_ack_fabricated": false
+  },
+  "open_gate": "Approved independent second staging host and physical two-node failure/egress/cutoff/expiry/ledger/cleanup drill",
+  "source_sha256": {
+    "services/api/src/vpn_api/nodes/catalog.py": "99ae0e356714390d9f16291312d12af5e2a145d141ec72fc73292e614d098d39",
+    "services/api/src/vpn_api/tunnels/admission.py": "29098276ce69cda4e1c9323b97bb94517b3c229c1f7144fe8a9da4ac87412c44",
+    "services/api/src/vpn_api/tunnels/contracts.py": "96c3c5b24e034a463f3d5512499bd92b03fc7dba6993470bed48301091d3fd96",
+    "services/api/src/vpn_api/tunnels/service.py": "9050619c379560b71a2604fa2a243fc822d8172e7cc94dd026b99a67af4113cb",
+    "services/api/src/vpn_api/tunnels/routes.py": "e90be76e754e726e1cdeee5f8e541fd8e46ceeda54b1d164487a6889c8f2c6b5",
+    "services/api/src/vpn_api/operations.py": "2f756ecf1be41f0e93ec685d6660a3a72c98e9ee2fb7272dbe2404ae0956220b",
+    "services/api/src/vpn_api/main.py": "badd4adb790da381e2b6dcf9690e4cadf906b799ed79208e8705f530ccaaf356",
+    "services/api/tests/test_node_failover.py": "8ed3e5a82ce8e13a5d661570b8170867389aa8ea611ccdf691a0c0ddc1289bc3",
+    "services/api/tests/test_tunnels.py": "b59bf43e5a2317a8e351b2b87a565322715753ea46aaedb8d9cf7dcfdc4769eb",
+    "packages/contracts/openapi.json": "ca72823b9c153473e6597c117a5e9adfabacc47f3581355acfe3613a02525359",
+    "apps/client/lib/main.dart": "09e2e6529dfaa4c1e8575a8caf536b93bca06a63caeddfabf24756b3ed1d5260",
+    "apps/client/lib/connection.dart": "c18566481ab57d8db95b5460342b0ea7c1a226d587b8df4981064fe92952afd1",
+    "apps/client/test/node_failover_test.dart": "b3604f497dadc41205e489eabafa998d9d08580537b33e02b7b2c7ca6c3122b8",
+    "apps/client/test/ui_preview_test.dart": "4f12063456aa7445529995b18c663a7a9cc15117763fa5570dfc118b535e26dd"
+  }
+}

@@ -1,0 +1,23 @@
+{
+  "schema_version": 1,
+  "source": "owner_play_recap_and_read_only_ssh_service_properties",
+  "host": "staging-45-10-166-106",
+  "failed_task": "Wait for the private profile or fail before phone traffic",
+  "profile_wait_attempts": 25,
+  "play_recap": {"ok": 18, "changed": 5, "unreachable": 0, "failed": 1},
+  "always_stop_task_succeeded": true,
+  "observed_service": {
+    "ActiveState": "failed",
+    "SubState": "failed",
+    "Result": "exit-code",
+    "ExecMainStatus": 1,
+    "ExecStopPost_status": 0,
+    "RuntimeMaxUSec": "10min",
+    "KillMode": "control-group"
+  },
+  "cleanup_complete_verified": false,
+  "root_cause": "pending_read_only_sandbox_diagnostic",
+  "android_connected": false,
+  "egress_verified": false,
+  "deadline_verified": false
+}

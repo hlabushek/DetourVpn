@@ -1,0 +1,26 @@
+# Dedicated bounded staging endpoint only, never enabled at boot.
+[Unit]
+Description=Bounded I-012 peer lifecycle agent
+After=project-vpn-i011.service
+BindsTo=project-vpn-i011.service
+
+[Service]
+Type=exec
+User=root
+UMask=0077
+ExecStart=/usr/bin/python3 -I /opt/project-vpn/acceptance/i012_agent.py
+RuntimeMaxSec=600
+TimeoutStopSec=20
+KillMode=control-group
+Restart=no
+LimitCORE=0
+CapabilityBoundingSet=CAP_SYS_ADMIN CAP_NET_ADMIN CAP_NET_RAW
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectHome=yes
+ProtectSystem=strict
+ReadWritePaths=/run
+# Agent emits only a fixed error label and a fixed phase, never exception/command output.
+StandardOutput=journal
+StandardError=null
+Environment=PYTHONDONTWRITEBYTECODE=1

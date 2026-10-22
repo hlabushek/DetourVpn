@@ -1,0 +1,153 @@
+{
+  "schema_version": 1,
+  "recorded_at": "2026-10-19T12:34:07.889275+00:00",
+  "scope": "I-011 Android build and local physical-device acceptance; no tunnel/egress acceptance",
+  "sdk_revision": "ff15093bf3856fea0947923474870b86efb682f0",
+  "core_version": "v3.1.20260814",
+  "toolchain": {
+    "go": "1.25.14",
+    "ndk": "26.1.10909125",
+    "gradle": "8.13",
+    "agp": "8.13.0",
+    "jdk": "JetBrains 21.0.5",
+    "sdk": 36,
+    "build_tools": "36.0.0",
+    "ndk_archive_sha256": "ad73c0370f0b0a87d1671ed2fd5a9ac9acfd1eb5c43a7fbfbd330f85d19dd632"
+  },
+  "artifacts": {
+    "apps/android/app/build/outputs/apk/debug/app-debug.apk": {
+      "sha256": "6af2ba815293443c03722dbdaf35961c8dd1df3b2acd23946d3d37ba529635b0",
+      "bytes": 15443152,
+      "native": [
+        "lib/arm64-v8a/libwg-go.so",
+        "lib/x86_64/libwg-go.so"
+      ],
+      "minimum_elf_load_alignment": {
+        "lib/arm64-v8a/libwg-go.so": 16384,
+        "lib/x86_64/libwg-go.so": 16384
+      },
+      "root_notices_bundled": true
+    },
+    "apps/android/app/build/outputs/apk/release/app-release-unsigned.apk": {
+      "sha256": "b8ba712926f9891c327d531e2b35507d50dbb257eaa69b0b6df2f4dac02b3932",
+      "bytes": 15089456,
+      "native": [
+        "lib/arm64-v8a/libwg-go.so",
+        "lib/x86_64/libwg-go.so"
+      ],
+      "minimum_elf_load_alignment": {
+        "lib/arm64-v8a/libwg-go.so": 16384,
+        "lib/x86_64/libwg-go.so": 16384
+      },
+      "root_notices_bundled": true
+    },
+    "apps/android/tunnel/build/outputs/aar/tunnel-release.aar": {
+      "sha256": "763ca2e54696f456b7ab4739ccbc02f06d8012394da34ba62127d793cba18434",
+      "bytes": 5305507,
+      "native": [
+        "jni/arm64-v8a/libwg-go.so",
+        "jni/x86_64/libwg-go.so"
+      ],
+      "minimum_elf_load_alignment": {
+        "jni/arm64-v8a/libwg-go.so": 16384,
+        "jni/x86_64/libwg-go.so": 16384
+      },
+      "root_notices_bundled": true
+    }
+  },
+  "native_unstripped": {
+    "arm64-v8a": {
+      "sha256": "df0a0e3365d5f9b2a857165c4b09a3b7eb1c683c3337821c8107721a77a5893d",
+      "repeat_hash_matched": true
+    },
+    "x86_64": {
+      "sha256": "e321d2962e9f7b59c37974a10d21633a247acc01c53f6a6f5797c2c16826660c",
+      "repeat_hash_matched": true
+    }
+  },
+  "unit_tests": {
+    "tests": 7,
+    "failures": 0,
+    "errors": 0
+  },
+  "android_lint": {
+    "errors": 0,
+    "warnings": 1,
+    "warning": "newer Gradle available; pinned toolchain retained"
+  },
+  "strict_dependency_verification": true,
+  "source_drift_negative_check_passed": true,
+  "device": {
+    "model": "Pixel 8 Pro",
+    "android_api": 37,
+    "abi": "arm64-v8a",
+    "native_core_version_and_down_state": true,
+    "device_key_and_awg_config_parse": true,
+    "negative_profiles_rejected": true,
+    "backup_disabled_and_service_protected": true,
+    "system_permission_denial_no_native_tunnel": true,
+    "permission_dialog_package": "com.android.vpndialogs",
+    "instrumentation_success_code": -1,
+    "private_key_exported": false,
+    "tunnel_or_network_test": false
+  },
+  "scans": {
+    "binary": {
+      "raw_report_sha256": "45e51f61c6b481443fb3e99843b7e43dafb55d0c76b783a37e247971501ec7f7",
+      "scanner": {
+        "protocol_version": "v1.0.0",
+        "scanner_name": "govulncheck",
+        "scanner_version": "v1.9.0",
+        "db": "https://vuln.go.dev",
+        "db_last_modified": "2026-10-08T22:31:09Z",
+        "scan_level": "symbol",
+        "scan_mode": "binary"
+      },
+      "finding_counts": {
+        "module": 52,
+        "package": 60,
+        "symbol": 19826
+      },
+      "unique_advisories": {
+        "module": 42,
+        "package": 42,
+        "symbol": 42
+      },
+      "reachable_symbol_findings": null
+    },
+    "source_with_jni_roots": {
+      "raw_report_sha256": "a0fee580eed524a3b110154652f2d3b8e8cfc2b1ac4183d93e6f707546e66b3f",
+      "scanner": {
+        "protocol_version": "v1.0.0",
+        "scanner_name": "govulncheck",
+        "scanner_version": "v1.9.0",
+        "db": "https://vuln.go.dev",
+        "db_last_modified": "2026-10-08T22:31:09Z",
+        "go_version": "go1.25.14",
+        "scan_level": "symbol",
+        "scan_mode": "source"
+      },
+      "finding_counts": {
+        "module": 54,
+        "package": 1
+      },
+      "unique_advisories": {
+        "module": 44,
+        "package": 1
+      },
+      "reachable_symbol_findings": 0
+    }
+  },
+  "python": {
+    "pytest_passed": 90,
+    "postgres_skipped": 166,
+    "ruff_lint_passed": true,
+    "mypy_source_files": 57,
+    "openapi_check_passed": true,
+    "new_python_format_passed": true,
+    "global_format_known_failure": "preexisting services/api/tests/test_migrations.py"
+  },
+  "remote_changes": false,
+  "i011_network_acceptance_complete": false,
+  "release_gate_complete": false
+}

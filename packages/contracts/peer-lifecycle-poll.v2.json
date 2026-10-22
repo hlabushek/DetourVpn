@@ -1,0 +1,52 @@
+{
+  "$id": "urn:project-vpn:peer-lifecycle-poll.v2.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "capabilities": {
+      "items": {
+        "enum": [
+          "peer-lease.v2",
+          "kernel-udp-budget.v1"
+        ],
+        "type": "string"
+      },
+      "maxItems": 2,
+      "minItems": 2,
+      "title": "Capabilities",
+      "type": "array"
+    },
+    "contract_version": {
+      "title": "Contract Version",
+      "type": "integer"
+    },
+    "observed_public_keys": {
+      "items": {
+        "type": "string"
+      },
+      "maxItems": 1,
+      "title": "Observed Public Keys",
+      "type": "array"
+    },
+    "runtime_id": {
+      "format": "uuid",
+      "title": "Runtime Id",
+      "type": "string"
+    },
+    "server_public_key": {
+      "maxLength": 44,
+      "minLength": 44,
+      "title": "Server Public Key",
+      "type": "string"
+    }
+  },
+  "required": [
+    "contract_version",
+    "capabilities",
+    "server_public_key",
+    "runtime_id",
+    "observed_public_keys"
+  ],
+  "title": "LifecyclePoll",
+  "type": "object"
+}

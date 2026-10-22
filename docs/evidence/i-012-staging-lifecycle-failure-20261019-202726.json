@@ -1,0 +1,32 @@
+{
+  "cleanup_complete": true,
+  "cleanup_receipt": {
+    "events": [
+      {
+        "egress_verified": false,
+        "endpoint_ready": true
+      },
+      {
+        "cleanup_complete": true,
+        "restored": {
+          "containers": true,
+          "filter_nat": true,
+          "ipv6_filter": true,
+          "links": true,
+          "namespaces": true,
+          "routes4": true,
+          "routes6": true
+        }
+      }
+    ],
+    "invocation_id": "e2d8254dbb994840b996e5fc849dfeb7"
+  },
+  "control_grant_removed": true,
+  "failed_at": "endpoint_start",
+  "measured_at": "2026-10-19T20:27:14.509774+00:00",
+  "passed": false,
+  "real_http_api": true,
+  "real_postgresql": true,
+  "scenarios": {},
+  "telegram_delivery": "TEST FAKE ONLY"
+}

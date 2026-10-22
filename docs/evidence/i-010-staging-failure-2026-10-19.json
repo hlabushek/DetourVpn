@@ -1,0 +1,39 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-19",
+  "source": "operator_supplied_failed_staging_acceptance",
+  "source_sha256": "75978f4dd0ec10413d035bcd852da9d80966576ae1fca8ab130c70b2b565a5a9",
+  "runtime_result": {
+    "cleanup_complete": true,
+    "existing_containers_unchanged": true,
+    "external_ingress_tested": false,
+    "failed_stage": "start_pinned_awg",
+    "firewall_v4_unchanged": true,
+    "firewall_v6_unchanged": true,
+    "host_ipv4_routes_unchanged": true,
+    "host_ipv6_routes_unchanged": true,
+    "host_links_unchanged": true,
+    "passed": false,
+    "preexisting_namespaces_unchanged": true,
+    "scope": "approved_staging_isolated_sandbox"
+  },
+  "recap": {
+    "staging": {
+      "ok": 33,
+      "changed": 2,
+      "unreachable": 0,
+      "failed": 1
+    }
+  },
+  "diagnosis": "Confirmed /run noexec; original runner attempted to execute verified binaries from /run",
+  "remote_run_mount_flags": "rw,nosuid,nodev,noexec",
+  "fix": "Only keys/configs in /run tmpfs; executable copies in private /tmp with SHA-256 and X_OK checks",
+  "local_regression": {
+    "old_failure_reproduced_with_NoExecPaths_run": true,
+    "fixed_real_handshake_packets_remove_with_NoExecPaths_run": true,
+    "setup_failure_cleanup": true,
+    "key_file_failure_cleanup": true,
+    "systemd_deadline_cleanup": true
+  },
+  "successful_staging_rerun_pending": true
+}

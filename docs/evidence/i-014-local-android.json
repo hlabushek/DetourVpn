@@ -1,0 +1,17 @@
+{
+  "facts": {
+    "admission_closed_no_false_connected": true,
+    "flutter_auth_ui": true,
+    "quota_ui_exact_and_paginated": true
+  },
+  "flutter_test_exit_success": true,
+  "live_staging": false,
+  "measured_at": "2026-10-21T14:27:34.597799+00:00",
+  "passed": true,
+  "phone_stopped_and_reverse_removed": true,
+  "quota_database_consistent": true,
+  "real_api": true,
+  "real_postgresql": true,
+  "remote_revoked_and_settled": true,
+  "telegram_delivery": "TEST FAKE ONLY"
+}

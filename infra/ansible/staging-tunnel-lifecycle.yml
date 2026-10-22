@@ -1,0 +1,169 @@
+---
+# Installs an expiring fixed-action controller only; does not start the endpoint.
+- name: Validate the I-012 sandbox request locally
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  any_errors_fatal: true
+  tasks:
+    - name: Require the explicitly approved single staging target
+      ansible.builtin.assert:
+        that:
+          - vpn_i012_staging_approved | default(false) | bool
+          - vpn_staging_approved | default(false) | bool
+          - vpn_environment | default('') == 'staging'
+          - vpn_approved_host_address | default('') == '45.10.166.106'
+          - groups['vpn_staging'] | default([]) | length == 1
+          - groups['vpn_staging'][0] == vpn_approved_inventory_name | default('')
+          - hostvars[groups['vpn_staging'][0]].ansible_host | default('') == '45.10.166.106'
+          - hostvars[groups['vpn_staging'][0]].ansible_user | default('') == 'vpn-deploy'
+          - hostvars[groups['vpn_staging'][0]].ansible_connection | default('ssh') == 'ssh'
+          - not ansible_check_mode
+
+- name: Install bounded lifecycle control on the approved staging only
+  hosts: vpn_staging
+  gather_facts: false
+  become: true
+  any_errors_fatal: true
+  tasks:
+    - name: Authenticate sudo without retaining its password
+      ansible.builtin.command:
+        argv: [/usr/bin/true]
+      changed_when: false
+    - name: Refuse an active I-011 window
+      ansible.builtin.command:
+        argv: [/usr/bin/systemctl, show, project-vpn-i011.service, --property=ActiveState, --value]
+      register: prior
+      changed_when: false
+      failed_when: prior.rc != 0 or prior.stdout | trim not in ['inactive', 'failed']
+    - name: Require the kernel firewall tool without installing packages
+      ansible.builtin.command:
+        argv: [/usr/sbin/nft, --version]
+      changed_when: false
+    - name: Create private runtime and trusted code directories
+      ansible.builtin.file:
+        path: '{{ item.path }}'
+        state: directory
+        owner: root
+        group: root
+        mode: '{{ item.mode }}'
+      loop:
+        - {path: /opt/project-vpn/acceptance, mode: '0755'}
+        - {path: /run/project-vpn-i011, mode: '0700'}
+        - {path: /run/project-vpn-i011-input, mode: '0700'}
+        - {path: /run/project-vpn-i011-control, mode: '0700'}
+        - {path: /run/project-vpn-i012-agent, mode: '0700'}
+    - name: Install reviewed scripts without changing the tunnel engine release
+      ansible.builtin.copy:
+        src: '../../{{ item.src }}'
+        dest: '/opt/project-vpn/acceptance/{{ item.dest }}'
+        owner: root
+        group: root
+        mode: '0755'
+      loop:
+        - {src: scripts/android_staging_window.py, dest: android_staging_window.py}
+        - {src: scripts/awg_local_smoke.py, dest: awg_local_smoke.py}
+        - {src: scripts/i011_control.py, dest: i011_control.py}
+        - {src: scripts/i012_control.py, dest: i012_control.py}
+        - {src: services/node-agent/agent.py, dest: i012_agent.py}
+    - name: Ensure the public input file exists for the fixed controller
+      ansible.builtin.copy:
+        content: "{{ lookup('ansible.builtin.file', playbook_dir ~ '/../../.cache/i-011/device-public-key') | trim }}\n"
+        dest: /run/project-vpn-i011-input/public-key
+        owner: root
+        group: root
+        mode: '0600'
+      no_log: true
+    - name: Install deadline units without boot enablement
+      ansible.builtin.copy:
+        src: 'files/{{ item }}'
+        dest: '/etc/systemd/system/{{ item }}'
+        owner: root
+        group: root
+        mode: '0644'
+      loop: [project-vpn-i011.service, project-vpn-i012-agent.service]
+    - name: Verify both units on staging
+      ansible.builtin.command:
+        argv:
+          - /usr/bin/systemd-analyze
+          - verify
+          - --man=no
+          - /etc/systemd/system/project-vpn-i011.service
+          - /etc/systemd/system/project-vpn-i012-agent.service
+      changed_when: false
+    - name: Verify fresh isolation preflight without starting the endpoint
+      ansible.builtin.command:
+        argv: [/usr/bin/python3, /opt/project-vpn/acceptance/android_staging_window.py, preflight]
+      changed_when: false
+    - name: Load the reviewed units
+      ansible.builtin.systemd_service:
+        daemon_reload: true
+    - name: Stop only a prior I-012 expiry timer
+      ansible.builtin.command:
+        argv: [/usr/bin/systemctl, stop, project-vpn-i012-control-expiry.timer]
+      register: old_timer
+      failed_when: old_timer.rc not in [0, 5]
+      changed_when: old_timer.rc == 0
+    - name: Generate boot-clock-code bound grant metadata without secrets
+      ansible.builtin.command:
+        argv:
+          - /usr/bin/python3
+          - -I
+          - -c
+          - |
+            import hashlib, json, pathlib, pwd, time
+            root = pathlib.Path('/opt/project-vpn/acceptance')
+            unit = pathlib.Path('/etc/systemd/system')
+            now, ticks = int(time.time()), int(time.monotonic())
+            print(json.dumps({
+                'schema_version': 1, 'owner': 'vpn-deploy',
+                'owner_uid': pwd.getpwnam('vpn-deploy').pw_uid,
+                'host': '45.10.166.106',
+                'boot_id': pathlib.Path('/proc/sys/kernel/random/boot_id').read_text().strip(),
+                'issued_at': now, 'issued_monotonic': ticks,
+                'expires_at': now+2700, 'expires_monotonic': ticks+2700,
+                'code_sha256': {n: hashlib.sha256((root/n).read_bytes()).hexdigest()
+                    for n in ('android_staging_window.py', 'awg_local_smoke.py', 'i011_control.py')},
+                'unit_sha256': hashlib.sha256((unit/'project-vpn-i011.service').read_bytes()).hexdigest(),
+                'i012_sha256': {n: hashlib.sha256(((unit if n.endswith('.service') else root)/n).read_bytes()).hexdigest()
+                    for n in ('i012_control.py', 'i012_agent.py', 'project-vpn-i012-agent.service')}
+            }, sort_keys=True))
+      register: lease
+      changed_when: false
+    - name: Store grant metadata in private tmpfs
+      ansible.builtin.copy:
+        content: '{{ lease.stdout }}'
+        dest: /run/project-vpn-i011-control/lease.json
+        owner: root
+        group: root
+        mode: '0600'
+    - name: Schedule unconditional stop and grant removal
+      ansible.builtin.command:
+        argv:
+          - /usr/bin/systemd-run
+          - --quiet
+          - --unit=project-vpn-i012-control-expiry
+          - --on-active=45m
+          - --timer-property=AccuracySec=1s
+          - --property=Type=oneshot
+          - /opt/project-vpn/acceptance/i012_control.py
+          - expire
+      changed_when: true
+    - name: Permit only the exact isolated fixed-action controller
+      ansible.builtin.copy:
+        content: |
+          # I-012 staging only, expires after 45m; controller checks UID/boot/time/code hashes.
+          vpn-deploy ALL=(root) NOPASSWD: /opt/project-vpn/acceptance/i012_control.py
+        dest: /etc/sudoers.d/project-vpn-i012-control
+        owner: root
+        group: root
+        mode: '0440'
+        validate: /usr/sbin/visudo -cf %s
+    - name: Verify the grant under the actual deployment identity
+      become: false
+      ansible.builtin.command:
+        argv: [/usr/bin/sudo, -n, /opt/project-vpn/acceptance/i012_control.py, status]
+      changed_when: false
+    - name: Report the preparation boundary
+      ansible.builtin.debug:
+        msg: 'I-012 bounded controller installed; endpoint not started, live acceptance pending.'

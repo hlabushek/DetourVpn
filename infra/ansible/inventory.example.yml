@@ -1,0 +1,7 @@
+---
+# Copy to inventory.yml only after the owner explicitly approves a staging host.
+# Do not put passwords, private keys, tokens, or production hosts in this file.
+all:
+  children:
+    vpn_staging:
+      hosts: {}

@@ -1,0 +1,418 @@
+[
+  {
+    "module": "github.com/goccy/go-yaml",
+    "version": "v1.17.1",
+    "declared_indirect": false,
+    "scope": "declared module graph; linked packages not measured",
+    "url": "https://proxy.golang.org/github.com/goccy/go-yaml/@v/v1.17.1.zip",
+    "archive_sha256": "d696eddbab891896b3a70334d04cfb0208cdc0e18544bebdf95926e1f64df310",
+    "license_files": [
+      {
+        "path": "LICENSE",
+        "sha256": "43fe703ea9ebe27f0a6e5d2a1f6dd094fbe324251c743498f3ec19986d7349cd"
+      }
+    ],
+    "root_license_candidate": "MIT",
+    "status": "root text inspected; per-file exceptions and linked-package scope not cleared"
+  },
+  {
+    "module": "go.uber.org/atomic",
+    "version": "v1.11.0",
+    "declared_indirect": false,
+    "scope": "declared module graph; linked packages not measured",
+    "url": "https://proxy.golang.org/go.uber.org/atomic/@v/v1.11.0.zip",
+    "archive_sha256": "8109325abe17488245878b07f3c35b10ba7d1aa3310f792968f5b9deba432e2c",
+    "license_files": [
+      {
+        "path": "LICENSE.txt",
+        "sha256": "edbb5a4d165ac69376c765b551c0662ff42bea87e1f1eda85f42ac90c34b09d0"
+      }
+    ],
+    "root_license_candidate": "MIT",
+    "status": "root text inspected; per-file exceptions and linked-package scope not cleared"
+  },
+  {
+    "module": "golang.getoutline.org/sdk",
+    "version": "v0.0.23",
+    "declared_indirect": false,
+    "scope": "declared module graph; linked packages not measured",
+    "url": "https://proxy.golang.org/golang.getoutline.org/sdk/@v/v0.0.23.zip",
+    "archive_sha256": "47a66c44be8185435954f13a6f8fc90ee21ea1201e9ad37d9b5d2484981b4881",
+    "license_files": [
+      {
+        "path": "LICENSE",
+        "sha256": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4"
+      }
+    ],
+    "root_license_candidate": "Apache-2.0",
+    "status": "root text inspected; per-file exceptions and linked-package scope not cleared"
+  },
+  {
+    "module": "golang.getoutline.org/sdk/x",
+    "version": "v0.2.0",
+    "declared_indirect": false,
+    "scope": "declared module graph; linked packages not measured",
+    "url": "https://proxy.golang.org/golang.getoutline.org/sdk/x/@v/v0.2.0.zip",
+    "archive_sha256": "3de0e55742f4cdafaaf3761c41b9fde610350b616834f8def41db556a6292663",
+    "license_files": [
+      {
+        "path": "LICENSE",
+        "sha256": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4"
+      }
+    ],
+    "root_license_candidate": "Apache-2.0",
+    "status": "root text inspected; per-file exceptions and linked-package scope not cleared"
+  },
+  {
+    "module": "golang.org/x/crypto",
+    "version": "v0.42.0",
+    "declared_indirect": false,
+    "scope": "declared module graph; linked packages not measured",
+    "url": "https://proxy.golang.org/golang.org/x/crypto/@v/v0.42.0.zip",
+    "archive_sha256": "dd13a44ed4e46d97aebf16b3bb654323f199c3bb37b9484e0104a5e537721c71",
+    "license_files": [
+      {
+        "path": "LICENSE",
+        "sha256": "911f8f5782931320f5b8d1160a76365b83aea6447ee6c04fa6d5591467db9dad"
+      }
+    ],
+    "root_license_candidate": "BSD-3-Clause",
+    "status": "root text inspected; per-file exceptions and linked-package scope not cleared"
+  },
+  {
+    "module": "golang.org/x/net",
+    "version": "v0.44.0",
+    "declared_indirect": false,
+    "scope": "declared module graph; linked packages not measured",
+    "url": "https://proxy.golang.org/golang.org/x/net/@v/v0.44.0.zip",
+    "archive_sha256": "e45c82aff473f14b51b0e4b1ca25274364885af81ad3eb433c84c61aae7506cd",
+    "license_files": [
+      {
+        "path": "LICENSE",
+        "sha256": "911f8f5782931320f5b8d1160a76365b83aea6447ee6c04fa6d5591467db9dad"
+      }
+    ],
+    "root_license_candidate": "BSD-3-Clause",
+    "status": "root text inspected; per-file exceptions and linked-package scope not cleared"
+  },
+  {
+    "module": "golang.org/x/sys",
+    "version": "v0.36.0",
+    "declared_indirect": false,
+    "scope": "declared module graph; linked packages not measured",
+    "url": "https://proxy.golang.org/golang.org/x/sys/@v/v0.36.0.zip",
+    "archive_sha256": "894ee9a48e191265cd3d2200ddd81b8d75c554a0eabe9fc1a9afbab25a4b29c4",
+    "license_files": [
+      {
+        "path": "LICENSE",
+        "sha256": "911f8f5782931320f5b8d1160a76365b83aea6447ee6c04fa6d5591467db9dad"
+      }
+    ],
+    "root_license_candidate": "BSD-3-Clause",
+    "status": "root text inspected; per-file exceptions and linked-package scope not cleared"
+  },
+  {
+    "module": "golang.zx2c4.com/wintun",
+    "version": "v0.0.0-20230126152724-0fa3db229ce2",
+    "declared_indirect": false,
+    "scope": "declared module graph; linked packages not measured",
+    "url": "https://proxy.golang.org/golang.zx2c4.com/wintun/@v/v0.0.0-20230126152724-0fa3db229ce2.zip",
+    "archive_sha256": "06599222daa6af8547045c446cefa9a2bab19d57bde1fc6436114308d79a2b4b",
+    "license_files": [
+      {
+        "path": "LICENSE",
+        "sha256": "91276db973f25602d1aa43491f59cbc84cb88e6f151e1d0cc82a755563ce0195"
+      }
+    ],
+    "root_license_candidate": "MIT",
+    "status": "root text inspected; per-file exceptions and linked-package scope not cleared"
+  },
+  {
+    "module": "gvisor.dev/gvisor",
+    "version": "v0.0.0-20231202080848-1f7806d17489",
+    "declared_indirect": false,
+    "scope": "declared module graph; linked packages not measured",
+    "url": "https://proxy.golang.org/gvisor.dev/gvisor/@v/v0.0.0-20231202080848-1f7806d17489.zip",
+    "archive_sha256": "65ffd049108feaa0690704ddf503d718e487444b1ffc099e792e5c5837265f55",
+    "license_files": [
+      {
+        "path": "LICENSE",
+        "sha256": "5af94223052169198cfa2195455b7d87209d9aa0fff4705822f328b4b272facb"
+      }
+    ],
+    "root_license_candidate": "Apache-2.0",
+    "status": "root text inspected; per-file exceptions and linked-package scope not cleared"
+  },
+  {
+    "module": "github.com/go-task/slim-sprig",
+    "version": "v0.0.0-20230315185526-52ccab3ef572",
+    "declared_indirect": true,
+    "scope": "declared module graph; linked packages not measured",
+    "url": "https://proxy.golang.org/github.com/go-task/slim-sprig/@v/v0.0.0-20230315185526-52ccab3ef572.zip",
+    "archive_sha256": "25a036dc8eb9f6227c2df818916f76db93eebbac88cc24bad5c960b0c60d7a08",
+    "license_files": [
+      {
+        "path": "LICENSE.txt",
+        "sha256": "dbad9a1f3fee465db42b92cb8a41ddaae028248fdcc54f46f1e72f7707d21dc2"
+      }
+    ],
+    "root_license_candidate": "MIT",
+    "status": "root text inspected; per-file exceptions and linked-package scope not cleared"
+  },
+  {
+    "module": "github.com/google/btree",
+    "version": "v1.1.3",
+    "declared_indirect": true,
+    "scope": "declared module graph; linked packages not measured",
+    "url": "https://proxy.golang.org/github.com/google/btree/@v/v1.1.3.zip",
+    "archive_sha256": "11b736bc8252b52fecdf346d3707ccf3a2b6d458ba21b4f843616fc12eeb30b2",
+    "license_files": [
+      {
+        "path": "LICENSE",
+        "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
+      }
+    ],
+    "root_license_candidate": "Apache-2.0",
+    "status": "root text inspected; per-file exceptions and linked-package scope not cleared"
+  },
+  {
+    "module": "github.com/google/pprof",
+    "version": "v0.0.0-20211214055906-6f57359322fd",
+    "declared_indirect": true,
+    "scope": "declared module graph; linked packages not measured",
+    "url": "https://proxy.golang.org/github.com/google/pprof/@v/v0.0.0-20211214055906-6f57359322fd.zip",
+    "archive_sha256": "fb4e529339b87c62ea93770bf50c834db0d9c6a73de4413e9b322d172f875b4f",
+    "license_files": [
+      {
+        "path": "LICENSE",
+        "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
+      }
+    ],
+    "root_license_candidate": "Apache-2.0",
+    "status": "root text inspected; per-file exceptions and linked-package scope not cleared"
+  },
+  {
+    "module": "github.com/gorilla/websocket",
+    "version": "v1.5.3",
+    "declared_indirect": true,
+    "scope": "declared module graph; linked packages not measured",
+    "url": "https://proxy.golang.org/github.com/gorilla/websocket/@v/v1.5.3.zip",
+    "archive_sha256": "dbbd31dd0f08548c5dc43e4c2f12bbba66abff5252b224b1cd06afbb72783a76",
+    "license_files": [
+      {
+        "path": "LICENSE",
+        "sha256": "2be1b548b0387ca8948e1bb9434e709126904d15f622cc2d0d8e7f186e4d122d"
+      }
+    ],
+    "root_license_candidate": "BSD-2-Clause",
+    "status": "root text inspected; per-file exceptions and linked-package scope not cleared"
+  },
+  {
+    "module": "github.com/onsi/ginkgo/v2",
+    "version": "v2.12.0",
+    "declared_indirect": true,
+    "scope": "declared module graph; linked packages not measured",
+    "url": "https://proxy.golang.org/github.com/onsi/ginkgo/v2/@v/v2.12.0.zip",
+    "archive_sha256": "6c1645ec771573bef3e2177dfcad78d3dc9f5a45d7008a020044ebc3e2786a74",
+    "license_files": [
+      {
+        "path": "LICENSE",
+        "sha256": "3da40f6328f42cbc970672f8129e0ecb6e2cc4f5117a072593ba247276354454"
+      }
+    ],
+    "root_license_candidate": "MIT",
+    "status": "root text inspected; per-file exceptions and linked-package scope not cleared"
+  },
+  {
+    "module": "github.com/quic-go/qpack",
+    "version": "v0.5.1",
+    "declared_indirect": true,
+    "scope": "declared module graph; linked packages not measured",
+    "url": "https://proxy.golang.org/github.com/quic-go/qpack/@v/v0.5.1.zip",
+    "archive_sha256": "d895558cd31fe1432b7d738c9977e5c0853f86087ca923d0a30e55b24480a8a5",
+    "license_files": [
+      {
+        "path": "LICENSE.md",
+        "sha256": "1b6a897efd39b20b3cdce8cd306160d115dbded39d855ceeffe21dc11e4d53df"
+      }
+    ],
+    "root_license_candidate": "MIT",
+    "status": "root text inspected; per-file exceptions and linked-package scope not cleared"
+  },
+  {
+    "module": "github.com/quic-go/quic-go",
+    "version": "v0.48.1",
+    "declared_indirect": true,
+    "scope": "declared module graph; linked packages not measured",
+    "url": "https://proxy.golang.org/github.com/quic-go/quic-go/@v/v0.48.1.zip",
+    "archive_sha256": "c364046ee8cffb3d50621ac229267de7a38570a1fb6bfaf92e8ae62cc44f262b",
+    "license_files": [
+      {
+        "path": "LICENSE",
+        "sha256": "77d0b7b53e8abb84cf4dd3f9945a7fdf27044240d2e8023966a721a9a46fe96e"
+      }
+    ],
+    "root_license_candidate": "MIT",
+    "status": "root text inspected; per-file exceptions and linked-package scope not cleared"
+  },
+  {
+    "module": "github.com/shadowsocks/go-shadowsocks2",
+    "version": "v0.1.5",
+    "declared_indirect": true,
+    "scope": "declared module graph; linked packages not measured",
+    "url": "https://proxy.golang.org/github.com/shadowsocks/go-shadowsocks2/@v/v0.1.5.zip",
+    "archive_sha256": "9d1f3a199fd0f2f7472ef1e4026c9a72a7d0c7faf4b6610b7147abd82b4d9b21",
+    "license_files": [
+      {
+        "path": "LICENSE",
+        "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
+      }
+    ],
+    "root_license_candidate": "Apache-2.0",
+    "status": "root text inspected; per-file exceptions and linked-package scope not cleared"
+  },
+  {
+    "module": "github.com/stretchr/testify",
+    "version": "v1.10.0",
+    "declared_indirect": true,
+    "scope": "declared module graph; linked packages not measured",
+    "url": "https://proxy.golang.org/github.com/stretchr/testify/@v/v1.10.0.zip",
+    "archive_sha256": "36c87573527a97ce97fc15ce2a101e65e5ebb350db142d09f633580cb8d5c839",
+    "license_files": [
+      {
+        "path": "LICENSE",
+        "sha256": "f8e536c1c7b695810427095dc85f5f80d44ff7c10535e8a9486cf393e2599189"
+      }
+    ],
+    "root_license_candidate": "MIT",
+    "status": "root text inspected; per-file exceptions and linked-package scope not cleared"
+  },
+  {
+    "module": "go.uber.org/mock",
+    "version": "v0.4.0",
+    "declared_indirect": true,
+    "scope": "declared module graph; linked packages not measured",
+    "url": "https://proxy.golang.org/go.uber.org/mock/@v/v0.4.0.zip",
+    "archive_sha256": "29c088ba1621e04fba8670e388e962f92c15f47cd45a63bf0e5decd6d5d63cd1",
+    "license_files": [
+      {
+        "path": "LICENSE",
+        "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
+      }
+    ],
+    "root_license_candidate": "Apache-2.0",
+    "status": "root text inspected; per-file exceptions and linked-package scope not cleared"
+  },
+  {
+    "module": "golang.org/x/exp",
+    "version": "v0.0.0-20240506185415-9bf2ced13842",
+    "declared_indirect": true,
+    "scope": "declared module graph; linked packages not measured",
+    "url": "https://proxy.golang.org/golang.org/x/exp/@v/v0.0.0-20240506185415-9bf2ced13842.zip",
+    "archive_sha256": "6b4a2c206c65da1945186e59b9fdf8da26f13db40ee18a37f963c6ea053a665c",
+    "license_files": [
+      {
+        "path": "LICENSE",
+        "sha256": "2d36597f7117c38b006835ae7f537487207d8ec407aa9d9980794b2030cbc067"
+      }
+    ],
+    "root_license_candidate": "BSD-3-Clause",
+    "status": "root text inspected; per-file exceptions and linked-package scope not cleared"
+  },
+  {
+    "module": "golang.org/x/mobile",
+    "version": "v0.0.0-20240520174638-fa72addaaa1b",
+    "declared_indirect": true,
+    "scope": "declared module graph; linked packages not measured",
+    "url": "https://proxy.golang.org/golang.org/x/mobile/@v/v0.0.0-20240520174638-fa72addaaa1b.zip",
+    "archive_sha256": "db9970fbfca339bb64649423c49bbb92523cdfcf3552cf25e77b296a9762fe9d",
+    "license_files": [
+      {
+        "path": "LICENSE",
+        "sha256": "2d36597f7117c38b006835ae7f537487207d8ec407aa9d9980794b2030cbc067"
+      }
+    ],
+    "root_license_candidate": "BSD-3-Clause",
+    "status": "root text inspected; per-file exceptions and linked-package scope not cleared"
+  },
+  {
+    "module": "golang.org/x/mod",
+    "version": "v0.28.0",
+    "declared_indirect": true,
+    "scope": "declared module graph; linked packages not measured",
+    "url": "https://proxy.golang.org/golang.org/x/mod/@v/v0.28.0.zip",
+    "archive_sha256": "1033fb59927549a16c7000369f6d534b652fcd201746a7d6d8cfd521e1ad85e2",
+    "license_files": [
+      {
+        "path": "LICENSE",
+        "sha256": "911f8f5782931320f5b8d1160a76365b83aea6447ee6c04fa6d5591467db9dad"
+      }
+    ],
+    "root_license_candidate": "BSD-3-Clause",
+    "status": "root text inspected; per-file exceptions and linked-package scope not cleared"
+  },
+  {
+    "module": "golang.org/x/sync",
+    "version": "v0.17.0",
+    "declared_indirect": true,
+    "scope": "declared module graph; linked packages not measured",
+    "url": "https://proxy.golang.org/golang.org/x/sync/@v/v0.17.0.zip",
+    "archive_sha256": "c5dcfd32e223edc7a003a51a166a81759a4beccb9a91eb85385b4d67a1c820c6",
+    "license_files": [
+      {
+        "path": "LICENSE",
+        "sha256": "911f8f5782931320f5b8d1160a76365b83aea6447ee6c04fa6d5591467db9dad"
+      }
+    ],
+    "root_license_candidate": "BSD-3-Clause",
+    "status": "root text inspected; per-file exceptions and linked-package scope not cleared"
+  },
+  {
+    "module": "golang.org/x/text",
+    "version": "v0.29.0",
+    "declared_indirect": true,
+    "scope": "declared module graph; linked packages not measured",
+    "url": "https://proxy.golang.org/golang.org/x/text/@v/v0.29.0.zip",
+    "archive_sha256": "fb47744565fd36da42ab2ebd3ee4db0038dfed4f703c926a9e7327debab8af77",
+    "license_files": [
+      {
+        "path": "LICENSE",
+        "sha256": "911f8f5782931320f5b8d1160a76365b83aea6447ee6c04fa6d5591467db9dad"
+      }
+    ],
+    "root_license_candidate": "BSD-3-Clause",
+    "status": "root text inspected; per-file exceptions and linked-package scope not cleared"
+  },
+  {
+    "module": "golang.org/x/time",
+    "version": "v0.9.0",
+    "declared_indirect": true,
+    "scope": "declared module graph; linked packages not measured",
+    "url": "https://proxy.golang.org/golang.org/x/time/@v/v0.9.0.zip",
+    "archive_sha256": "e8a6b77acb93415e3819654d11f072c15eb1e72ba2bd37b6c732f05a359ff794",
+    "license_files": [
+      {
+        "path": "LICENSE",
+        "sha256": "911f8f5782931320f5b8d1160a76365b83aea6447ee6c04fa6d5591467db9dad"
+      }
+    ],
+    "root_license_candidate": "BSD-3-Clause",
+    "status": "root text inspected; per-file exceptions and linked-package scope not cleared"
+  },
+  {
+    "module": "golang.org/x/tools",
+    "version": "v0.37.0",
+    "declared_indirect": true,
+    "scope": "declared module graph; linked packages not measured",
+    "url": "https://proxy.golang.org/golang.org/x/tools/@v/v0.37.0.zip",
+    "archive_sha256": "429b25131b8564084cce722043b12dd8e3ff5231ac6cd63a405b4f3e6fd69204",
+    "license_files": [
+      {
+        "path": "LICENSE",
+        "sha256": "911f8f5782931320f5b8d1160a76365b83aea6447ee6c04fa6d5591467db9dad"
+      }
+    ],
+    "root_license_candidate": "BSD-3-Clause",
+    "status": "root text inspected; per-file exceptions and linked-package scope not cleared"
+  }
+]

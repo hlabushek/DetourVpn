@@ -1,0 +1,146 @@
+---
+# I-010: stage verified binaries only. No tunnel, secrets, ports, or services start.
+- name: Stage one approved VPN test node
+  hosts: vpn_staging
+  gather_facts: false
+  become: false
+  serial: 1
+  vars:
+    vpn_expected_go_commit: 1b86b2ae0e493e7ea93f8c1a0f0cb6735b1551f1
+    vpn_expected_tools_commit: ee0f0a9aa34ff0a0da4b3433b9512781cfe02843
+    vpn_release_id: "{{ (awg_go_sha256 ~ ':' ~ awg_tools_sha256) | hash('sha256') }}"
+    vpn_release_dir: "/opt/project-vpn/releases/{{ vpn_release_id }}"
+    vpn_artifacts:
+      - name: amneziawg-go
+        path: "{{ awg_go_artifact }}"
+        sha256: "{{ awg_go_sha256 }}"
+        mode: "0755"
+      - name: awg
+        path: "{{ awg_tools_artifact }}"
+        sha256: "{{ awg_tools_sha256 }}"
+        mode: "0755"
+      - name: LICENSE.amneziawg-go
+        path: "{{ awg_go_license }}"
+        sha256: 9ec168d1f4af53f293be8bd2e882588f0e35af0334292d4ca4e5ede84408420e
+        mode: "0644"
+      - name: COPYING.awg-tools
+        path: "{{ awg_tools_license }}"
+        sha256: 8177f97513213526df2cf6184d8ff986c675afb514d4e68a404010521b880643
+        mode: "0644"
+
+  pre_tasks:
+    - name: Require one explicitly approved staging target
+      ansible.builtin.assert:
+        that:
+          - groups['vpn_staging'] | length == 1
+          - vpn_staging_approved | default(false) | bool
+          - (vpn_environment | default('')) == 'staging'
+          - (vpn_approved_inventory_name | default('')) == inventory_hostname
+          - (vpn_approved_host_address | default('')) == '45.10.166.106'
+          - (ansible_host | default(inventory_hostname)) == vpn_approved_host_address
+          - (ansible_user | default('')) not in ['', 'root']
+          - (ansible_connection | default('ssh')) == 'ssh'
+        fail_msg: "Target must be the single explicitly approved staging host."
+
+    - name: Require pinned source and artifact checksums
+      ansible.builtin.assert:
+        that:
+          - (awg_go_source_commit | default('')) == vpn_expected_go_commit
+          - (awg_tools_source_commit | default('')) == vpn_expected_tools_commit
+          - (awg_go_sha256 | default('')) is match('^[a-f0-9]{64}$')
+          - (awg_tools_sha256 | default('')) is match('^[a-f0-9]{64}$')
+          - (awg_go_artifact | default('')) | length > 0
+          - (awg_tools_artifact | default('')) | length > 0
+          - (awg_go_license | default('')) | length > 0
+          - (awg_tools_license | default('')) | length > 0
+        fail_msg: "Supply reviewed, pinned binary and license paths and SHA-256 hashes."
+
+    - name: Inspect local artifacts before changing the node
+      ansible.builtin.stat:
+        path: "{{ item.path }}"
+        checksum_algorithm: sha256
+      delegate_to: localhost
+      become: false
+      loop: "{{ vpn_artifacts }}"
+      register: vpn_local_artifacts
+
+    - name: Reject missing or changed local artifacts
+      ansible.builtin.assert:
+        that:
+          - item.stat.isreg | default(false)
+          - (item.stat.checksum | default('')) == item.item.sha256
+        fail_msg: "Local artifact missing or SHA-256 differs from reviewed manifest."
+      loop: "{{ vpn_local_artifacts.results }}"
+
+    - name: Read staging host facts after local approval and artifact checks
+      ansible.builtin.setup:
+
+    - name: Require the supported staging operating system
+      ansible.builtin.assert:
+        that:
+          - ansible_facts['distribution'] == 'Ubuntu'
+          - ansible_facts['distribution_version'] == '24.04'
+          - ansible_facts['architecture'] == 'x86_64'
+          - ansible_service_mgr == 'systemd'
+        fail_msg: "This release procedure supports only Ubuntu 24.04 amd64 with systemd."
+
+    - name: Require a TUN device
+      ansible.builtin.stat:
+        path: /dev/net/tun
+      register: vpn_tun
+
+    - name: Stop if TUN is unavailable
+      ansible.builtin.assert:
+        that:
+          - vpn_tun.stat.exists
+        fail_msg: "Staging host has no /dev/net/tun."
+
+  tasks:
+    - name: Create root-owned release directories
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: directory
+        owner: root
+        group: root
+        mode: "0755"
+      loop:
+        - /opt/project-vpn
+        - /opt/project-vpn/releases
+        - "{{ vpn_release_dir }}"
+      become: true
+
+    - name: Copy reviewed binaries and licenses
+      ansible.builtin.copy:
+        src: "{{ item.path }}"
+        dest: "{{ vpn_release_dir }}/{{ item.name }}"
+        owner: root
+        group: root
+        mode: "{{ item.mode }}"
+      loop: "{{ vpn_artifacts }}"
+      become: true
+
+    - name: Verify staged files on the node
+      ansible.builtin.stat:
+        path: "{{ vpn_release_dir }}/{{ item.name }}"
+        checksum_algorithm: sha256
+      loop: "{{ vpn_artifacts }}"
+      register: vpn_remote_artifacts
+      become: true
+
+    - name: Reject altered files on the node
+      ansible.builtin.assert:
+        that:
+          - item.stat.isreg | default(false)
+          - (item.stat.checksum | default('')) == item.item.sha256
+        fail_msg: "Staged artifact hash mismatch; current release was not switched."
+      loop: "{{ vpn_remote_artifacts.results }}"
+
+    - name: Select the verified release
+      ansible.builtin.file:
+        src: "{{ vpn_release_dir }}"
+        dest: /opt/project-vpn/current
+        state: link
+        force: true
+        owner: root
+        group: root
+      become: true

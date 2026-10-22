@@ -1,0 +1,113 @@
+{
+  "issue": "I-018",
+  "date": "2026-10-22",
+  "branch": "codex/i-018-referral-qualification",
+  "scope": "local_only",
+  "deployed": false,
+  "live_telegram_verified": false,
+  "new_physical_vpn_evidence": false,
+  "production_campaigns_enabled": false,
+  "qualification": "verified active account + post-binding settled observed traffic + matching applied tunnel_lease debit",
+  "reward_recipient": "inviter_only",
+  "award_trigger": "explicit_pull_request",
+  "backend_regression": {
+    "passed": 498,
+    "skipped": 3,
+    "seconds": 262.03,
+    "skip_reasons": [
+      "I-012 staging not requested",
+      "I-013 physical not requested",
+      "browser QA opt-in, separately run"
+    ]
+  },
+  "browser_qa": {
+    "passed": 1,
+    "deselected": 500,
+    "seconds": 191.75,
+    "data": "TEST SYNTHETIC ONLY",
+    "database": "real disposable PostgreSQL",
+    "telegram_sdk": "TEST FAKE ONLY",
+    "observed_balance_bytes": [
+      12400000000,
+      12400000017
+    ],
+    "observed_invited": 1,
+    "observed_rewarded": 1,
+    "binding_confirmed": true,
+    "themes": [
+      "dark",
+      "light"
+    ],
+    "requested_viewport_widths": [
+      390,
+      320
+    ],
+    "client_and_scroll_widths": [
+      [
+        375,
+        375
+      ],
+      [
+        305,
+        305
+      ]
+    ],
+    "logout_cleared_ui": true
+  },
+  "client_tests_passed": 5,
+  "typescript_vite_build": "passed",
+  "npm_audit_vulnerabilities": 0,
+  "ruff": "passed",
+  "ruff_formatted_files": 203,
+  "mypy": {
+    "passed": true,
+    "files": 103
+  },
+  "openapi": "current",
+  "new_dependencies": [],
+  "cleanup": {
+    "task_clusters_stopped_and_removed": true,
+    "ports_checked": [
+      18767,
+      50535
+    ],
+    "ports_open": [],
+    "preexisting_stopped_cluster_directories_preserved": 2,
+    "browser_tab_closed": true,
+    "viewport_override_reset": true
+  },
+  "limits": [
+    "No public/live Telegram acceptance",
+    "No new physical tunnel verification",
+    "Campaign economics, retention, privacy/legal and support gates remain open",
+    "Multi-account farms not eliminated",
+    "Manual code entry and explicit inviter claim; no deep links or payout scheduler"
+  ],
+  "sha256": {
+    "apps/telegram-mini-app/dist/assets/index-Dd5D6dNu.css": "a33d0d7a0d8b3684ba4c2cb3334ad763ced6a8a2f467f0cb3653d84b03371022",
+    "apps/telegram-mini-app/dist/assets/index-QQ3tTmCq.js": "4f6c300f2dc6b65ecaf67c02f8475386d71071722851ab40771f4cf9a50b37f2",
+    "apps/telegram-mini-app/dist/index.html": "7cc0f38d57dd2e91bb88f496e69b224af05055c29c854bda5e3edb1cec9cd205",
+    "apps/telegram-mini-app/src/api.mjs": "59b2e2e26a87d918ecbb7b863a8a577a4302087e9c9f86291c5e8cc983aff1d8",
+    "apps/telegram-mini-app/src/main.tsx": "17e0fb8f619453b22f69144787069716b9ccb60e208c99b675f0c83f33888daf",
+    "apps/telegram-mini-app/src/style.css": "c13bd276d3865de0ee716afdd55138fcd97d56e32056e54fd2707d535a6c5cd5",
+    "apps/telegram-mini-app/tests/api.test.mjs": "5a26a55c9d361f2f746eadcfde170cbe0021787693b06c2839bd0be4d66a9ee3",
+    "docs/assets/i-018/referrals-dark.png": "910c591b79b9b07c3480cbc4d3eb63404ec6bcfabeca9e79c764fa8a8a540248",
+    "docs/assets/i-018/referrals-light.png": "bdb9af184965dc8ba4da1340043c0495cb84c727148b47cc4ec09419bfe3c44a",
+    "docs/assets/i-018/referrals-result.png": "4ad2fe68356f1f15358d36dd00b2e6da7c5c8e5fbfe06f510c0b836e0a07689c",
+    "docs/assets/i-018/referrals-test-only.png": "8e59a2a4d595f347b6bd62bc8b356e1c77c6e09b2a6ac0482a7a34681b021617",
+    "packages/contracts/openapi.json": "a309c2a9453b22c1f6c834e7244175bf072ae480ad1d7e26c66f01f63f459803",
+    "services/api/migrations/versions/0011_referrals.py": "586c846581b6678ff6dd69a52593e5d4f175f3ebbbdd8201479338edacdcc91a",
+    "services/api/src/vpn_api/auth/security.py": "0a80ac03def891d4b078dc09d9e2ce52a0c9a938a3d5220d0afde337278367b4",
+    "services/api/src/vpn_api/auth/service.py": "d00e2fc6376c1f34e84b89960f1ed8058b7b84583c57278cb94bd90704bfd8d6",
+    "services/api/src/vpn_api/db/models.py": "d8df2e75178886928953d8bbe4f1078e429fd5a86417681ca322a89f4efdd608",
+    "services/api/src/vpn_api/main.py": "f8dc02584d82f54e110414eae2dfc512f90c733d393c3bacf4d61c73dd97d449",
+    "services/api/src/vpn_api/referrals/contracts.py": "5a4e8db91f4ad16b67d7655204b933a0407d710ebbb8ecd3a54bab66d2ec808f",
+    "services/api/src/vpn_api/referrals/routes.py": "82e78f6210088dd4e65e303e055eb438f2f1ee7e4f4a74499946dd354f0ca79d",
+    "services/api/src/vpn_api/referrals/service.py": "680da60e70260fc29b55bafef2e7995562b701881b490fa9aa325a0da5788df6",
+    "services/api/tests/test_migrations.py": "440fe3da871b4956efcbd564c22ba3769c887f4ed1cf7928db4e8afd655ae911",
+    "services/api/tests/test_mini_app_browser.py": "46cd0c5ac7b48ae36268b3220f57ee6ce3f5f2eb05b08eb16b933020c7779971",
+    "services/api/tests/test_referrals.py": "044dd43108332ae0982d0919ce44e4b6bad6eaa1004d220b64fd7d08f660bb27",
+    "services/api/tests/test_rewards.py": "8e99e5d958511cc16e151356beac35a1edad9c5e341dd42724fbe4e8426d76a6",
+    "services/api/tests/test_tunnel_admission.py": "c09aa75dee4a36787e6d6b7ce779a82f3e70920bc6d625f880f501d7f2807c03"
+  }
+}

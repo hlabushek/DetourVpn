@@ -1,0 +1,12 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "urn:project-vpn:agent-usage.v1.json",
+    "title": "Authenticated node agent usage request v1",
+    "type": "object",
+    "additionalProperties": false,
+    "required": ["contract_version", "sample"],
+    "properties": {
+        "contract_version": {"const": 1},
+        "sample": {"$ref": "urn:project-vpn:usage-sample.v1.json"}
+    }
+}

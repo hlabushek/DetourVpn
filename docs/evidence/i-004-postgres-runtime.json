@@ -1,0 +1,9 @@
+{
+  "url": "https://get.enterprisedb.com/postgresql/postgresql-17.11-2-windows-x64-binaries.zip",
+  "sha256": "2f868d77832f5cbc62182a0ca57f02df14d33d85ce0d0bbaaeb0de3a7029bd2b",
+  "bytes": 340722468,
+  "scope": "local ephemeral I-004 tests; digest observed after HTTPS download, not independent vendor signature verification",
+  "observed_on": "2026-10-18",
+  "reported_server_version": "PostgreSQL 17.11",
+  "test_scope": "temporary local SCRAM-authenticated loopback cluster; no Windows service registration"
+}
