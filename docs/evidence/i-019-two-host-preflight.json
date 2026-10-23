@@ -1,0 +1,52 @@
+{
+  "issue": "I-019",
+  "measured_at": "2026-10-22T17:04:26Z",
+  "scope": "read-only SSH metadata and local adb inventory",
+  "adr": "ADR-033",
+  "issue_complete": false,
+  "live_vpn_drill_run": false,
+  "infrastructure_changed": false,
+  "provider_independence_verified": false,
+  "same_provider": "owner-confirmed",
+  "provider_name": null,
+  "physical_android_connected": false,
+  "hosts": [
+    {
+      "role": "A",
+      "address": "45.10.166.106",
+      "ssh_user": "vpn-deploy",
+      "ssh_key_auth_passed": true,
+      "kernel": "6.8.0-147-generic",
+      "tun_present": true,
+      "ntp_synchronized_reported": true,
+      "clock_skew_measured": false,
+      "sudo_noninteractive_available": false,
+      "pinned_release_path_present": true,
+      "release_hashes_verified": false,
+      "i011_service_state": "failed",
+      "i012_agent_service_state": "inactive"
+    },
+    {
+      "role": "B",
+      "address": "85.209.132.205",
+      "ssh_user": "vpn-deploy",
+      "ssh_key_auth_passed": true,
+      "kernel": "6.8.0-35-generic",
+      "tun_present": true,
+      "ntp_synchronized_reported": true,
+      "clock_skew_measured": false,
+      "sudo_noninteractive_available": false,
+      "pinned_release_path_present": false,
+      "release_hashes_verified": false,
+      "reboot_required_reported": true,
+      "i011_service_state": "inactive",
+      "i012_agent_service_state": "inactive"
+    }
+  ],
+  "limits": [
+    "Not a complete privileged network/container/firewall baseline",
+    "No tunnel, peer, egress, cutoff, expiry, ledger or cleanup drill performed",
+    "Existing A-only scripts cannot be used on B by overriding their guards",
+    "Provisioning B, reviewed two-node runner, local sudo and physical Android remain prerequisites"
+  ]
+}

@@ -1,0 +1,91 @@
+{
+  "issue": "I-019",
+  "measured_at": "2026-10-22T17:56:59.460742+00:00",
+  "scope": "B pinned artifact installation and local two-host drill preparation",
+  "issue_complete": false,
+  "live_failover_run": false,
+  "i019_grants_installed": false,
+  "b_artifacts_installed": true,
+  "b_ansible": {
+    "ok": 14,
+    "changed": 3,
+    "unreachable": 0,
+    "failed": 0
+  },
+  "b_remote_four_artifact_hashes_matched": true,
+  "b_root_ownership_and_binary_0755_verified": true,
+  "b_forwarding_after_install": 0,
+  "b_i011_endpoint_state": "inactive",
+  "b_i012_agent_state": "inactive",
+  "same_provider": "owner-confirmed",
+  "provider_independence_verified": false,
+  "physical_android_connected": true,
+  "python": {
+    "ruff_passed": true,
+    "mypy_files": 108,
+    "mypy_passed": true
+  },
+  "local_tests": {
+    "passed": 151,
+    "skipped": 1,
+    "skip": "opt-in physical two-host drill"
+  },
+  "flutter": {
+    "analyze_passed": true,
+    "tests_passed": 47
+  },
+  "android": {
+    "unit_tests": 10,
+    "failures": 0,
+    "errors": 0,
+    "lint_passed": true,
+    "normal_debug_built": true,
+    "unsigned_release_built": true,
+    "physical_i019_target_compiled": true
+  },
+  "normal_artifacts": {
+    "app-debug.apk": {
+      "sha256": "cc880d73d64406373eabadc003080d6df7640e9a8a63e8947803c11d90b5c194",
+      "selected_i019_test_markers_present": false
+    },
+    "app-release.apk": {
+      "sha256": "5cbf0cff2646ddb39772f070442708e909d91b0e464c6f9719c5caa4260bfd01",
+      "selected_i019_test_markers_present": false
+    }
+  },
+  "local_wsl_network_namespace": {
+    "real_nft_table_cleanup_passed": true,
+    "foreign_rule_preserved": true,
+    "iptables_frontend_tested": false,
+    "note": "WSL has nft, not iptables; native nft created standard table shape in fresh unshare --net"
+  },
+  "read_only_clock_offset_upper_bounds_seconds": {
+    "45.10.166.106": 0.9518,
+    "85.209.132.205": 0.9336
+  },
+  "clock_check_repeated_before_live": true,
+  "limits": [
+    "No live two-node VPN acceptance yet",
+    "No provider-failure acceptance",
+    "No new production deployment or public release",
+    "Selected APK marker check is not a supply-chain audit"
+  ],
+  "source_sha256": {
+    "infra/ansible/staging-node.yml": "4052c1aa55aa108501001737ea4e9742baa18c582257eec11c93e18b707f3fda",
+    "infra/ansible/inventory.i019-b.yml": "473deeb1b3a5dd78769cade1a629517ae5b4e385c5fda31a202a2eb5d48ee9ed",
+    "infra/ansible/inventory.i019.yml": "457747f64d6c25ad7315aa2ec5e45485ce1c8629fd082c8e68a37652aa6f7adf",
+    "infra/ansible/staging-i019.yml": "e8431f6b917d68f983a20c7edff9c19742beafde26ef95b5683c6f35808c846b",
+    "scripts/prepare_i019_node_b.ps1": "aad2a5ce98104668d798fefe239c6345d8cb63a545086aee71ff2dece89779a1",
+    "scripts/run_i019_staging.ps1": "4f565a7fcad35b279d1ace4fc3602462e091c5b0836d7eab14deed0b5e2bf991",
+    "scripts/i019_control.py": "cd22b2ec5b247ee874b8ebe779dbdaed66c82cd52713883e0550eeb415fc6b30",
+    "scripts/check_i019_nft.py": "fb7f1ea83482c76d8bbbb2f112d262ce85c4d454dc4f58db38f8623d44b6fffe",
+    "scripts/android_staging_window.py": "b66edbf5e2c66aa048fa9c91dfa3e01f67f09c774571eed7eca99705ea104f70",
+    "scripts/awg_local_smoke.py": "af23424c21b28c6a30b5f614995f3c1eae5467c66e71495f985578ce750a480c",
+    "infra/ansible/tests/test_i019_control.py": "5b8ceff9aa4f36900d25e4251da944a08cdbd0538559a623bed198171e7d6301",
+    "infra/ansible/tests/test_android_staging_window.py": "1650e1ccbdb3d9e0d1c4465c8e1eb18f8bbbe460925e16894d2efae498a42238",
+    "services/api/tests/test_i019_live.py": "9a6e8391ebed4e3e98d5dc37df9ca41f92c7ef886de020d10b4187866f0a3530",
+    "apps/client/integration_test/node_failover_live_test.dart": "412978379d5f0d1cfa1e8733309a41433ea66d6da84a80e459da30eb1de7c292",
+    "docs/adr/033-i019-same-provider-drill.md": "4bf71b9089d8d7fa702e3f489937f78178de2134dca7132614b478d57bcc1c29",
+    "docs/runbooks/node-failover.md": "1d7c0948efcb219550a4d22b7e326ea424e34fc2532f492a189e3c578f1d3fd8"
+  }
+}

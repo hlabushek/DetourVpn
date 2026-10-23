@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>DetourVpn — управление</title><link rel="stylesheet" href="style.css"><script type="module" src="admin.js"></script></head>
+<body><header><h1>DetourVpn · управление</h1><p>Закрытая бесплатная эксплуатация. Приём платежей выключен.</p></header>
+<p id="status" role="status" aria-live="polite"></p>
+<section id="login"><h2>Вход администратора</h2>
+<form id="login-form"><label>Логин<input name="username" autocomplete="username" required></label>
+<label>Пароль<input name="password" type="password" autocomplete="current-password" required></label>
+<label>Код аутентификатора<input name="code" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" required></label>
+<button>Войти с MFA</button></form></section>
+<main id="workspace" hidden>
+<nav><button id="refresh">Обновить</button><button id="logout">Выйти</button></nav>
+<section><h2>Пользователи</h2><form id="search-form"><label>UUID или Telegram ID<input name="q"></label><button>Найти</button></form><div id="users"></div></section>
+<section><h2>Выбранный пользователь</h2><p id="selected">Выберите пользователя в списке.</p><div id="quota"></div><div id="devices"></div><div id="subscriptions"></div><div id="history"></div></section>
+<section id="changes"><h2>Изменить трафик или доступ</h2><p>Изменения требуют причины. При сетевой ошибке повтор сохраняет тот же ключ операции.</p>
+<form id="action-form"><label>Действие<select name="operation"><option value="credit">Добавить трафик / компенсация</option><option value="debit">Уменьшить доступный трафик</option><option value="grant_subscription">Выдать / продлить / сменить тариф</option><option value="revoke_subscription">Отменить / отозвать подписку</option><option value="revoke_device">Отозвать устройство и VPN-доступ</option></select></label>
+<label>Тариф для выдачи<select name="plan_id" id="plan-picker"></select></label>
+<label>UUID подписки или устройства для отзыва<input name="resource_id"></label>
+<label>Количество bytes для изменения трафика<input name="amount_bytes" inputmode="numeric" pattern="[0-9]+"></label>
+<label>Причина<textarea name="reason" minlength="3" maxlength="500" required></textarea></label>
+<button>Применить</button><button type="button" id="new-operation">Начать новую операцию</button></form></section>
+<section><h2>Тарифы и версии</h2><p>Цены демонстрационные. Действующая выдача сохраняет свою версию тарифа.</p><div id="plans"></div>
+<button id="demo-catalog">Инициализировать демонстрационный каталог</button>
+<form id="plan-form"><h3>Новая версия тарифа</h3><label>Код<input name="code" pattern="[a-z][a-z0-9_-]{0,31}" required></label>
+<label>Название<input name="name" maxlength="80" required></label><label>Тип<select name="kind"><option value="subscription">Подписка</option><option value="addon">Дополнительный пакет</option></select></label>
+<label>Цена, копейки<input name="price_minor" inputmode="numeric" pattern="[0-9]+" required></label>
+<label>Квота, bytes<input name="quota_bytes" inputmode="numeric" pattern="[0-9]+" required></label>
+<label>Период, дней<input name="period_days" type="number" min="1" max="366" value="30" required></label>
+<label>Причина<textarea name="reason" minlength="3" maxlength="500" required></textarea></label><button>Создать версию</button></form></section>
+<section><h2>Узлы</h2><p>Статус control plane не подтверждает VPN egress. Текущий v2: один peer на узел, lease до 60 секунд.</p><div id="nodes"></div></section>
+<section><h2>Журнал административных действий</h2><div id="audit"></div></section>
+</main></body></html>

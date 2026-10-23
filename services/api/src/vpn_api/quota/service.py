@@ -1,10 +1,18 @@
+from datetime import datetime
 from uuid import UUID
 
-from sqlalchemy import Engine, case, func, select
+from sqlalchemy import Engine, case, func, or_, select
 from sqlalchemy.orm import Session
 
 from vpn_api.db.connection import transaction
-from vpn_api.db.models import QuotaLedger, QuotaOperation, TunnelReservation, User
+from vpn_api.db.models import (
+    QuotaFundingLot,
+    QuotaFundingUse,
+    QuotaLedger,
+    QuotaOperation,
+    TunnelReservation,
+    User,
+)
 from vpn_api.quota.contracts import (
     MAX_BYTES,
     HistoryResponse,
@@ -35,7 +43,8 @@ class LedgerService:
             raise QuotaError("quota_owner_unavailable")
 
     @staticmethod
-    def _state(session: Session, user_id: UUID) -> QuotaResponse:
+    def _state(session: Session, user_id: UUID, now: datetime | None = None) -> QuotaResponse:
+        now = now if now is not None else session.scalar(select(func.clock_timestamp()))
         row = session.execute(
             select(
                 func.coalesce(
@@ -90,13 +99,36 @@ class LedgerService:
             )
             or 0
         )
-        if not 0 <= reserved <= granted - used:
+        funded, unavailable = session.execute(
+            select(
+                func.coalesce(func.sum(QuotaFundingLot.remaining_bytes), 0),
+                func.coalesce(
+                    func.sum(
+                        case(
+                            (
+                                or_(
+                                    QuotaFundingLot.revoked_at.is_not(None),
+                                    QuotaFundingLot.starts_at > now,
+                                    QuotaFundingLot.expires_at <= now,
+                                ),
+                                QuotaFundingLot.remaining_bytes,
+                            ),
+                            else_=0,
+                        )
+                    ),
+                    0,
+                ),
+            ).where(QuotaFundingLot.user_id == user_id)
+        ).one()
+        unavailable = int(unavailable)
+        if int(funded) != granted - used or not 0 <= reserved <= granted - used - unavailable:
             raise QuotaError("quota_inconsistent", 503)
         return QuotaResponse(
             granted_bytes=granted,
             used_bytes=used,
-            available_bytes=granted - used - reserved,
+            available_bytes=granted - used - reserved - unavailable,
             reserved_bytes=reserved,
+            unavailable_bytes=unavailable,
             revision=count,
             initial_grant_applied=initial is not None,
         )
@@ -182,6 +214,9 @@ class LedgerService:
         source_type: str,
         source_id: UUID,
         key: UUID,
+        *,
+        starts_at: datetime | None = None,
+        expires_at: datetime | None = None,
     ) -> OperationResult:
         existing = session.scalar(
             select(QuotaOperation).where(
@@ -206,7 +241,8 @@ class LedgerService:
         )
         if business is not None:
             raise QuotaError("quota_source_conflict")
-        current = self._state(session, user_id)
+        now = session.scalar(select(func.clock_timestamp()))
+        current = self._state(session, user_id, now)
         error: str | None = None
         if kind == "debit" and amount > current.available_bytes:
             error = "insufficient_quota"
@@ -219,7 +255,6 @@ class LedgerService:
         delta = amount if kind == "credit" else -amount
         prior_balance = current.granted_bytes - current.used_bytes
         balance = prior_balance + delta if error is None else prior_balance
-        now = session.scalar(select(func.clock_timestamp()))
         receipt = QuotaOperation(
             user_id=user_id,
             idempotency_key=key,
@@ -232,6 +267,7 @@ class LedgerService:
             balance_after_bytes=balance,
             revision_before=current.revision,
             reserved_before_bytes=current.reserved_bytes,
+            unavailable_before_bytes=current.unavailable_bytes,
             created_at=now,
         )
         session.add(receipt)
@@ -252,6 +288,54 @@ class LedgerService:
                 )
             )
             session.flush()
+            if kind == "credit":
+                session.add(
+                    QuotaFundingLot(
+                        id=receipt.id,
+                        user_id=user_id,
+                        granted_bytes=amount,
+                        initial_remaining_bytes=amount,
+                        remaining_bytes=amount,
+                        starts_at=starts_at or now,
+                        expires_at=expires_at,
+                    )
+                )
+            else:
+                remaining = amount
+                lots = session.scalars(
+                    select(QuotaFundingLot)
+                    .where(
+                        QuotaFundingLot.user_id == user_id,
+                        QuotaFundingLot.remaining_bytes > 0,
+                        QuotaFundingLot.starts_at <= now,
+                        QuotaFundingLot.revoked_at.is_(None),
+                        or_(QuotaFundingLot.expires_at.is_(None), QuotaFundingLot.expires_at > now),
+                    )
+                    .order_by(
+                        QuotaFundingLot.expires_at.asc().nulls_last(),
+                        QuotaFundingLot.starts_at,
+                        QuotaFundingLot.id,
+                    )
+                    .with_for_update()
+                )
+                for lot in lots:
+                    spent = min(remaining, lot.remaining_bytes)
+                    if spent:
+                        lot.remaining_bytes -= spent
+                        session.add(
+                            QuotaFundingUse(
+                                operation_id=receipt.id,
+                                lot_id=lot.id,
+                                user_id=user_id,
+                                amount_bytes=spent,
+                            )
+                        )
+                        remaining -= spent
+                    if remaining == 0:
+                        break
+                if remaining:
+                    raise QuotaError("quota_inconsistent", 503)
+            session.flush()
         return self._result(session, receipt)
 
     def quota(self, session: Session, user_id: UUID) -> QuotaResponse:
@@ -266,8 +350,9 @@ class LedgerService:
         limit: int = 50,
         before_sequence: int | None = None,
         snapshot_revision: int | None = None,
+        include_inactive: bool = False,
     ) -> HistoryResponse:
-        self._lock_owner(session, user_id)
+        self._lock_owner(session, user_id, active=not include_inactive)
         current = self._state(session, user_id)
         snapshot = current.revision if snapshot_revision is None else snapshot_revision
         if (
@@ -358,11 +443,17 @@ class LedgerService:
                 violations += 1
                 continue
             prior_grants, prior_used, prior_balance = prefix
-            violations += int(not 0 <= receipt.reserved_before_bytes <= prior_balance)
+            violations += int(
+                not 0 <= receipt.reserved_before_bytes <= prior_balance
+                or not 0
+                <= receipt.unavailable_before_bytes
+                <= prior_balance - receipt.reserved_before_bytes
+            )
             expected_error = (
                 "insufficient_quota"
                 if receipt.kind == "debit"
-                and receipt.amount_bytes > prior_balance - receipt.reserved_before_bytes
+                and receipt.amount_bytes
+                > prior_balance - receipt.reserved_before_bytes - receipt.unavailable_before_bytes
                 else "quota_capacity_exceeded"
                 if (
                     receipt.revision_before == MAX_BYTES
@@ -405,6 +496,54 @@ class LedgerService:
                     or operation.idempotency_key != reservation.tunnel_id
                 )
         violations += len(lease_ops)
+        lots = list(
+            session.scalars(select(QuotaFundingLot).where(QuotaFundingLot.user_id == user_id))
+        )
+        violations += int(len(lots) != sum(entry.kind == "credit" for entry in entries))
+        violations += int(sum(lot.remaining_bytes for lot in lots) != granted - used)
+        for lot in lots:
+            allocated = int(
+                session.scalar(
+                    select(func.coalesce(func.sum(QuotaFundingUse.amount_bytes), 0)).where(
+                        QuotaFundingUse.lot_id == lot.id
+                    )
+                )
+                or 0
+            )
+            violations += int(lot.initial_remaining_bytes - allocated != lot.remaining_bytes)
+            credit = receipts.get(lot.id)
+            violations += int(
+                credit is None
+                or credit.kind != "credit"
+                or credit.status != "applied"
+                or credit.amount_bytes != lot.granted_bytes
+            )
+        unavailable = int(
+            session.scalar(
+                select(func.coalesce(func.sum(QuotaFundingLot.remaining_bytes), 0)).where(
+                    QuotaFundingLot.user_id == user_id,
+                    or_(
+                        QuotaFundingLot.revoked_at.is_not(None),
+                        QuotaFundingLot.starts_at > func.clock_timestamp(),
+                        QuotaFundingLot.expires_at <= func.clock_timestamp(),
+                    ),
+                )
+            )
+            or 0
+        )
+        violations += int(not 0 <= reserved <= granted - used - unavailable)
+        for operation_id, amount in session.execute(
+            select(QuotaFundingUse.operation_id, func.sum(QuotaFundingUse.amount_bytes))
+            .where(QuotaFundingUse.user_id == user_id)
+            .group_by(QuotaFundingUse.operation_id)
+        ):
+            debit = receipts.get(operation_id)
+            violations += int(
+                debit is None
+                or debit.kind != "debit"
+                or debit.status != "applied"
+                or debit.amount_bytes != int(amount)
+            )
         return ReconciliationResult(
             consistent=violations == 0,
             ledger_entries=len(entries),
@@ -412,5 +551,5 @@ class LedgerService:
             violations=violations,
             granted_bytes=granted,
             used_bytes=used,
-            available_bytes=granted - used - reserved,
+            available_bytes=granted - used - reserved - unavailable,
         )

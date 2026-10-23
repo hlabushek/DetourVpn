@@ -1,3 +1,5 @@
+import re
+
 from pydantic import SecretStr
 from sqlalchemy.engine import URL, make_url
 from sqlalchemy.exc import ArgumentError
@@ -15,6 +17,9 @@ def parse_local_database_url(value: SecretStr) -> URL:
             or url.host not in LOOPBACK_ADDRESSES
             or not url.username
             or not url.database
+            # libpq can expand dbname containing '=' or a connection URI.
+            # Match the operations CLI boundary; never accept connection options here.
+            or re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]{0,62}", url.database) is None
             or url.query
             or (url.port is not None and not 1 <= url.port <= 65535)
         ):

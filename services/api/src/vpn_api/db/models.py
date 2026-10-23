@@ -3,6 +3,7 @@ from typing import Literal
 from uuid import UUID, uuid4
 
 from sqlalchemy import (
+    JSON,
     BigInteger,
     Boolean,
     CheckConstraint,
@@ -39,6 +40,46 @@ class User(Base):
     locale: Mapped[str] = mapped_column(String(16), server_default=text("'ru'"))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     verified_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class AdminIdentity(Base):
+    __tablename__ = "admin_identities"
+    __table_args__ = (
+        CheckConstraint("role IN ('admin', 'operator')", name="ck_admin_identities_role"),
+    )
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    username: Mapped[str] = mapped_column(String(64), unique=True)
+    password_hash: Mapped[str] = mapped_column(String(512))
+    totp_ciphertext: Mapped[str] = mapped_column(String(512))
+    role: Mapped[str] = mapped_column(String(16))
+    last_totp_step: Mapped[int] = mapped_column(BigInteger, server_default=text("-1"))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    disabled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class AdminSession(Base):
+    __tablename__ = "admin_sessions"
+    __table_args__ = (Index("ix_admin_sessions_expiry", "expires_at"),)
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    admin_id: Mapped[UUID] = mapped_column(ForeignKey("admin_identities.id", ondelete="RESTRICT"))
+    token_digest: Mapped[str] = mapped_column(String(64), unique=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class AdminAction(Base):
+    __tablename__ = "admin_actions"
+    __table_args__ = (Index("ix_admin_actions_created", "created_at", "id"),)
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    admin_id: Mapped[UUID] = mapped_column(ForeignKey("admin_identities.id", ondelete="RESTRICT"))
+    user_id: Mapped[UUID | None] = mapped_column(ForeignKey("users.id", ondelete="RESTRICT"))
+    operation: Mapped[str] = mapped_column(String(32))
+    reason: Mapped[str] = mapped_column(String(500))
+    idempotency_key: Mapped[UUID] = mapped_column(unique=True)
+    request_digest: Mapped[str] = mapped_column(String(64))
+    result: Mapped[dict[str, object]] = mapped_column(JSON)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
 
 
 class AuthIdentity(Base):
@@ -209,6 +250,7 @@ class QuotaOperation(Base):
         ),
         CheckConstraint("balance_after_bytes >= 0", name="ck_quota_operations_balance"),
         CheckConstraint("revision_before >= 0", name="ck_quota_operations_revision"),
+        CheckConstraint("unavailable_before_bytes >= 0", name="ck_quota_operations_unavailable"),
         CheckConstraint(
             "source_type NOT IN ('usage', 'tunnel_lease') OR kind = 'debit'",
             name="ck_quota_operations_usage",
@@ -227,6 +269,7 @@ class QuotaOperation(Base):
     balance_after_bytes: Mapped[int] = mapped_column(BigInteger)
     revision_before: Mapped[int] = mapped_column(BigInteger)
     reserved_before_bytes: Mapped[int] = mapped_column(BigInteger, server_default=text("0"))
+    unavailable_before_bytes: Mapped[int] = mapped_column(BigInteger, server_default=text("0"))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
 
 
@@ -282,6 +325,129 @@ class QuotaLedger(Base):
     source_id: Mapped[UUID] = mapped_column()
     idempotency_key: Mapped[UUID] = mapped_column()
     balance_after_bytes: Mapped[int] = mapped_column(BigInteger)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+
+class QuotaFundingLot(Base):
+    __tablename__ = "quota_funding_lots"
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["id", "user_id"],
+            ["quota_operations.id", "quota_operations.user_id"],
+            name="fk_quota_funding_owner",
+            ondelete="RESTRICT",
+        ),
+        UniqueConstraint("id", "user_id", name="uq_quota_funding_id_user"),
+        CheckConstraint(
+            "granted_bytes >= initial_remaining_bytes AND initial_remaining_bytes >= "
+            "remaining_bytes AND remaining_bytes >= 0",
+            name="ck_quota_funding_bytes",
+        ),
+        CheckConstraint(
+            "expires_at IS NULL OR expires_at > starts_at", name="ck_quota_funding_window"
+        ),
+        Index("ix_quota_funding_user_window", "user_id", "expires_at", "starts_at"),
+    )
+    id: Mapped[UUID] = mapped_column(primary_key=True)
+    user_id: Mapped[UUID] = mapped_column(ForeignKey("users.id", ondelete="RESTRICT"))
+    granted_bytes: Mapped[int] = mapped_column(BigInteger)
+    initial_remaining_bytes: Mapped[int] = mapped_column(BigInteger)
+    remaining_bytes: Mapped[int] = mapped_column(BigInteger)
+    starts_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class QuotaFundingUse(Base):
+    __tablename__ = "quota_funding_uses"
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["operation_id", "user_id"],
+            ["quota_operations.id", "quota_operations.user_id"],
+            name="fk_quota_funding_use_operation",
+            ondelete="RESTRICT",
+        ),
+        ForeignKeyConstraint(
+            ["lot_id", "user_id"],
+            ["quota_funding_lots.id", "quota_funding_lots.user_id"],
+            name="fk_quota_funding_use_lot",
+            ondelete="RESTRICT",
+        ),
+        CheckConstraint("amount_bytes > 0", name="ck_quota_funding_use_bytes"),
+        Index("ix_quota_funding_uses_lot", "lot_id"),
+    )
+    operation_id: Mapped[UUID] = mapped_column(primary_key=True)
+    lot_id: Mapped[UUID] = mapped_column(primary_key=True)
+    user_id: Mapped[UUID] = mapped_column(ForeignKey("users.id", ondelete="RESTRICT"))
+    amount_bytes: Mapped[int] = mapped_column(BigInteger)
+
+
+class PlanRevision(Base):
+    __tablename__ = "plan_revisions"
+    __table_args__ = (
+        UniqueConstraint("code", "version", name="uq_plan_revisions_code_version"),
+        UniqueConstraint("idempotency_key", name="uq_plan_revisions_key"),
+        CheckConstraint(
+            "version > 0 AND price_minor >= 0 AND quota_bytes > 0", name="ck_plan_revisions_amounts"
+        ),
+        CheckConstraint("period_days BETWEEN 1 AND 366", name="ck_plan_revisions_period"),
+        CheckConstraint(
+            "kind IN ('subscription', 'addon') AND currency = 'RUB'", name="ck_plan_revisions_kind"
+        ),
+    )
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    code: Mapped[str] = mapped_column(String(32))
+    version: Mapped[int] = mapped_column(Integer)
+    name: Mapped[str] = mapped_column(String(80))
+    kind: Mapped[str] = mapped_column(String(16))
+    price_minor: Mapped[int] = mapped_column(BigInteger)
+    currency: Mapped[str] = mapped_column(String(3), server_default=text("'RUB'"))
+    quota_bytes: Mapped[int] = mapped_column(BigInteger)
+    period_days: Mapped[int] = mapped_column(Integer)
+    idempotency_key: Mapped[UUID] = mapped_column()
+    actor: Mapped[str] = mapped_column(String(128))
+    reason: Mapped[str] = mapped_column(String(500))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+
+class Subscription(Base):
+    __tablename__ = "subscriptions"
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["funding_id", "user_id"],
+            ["quota_funding_lots.id", "quota_funding_lots.user_id"],
+            name="fk_subscriptions_funding_owner",
+            ondelete="RESTRICT",
+        ),
+        UniqueConstraint("user_id", "idempotency_key", name="uq_subscriptions_user_key"),
+        UniqueConstraint("funding_id", name="uq_subscriptions_funding"),
+        CheckConstraint("ends_at > starts_at", name="ck_subscriptions_window"),
+        CheckConstraint("basis = 'admin_grant'", name="ck_subscriptions_basis"),
+        Index("ix_subscriptions_user_window", "user_id", "ends_at"),
+    )
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    user_id: Mapped[UUID] = mapped_column(ForeignKey("users.id", ondelete="RESTRICT"))
+    plan_revision_id: Mapped[UUID] = mapped_column(
+        ForeignKey("plan_revisions.id", ondelete="RESTRICT")
+    )
+    funding_id: Mapped[UUID] = mapped_column()
+    idempotency_key: Mapped[UUID] = mapped_column()
+    basis: Mapped[str] = mapped_column(String(32), server_default=text("'admin_grant'"))
+    starts_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    ends_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    actor: Mapped[str] = mapped_column(String(128))
+    reason: Mapped[str] = mapped_column(String(500))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+
+class SubscriptionRevocation(Base):
+    __tablename__ = "subscription_revocations"
+    subscription_id: Mapped[UUID] = mapped_column(
+        ForeignKey("subscriptions.id", ondelete="RESTRICT"), primary_key=True
+    )
+    idempotency_key: Mapped[UUID] = mapped_column(unique=True)
+    actor: Mapped[str] = mapped_column(String(128))
+    reason: Mapped[str] = mapped_column(String(500))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
 
 

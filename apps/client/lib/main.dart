@@ -6,6 +6,10 @@ import 'api.dart';
 import 'connection.dart';
 import 'native_tunnel.dart';
 import 'quota_screen.dart';
+import 'connection_screen.dart';
+import 'orbit_theme.dart';
+import 'orbit_widgets.dart';
+export 'connection_screen.dart' show ConnectionScreen;
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -30,7 +34,8 @@ class VpnApp extends StatefulWidget {
 class _VpnAppState extends State<VpnApp> with WidgetsBindingObserver {
   ConnectionController? connection;
   bool showLogin = true;
-  ThemeMode theme = ThemeMode.system;
+  ThemeMode theme = ThemeMode.dark;
+  int tab = 0;
   @override
   void initState() {
     super.initState();
@@ -52,6 +57,7 @@ class _VpnAppState extends State<VpnApp> with WidgetsBindingObserver {
     setState(() {
       connection = value;
       showLogin = false;
+      tab = 0;
     });
     unawaited(value.refresh());
     unawaited(value.refreshQuota());
@@ -87,18 +93,24 @@ class _VpnAppState extends State<VpnApp> with WidgetsBindingObserver {
     title: 'DetourVpn · тестовый клиент',
     debugShowCheckedModeBanner: false,
     themeMode: theme,
-    theme: ThemeData(
-      colorSchemeSeed: const Color(0xff206c60),
-      useMaterial3: true,
-    ),
-    darkTheme: ThemeData(
-      colorSchemeSeed: const Color(0xff67d7bc),
-      brightness: Brightness.dark,
-      useMaterial3: true,
-    ),
+    theme: orbitTheme(Brightness.light),
+    darkTheme: orbitTheme(Brightness.dark),
     home: Scaffold(
       appBar: AppBar(
-        title: const Text('DetourVpn'),
+        title: const Text.rich(
+          TextSpan(
+            children: [
+              TextSpan(
+                text: 'Detour',
+                style: TextStyle(fontWeight: FontWeight.w700),
+              ),
+              TextSpan(
+                text: 'Vpn',
+                style: TextStyle(color: Color(0xffbc93ed)),
+              ),
+            ],
+          ),
+        ),
         actions: [
           IconButton(
             tooltip: 'Сменить тему',
@@ -111,6 +123,31 @@ class _VpnAppState extends State<VpnApp> with WidgetsBindingObserver {
           ),
         ],
       ),
+      bottomNavigationBar: showLogin
+          ? null
+          : NavigationBar(
+              selectedIndex: tab,
+              onDestinationSelected: (value) {
+                setState(() => tab = value);
+                if (value == 1) unawaited(connection!.refreshQuota());
+              },
+              destinations: const [
+                NavigationDestination(
+                  icon: Icon(Icons.home_outlined),
+                  selectedIcon: Icon(Icons.home_rounded),
+                  label: 'VPN',
+                ),
+                NavigationDestination(
+                  icon: Icon(Icons.bar_chart_rounded),
+                  label: 'Трафик',
+                ),
+                NavigationDestination(
+                  icon: Icon(Icons.person_outline),
+                  selectedIcon: Icon(Icons.person),
+                  label: 'Профиль',
+                ),
+              ],
+            ),
       body: SafeArea(
         child: Center(
           child: ConstrainedBox(
@@ -128,7 +165,25 @@ class _VpnAppState extends State<VpnApp> with WidgetsBindingObserver {
                     native: widget.native,
                     onSignedIn: signedIn,
                   )
-                : ConnectionScreen(controller: connection!, onSignOut: signOut),
+                : switch (tab) {
+                    1 => QuotaScreen(
+                      controller: connection!.quota,
+                      embedded: true,
+                    ),
+                    2 => ProfileScreen(
+                      onSignOut: signOut,
+                      onTheme: () => setState(
+                        () => theme = theme == ThemeMode.dark
+                            ? ThemeMode.light
+                            : ThemeMode.dark,
+                      ),
+                      controller: connection!,
+                    ),
+                    _ => ConnectionScreen(
+                      controller: connection!,
+                      onSignOut: signOut,
+                    ),
+                  },
           ),
         ),
       ),
@@ -185,8 +240,9 @@ class _LoginScreenState extends State<LoginScreen> {
   Widget build(BuildContext context) => ListView(
     padding: const EdgeInsets.all(24),
     children: [
+      const OrbitArtwork(),
       Text(
-        'Подключение под вашим контролем',
+        'Ваш маршрут\nк свободному интернету',
         style: Theme.of(context).textTheme.headlineMedium,
       ),
       const SizedBox(height: 16),
@@ -268,177 +324,5 @@ class _LoginScreenState extends State<LoginScreen> {
         'Просмотренные сайты и DNS-запросы не отправляются в API приложения.',
       ),
     ],
-  );
-}
-
-class ConnectionScreen extends StatelessWidget {
-  const ConnectionScreen({
-    super.key,
-    required this.controller,
-    required this.onSignOut,
-  });
-  final ConnectionController controller;
-  final Future<void> Function() onSignOut;
-  @override
-  Widget build(BuildContext context) => ListenableBuilder(
-    listenable: controller,
-    builder: (context, _) {
-      final c = controller;
-      final connected = c.phase == ConnectionPhase.connected;
-      final title = switch (c.phase) {
-        ConnectionPhase.disconnected => 'Отключено',
-        ConnectionPhase.connecting => 'Подключение',
-        ConnectionPhase.connected => 'Подключено',
-        ConnectionPhase.reconnecting => 'Восстановление связи',
-        ConnectionPhase.failed => 'Требуется действие',
-      };
-      return ListView(
-        padding: const EdgeInsets.all(24),
-        children: [
-          Semantics(
-            liveRegion: true,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(title, style: Theme.of(context).textTheme.headlineLarge),
-                const SizedBox(height: 8),
-                Text(c.detail),
-              ],
-            ),
-          ),
-          const SizedBox(height: 24),
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(20),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Row(
-                    children: [
-                      Icon(Icons.dns_outlined),
-                      SizedBox(width: 12),
-                      Expanded(child: Text('Тестовые узлы')),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  const Text('До 60 секунд · бюджет 1 048 576 байт'),
-                  RadioGroup<String?>(
-                    groupValue: c.selectedNode,
-                    onChanged: c.selectNode,
-                    child: Column(
-                      children: [
-                        RadioListTile<String?>(
-                          value: null,
-                          title: const Text('Первый доступный узел'),
-                          enabled: !c.busy && !c.hasLease,
-                        ),
-                        for (final node in c.nodes)
-                          RadioListTile<String?>(
-                            value: node.id,
-                            title: Text('${node.name} · ${node.region}'),
-                            subtitle: Text(nodeMessage(node.reason)),
-                            enabled:
-                                !c.busy &&
-                                !c.hasLease &&
-                                c.nodesError == null &&
-                                node.reason == 'available',
-                          ),
-                      ],
-                    ),
-                  ),
-                  if (c.nodesError != null)
-                    const Text(
-                      'Каталог не обновлён; прежние статусы устарели.',
-                    ),
-                  if (c.nodesUpdatedAt != null)
-                    Text(
-                      'Проверка: ${c.nodesUpdatedAt!.toLocal().toString().substring(0, 19)}',
-                    ),
-                  TextButton(
-                    onPressed: c.nodesLoading ? null : c.refreshNodes,
-                    child: const Text('Обновить список узлов'),
-                  ),
-                  const SizedBox(height: 12),
-                  Text(
-                    c.availableBytes == null
-                        ? 'Остаток трафика неизвестен'
-                        : 'Доступно: ${c.availableBytes} байт',
-                  ),
-                  if (c.quotaUpdatedAt != null)
-                    Text(
-                      '${c.quotaStale ? 'Данные устарели' : 'Обновлено'}: ${c.quotaUpdatedAt!.toLocal().toString().substring(0, 19)}',
-                    ),
-                  TextButton(
-                    onPressed: c.busy ? null : c.refreshQuota,
-                    child: const Text('Обновить остаток'),
-                  ),
-                  TextButton.icon(
-                    icon: const Icon(Icons.receipt_long_outlined),
-                    label: const Text('Трафик и история'),
-                    onPressed: () {
-                      unawaited(c.refreshQuota());
-                      Navigator.of(context).push(
-                        MaterialPageRoute<void>(
-                          builder: (_) => QuotaScreen(controller: c.quota),
-                        ),
-                      );
-                    },
-                  ),
-                ],
-              ),
-            ),
-          ),
-          const SizedBox(height: 24),
-          FilledButton.icon(
-            style: FilledButton.styleFrom(
-              minimumSize: const Size.fromHeight(64),
-            ),
-            onPressed: c.busy || c.hasLease ? null : c.connect,
-            icon: Icon(connected ? Icons.shield : Icons.power_settings_new),
-            label: const Text('Подключить'),
-          ),
-          const SizedBox(height: 12),
-          OutlinedButton(
-            onPressed: c.disconnect,
-            child: Text(c.busy ? 'Отменить подключение' : 'Отключить VPN'),
-          ),
-          if (c.error != null)
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 16),
-              child: Semantics(
-                liveRegion: true,
-                child: Text(
-                  messageFor(c.error!),
-                  style: TextStyle(color: Theme.of(context).colorScheme.error),
-                ),
-              ),
-            ),
-          if (c.remotePending)
-            const Text('Ожидается подтверждение удаления peer на сервере.'),
-          if (c.remotePending) ...[
-            const Text(
-              'Если узел потерян, после истечения lease можно завершить '
-              'его с полным списанием резерва 1 048 576 байт. '
-              'Это позволит выбрать другой узел.',
-            ),
-            TextButton(
-              onPressed: c.canRecover ? c.recoverExpired : null,
-              child: const Text(
-                'Завершить истёкший lease со списанием резерва',
-              ),
-            ),
-          ],
-          const SizedBox(height: 24),
-          const Text(
-            'Статус подключения основан на системном VPN, свежем handshake и активном lease. '
-            'Проверка внешнего IP и DNS выполняется отдельно. Автоматического продления нет.',
-          ),
-          TextButton(
-            onPressed: c.busy ? null : onSignOut,
-            child: const Text('Выйти из аккаунта'),
-          ),
-        ],
-      );
-    },
   );
 }

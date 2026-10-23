@@ -77,12 +77,17 @@ class ConnectionController extends ChangeNotifier {
     this.api,
     this.native, {
     this.pollInterval = const Duration(seconds: 2),
+    this.leaseBudgetBytes = 1048576,
   }) : quota = QuotaController(api) {
+    if (leaseBudgetBytes < 65536 || leaseBudgetBytes > 16777216) {
+      throw ArgumentError.value(leaseBudgetBytes, 'leaseBudgetBytes');
+    }
     quota.addListener(_emit);
   }
   final TunnelApi api;
   final NativeTunnel native;
   final Duration pollInterval;
+  final int leaseBudgetBytes;
   ConnectionPhase phase = ConnectionPhase.disconnected;
   String? error;
   String detail = 'VPN выключен';
@@ -276,7 +281,7 @@ class ConnectionController extends ChangeNotifier {
         'idempotency_key': newId(),
         'proof_id': proof['id'],
         'proof_response': answer,
-        'budget_bytes': 1048576,
+        'budget_bytes': leaseBudgetBytes,
         if (selectedNode != null) 'node_id': selectedNode,
       };
       _leaseClock = Stopwatch()..start();

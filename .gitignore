@@ -19,6 +19,7 @@ infra/ansible/release.yml
 *.keystore
 secrets/
 credentials/
+.tgcloud/
 .codex-remote-attachments/
 
 # Python and tooling

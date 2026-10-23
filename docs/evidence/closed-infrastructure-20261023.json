@@ -1,0 +1,34 @@
+{
+  "scope": "Approved B infrastructure phase only; API/auth/admin enrollment pending",
+  "measured_at": "2026-10-23T14:00:24.262607+00:00",
+  "host": "85.209.132.205",
+  "trusted_tls": true,
+  "tls_version": "TLSv1.3",
+  "ip_san": [
+    [
+      "IP Address",
+      "85.209.132.205"
+    ]
+  ],
+  "expires_utc": "2026-10-30T04:55:10+00:00",
+  "daily_vpn_accepted": false,
+  "routes": {
+    "/api/v1/ready": 404,
+    "/api/internal/peers/poll": 404,
+    "/api/v1/health": 502,
+    "/admin/": 502
+  },
+  "public_ports": {
+    "vantage": "existing staging A, read-only Python socket probe",
+    "8000": "ConnectionRefusedError",
+    "15433": "ConnectionRefusedError",
+    "65001_control": "ConnectionRefusedError"
+  },
+  "local_probe_limitation": "Local Windows network accepted TCP connect then EOF for 8000, 15433 and unused control 65001. Connect-only result is not a service reachability check. Independent A probe refused all three.",
+  "remote_listeners": {
+    "15433": "127.0.0.1 only",
+    "8000": "not listening; API disabled",
+    "443": "public Caddy",
+    "80": "public Caddy"
+  }
+}

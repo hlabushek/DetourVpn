@@ -1,0 +1,196 @@
+{
+  "issue": "I-019",
+  "measured_at": "2026-10-22T19:20:30.624088+00:00",
+  "passed": false,
+  "telegram_delivery": "TEST FAKE ONLY",
+  "real_postgresql": true,
+  "physical_android": true,
+  "same_provider": true,
+  "provider_independence_verified": false,
+  "facts": {},
+  "cleanup": {
+    "45.10.166.106": {
+      "cleanup_complete": true,
+      "forwarding_restored": true,
+      "cleanup_receipt": {
+        "invocation_id": "830fa8909a444cebbaf598bef8d172bb",
+        "events": [
+          {
+            "endpoint_ready": true,
+            "egress_verified": false
+          },
+          {
+            "cleanup_complete": true,
+            "restored": {
+              "containers": true,
+              "filter_nat": true,
+              "ipv6_filter": true,
+              "links": true,
+              "namespaces": true,
+              "routes4": true,
+              "routes6": true
+            }
+          }
+        ]
+      },
+      "owned_resources_absent": true,
+      "control_grant_retained_until_original_deadline": true
+    },
+    "85.209.132.205": {
+      "cleanup_complete": true,
+      "forwarding_restored": true,
+      "cleanup_receipt": {
+        "invocation_id": "e34eebd2e3024d3a82d40875493a47d7",
+        "events": [
+          {
+            "endpoint_ready": true,
+            "egress_verified": false
+          },
+          {
+            "cleanup_complete": true,
+            "restored": {
+              "containers": true,
+              "filter_nat": true,
+              "ipv6_filter": true,
+              "links": true,
+              "namespaces": true,
+              "routes4": true,
+              "routes6": true
+            }
+          }
+        ]
+      },
+      "owned_resources_absent": true,
+      "control_grant_retained_until_original_deadline": true
+    }
+  },
+  "diagnostic_session": true,
+  "clock_offset_upper_bounds_seconds": {
+    "45.10.166.106": 0.213222396,
+    "85.209.132.205": 0.226794952
+  },
+  "live_phone": {
+    "stage": "b_initial_connect_egress",
+    "phase": "connected",
+    "error": "none",
+    "nodes_error": "other",
+    "has_lease": true,
+    "native_up": true,
+    "native_network": true,
+    "handshake_age": 0,
+    "remaining_ms": 58386
+  },
+  "egress_probes": [
+    {
+      "stage": "b_initial_connect_egress",
+      "phase": "body",
+      "result": "node_b"
+    },
+    {
+      "stage": "b_initial_connect_egress",
+      "phase": "request",
+      "result": "socket_error"
+    },
+    {
+      "stage": "b_initial_connect_egress",
+      "phase": "request",
+      "result": "socket_error"
+    }
+  ],
+  "phone_failure": {
+    "stage": "b_initial_connect_egress",
+    "phase": "connected",
+    "error": "none",
+    "nodes_error": "none",
+    "has_lease": true,
+    "remote_pending": false,
+    "native_up": true,
+    "native_network": true,
+    "handshake_age": 8,
+    "remaining_ms": 50182,
+    "node_reasons": [
+      "available",
+      "available"
+    ],
+    "last_probe": {
+      "stage": "other",
+      "phase": "request",
+      "result": "socket_error"
+    }
+  },
+  "failure_control_plane": {
+    "a": {
+      "heartbeat_age_seconds": 0.361,
+      "runtime_matches": true,
+      "tunnel_states": [],
+      "commands": []
+    },
+    "b": {
+      "heartbeat_age_seconds": 0.494,
+      "runtime_matches": true,
+      "tunnel_states": [
+        "active"
+      ],
+      "commands": [
+        {
+          "operation": "add_peer",
+          "acknowledged": true
+        }
+      ]
+    }
+  },
+  "failure_settlement": {
+    "budget_bytes": 1048576,
+    "observed_bytes": 995864,
+    "charged_bytes": 995864
+  },
+  "phone_failure_stage": "b_initial_connect_egress",
+  "failure_nodes": {
+    "45.10.166.106": {
+      "status": {
+        "endpoint_active": true,
+        "agent_active": true
+      },
+      "diagnostics": {
+        "endpoint_state": "active",
+        "agent_failure_stage": null,
+        "receipt": {
+          "invocation_id": "830fa8909a444cebbaf598bef8d172bb",
+          "events": [
+            {
+              "endpoint_ready": true,
+              "egress_verified": false
+            }
+          ]
+        }
+      },
+      "gate": {
+        "kernel_gate_empty": true
+      }
+    },
+    "85.209.132.205": {
+      "status": {
+        "endpoint_active": true,
+        "agent_active": true
+      },
+      "diagnostics": {
+        "endpoint_state": "active",
+        "agent_failure_stage": null,
+        "receipt": {
+          "invocation_id": "e34eebd2e3024d3a82d40875493a47d7",
+          "events": [
+            {
+              "endpoint_ready": true,
+              "egress_verified": false
+            }
+          ]
+        }
+      },
+      "gate": {
+        "kernel_gate_empty": true
+      }
+    }
+  },
+  "phone_stopped_and_reverse_removed": true,
+  "failed_at": "physical_failover"
+}

@@ -257,10 +257,10 @@ def test_unit_has_deadline_unconditional_cleanup_no_restart_or_boot_enablement()
 def test_main_failure_exposes_only_fixed_checkpoint_and_category(monkeypatch, capsys, exception):
     # Synthetic marker text is deliberately not real key/config material.
     marker = "synthetic-sensitive-command-output"
-    monkeypatch.setattr(window, "require_environment", lambda *args: None)
+    monkeypatch.setattr(window, "require_environment", lambda *args, **kwargs: None)
     monkeypatch.setattr(sys, "argv", ["android_staging_window.py", "preflight"])
 
-    def fail():
+    def fail(**kwargs):
         window.checkpoint("container_routes")
         raise exception(marker)
 

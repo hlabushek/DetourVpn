@@ -1,0 +1,175 @@
+{
+  "issue": "I-019",
+  "mode": "full_two_host_failover",
+  "measured_at": "2026-10-23T07:17:00.122442+00:00",
+  "passed": true,
+  "telegram_delivery": "TEST FAKE ONLY",
+  "real_postgresql": true,
+  "physical_android": true,
+  "same_provider": true,
+  "provider_independence_verified": false,
+  "facts": {
+    "b_initial_handshake_egress": true,
+    "b_initial_disconnect_restores_network": true,
+    "a_handshake_egress": true,
+    "early_recovery_denied": true,
+    "second_peer_denied": true,
+    "kernel_expiry_without_agent_or_api": true,
+    "normal_network_after_expiry": true,
+    "first_recovery": true,
+    "a_restart_egress": true,
+    "node_failure_cutoff_before_expiry": true,
+    "normal_network_after_node_failure": true,
+    "second_recovery": true,
+    "b_handshake_egress": true,
+    "return_a_does_not_revive_old_peer": true,
+    "b_disconnect_restores_network": true
+  },
+  "cleanup": {
+    "45.10.166.106": {
+      "cleanup_complete": true,
+      "forwarding_restored": true,
+      "cleanup_receipt": {
+        "invocation_id": "ff5eecaeb0334ee3820b9c96572f0dac",
+        "events": [
+          {
+            "endpoint_ready": true,
+            "egress_verified": false
+          },
+          {
+            "cleanup_complete": true,
+            "restored": {
+              "containers": true,
+              "filter_nat": true,
+              "ipv6_filter": true,
+              "links": true,
+              "namespaces": true,
+              "routes4": true,
+              "routes6": true
+            }
+          }
+        ]
+      },
+      "owned_resources_absent": true,
+      "control_grant_removed": true
+    },
+    "85.209.132.205": {
+      "cleanup_complete": true,
+      "forwarding_restored": true,
+      "cleanup_receipt": {
+        "invocation_id": "7473eae058634950aaedc0cd7a9d2192",
+        "events": [
+          {
+            "endpoint_ready": true,
+            "egress_verified": false
+          },
+          {
+            "cleanup_complete": true,
+            "restored": {
+              "containers": true,
+              "filter_nat": true,
+              "ipv6_filter": true,
+              "links": true,
+              "namespaces": true,
+              "routes4": true,
+              "routes6": true
+            }
+          }
+        ]
+      },
+      "owned_resources_absent": true,
+      "control_grant_removed": true
+    }
+  },
+  "diagnostic_session": true,
+  "clock_offset_upper_bounds_seconds": {
+    "45.10.166.106": 0.198420978,
+    "85.209.132.205": 0.18160316
+  },
+  "last_default_network": {
+    "identified": true,
+    "vpn": false,
+    "validated": true,
+    "not_vpn": true,
+    "normal": true
+  },
+  "live_phone": {
+    "stage": "ledger_verify",
+    "phase": "disconnected",
+    "error": "none",
+    "nodes_error": "other",
+    "has_lease": false,
+    "native_up": false,
+    "native_network": true,
+    "handshake_age": -1,
+    "remaining_ms": 0
+  },
+  "agent_b": {
+    "deliveries": 4,
+    "acks": 4,
+    "last_delivery": {
+      "operation": "remove_peer",
+      "version": 2,
+      "budget_bytes": 16777216,
+      "remaining_seconds": 46.934,
+      "inventory_count": 1
+    },
+    "last_ack": {
+      "operation": "remove_peer",
+      "applied": true,
+      "version": 2
+    }
+  },
+  "egress_probes": [
+    {
+      "stage": "b_initial_connect_egress",
+      "phase": "body",
+      "result": "node_b"
+    },
+    {
+      "stage": "b_initial_connect_egress",
+      "phase": "body",
+      "result": "node_b"
+    },
+    {
+      "stage": "a_first_connect_egress",
+      "phase": "body",
+      "result": "node_a"
+    },
+    {
+      "stage": "a_first_connect_egress",
+      "phase": "body",
+      "result": "node_a"
+    },
+    {
+      "stage": "restart_a_egress",
+      "phase": "body",
+      "result": "node_a"
+    },
+    {
+      "stage": "restart_a_egress",
+      "phase": "body",
+      "result": "node_a"
+    },
+    {
+      "stage": "b_connect_egress",
+      "phase": "body",
+      "result": "node_b"
+    },
+    {
+      "stage": "b_connect_egress",
+      "phase": "body",
+      "result": "node_b"
+    }
+  ],
+  "agent_frozen_and_api_transport_removed": true,
+  "kernel_gate_empty_with_agent_frozen_and_api_absent": true,
+  "node_a_runtime_stopped_before_expiry": true,
+  "ledger": {
+    "settlements": 4,
+    "lost_counter_full_debits": 2,
+    "reserved_bytes": 0,
+    "available_bytes": 33300232
+  },
+  "phone_stopped_and_reverse_removed": true
+}

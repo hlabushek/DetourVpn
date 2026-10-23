@@ -1,0 +1,63 @@
+{
+  "task": "Telegram Serverless menu deployment",
+  "measured_at": "2026-10-22T14:52:18.240980+00:00",
+  "owner_approval": "Explicit approval in this chat to publish menu and two service tables",
+  "bot_username": "DetourVpnBot",
+  "deployment_verified": true,
+  "initial_cloud_revision": 0,
+  "initial_module_count": 0,
+  "final_cloud_revision": 2,
+  "deployed_module_count": 7,
+  "cloud_sources_match_local": true,
+  "tables": [
+    "bot_menu_limits",
+    "bot_menu_updates"
+  ],
+  "expiry_indexes": [
+    "bot_menu_limits_expiry",
+    "bot_menu_updates_expiry"
+  ],
+  "pending_migrations": 0,
+  "webhook_in_sync": true,
+  "allowed_updates": [
+    "message",
+    "callback_query"
+  ],
+  "commands": {
+    "scope": "all_private_chats",
+    "before": 0,
+    "after": 6,
+    "readback_matches": true
+  },
+  "hosted_v8_probe": {
+    "menu_build": true,
+    "untrusted_message_rejected": true,
+    "untrusted_callback_rejected": true
+  },
+  "hosted_sqlite_probe": {
+    "synthetic_id_only": true,
+    "first": "accepted",
+    "repeat": "duplicate",
+    "cleanup_passed": true
+  },
+  "real_chat_messages_sent_by_agent": false,
+  "real_user_start_verified": false,
+  "auth_relay_implemented": false,
+  "public_links_configured": false,
+  "local_regression": {
+    "tests_passed": 44,
+    "failed": 0,
+    "runtime_check_passed": true
+  },
+  "cli_issue": "Initial push succeeded remotely, then CLI snapshot save failed with ERR_INVALID_ARG_TYPE; state verified via GET and recovered with tgcloud fetch. No blind redeploy.",
+  "config_update": "Official CLI batchDeploy, expected_revision=1, one changed source, full existing manifest retained, no static changes; verified via GET and fetched snapshot.",
+  "source_sha256": {
+    "apps/telegram-bot/tgcloud/handlers/callback_query.js": "6bfdaa5f3958f130e0d7f533636786a73eb352891ec391658e67d7f4926035b5",
+    "apps/telegram-bot/tgcloud/handlers/message.js": "edca08f632fa18781511e8dd78c852a9895991fc29413416d07a0ee364ef6f49",
+    "apps/telegram-bot/tgcloud/lib/config.js": "0012b9ae977e92a65ac4c256c7769cee6a2e03fb35e6007bfe426b0c17f3c004",
+    "apps/telegram-bot/tgcloud/lib/handle.js": "fecab181c5f106625dea6c741472e5ab092fa11396787e5a6e5fda5913cd5e1e",
+    "apps/telegram-bot/tgcloud/lib/menu.js": "f063ea682631369e2651cad03b299977adbfd8a2f7c73b4fa38d954565f4c0b6",
+    "apps/telegram-bot/tgcloud/lib/storage.js": "8d259fc2dd275ace2543b80b56fe801717b703137697d78797ec24048e67884e",
+    "apps/telegram-bot/tgcloud/schema.js": "05b2655b71bdb8bc2dbefcad89d7687dd141569921f5a3ba93f57a59150541ab"
+  }
+}

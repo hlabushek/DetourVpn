@@ -9,7 +9,7 @@ Color orbitWarning(Brightness brightness) => brightness == Brightness.dark
 /// Shared tokens; applying these does not change tunnel behavior or navigation.
 ThemeData orbitTheme(
   Brightness brightness, {
-  OrbitAccent accent = OrbitAccent.coral,
+  OrbitAccent accent = OrbitAccent.lavender,
 }) {
   final dark = brightness == Brightness.dark;
   final seed = switch (accent) {
@@ -20,7 +20,7 @@ ThemeData orbitTheme(
   };
   final scheme = ColorScheme.fromSeed(seedColor: seed, brightness: brightness)
       .copyWith(
-        surface: dark ? const Color(0xff241c2a) : const Color(0xfffff7fc),
+        surface: dark ? const Color(0xff211b30) : const Color(0xfffaf5ff),
         onSurface: dark ? const Color(0xfff4e9f0) : const Color(0xff302334),
         error: dark ? const Color(0xffffb4ab) : const Color(0xffba1a1a),
         onError: dark ? const Color(0xff690005) : Colors.white,
@@ -28,6 +28,38 @@ ThemeData orbitTheme(
   return ThemeData(
     useMaterial3: true,
     colorScheme: scheme,
+    scaffoldBackgroundColor: dark
+        ? const Color(0xff191624)
+        : const Color(0xfffaf5ff),
+    appBarTheme: const AppBarTheme(
+      backgroundColor: Colors.transparent,
+      surfaceTintColor: Colors.transparent,
+      elevation: 0,
+    ),
+    navigationBarTheme: NavigationBarThemeData(
+      backgroundColor: dark ? const Color(0xff241e33) : Colors.white,
+      indicatorColor: seed.withValues(alpha: dark ? 0.28 : 0.14),
+    ),
+    filledButtonTheme: FilledButtonThemeData(
+      style: FilledButton.styleFrom(
+        backgroundColor: dark
+            ? const Color(0xffff7e88)
+            : const Color(0xffa53649),
+        foregroundColor: dark ? const Color(0xff30101b) : Colors.white,
+        minimumSize: const Size(48, 52),
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+        textStyle: const TextStyle(
+          fontFamily: 'Roboto',
+          fontWeight: FontWeight.w600,
+          fontSize: 16,
+        ),
+      ),
+    ),
+    inputDecorationTheme: InputDecorationTheme(
+      filled: true,
+      fillColor: scheme.surfaceContainerHigh,
+      border: OutlineInputBorder(borderRadius: BorderRadius.circular(20)),
+    ),
     cardTheme: CardThemeData(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
     ),

@@ -18,8 +18,12 @@ class Settings(BaseSettings):
         hide_input_in_errors=True,
     )
 
-    environment: Literal["local", "test"] = "local"
+    environment: Literal["local", "test", "closed"] = "local"
+    public_origin: str = ""
     enable_api_docs: bool = False
+    enable_admin: bool = False
+    closed_admin_only: bool = False
+    admin_encryption_key: SecretStr | None = None
     database_url: SecretStr | None = None
     enable_auth: bool = False
     enable_mini_app: bool = False
@@ -31,6 +35,41 @@ class Settings(BaseSettings):
     telegram_bot_id: int = 0
     initial_quota_bytes: int = Field(default=0, ge=0, le=2**63 - 1)
     tunnel_profile_file: Path | None = Field(default=None, repr=False)
+
+    @model_validator(mode="after")
+    def validate_closed_environment(self) -> "Settings":
+        if self.closed_admin_only and (
+            self.environment != "closed" or self.enable_auth or not self.enable_admin
+        ):
+            raise ValueError(
+                "Admin-only setup requires closed environment, admin and disabled auth"
+            )
+        if self.environment != "closed":
+            return self
+        from urllib.parse import urlsplit
+
+        origin = urlsplit(self.public_origin)
+        if (
+            not (self.enable_auth or self.closed_admin_only)
+            or self.database_url is None
+            or self.enable_api_docs
+            or origin.scheme != "https"
+            or not origin.hostname
+            or origin.username is not None
+            or origin.password is not None
+            or origin.path not in ("", "/")
+            or origin.query
+            or origin.fragment
+        ):
+            raise ValueError(
+                "Closed operation requires auth or explicit admin setup, DB, HTTPS and no docs"
+            )
+        url = parse_local_database_url(self.database_url)
+        if url.username != "vpn_api" or not url.password:
+            raise ValueError(
+                "Closed operation requires the dedicated password-protected runtime role"
+            )
+        return self
 
     @field_validator("mini_app_static_dir", mode="before")
     @classmethod
@@ -52,6 +91,15 @@ class Settings(BaseSettings):
 
     @model_validator(mode="after")
     def validate_auth(self) -> "Settings":
+        if self.enable_admin:
+            from cryptography.fernet import Fernet
+
+            if self.database_url is None or self.admin_encryption_key is None:
+                raise ValueError("Administration requires database and independent encryption key")
+            try:
+                Fernet(self.admin_encryption_key.get_secret_value().encode("ascii"))
+            except (ValueError, UnicodeError):
+                raise ValueError("Invalid administration encryption key") from None
         if self.enable_mini_app and not self.enable_auth:
             raise ValueError("Mini App requires authentication")
         if not self.enable_auth:

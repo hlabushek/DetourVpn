@@ -1,0 +1,23 @@
+# Explicit trusted IP certificate, issued/renewed separately by Certbot >=5.4.
+{
+    auto_https disable_certs
+}
+http://{$DETOURVPN_IP} {
+    handle /.well-known/acme-challenge/* {
+        root * /var/lib/detourvpn/acme
+        file_server
+    }
+    handle {
+        redir https://{$DETOURVPN_IP}{uri} permanent
+    }
+}
+https://{$DETOURVPN_IP} {
+    tls /etc/detourvpn/tls/fullchain.pem /etc/detourvpn/tls/privkey.pem
+    header {
+        X-Content-Type-Options "nosniff"
+        Referrer-Policy "no-referrer"
+    }
+    @internal path /api/internal/* /api/v1/ready
+    respond @internal 404
+    reverse_proxy 127.0.0.1:8000
+}

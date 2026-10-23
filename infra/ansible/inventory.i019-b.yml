@@ -1,0 +1,10 @@
+# Owner-approved staging B, ADR-033. No credentials; private key stays on controller.
+all:
+  children:
+    vpn_staging:
+      hosts:
+        i019-node-b:
+          ansible_host: 85.209.132.205
+          ansible_user: vpn-deploy
+          ansible_ssh_private_key_file: /home/ad/.ssh/vpn_staging_20261019
+          ansible_ssh_common_args: '-o StrictHostKeyChecking=yes -o BatchMode=yes'

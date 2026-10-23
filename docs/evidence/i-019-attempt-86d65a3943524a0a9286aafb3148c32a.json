@@ -1,0 +1,258 @@
+{
+  "issue": "I-019",
+  "measured_at": "2026-10-22T19:36:43.961838+00:00",
+  "passed": false,
+  "telegram_delivery": "TEST FAKE ONLY",
+  "real_postgresql": true,
+  "physical_android": true,
+  "same_provider": true,
+  "provider_independence_verified": false,
+  "facts": {
+    "b_initial_handshake_egress": true,
+    "b_initial_disconnect_restores_network": true,
+    "a_handshake_egress": true,
+    "early_recovery_denied": true,
+    "second_peer_denied": true,
+    "kernel_expiry_without_agent_or_api": true,
+    "normal_network_after_expiry": true,
+    "first_recovery": true
+  },
+  "cleanup": {
+    "45.10.166.106": {
+      "cleanup_complete": true,
+      "forwarding_restored": true,
+      "cleanup_receipt": {
+        "invocation_id": "6e4ee5822b31415e9e463c31b83bed04",
+        "events": [
+          {
+            "endpoint_ready": true,
+            "egress_verified": false
+          },
+          {
+            "cleanup_complete": true,
+            "restored": {
+              "containers": true,
+              "filter_nat": true,
+              "ipv6_filter": true,
+              "links": true,
+              "namespaces": true,
+              "routes4": true,
+              "routes6": true
+            }
+          }
+        ]
+      },
+      "owned_resources_absent": true,
+      "control_grant_retained_until_original_deadline": true
+    },
+    "85.209.132.205": {
+      "cleanup_complete": true,
+      "forwarding_restored": true,
+      "cleanup_receipt": {
+        "invocation_id": "d79d103ed2884683adfeb4a56269c5c2",
+        "events": [
+          {
+            "endpoint_ready": true,
+            "egress_verified": false
+          },
+          {
+            "cleanup_complete": true,
+            "restored": {
+              "containers": true,
+              "filter_nat": true,
+              "ipv6_filter": true,
+              "links": true,
+              "namespaces": true,
+              "routes4": true,
+              "routes6": true
+            }
+          }
+        ]
+      },
+      "owned_resources_absent": true,
+      "control_grant_retained_until_original_deadline": true
+    }
+  },
+  "diagnostic_session": true,
+  "clock_offset_upper_bounds_seconds": {
+    "45.10.166.106": 0.265909602,
+    "85.209.132.205": 0.28502942
+  },
+  "live_phone": {
+    "stage": "restart_a_egress",
+    "phase": "connected",
+    "error": "none",
+    "nodes_error": "other",
+    "has_lease": true,
+    "native_up": true,
+    "native_network": true,
+    "handshake_age": 1,
+    "remaining_ms": 58846
+  },
+  "agent_b": {
+    "deliveries": 2,
+    "acks": 2,
+    "last_delivery": {
+      "operation": "remove_peer",
+      "version": 2,
+      "budget_bytes": 4194304,
+      "remaining_seconds": 55.933,
+      "inventory_count": 1
+    },
+    "last_ack": {
+      "operation": "remove_peer",
+      "applied": true,
+      "version": 2
+    }
+  },
+  "egress_probes": [
+    {
+      "stage": "b_initial_connect_egress",
+      "phase": "body",
+      "result": "node_b"
+    },
+    {
+      "stage": "b_initial_connect_egress",
+      "phase": "body",
+      "result": "node_b"
+    },
+    {
+      "stage": "a_first_connect_egress",
+      "phase": "body",
+      "result": "node_a"
+    },
+    {
+      "stage": "a_first_connect_egress",
+      "phase": "body",
+      "result": "node_a"
+    },
+    {
+      "stage": "restart_a_egress",
+      "phase": "body",
+      "result": "node_a"
+    },
+    {
+      "stage": "restart_a_egress",
+      "phase": "response",
+      "result": "timeout"
+    },
+    {
+      "stage": "restart_a_egress",
+      "phase": "request",
+      "result": "socket_error"
+    }
+  ],
+  "agent_frozen_and_api_transport_removed": true,
+  "kernel_gate_empty_with_agent_frozen_and_api_absent": true,
+  "phone_failure": {
+    "stage": "restart_a_egress",
+    "phase": "connected",
+    "error": "none",
+    "nodes_error": "none",
+    "has_lease": true,
+    "remote_pending": false,
+    "native_up": true,
+    "native_network": true,
+    "handshake_age": 10,
+    "remaining_ms": 49370,
+    "node_reasons": [
+      "available",
+      "available"
+    ],
+    "last_probe": {
+      "stage": "other",
+      "phase": "request",
+      "result": "socket_error"
+    }
+  },
+  "failure_control_plane": {
+    "a": {
+      "heartbeat_age_seconds": 0.251,
+      "runtime_matches": true,
+      "tunnel_states": [
+        "revoked",
+        "active"
+      ],
+      "commands": [
+        {
+          "operation": "add_peer",
+          "acknowledged": true
+        },
+        {
+          "operation": "remove_peer",
+          "acknowledged": false
+        },
+        {
+          "operation": "add_peer",
+          "acknowledged": true
+        }
+      ]
+    },
+    "b": {
+      "heartbeat_age_seconds": 0.043,
+      "runtime_matches": true,
+      "tunnel_states": [
+        "revoked"
+      ],
+      "commands": [
+        {
+          "operation": "add_peer",
+          "acknowledged": true
+        },
+        {
+          "operation": "remove_peer",
+          "acknowledged": true
+        }
+      ]
+    }
+  },
+  "phone_failure_stage": "restart_a_egress",
+  "failure_nodes": {
+    "45.10.166.106": {
+      "status": {
+        "endpoint_active": true,
+        "agent_active": true
+      },
+      "diagnostics": {
+        "endpoint_state": "active",
+        "agent_failure_stage": null,
+        "receipt": {
+          "invocation_id": "6e4ee5822b31415e9e463c31b83bed04",
+          "events": [
+            {
+              "endpoint_ready": true,
+              "egress_verified": false
+            }
+          ]
+        }
+      },
+      "gate": {
+        "kernel_gate_empty": false
+      }
+    },
+    "85.209.132.205": {
+      "status": {
+        "endpoint_active": true,
+        "agent_active": true
+      },
+      "diagnostics": {
+        "endpoint_state": "active",
+        "agent_failure_stage": null,
+        "receipt": {
+          "invocation_id": "d79d103ed2884683adfeb4a56269c5c2",
+          "events": [
+            {
+              "endpoint_ready": true,
+              "egress_verified": false
+            }
+          ]
+        }
+      },
+      "gate": {
+        "kernel_gate_empty": true
+      }
+    }
+  },
+  "phone_stopped_and_reverse_removed": true,
+  "failed_at": "physical_failover"
+}

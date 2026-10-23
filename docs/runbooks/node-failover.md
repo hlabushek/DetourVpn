@@ -1,5 +1,12 @@
 # I-019 — выбор узла и bounded recovery
 
+Полный physical drill принят 2026-10-23 в scope ADR-033: два сервера одного
+провайдера, 15/15 facts, ledger и cleanup passed. Текущие receipts:
+`docs/evidence/i-019-staging.json`, `docs/evidence/i-019-session-post-cleanup.json`.
+Оба временных grant удалены; повторять команды для завершения этого этапа
+не требуется. Инструкции ниже предназначены для будущего отдельно разрешённого
+drill. Независимость от провайдера остаётся открытой.
+
 ## Локальное воспроизведение
 
 ```powershell
@@ -39,6 +46,36 @@ manifest fail closed. Агент B использует свой node credential
 Установка B требует отдельного проверенного baseline и ограниченного provisioning.
 Backend по-прежнему не имеет generic remote shell endpoint.
 
+### Размещение pinned artifacts на B (ADR-033)
+
+`scripts/prepare_i019_node_b.ps1 -SyntaxCheck` проверяет синтаксис без SSH.
+`scripts/prepare_i019_node_b.ps1` запускается владельцем в локальном PowerShell;
+на `BECOME password:` вводится sudo-пароль vpn-deploy для B, скрыто и только
+локально. Этот шаг размещает лишь прежние проверенные бинарники/лицензии
+и root-owned release symlink. Туннель, NAT, forwarding, firewall и службы
+не запускаются и не настраиваются.
+
+После `Missing sudo password` (ok=9, changed=0, failed=1) подтверждено,
+что release B отсутствует и forwarding остался 0. Причина отсутствующего
+ввода по этому сообщению не установлена. Launcher теперь выделяет Linux PTY
+через `script --echo never`, проверяет stdin/stdout TTY перед Ansible и
+направляет output log в `/dev/null`; input/timing logging не включается.
+Это проверка терминального транспорта, не доказательство успешного sudo.
+
+Используется отдельный `infra/ansible/inventory.i019-b.yml`. B разрешён в
+artifact playbook только при явном `vpn_i019_second_node_approved=true`, точных
+адресе/inventory name/user; фактический IPv4 сверяется с host facts.
+Без флага отказ проверен до remote setup (changed=0); syntax check A/B прошёл.
+Host-key checking включён; в WSL копируется только ранее доверенная публичная
+запись B из Windows known_hosts. Ключи хоста через keyscan не принимаются.
+I-011/I-012 runtime guards не расширены. Успешное размещение artifacts не
+является доказательством VPN и не делает старый lifecycle runner двухузловым.
+
+B сообщает `ip_forward=0` и `ens3` как default interface. Для будущего drill
+нужно отдельно учесть временное forwarding и его подтверждённое восстановление;
+этот artifact step его не меняет. При неудаче сохранить task/recap и сначала
+разобрать причину; не запускать повторно вслепую.
+
 `GET /api/v1/nodes` требует `tunnels:manage`; Mini App получает 403. Каталог
 возвращает configured registry rows: id/name/region/reason и checked_at.
 `available` = active + negotiated v2/runtime + heartbeat <=10s + свободный slot.
@@ -76,7 +113,15 @@ intent нельзя создавать на том же устройстве, п
 временное окно, команды отключения A и cleanup. До действия проверить baseline,
 kernel gates, runtime/key identity, отсутствие чужих peers/контейнеров, часы
 (погрешность node/API не более 1s, gate operation не более 5s),
-independent provider и SSH transport API. Production root credentials не нужны.
+SSH transport API. Production root credentials не нужны.
+
+По ADR-033 владелец разрешил этот drill на A 45.10.166.106 и B 85.209.132.205
+у одного провайдера. Независимость от отказа провайдера проверяется позднее
+отдельно; её нельзя включать в успешные результаты этого drill.
+Read-only preflight 2026-10-22: SSH/TUN/NTP доступны; B без pinned release;
+на обоих требуется локальная интерактивная sudo-авторизация, adb не видит
+телефон. Это предварительные сведения, не полный privileged network baseline.
+Старые A-only runners на B не запускать путём подмены inventory/guards.
 
 - На физическом Android подтвердить A: handshake и свежий egress probe.
 - В согласованном окне остановить только выделенный A runtime/agent. Проверить
@@ -94,3 +139,95 @@ independent provider и SSH transport API. Production root credentials не ну
 В evidence писать только codes/counts/timestamps/хеши, без конфигов, ключей,
 credential, Telegram payload или сетевого содержимого. До такого receipt I-019
 не считается принятой на реальных двух VPN узлах. Коммерческий запуск no-go.
+
+## I-019: текущий отдельный runner
+
+1. `scripts/run_i019_staging.ps1 -SyntaxCheck` — без VPS изменений.
+2. `scripts/run_i019_staging.ps1 -BuildOnly` — format/analyze/Flutter tests,
+   native unit/lint/debug/unsigned release и компиляция отдельного physical
+   entrypoint. ASCII snapshot вне OneDrive, private ACL и source hash stamp.
+   Этот шаг уже прошёл; неизменённые исходники повторно не пересобираются.
+3. В своём локальном PowerShell выполнить `scripts/run_i019_staging.ps1 -Prepare`.
+   Перед запросами sudo выполняется read-only проверка часов A/B/API (<=1s);
+   при отказе новые grants не устанавливаются. Source stamp нормализует пути
+   и использует ordinal sort, одинаковый для Windows PowerShell 5 и PowerShell 7.
+   Последовательно запросит sudo `vpn-deploy` для **A**, затем **B** в отдельных
+   PTY с выключенным echo и output log `/dev/null`. Пароли в чат/args/files
+   не передавать. Устанавливает только фиксированный 45m grant и units;
+   VPN endpoint ещё не запускается. Существующие grants/markers не перезаписывает.
+4. `scripts/run_i019_staging.ps1 -UseExistingGrants` — opt-in реальный drill.
+   Нужен один разблокированный физический arm64 Android по USB. Test APK
+   устанавливается в прежний debug package, VPN appop временно разрешается.
+   Подробный сценарий — ADR-033. API и peer profiles локальные/временные,
+   Telegram delivery — TEST FAKE ONLY. Это не production API/Telegram тест.
+   Сначала проверяется B handshake/egress и штатное отключение. При отказе B
+   длительные A expiry/failure окна не повторяются. Затем полный A→B drill;
+   ledger проверяет четыре settlement (два B observed, два A counters_lost).
+   Текущий physical entrypoint запрашивает по 16 MiB на lease при общем балансе 64 MiB;
+   обычный клиент сохраняет default 1 MiB. Egress требует два свежих IP ответа
+   выбранного узла подряд; не более трёх проб, другой IP — немедленный отказ.
+5. Проверить `docs/evidence/i-019-staging.json`: passed и cleanup обоих hosts,
+   source/clock/ledger facts, force-stop приложения, appop reset, удаление adb
+   reverse и private profile manifest. PostgreSQL runner удаляет свой cluster.
+   При failed/cleanup_not_confirmed сначала диагностика сохранённых fixed codes,
+   без verbose/raw config и без слепого повторного запуска.
+   При phone failure доступны whitelist `phone_failure` (catalog/admission/
+   handshake/egress, phase/error, bounded native metadata), `failure_control_plane`
+   (heartbeat/tunnel states/ACK flags) и fixed-action `failure_nodes` перед cleanup.
+
+Локальная реальная проверка cleanup пустых nft-таблиц (без VPS, egress и ключей):
+
+```powershell
+wsl -d kali-linux -u root --cd (Get-Location).Path -- /usr/bin/unshare --net -- /usr/bin/python3 scripts/check_i019_nft.py
+```
+
+Helper отказывается работать вне свежего WSL network namespace и требует
+пустой исходный nft ruleset. Использует реальные nft-объекты формы стандартных
+iptables tables; сам iptables frontend локально не проверялся (не установлен).
+
+### Однократный ввод паролей для диагностической сессии
+
+Владелец запускает `scripts/run_i019_staging.ps1 -Prepare -DiagnosticSession`
+в своём PowerShell и вводит sudo A, затем B. После этого Codex использует
+`-UseExistingGrants -DiagnosticSession`. До следующей попытки Codex разбирает
+`docs/evidence/i-019-progress.json` и отдельный `i-019-attempt-<id>.json`, проверяет
+runtime cleanup и вносит/проверяет необходимые локальные исправления. Клиент
+пересобирается через `-BuildOnly`, если его исходники изменились.
+
+При неудаче удаляется runtime, но остаётся grant до исходного 45m deadline;
+таймер не продлевается. Успех полного drill удаляет grant автоматически.
+Codex завершает оставшуюся сессию командой `-FinishSession` без участия владельца;
+она не зависит от телефона, актуальности APK или предыдущего PostgreSQL.
+Проверить `i-019-session-cleanup.json`; ошибка первого хоста не отменяет попытку
+очистки второго. При истечении таймера действуют прежние автоматические stop/expire.
+Редактирование закреплённого root-кода на хостах требует новой подготовки.
+
+Короткая проверка B: перед `-UseExistingGrants -DiagnosticSession` временно
+установить `VPN_I019_B_REUSE_DIAGNOSTIC=true`, после вызова восстановить прежнее
+значение env. Она запускает только B и сохраняет отдельный
+`docs/evidence/i-019-b-reuse-diagnostic.json`, mode=b_reuse_diagnostic_only.
+Это два настоящих lease/revoke/settlement в одном runtime, без ожиданий отказа A;
+её успех не закрывает полный двухузловой gate. В diagnostic session исходные
+grants сохраняются даже после успеха короткой проверки. Для полного drill
+переменная должна отсутствовать или иметь значение, отличное от `true`.
+
+Если изменён только physical integration target, Codex может выполнить
+`uv run --frozen python scripts/build_i019_physical_incremental.py`: он сначала
+проверяет исходный build stamp с предыдущим cached target, затем format/analyze,
+Flutter tests и новый physical APK. При изменении production inputs отказ;
+тогда нужен обычный `-BuildOnly`. Нельзя вручную переписывать stamp для обхода.
+Весь namespace уничтожается при выходе. Synthetic OS/command tests явно помечены
+в `infra/ansible/tests/test_i019_control.py` и не считаются live VPN evidence.
+
+### Первый live запуск: остановка до endpoint start
+
+Receipt `i-019-staging-failure-20261022-clock.json`: run остановился на clock
+preflight, до запуска VPN. Оба grant отозваны, owned resources отсутствуют,
+forwarding и телефон не менялись; временный PostgreSQL остановлен/удалён.
+Readonly диагностика: A offset interval 0.942–0.998s, B 0.935–1.012s; при
+допуске 1s B нельзя считать подтверждённым. Порог не ослаблялся.
+Владелец выполнил штатный `w32tm /resync` в локальном admin PowerShell;
+новые измеренные upper bounds: A 0.0836s, B 0.0918s. Перед следующим run
+измерение повторяется. Сетевые ограничения/runtime gates не обходились.
+Clock subprocess pipes теперь закрываются явно на success/failure; четыре
+synthetic unit tests проверяют границу <=1s, отказ >1s и закрытие handles.

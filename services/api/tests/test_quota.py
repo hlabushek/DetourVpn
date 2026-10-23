@@ -88,6 +88,7 @@ def test_empty_quota_read_has_no_side_effects(ledger: LedgerHarness) -> None:
         "used_bytes": 0,
         "available_bytes": 0,
         "reserved_bytes": 0,
+        "unavailable_bytes": 0,
         "revision": 0,
         "initial_grant_applied": False,
     }

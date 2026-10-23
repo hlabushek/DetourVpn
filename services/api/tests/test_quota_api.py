@@ -39,6 +39,7 @@ def test_login_applies_configured_quota_once(harness: Harness) -> None:
         "used_bytes": 0,
         "available_bytes": 17,
         "reserved_bytes": 0,
+        "unavailable_bytes": 0,
         "revision": 1,
         "initial_grant_applied": True,
     }

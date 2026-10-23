@@ -70,7 +70,7 @@ def prepare_executables(source_directory: Path, target_directory: Path) -> dict[
     return result
 
 
-def require_environment(staging_address: str | None) -> str:
+def require_environment(staging_address: str | None, *, i019: bool = False) -> str:
     if not hasattr(os, "geteuid") or os.geteuid() != 0:
         raise SmokeError("linux_root_required")
     wsl = "microsoft" in platform.release().lower()
@@ -78,7 +78,8 @@ def require_environment(staging_address: str | None) -> str:
         if not wsl:
             raise SmokeError("explicit_staging_address_required")
         return "local_wsl_only"
-    if staging_address != "45.10.166.106" or wsl:
+    allowed = ("45.10.166.106", "85.209.132.205") if i019 else ("45.10.166.106",)
+    if staging_address not in allowed or wsl:
         raise SmokeError("staging_target_not_approved")
     release = platform.freedesktop_os_release()
     if (

@@ -1,0 +1,93 @@
+{
+  "issue": "I-019",
+  "attempt": "14652957080243ddab229e9cf37b59d8",
+  "updated_at": "2026-10-23T07:20:56.112217+00:00",
+  "stage": "completed",
+  "facts": {
+    "b_initial_handshake_egress": true,
+    "b_initial_disconnect_restores_network": true,
+    "a_handshake_egress": true,
+    "early_recovery_denied": true,
+    "second_peer_denied": true,
+    "kernel_expiry_without_agent_or_api": true,
+    "normal_network_after_expiry": true,
+    "first_recovery": true,
+    "a_restart_egress": true,
+    "node_failure_cutoff_before_expiry": true,
+    "normal_network_after_node_failure": true,
+    "second_recovery": true,
+    "b_handshake_egress": true,
+    "return_a_does_not_revive_old_peer": true,
+    "b_disconnect_restores_network": true
+  },
+  "phone_failure": null,
+  "live_phone": {
+    "stage": "ledger_verify",
+    "phase": "disconnected",
+    "error": "none",
+    "nodes_error": "other",
+    "has_lease": false,
+    "native_up": false,
+    "native_network": true,
+    "handshake_age": -1,
+    "remaining_ms": 0
+  },
+  "egress_probes": [
+    {
+      "stage": "b_initial_connect_egress",
+      "phase": "body",
+      "result": "node_b"
+    },
+    {
+      "stage": "b_initial_connect_egress",
+      "phase": "body",
+      "result": "node_b"
+    },
+    {
+      "stage": "a_first_connect_egress",
+      "phase": "body",
+      "result": "node_a"
+    },
+    {
+      "stage": "a_first_connect_egress",
+      "phase": "body",
+      "result": "node_a"
+    },
+    {
+      "stage": "restart_a_egress",
+      "phase": "body",
+      "result": "node_a"
+    },
+    {
+      "stage": "restart_a_egress",
+      "phase": "body",
+      "result": "node_a"
+    },
+    {
+      "stage": "b_connect_egress",
+      "phase": "body",
+      "result": "node_b"
+    },
+    {
+      "stage": "b_connect_egress",
+      "phase": "body",
+      "result": "node_b"
+    }
+  ],
+  "agent_b": {
+    "deliveries": 4,
+    "acks": 4,
+    "last_delivery": {
+      "operation": "remove_peer",
+      "version": 2,
+      "budget_bytes": 16777216,
+      "remaining_seconds": 46.934,
+      "inventory_count": 1
+    },
+    "last_ack": {
+      "operation": "remove_peer",
+      "applied": true,
+      "version": 2
+    }
+  }
+}
