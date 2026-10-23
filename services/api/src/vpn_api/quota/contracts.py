@@ -39,6 +39,7 @@ class QuotaResponse(BaseModel):
     used_bytes: BytesAmount
     available_bytes: BytesAmount
     reserved_bytes: BytesAmount = 0
+    unavailable_bytes: BytesAmount = 0
     revision: Annotated[int, Field(strict=True, ge=0, le=MAX_BYTES)]
     initial_grant_applied: bool
 

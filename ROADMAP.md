@@ -339,7 +339,7 @@
   docs/verification-i-018.md, docs/evidence/i-018-local-acceptance.json.
   Следующий функциональный issue — I-019 (second node/failover); актуальный статус ниже.
 
-- I-019: **локальная реализация 2026-10-22; live node-failure gate открыт**.
+- I-019: **принят 2026-10-23: bounded same-provider node-failure drill (ADR-033)**.
   ADR-031: до двух private operator profiles, каталог heartbeat/runtime/capacity,
   explicit node selection и отдельные конфиги/agent credentials; один peer/узел.
   Flutter показывает выбор, причины и время проверки, не переключает живой lease.
@@ -350,15 +350,57 @@
   PostgreSQL полный regression: 506 passed, 3 opt-in skipped; Flutter 44,
   native Android 10, analyze/lint/debug/unsigned release и OpenAPI — passed.
   После финальной правки grace затронутый набор: 63 passed, 446 deselected.
-  Все это локальные проверки;
+  Это результаты первоначальных локальных проверок;
   фактические результаты: docs/verification-i-019.md и
-  docs/evidence/i-019-local-acceptance.json. VPS/телефон не изменялись.
-  **Следующий шаг: одобренный drill с двумя staging hosts**, физическим клиентом,
-  egress/cutoff/expiry, ledger и cleanup по docs/runbooks/node-failover.md.
-  Это не готовая production fleet, seamless failover или завершённая приёмка I-019.
+  docs/evidence/i-019-local-acceptance.json.
+  Полный physical Android drill: 1 passed, 552 deselected, 238.22s; все 15 facts,
+  fresh HTTPS egress B/A/A/B, cutoff/expiry без agent/API, два recovery,
+  возврат A без оживления старого peer, восстановление обычной сети.
+  Ledger: четыре settlement, два full lost-counter debit, reserved_bytes=0.
+  Оба runtime очищены, grants удалены; независимый post-check passed.
+  Receipts: docs/evidence/i-019-staging.json и i-019-session-post-cleanup.json.
+  Финальные targeted synthetic: 43 Python, 49 Flutter; mypy 113 files passed.
+  Production fleet и seamless/automatic failover не являются этим результатом.
   I-020 payment sandbox не начат; требует отдельного legal gate.
+  Уточнение владельца 2026-10-22, ADR-033: текущий drill разрешён на двух
+  существующих серверах одного провайдера (45.10.166.106 / 85.209.132.205).
+  Отказ провайдера остаётся отдельным открытым gate. Read-only SSH preflight
+  выполнен; pinned artifacts на B установлены и проверены (ok=14, failed=0).
+  Bounded runner завершил drill и отозвал временные grants.
+  История подготовки: docs/evidence/i-019-drill-preparation.json.
+
+### Отдельная UI-задача владельца — Android Soft Orbit, 2026-10-22
+
+Android-интерфейс приведён к предоставленному Soft Orbit reference: единая тема,
+вкладки VPN/Трафик/Профиль, отдельный выбор узла, орбитальная карточка и история.
+Telegram/Mini App и tunnel controller не менялись. Это UI-итерация поверх I-019,
+не закрытие двухузлового live gate. Проверки и ограничения:
+`docs/verification-android-soft-orbit.md`.
+
+### Отдельная задача владельца — Telegram Serverless bot, 2026-10-22
+
+Telegram Serverless bot navigation
+реализирована локально (`apps/telegram-bot`, ADR-032), 44 tests passed. Публичные
+ссылки, hosted acceptance и защищённый auth relay открыты. Нельзя переключать
+webhook текущего Android auth-бота до relay acceptance. Факты:
+`docs/verification-telegram-bot.md`; это не новый статус завершения I-017/I-019.
+
+После явного одобрения владельца menu bot опубликован 2026-10-22:
+@DetourVpnBot, revision 2, 7 modules, две operational tables/indexes и шесть
+private-chat commands. Hosted V8/SQLite probe и webhook sync подтверждены.
+OTP relay, публичные ссылки и user-chat `/start` acceptance ещё открыты;
+receipt `docs/evidence/telegram-bot-deployment.json`.
 
 ## 13. Как работать с Codex по каждому issue
+
+### Закрытая бесплатная эксплуатация — назначение 2026-10-23
+
+Владелец разрешил последовательную реализацию I-021–I-028 без платежей.
+Пробелы, зависимости и acceptance: `docs/issues/I-021.md`.
+I-021: локальный постоянный control-plane config/systemd/PostgreSQL roles,
+readiness и migration wrapper реализованы; targeted real PostgreSQL passed.
+Это не remote deploy, не длительный multiuser VPN и не приёмка эксплуатации.
+I-022 и следующие выполняются последовательно; I-020 payment не активирован.
 
 1. Передать контекст (`TECHNICAL_SPEC.md`, ADR, `AGENTS.md`) и **одну** issue.
 2. Попросить 3–8 конкретных шагов, затрагиваемые файлы, риски, тесты; без немедленного огромного изменения.

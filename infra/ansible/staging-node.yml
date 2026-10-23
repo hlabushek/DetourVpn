@@ -36,7 +36,16 @@
           - vpn_staging_approved | default(false) | bool
           - (vpn_environment | default('')) == 'staging'
           - (vpn_approved_inventory_name | default('')) == inventory_hostname
-          - (vpn_approved_host_address | default('')) == '45.10.166.106'
+          # B is artifact-only I-019 staging, enabled solely by explicit opt-in.
+          # Existing I-010/I-011/I-012 runtime gates remain A-only.
+          - >-
+            (vpn_approved_host_address | default('')) == '45.10.166.106'
+            or (
+              (vpn_approved_host_address | default('')) == '85.209.132.205'
+              and vpn_i019_second_node_approved | default(false) | bool
+              and inventory_hostname == 'i019-node-b'
+              and (ansible_user | default('')) == 'vpn-deploy'
+            )
           - (ansible_host | default(inventory_hostname)) == vpn_approved_host_address
           - (ansible_user | default('')) not in ['', 'root']
           - (ansible_connection | default('ssh')) == 'ssh'
@@ -83,6 +92,12 @@
           - ansible_facts['architecture'] == 'x86_64'
           - ansible_service_mgr == 'systemd'
         fail_msg: "This release procedure supports only Ubuntu 24.04 amd64 with systemd."
+
+    - name: Verify that the approved address belongs to the reached host
+      ansible.builtin.assert:
+        that:
+          - vpn_approved_host_address in ansible_facts['all_ipv4_addresses']
+        fail_msg: "Approved staging IPv4 is not assigned to the reached host."
 
     - name: Require a TUN device
       ansible.builtin.stat:

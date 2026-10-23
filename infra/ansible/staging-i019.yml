@@ -1,0 +1,232 @@
+---
+# Separate 45-minute fixed-action grant; installs code/units, does not start VPN.
+- name: Prepare the explicitly approved I-019 staging pair
+  hosts: vpn_i019
+  gather_facts: false
+  become: true
+  any_errors_fatal: true
+  vars:
+    i019_sources:
+      - {src: scripts/awg_local_smoke.py, dest: awg_local_smoke.py}
+      - {src: scripts/android_staging_window.py, dest: android_staging_window.py}
+      - {src: scripts/i011_control.py, dest: i011_control.py}
+      - {src: scripts/i012_control.py, dest: i012_control.py}
+      - {src: services/node-agent/agent.py, dest: i012_agent.py}
+      - {src: scripts/i019_control.py, dest: i019_control.py}
+  pre_tasks:
+    - name: Require exact approved pair, non-root SSH, explicit I-019 opt-in
+      ansible.builtin.assert:
+        that:
+          - vpn_i019_staging_approved | default(false) | bool
+          - not ansible_check_mode
+          - groups['vpn_i019'] | sort == ['i019-node-a', 'i019-node-b']
+          - ansible_user == 'vpn-deploy'
+          - ansible_connection == 'ssh'
+          - hostvars['i019-node-a'].ansible_host == '45.10.166.106'
+          - hostvars['i019-node-b'].ansible_host == '85.209.132.205'
+    - name: Verify actual assigned staging IPv4
+      ansible.builtin.command:
+        argv: [/usr/sbin/ip, -j, -4, address, show]
+      changed_when: false
+      register: addresses
+    - name: Reject an address mismatch
+      ansible.builtin.assert:
+        that:
+          - ansible_host in (addresses.stdout | from_json | map(attribute='addr_info') | flatten | map(attribute='local') | list)
+    - name: Require all older and I-019 windows inactive
+      ansible.builtin.command:
+        argv: [/usr/bin/systemctl, show, '{{ item }}', '--property=ActiveState', --value]
+      loop: [project-vpn-i011.service, project-vpn-i012-agent.service, project-vpn-i019.service, project-vpn-i019-agent.service]
+      register: prior
+      changed_when: false
+      failed_when: prior.rc != 0 or prior.stdout | trim not in ['inactive', 'failed']
+    - name: Refuse leftover ownership markers or older live grants
+      ansible.builtin.stat:
+        path: '{{ item }}'
+      loop:
+        - /run/project-vpn-i011/baseline.json
+        - /run/project-vpn-i019/baseline.json
+        - /run/project-vpn-i019-control/forwarding.json
+        - /run/project-vpn-i011-control/lease.json
+        - /run/project-vpn-i019-control/lease.json
+      register: marker
+    - name: Stop for operator review when a marker remains
+      ansible.builtin.assert:
+        that: [not item.stat.exists]
+      loop: '{{ marker.results }}'
+    - name: Verify pinned installed binaries before installing any grant
+      ansible.builtin.stat:
+        path: '/opt/project-vpn/current/{{ item.name }}'
+        checksum_algorithm: sha256
+      loop:
+        - {name: amneziawg-go, sha256: 84a3913e432b12850ae19873953b0d25b4aa2f13480453af04422d5910d86ffe}
+        - {name: awg, sha256: 4bfe07f714b514f9f2c1455f4848dc95666ae356e170830ae53182d4615b00ce}
+      register: binary
+    - name: Refuse untrusted binaries
+      ansible.builtin.assert:
+        that:
+          - item.stat.isreg | default(false)
+          - item.stat.uid == 0
+          - not item.stat.wgrp and not item.stat.woth
+          - item.stat.checksum == item.item.sha256
+      loop: '{{ binary.results }}'
+  tasks:
+    - name: Create private bounded runtime and trusted code directories
+      ansible.builtin.file:
+        path: '{{ item.path }}'
+        state: directory
+        owner: root
+        group: root
+        mode: '{{ item.mode }}'
+      loop:
+        - {path: /opt/project-vpn/acceptance, mode: '0755'}
+        - {path: /run/project-vpn-i019, mode: '0700'}
+        - {path: /run/project-vpn-i019-input, mode: '0700'}
+        - {path: /run/project-vpn-i019-control, mode: '0700'}
+        - {path: /run/project-vpn-i019-agent, mode: '0700'}
+    - name: Install reviewed fixed-action sources
+      ansible.builtin.copy:
+        src: '../../{{ item.src }}'
+        dest: '/opt/project-vpn/acceptance/{{ item.dest }}'
+        owner: root
+        group: root
+        mode: '0755'
+      loop: '{{ i019_sources }}'
+    - name: Bind the controller to this approved host only
+      ansible.builtin.copy:
+        content: '{{ {"host": ansible_host} | to_json }}'
+        dest: /opt/project-vpn/acceptance/i019-host.json
+        owner: root
+        group: root
+        mode: '0600'
+    - name: Create public-key input without any placeholder private key
+      ansible.builtin.copy:
+        content: ''
+        dest: /run/project-vpn-i019-input/public-key
+        owner: root
+        group: root
+        mode: '0600'
+    - name: Install isolated window unit with unconditional forwarding restoration
+      ansible.builtin.copy:
+        content: |
+          [Unit]
+          Description=Bounded I-019 staging endpoint
+          After=network-online.target
+          [Service]
+          Type=exec
+          User=root
+          UMask=0077
+          RuntimeDirectory=project-vpn-i019
+          RuntimeDirectoryMode=0700
+          RuntimeDirectoryPreserve=yes
+          ExecStartPre=/opt/project-vpn/acceptance/i019_control.py forwarding-start
+          ExecStart=/usr/bin/python3 /opt/project-vpn/acceptance/android_staging_window.py serve --i019-host {{ ansible_host }}
+          ExecStopPost=-/usr/bin/python3 /opt/project-vpn/acceptance/android_staging_window.py cleanup --i019-host {{ ansible_host }}
+          ExecStopPost=/opt/project-vpn/acceptance/i019_control.py forwarding-stop
+          RuntimeMaxSec=600
+          TimeoutStopSec=180
+          KillMode=control-group
+          KillSignal=SIGKILL
+          Restart=no
+          LimitCORE=0
+          CapabilityBoundingSet=CAP_SYS_ADMIN CAP_NET_ADMIN CAP_NET_RAW
+          NoNewPrivileges=yes
+          PrivateTmp=yes
+          ProtectHome=yes
+          ProtectSystem=strict
+          ReadWritePaths=/run /proc/sys/net/ipv4/ip_forward
+          StandardOutput=journal
+          StandardError=null
+          Environment=PYTHONDONTWRITEBYTECODE=1
+        dest: /etc/systemd/system/project-vpn-i019.service
+        owner: root
+        group: root
+        mode: '0644'
+    - name: Install the separate bounded agent unit
+      ansible.builtin.copy:
+        content: |
+          [Unit]
+          Description=Bounded I-019 staging agent
+          After=project-vpn-i019.service
+          BindsTo=project-vpn-i019.service
+          [Service]
+          Type=exec
+          User=root
+          UMask=0077
+          ExecStart=/opt/project-vpn/acceptance/i019_control.py agent
+          RuntimeMaxSec=600
+          TimeoutStopSec=20
+          KillMode=control-group
+          Restart=no
+          LimitCORE=0
+          CapabilityBoundingSet=CAP_SYS_ADMIN CAP_NET_ADMIN CAP_NET_RAW
+          NoNewPrivileges=yes
+          PrivateTmp=yes
+          ProtectHome=yes
+          ProtectSystem=strict
+          ReadWritePaths=/run
+          StandardOutput=journal
+          StandardError=null
+          Environment=PYTHONDONTWRITEBYTECODE=1
+        dest: /etc/systemd/system/project-vpn-i019-agent.service
+        owner: root
+        group: root
+        mode: '0644'
+    - name: Verify reviewed units without starting them
+      ansible.builtin.command:
+        argv: [/usr/bin/systemd-analyze, verify, --man=no, /etc/systemd/system/project-vpn-i019.service, /etc/systemd/system/project-vpn-i019-agent.service]
+      changed_when: false
+    - name: Load units without boot enablement
+      ansible.builtin.systemd_service:
+        daemon_reload: true
+    - name: Build boot-clock-source-unit bound grant
+      ansible.builtin.command:
+        argv:
+          - /usr/bin/python3
+          - -I
+          - -c
+          - |
+            import hashlib, json, pathlib, pwd, time
+            root = pathlib.Path('/opt/project-vpn/acceptance')
+            unit = pathlib.Path('/etc/systemd/system')
+            now, ticks = int(time.time()), int(time.monotonic())
+            names = ('awg_local_smoke.py', 'android_staging_window.py', 'i011_control.py',
+                     'i012_control.py', 'i012_agent.py', 'i019_control.py', 'i019-host.json')
+            print(json.dumps({
+              'schema_version': 1, 'owner': 'vpn-deploy', 'owner_uid': pwd.getpwnam('vpn-deploy').pw_uid,
+              'host': '{{ ansible_host }}',
+              'boot_id': pathlib.Path('/proc/sys/kernel/random/boot_id').read_text().strip(),
+              'issued_at': now, 'issued_monotonic': ticks,
+              'expires_at': now+2700, 'expires_monotonic': ticks+2700,
+              'code_sha256': {n: hashlib.sha256((root/n).read_bytes()).hexdigest() for n in names},
+              'unit_sha256': hashlib.sha256((unit/'project-vpn-i019.service').read_bytes()).hexdigest(),
+              'agent_unit_sha256': hashlib.sha256((unit/'project-vpn-i019-agent.service').read_bytes()).hexdigest()
+            }))
+      register: lease
+      changed_when: false
+    - name: Store private expiring metadata
+      ansible.builtin.copy:
+        content: '{{ lease.stdout }}'
+        dest: /run/project-vpn-i019-control/lease.json
+        owner: root
+        group: root
+        mode: '0600'
+    - name: Schedule automatic runtime stop and grant removal
+      ansible.builtin.command:
+        argv: [/usr/bin/systemd-run, --quiet, --unit=project-vpn-i019-expiry, --on-active=45m, '--timer-property=AccuracySec=1s', '--property=Type=oneshot', /opt/project-vpn/acceptance/i019_control.py, expire]
+      changed_when: true
+    - name: Grant only the fixed controller
+      ansible.builtin.copy:
+        content: |
+          # I-019 staging only; root-owned fixed actions, boot/time/hash bound, 45m.
+          vpn-deploy ALL=(root) NOPASSWD: /opt/project-vpn/acceptance/i019_control.py
+        dest: /etc/sudoers.d/project-vpn-i019-control
+        owner: root
+        group: root
+        mode: '0440'
+        validate: /usr/sbin/visudo -cf %s
+    - name: Verify fixed controller access without starting an endpoint
+      become: false
+      ansible.builtin.command:
+        argv: [/usr/bin/sudo, -n, /opt/project-vpn/acceptance/i019_control.py, status]
+      changed_when: false

@@ -1,0 +1,15 @@
+# Owner-approved pair, same provider (ADR-033); private key remains local.
+all:
+  children:
+    vpn_i019:
+      hosts:
+        i019-node-a:
+          ansible_host: 45.10.166.106
+        i019-node-b:
+          ansible_host: 85.209.132.205
+      vars:
+        ansible_user: vpn-deploy
+        ansible_connection: ssh
+        ansible_python_interpreter: /usr/bin/python3
+        ansible_ssh_private_key_file: /home/ad/.ssh/vpn_staging_20261019
+        ansible_ssh_common_args: '-o StrictHostKeyChecking=yes -o BatchMode=yes'

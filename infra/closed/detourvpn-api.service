@@ -1,0 +1,34 @@
+[Unit]
+Description=DetourVpn closed control plane
+After=network-online.target detourvpn-database.service
+Wants=network-online.target
+Requires=detourvpn-database.service
+StartLimitIntervalSec=300
+StartLimitBurst=10
+
+[Service]
+Type=simple
+User=detourvpn
+Group=detourvpn
+WorkingDirectory=/opt/detourvpn
+EnvironmentFile=/etc/detourvpn/api.env
+Environment=PYTHONDONTWRITEBYTECODE=1
+ExecStart=/opt/detourvpn/.venv/bin/python -m uvicorn vpn_api.main:create_app --factory --app-dir services/api/src --host 127.0.0.1 --port 8000 --limit-concurrency 32 --no-access-log --no-proxy-headers
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=30
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+LockPersonality=true
+CapabilityBoundingSet=
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+
+[Install]
+WantedBy=multi-user.target

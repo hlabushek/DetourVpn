@@ -1,0 +1,17 @@
+{
+  "issue": "I-019",
+  "date": "2026-10-22",
+  "diagnostic_only_not_vpn": true,
+  "host": "85.209.132.205",
+  "udp_port": 51893,
+  "server_privilege": "unprivileged vpn-deploy",
+  "server_timeout_seconds": 8,
+  "fixed_request": "I019_UDP_CHECK",
+  "fixed_reply": "I019_UDP_OK",
+  "firewall_or_vpn_configuration_changed": false,
+  "results": [
+    {"client": "windows", "roundtrip": true, "received_expected": true, "reply_sent": true},
+    {"client": "physical_android", "roundtrip": true, "received_expected": true, "reply_sent": true}
+  ],
+  "limitation": "Proves normal-network UDP reachability only; no AWG handshake, namespace forwarding or VPN egress evidence."
+}

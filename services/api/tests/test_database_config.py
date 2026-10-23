@@ -26,6 +26,8 @@ def test_database_is_optional_for_liveness(monkeypatch: pytest.MonkeyPatch) -> N
         "postgresql+psycopg://user@127.0.0.1/",
         "postgresql+psycopg://user@127.0.0.1:0/db",
         "postgresql+psycopg://user@127.0.0.1:65536/db",
+        "postgresql+psycopg://user@127.0.0.1/host=remote.invalid dbname=db",
+        "postgresql+psycopg://user@127.0.0.1/postgresql://remote.invalid/db",
     ],
 )
 def test_database_configuration_rejects_unsafe_targets(url: str) -> None:

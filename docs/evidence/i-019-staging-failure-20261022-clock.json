@@ -1,0 +1,33 @@
+{
+  "issue": "I-019",
+  "measured_at": "2026-10-22T18:12:12.510514+00:00",
+  "passed": false,
+  "telegram_delivery": "TEST FAKE ONLY",
+  "real_postgresql": true,
+  "physical_android": true,
+  "same_provider": true,
+  "provider_independence_verified": false,
+  "facts": {},
+  "cleanup": {
+    "45.10.166.106": {
+      "cleanup_complete": true,
+      "forwarding_restored": true,
+      "cleanup_receipt": {
+        "events": []
+      },
+      "owned_resources_absent": true,
+      "control_grant_removed": true
+    },
+    "85.209.132.205": {
+      "cleanup_complete": true,
+      "forwarding_restored": true,
+      "cleanup_receipt": {
+        "events": []
+      },
+      "owned_resources_absent": true,
+      "control_grant_removed": true
+    }
+  },
+  "phone_stopped_and_reverse_removed": true,
+  "failed_at": "preflight"
+}

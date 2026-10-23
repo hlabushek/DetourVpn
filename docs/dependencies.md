@@ -1,5 +1,11 @@
 # Зависимости I-001
 
+I-023 (2026-10-23): новых библиотек не добавлено. Закреплённая cryptography 50.0.2
+используется также для Argon2id PHC и RFC 6238 TOTP; проверены установленные API
+и реальные password/MFA/replay tests. HMAC-SHA1 применяется только внутри
+стандартного upstream TOTP, не для password hashing. Admin UI — собственные
+static HTML/CSS/JS без CDN, framework или npm dependencies.
+
 Дата проверки: 2026-10-15. Direct versions закреплены в pyproject.toml,
 транзитивные версии/хеши — uv.lock. Python 3.13; uv 0.11.17.
 Это инженерная инвентаризация, не разрешение распространения будущей native сборки.
@@ -77,6 +83,32 @@ SBOM и лицензии полного образа; перенос на нов
 GitHub Actions checkout v6 и setup-uv v7 закреплены commit SHA, полученными из
 upstream tag refs. Права workflow — contents:read, checkout не сохраняет credentials.
 Удалённый запуск workflow в I-001 не выполнен; локальные результаты в verification.
+
+## Telegram Serverless bot (2026-10-22)
+
+Closed rollout operator tools (2026-10-23): uv 0.11.17, upstream Astral,
+MIT/Apache-2.0, Linux asset SHA-256 pinned in `infra/closed/install-b.sh` from
+GitHub release metadata. Python 3.13.12, PSF licence, maintained 3.13 branch,
+downloaded through the pinned uv distribution catalogue. Certbot 5.8.0,
+Apache-2.0, maintained EFF project, isolated venv; full Linux Python 3.13
+dependency resolution and artifact hashes in `infra/closed/certbot-requirements.txt`.
+Docker/Compose/Caddy use signed Ubuntu 24.04 repositories, exact package versions
+in installer and actual dpkg versions in private rollout baseline. Caddy Apache-2.0,
+Docker/Compose Apache-2.0; review bundled dependencies before public release.
+OS security updates require deliberate version review; pins are not vulnerability
+clearance. Renewal expiry check currently fails the systemd unit below 48h;
+external alert delivery remains I-027, not implemented by this timer.
+
+`apps/telegram-bot`: `@tgcloud/cli==0.2.0`, MIT, dev/operator tooling only.
+Namespace/package указаны в [официальной документации](https://core.telegram.org/bots/serverless).
+Reviewed package metadata/source и SDK reference bundled с CLI; registry integrity
+проверен. Версии/integrities 22 dependency packages закреплены package-lock.json,
+install выполнен с --ignore-scripts; npm audit сообщил 0 vulnerabilities.
+Это молодой early-access CLI; runtime/secrets/deployment API не считать стабильным
+контрактом. Нужна проверка фактического early-access окружения перед deploy.
+Runtime dependencies не добавлены: Telegram предоставляет `sdk`/`sdk/db`.
+Node 24.15.0 используется локально; node:sqlite только TEST ONLY SQLite harness.
+Никакой npm library, CLI, loader или fake adapter не входит в tgcloud module space.
 
 ## I-011 Android engineering spike (2026-10-19)
 

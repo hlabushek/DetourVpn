@@ -1,0 +1,113 @@
+{
+  "issue": "I-019",
+  "mode": "b_reuse_diagnostic_only",
+  "measured_at": "2026-10-23T07:15:08.615160+00:00",
+  "passed": true,
+  "telegram_delivery": "TEST FAKE ONLY",
+  "real_postgresql": true,
+  "physical_android": true,
+  "same_provider": true,
+  "provider_independence_verified": false,
+  "facts": {
+    "b_initial_handshake_egress": true,
+    "b_initial_disconnect_restores_network": true,
+    "b_handshake_egress": true,
+    "b_disconnect_restores_network": true
+  },
+  "cleanup": {
+    "85.209.132.205": {
+      "cleanup_complete": true,
+      "forwarding_restored": true,
+      "cleanup_receipt": {
+        "invocation_id": "c53d78060ebe49b79d7eaf3438d66c65",
+        "events": [
+          {
+            "endpoint_ready": true,
+            "egress_verified": false
+          },
+          {
+            "cleanup_complete": true,
+            "restored": {
+              "containers": true,
+              "filter_nat": true,
+              "ipv6_filter": true,
+              "links": true,
+              "namespaces": true,
+              "routes4": true,
+              "routes6": true
+            }
+          }
+        ]
+      },
+      "owned_resources_absent": true,
+      "control_grant_retained_until_original_deadline": true
+    }
+  },
+  "diagnostic_session": true,
+  "clock_offset_upper_bounds_seconds": {
+    "85.209.132.205": 0.177673708
+  },
+  "last_default_network": {
+    "identified": true,
+    "vpn": false,
+    "validated": true,
+    "not_vpn": true,
+    "normal": true
+  },
+  "live_phone": {
+    "stage": "ledger_verify",
+    "phase": "disconnected",
+    "error": "none",
+    "nodes_error": "other",
+    "has_lease": false,
+    "native_up": false,
+    "native_network": true,
+    "handshake_age": -1,
+    "remaining_ms": 0
+  },
+  "agent_b": {
+    "deliveries": 4,
+    "acks": 4,
+    "last_delivery": {
+      "operation": "remove_peer",
+      "version": 2,
+      "budget_bytes": 16777216,
+      "remaining_seconds": 56.899,
+      "inventory_count": 1
+    },
+    "last_ack": {
+      "operation": "remove_peer",
+      "applied": true,
+      "version": 2
+    }
+  },
+  "egress_probes": [
+    {
+      "stage": "b_initial_connect_egress",
+      "phase": "body",
+      "result": "node_b"
+    },
+    {
+      "stage": "b_initial_connect_egress",
+      "phase": "body",
+      "result": "node_b"
+    },
+    {
+      "stage": "b_connect_egress",
+      "phase": "body",
+      "result": "node_b"
+    },
+    {
+      "stage": "b_connect_egress",
+      "phase": "body",
+      "result": "node_b"
+    }
+  ],
+  "ledger": {
+    "settlements": 2,
+    "lost_counter_full_debits": 0,
+    "reserved_bytes": 0,
+    "available_bytes": 67024320
+  },
+  "phone_stopped_and_reverse_removed": true
+}

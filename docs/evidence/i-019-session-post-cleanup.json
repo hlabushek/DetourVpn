@@ -1,0 +1,28 @@
+{
+  "private_manifest_removed": true,
+  "measured_at": "2026-10-23T07:24:14.8405525+00:00",
+  "adb_reverse_removed": true,
+  "passed": true,
+  "issue": "I-019",
+  "nodes": {
+    "45.10.166.106": {
+      "owned_host_link_absent": true,
+      "ip_forward": "1",
+      "states": {
+        "project-vpn-i019.service": "failed",
+        "project-vpn-i019-expiry.timer": "inactive",
+        "project-vpn-i019-agent.service": "inactive"
+      }
+    },
+    "85.209.132.205": {
+      "owned_host_link_absent": true,
+      "ip_forward": "0",
+      "states": {
+        "project-vpn-i019.service": "failed",
+        "project-vpn-i019-expiry.timer": "inactive",
+        "project-vpn-i019-agent.service": "inactive"
+      }
+    }
+  },
+  "read_only": true
+}

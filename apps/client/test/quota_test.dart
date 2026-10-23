@@ -48,6 +48,18 @@ class QuotaApi implements TunnelApi {
 }
 
 void main() {
+  test('unavailable funding is exact and separate from measured usage', () {
+    final json = summary();
+    json['unavailable_bytes'] = 9007199254740000;
+    json['available_bytes'] = 890;
+    final snapshot = QuotaSnapshot.fromJson(json);
+    expect(snapshot.unavailable, 9007199254740000);
+    expect(snapshot.used, 3);
+    expect(snapshot.available, 890);
+    json['unavailable_bytes'] = 9007199254740991;
+    expect(() => QuotaSnapshot.fromJson(json), throwsA(isA<ClientError>()));
+  });
+
   test(
     'bounds loaded history to 500 rows and resets cursor on refresh',
     () async {

@@ -9,9 +9,26 @@ import 'package:vpn_client/connection.dart';
 import 'package:vpn_client/main.dart';
 import 'package:vpn_client/quota.dart';
 import 'package:vpn_client/quota_screen.dart';
+import 'package:vpn_client/orbit_theme.dart';
 import 'connection_test.dart' show FakeNative;
 import 'node_failover_test.dart' show FailoverApi;
 import 'quota_test.dart' show QuotaApi, entry;
+
+// TEST ONLY presentation data, never included in main.dart or release assets.
+class PreviewApi extends Api {
+  PreviewApi(this.quota) : super(Uri.parse('https://example.invalid'));
+  final QuotaApi quota;
+  final nodes = FailoverApi();
+  @override
+  Future<Map<String, dynamic>> call(
+    String method,
+    String path, [
+    Map<String, dynamic>? body,
+  ]) {
+    if (path.startsWith('/api/v1/quota')) return quota.call(method, path, body);
+    return nodes.call(method, path, body);
+  }
+}
 
 // TEST ONLY: render real widgets without credentials, API calls or a live VPN.
 void main() {
@@ -34,7 +51,7 @@ void main() {
   testWidgets('render credential-free login and disconnected UI previews', (
     tester,
   ) async {
-    tester.view.physicalSize = const Size(430, 1040);
+    tester.view.physicalSize = const Size(390, 844);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
@@ -42,10 +59,18 @@ void main() {
         Platform.environment['LOCALAPPDATA'] ?? Directory.systemTemp.path;
     final directory = Directory('$base/ProjectVpn/i013-preview')
       ..createSync(recursive: true);
-    Future<void> capture(Widget widget, String name) async {
+    Future<void> capture(
+      Widget widget,
+      String name, {
+      Future<void> Function()? prepare,
+    }) async {
       final key = GlobalKey();
       await tester.pumpWidget(RepaintBoundary(key: key, child: widget));
       await tester.pumpAndSettle();
+      if (prepare != null) {
+        await prepare();
+        await tester.pumpAndSettle();
+      }
       final boundary =
           key.currentContext!.findRenderObject()! as RenderRepaintBoundary;
       await tester.runAsync(() async {
@@ -100,11 +125,7 @@ void main() {
       await capture(
         MaterialApp(
           debugShowCheckedModeBanner: false,
-          theme: ThemeData(
-            brightness: brightness,
-            colorSchemeSeed: const Color(0xff206c60),
-            useMaterial3: true,
-          ),
+          theme: orbitTheme(brightness),
           home: QuotaScreen(controller: quota),
         ),
         'quota-${brightness.name}',
@@ -112,11 +133,7 @@ void main() {
       await capture(
         MaterialApp(
           debugShowCheckedModeBanner: false,
-          theme: ThemeData(
-            colorSchemeSeed: const Color(0xff206c60),
-            brightness: brightness,
-            useMaterial3: true,
-          ),
+          theme: orbitTheme(brightness),
           home: Scaffold(
             appBar: AppBar(title: const Text('VPN')),
             body: ConnectionScreen(
@@ -127,6 +144,36 @@ void main() {
         ),
         'disconnected-${brightness.name}',
       );
+      for (final destination in ['VPN', 'Трафик', 'Профиль']) {
+        final previewNative = FakeNative()..age = 0;
+        await capture(
+          VpnApp(
+            key: UniqueKey(),
+            api: PreviewApi(quotaApi),
+            native: previewNative,
+          ),
+          'shell-${brightness.name}-$destination',
+          prepare: () async {
+            if (brightness == Brightness.light) {
+              await tester.tap(find.byTooltip('Сменить тему'));
+              await tester.pumpAndSettle();
+            }
+            tester.widget<LoginScreen>(find.byType(LoginScreen)).onSignedIn();
+            await tester.pumpAndSettle();
+            if (destination == 'VPN') {
+              await tester.tap(find.text('Подключить'));
+              await tester.pumpAndSettle();
+              final c = tester
+                  .widget<ConnectionScreen>(find.byType(ConnectionScreen))
+                  .controller;
+              await c.refresh();
+            } else {
+              await tester.tap(find.text(destination));
+            }
+          },
+        );
+      }
     }
+    await tester.pumpWidget(const SizedBox());
   });
 }

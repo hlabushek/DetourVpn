@@ -1,0 +1,2 @@
+# Operator tool, isolated from API. Apache-2.0; upstream EFF/certbot.
+certbot==5.8.0

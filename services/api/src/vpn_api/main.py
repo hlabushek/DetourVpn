@@ -10,6 +10,8 @@ from sqlalchemy import Engine
 from sqlalchemy.exc import SQLAlchemyError
 from starlette.exceptions import HTTPException
 
+from vpn_api.admin import AdminService
+from vpn_api.admin import router as admin_router
 from vpn_api.auth.mini_app import router as mini_app_router
 from vpn_api.auth.routes import router
 from vpn_api.auth.security import AuthError
@@ -24,9 +26,11 @@ from vpn_api.nodes.routes import router as agent_router
 from vpn_api.nodes.service import NodeError
 from vpn_api.quota.contracts import QuotaError
 from vpn_api.quota.routes import router as quota_router
+from vpn_api.readiness import database_ready
 from vpn_api.referrals.routes import router as referrals_router
 from vpn_api.rewards.routes import router as rewards_router
 from vpn_api.schemas import ErrorDetail, ErrorResponse, HealthResponse
+from vpn_api.subscriptions import router as subscriptions_router
 from vpn_api.tunnels.routes import agent_router as peer_agent_router
 from vpn_api.tunnels.routes import router as tunnels_router
 
@@ -44,6 +48,7 @@ def create_app(
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         engine = database_engine
         app.state.auth = None
+        app.state.admin = None
         app.state.node_engine = engine
         if config.database_url is not None and engine is None:
             engine = create_database_engine(config)
@@ -58,6 +63,9 @@ def create_app(
                 else TelegramSender(config.telegram_bot_token)
             )
             app.state.auth = AuthService(engine, config, sender)
+        if config.enable_admin:
+            engine = engine if engine is not None else create_database_engine(config)
+            app.state.admin = AdminService(engine, config)
         try:
             yield
         finally:
@@ -75,6 +83,7 @@ def create_app(
         redirect_slashes=False,
     )
     app.state.auth = None
+    app.state.admin = None
     app.add_middleware(BodyLimitMiddleware)
     app.include_router(router)
     app.include_router(mini_app_router)
@@ -86,6 +95,17 @@ def create_app(
     app.include_router(nodes_router)
     app.include_router(tunnels_router)
     app.include_router(peer_agent_router)
+    app.include_router(subscriptions_router)
+    app.include_router(admin_router)
+    if config.enable_admin:
+        from pathlib import Path
+
+        app.mount(
+            "/admin",
+            StaticFiles(
+                directory=Path(__file__).resolve().parents[4] / "apps/admin/static", html=True
+            ),
+        )
     if config.enable_mini_app and config.mini_app_static_dir is not None:
         app.mount("/mini-app", StaticFiles(directory=config.mini_app_static_dir, html=True))
 
@@ -131,6 +151,14 @@ def create_app(
         response = await call_next(request)
         response.headers["X-Request-ID"] = str(request.state.request_id)
         response.headers["Cache-Control"] = "no-store"
+        if request.url.path.startswith(("/admin", "/api/admin/")):
+            response.headers["Content-Security-Policy"] = (
+                "default-src 'none'; script-src 'self'; style-src 'self'; "
+                "connect-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
+            )
+            response.headers["Referrer-Policy"] = "no-referrer"
+            response.headers["X-Content-Type-Options"] = "nosniff"
+            response.headers["X-Frame-Options"] = "DENY"
         if request.url.path.startswith("/mini-app/"):
             response.headers["Content-Security-Policy"] = (
                 "default-src 'none'; script-src 'self' https://telegram.org; "
@@ -172,6 +200,20 @@ def create_app(
         summary="Process liveness (not dependency or tunnel readiness)",
     )
     async def health() -> HealthResponse:
+        return HealthResponse()
+
+    @app.get(
+        "/api/v1/ready",
+        response_model=HealthResponse,
+        tags=["health"],
+        responses={503: {"model": ErrorResponse}},
+        summary="Control-plane database and migration readiness; excludes VPN and Telegram",
+    )
+    def ready(request: Request) -> HealthResponse | JSONResponse:
+        if not database_ready(
+            request.app.state.node_engine, least_privilege=config.environment == "closed"
+        ):
+            return error_response(request, 503, "dependencies_unavailable")
         return HealthResponse()
 
     return app

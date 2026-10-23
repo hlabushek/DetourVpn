@@ -1,0 +1,51 @@
+{
+  "task": "Telegram Serverless bot navigation",
+  "measured_at": "2026-10-22T14:34:16.674336+00:00",
+  "local_checks_passed": true,
+  "task_complete": false,
+  "scope": "Native handlers/menu and local SQLite tests; no hosting or auth relay acceptance",
+  "node_version": "24.15.0",
+  "npm_version": "11.12.1",
+  "cli_version": "0.2.0",
+  "cli_license": "MIT",
+  "tests": {
+    "passed": 44,
+    "failed": 0,
+    "skipped": 0,
+    "sqlite": "real local node:sqlite",
+    "telegram_sdk": "TEST ONLY adapter",
+    "schema_dsl": "TEST ONLY metadata adapter"
+  },
+  "runtime_check": {
+    "passed": true,
+    "modules": 7,
+    "official_cli_scanner_match": true,
+    "stray_files": 0,
+    "runtime_node_apis_or_test_markers": false
+  },
+  "npm_audit_reported_vulnerabilities": 0,
+  "deployment_run": false,
+  "platform_migration_run": false,
+  "real_telegram_messages_sent": false,
+  "webhook_changed": false,
+  "public_links_configured": false,
+  "auth_relay_implemented": false,
+  "open_gates": [
+    "Verify early-access runtime secret injection",
+    "Reviewed trusted auth relay and HTTPS ingress",
+    "Public Mini App/download/support links",
+    "Approved staging bot deploy/migration/live chat acceptance"
+  ],
+  "source_sha256": {
+    "apps/telegram-bot/tgcloud/handlers/callback_query.js": "6bfdaa5f3958f130e0d7f533636786a73eb352891ec391658e67d7f4926035b5",
+    "apps/telegram-bot/tgcloud/handlers/message.js": "edca08f632fa18781511e8dd78c852a9895991fc29413416d07a0ee364ef6f49",
+    "apps/telegram-bot/tgcloud/lib/config.js": "1b51f4b351694a6496df878b8e80df3ebb847c1ddfd63c8f9377496d04945e6c",
+    "apps/telegram-bot/tgcloud/lib/handle.js": "fecab181c5f106625dea6c741472e5ab092fa11396787e5a6e5fda5913cd5e1e",
+    "apps/telegram-bot/tgcloud/lib/menu.js": "f063ea682631369e2651cad03b299977adbfd8a2f7c73b4fa38d954565f4c0b6",
+    "apps/telegram-bot/tgcloud/lib/storage.js": "8d259fc2dd275ace2543b80b56fe801717b703137697d78797ec24048e67884e",
+    "apps/telegram-bot/tgcloud/schema.js": "05b2655b71bdb8bc2dbefcad89d7687dd141569921f5a3ba93f57a59150541ab",
+    "apps/telegram-bot/package.json": "e02b78e7229b5f288787b12abd9bbf5b4e6110f1a47995d62b9dd0a130658980",
+    "apps/telegram-bot/package-lock.json": "a96b270634ba0e98cc05ec8dbf5e3961421f6f155afcfcb958bfec214b306a5c",
+    "apps/telegram-bot/tgcloud.jsonc": "8d1780dfd3aa6a8ba7148d0b996967cd9ec7d8058270cf91992ea3d94995c9db"
+  }
+}

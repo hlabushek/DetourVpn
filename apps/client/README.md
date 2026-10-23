@@ -25,3 +25,11 @@ Architecture/security decisions: [ADR-025](../../docs/adr/025-flutter-connect-li
 `android/app/src/main/java/...`: application-scoped native owner and lease timer.
 `test` uses explicitly fake adapters; `integration_test` is a separate test entrypoint.
 Never ship an APK built from an integration_test target.
+
+## Android UI — Soft Orbit (2026-10-22)
+
+Главная с орбитальной карточкой подключения, отдельный выбор сервера и вкладки
+VPN / Трафик / Профиль используют существующие API/controller. Общая тёмная и
+светлая тема; оформление и навигация не меняют живое подключение. Новый профиль
+не добавляет постоянное хранение сессии или управление аккаунтом.
+Проверки и ограничения: [UI report](../../docs/verification-android-soft-orbit.md).

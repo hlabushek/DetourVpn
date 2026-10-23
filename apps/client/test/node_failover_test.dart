@@ -18,6 +18,7 @@ class FailoverApi extends FakeApi {
   bool recoveryReady = false;
   int recoveries = 0;
   final List<String?> chosen = [];
+  final List<int> budgets = [];
   Completer<void>? catalogGate;
 
   @override
@@ -53,8 +54,10 @@ class FailoverApi extends FakeApi {
       deletePending = false;
       return {'state': 'revoked'};
     }
-    if (method == 'POST' && path == '/api/v1/tunnels')
+    if (method == 'POST' && path == '/api/v1/tunnels') {
       chosen.add(body?['node_id'] as String?);
+      budgets.add(body!['budget_bytes'] as int);
+    }
     return super.call(method, path, body);
   }
 }
@@ -75,12 +78,41 @@ void main() {
   tearDown(() => c.dispose());
 
   test(
+    'physical budget override is bounded and pinned on intent replay',
+    () async {
+      c.dispose();
+      c = ConnectionController(
+        api,
+        native,
+        leaseBudgetBytes: 4194304,
+        pollInterval: const Duration(days: 1),
+      );
+      api.lostCreate = true;
+      await c.connect();
+      await c.disconnect();
+      expect(api.budgets, [4194304, 4194304]);
+      expect(api.creates[0], api.creates[1]);
+    },
+  );
+
+  test('invalid lease budget is rejected before issuing any intent', () {
+    for (final value in [0, 65535, 16777217]) {
+      expect(
+        () => ConnectionController(api, native, leaseBudgetBytes: value),
+        throwsArgumentError,
+      );
+    }
+    expect(api.creates, isEmpty);
+  });
+
+  test(
     'selected node is pinned in POST and cannot change with an active lease',
     () async {
       await c.refreshNodes();
       c.selectNode(a);
       await c.connect();
       expect(api.chosen, [a]);
+      expect(api.budgets, [1048576]);
       c.selectNode(b);
       expect(c.selectedNode, a);
       api.staleA = true;
@@ -166,17 +198,37 @@ void main() {
     await c.disconnect();
     await tester.pumpWidget(
       MaterialApp(
-        home: MediaQuery(
-          data: const MediaQueryData(textScaler: TextScaler.linear(2)),
-          child: Scaffold(
-            body: ConnectionScreen(controller: c, onSignOut: () async {}),
-          ),
+        builder: (context, child) => MediaQuery(
+          data: MediaQuery.of(
+            context,
+          ).copyWith(textScaler: const TextScaler.linear(2)),
+          child: child!,
+        ),
+        home: Scaffold(
+          body: ConnectionScreen(controller: c, onSignOut: () async {}),
         ),
       ),
     );
     await tester.pump();
-    expect(find.text('TEST ONLY A · test-a'), findsOneWidget);
+    await tester.drag(find.byType(ListView).first, const Offset(0, -600));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Сменить регион'));
+    await tester.pumpAndSettle();
+    expect(find.text('Выберите сервер'), findsOneWidget);
+    await tester.scrollUntilVisible(
+      find.text('TEST ONLY A · test-a'),
+      200,
+      scrollable: find
+          .descendant(
+            of: find.byType(BottomSheet),
+            matching: find.byType(Scrollable),
+          )
+          .first,
+    );
+    expect(find.text('TEST ONLY A · test-a'), findsWidgets);
     expect(find.text('TEST ONLY B · test-b'), findsOneWidget);
+    Navigator.of(tester.element(find.text('Выберите сервер'))).pop();
+    await tester.pumpAndSettle();
     await tester.scrollUntilVisible(
       find.text('Завершить истёкший lease со списанием резерва'),
       300,

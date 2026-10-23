@@ -1,0 +1,14 @@
+{
+  "name": "detourvpn-telegram-bot",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": { "node": ">=24.15.0 <25" },
+  "scripts": {
+    "test": "node --import ./tests/register.mjs --test tests/*.test.mjs",
+    "check": "node tools/check.mjs",
+    "status": "tgcloud status",
+    "diff": "tgcloud diff"
+  },
+  "devDependencies": { "@tgcloud/cli": "0.2.0" }
+}

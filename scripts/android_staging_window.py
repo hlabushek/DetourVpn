@@ -24,6 +24,7 @@ from awg_local_smoke import AWG_PARAMETERS, ENV, HASHES, IP, SmokeError, require
 HOST = "45.10.166.106"
 NS = "vpn-i011"
 VETH = "v11host"
+VETH_NS = "v11ns"
 TUN = "v11awg"
 PORT = "51892"
 STATE = Path("/run/project-vpn-i011")
@@ -39,6 +40,97 @@ CONTAINER_STATE_FORMAT = (
     '"sandbox":{{json .NetworkSettings.SandboxKey}}}'
 )
 CHECKPOINT = "initialization"
+I019 = False
+LABEL = "project-vpn-i011"
+CONTAINERS: tuple[str, ...] = ("amnezia-awg2", "amnezia-wireguard")
+
+
+def configure_i019(host: str) -> None:
+    """Explicit, fixed staging opt-in. Default I-011 paths/host remain unchanged."""
+    global HOST, NS, VETH, VETH_NS, TUN, PORT, STATE, INPUT, SOCKET, UNIT
+    global I019, LABEL, CONTAINERS, BLOCKED
+    if host not in {"45.10.166.106", "85.209.132.205"}:
+        raise SmokeError("staging_target_not_approved")
+    HOST, NS, VETH, VETH_NS, TUN = host, "vpn-i019", "v19host", "v19ns", "v19awg"
+    PORT = "51893"
+    STATE = Path("/run/project-vpn-i019")
+    INPUT = Path("/run/project-vpn-i019-input/public-key")
+    SOCKET = Path(f"/run/amneziawg/{TUN}.sock")
+    UNIT = "project-vpn-i019.service"
+    LABEL, I019 = "project-vpn-i019", True
+    CONTAINERS = () if host == "85.209.132.205" else ("amnezia-awg2", "amnezia-wireguard")
+    BLOCKED = tuple(dict.fromkeys((*BLOCKED, "45.10.166.106/32", "85.209.132.205/32")))
+
+
+def no_docker_baseline() -> str:
+    """B-only: verify actual absence, never substitute fake container metadata."""
+    if not I019 or HOST != "85.209.132.205":
+        raise SmokeError("empty_container_baseline_not_approved")
+    for path in ("/usr/bin/docker", "/run/docker.sock", "/run/containerd/containerd.sock"):
+        if Path(path).exists():
+            raise SmokeError("unexpected_container_runtime")
+    for proc in Path("/proc").iterdir():
+        if proc.name.isdecimal():
+            try:
+                name = (proc / "comm").read_text().strip()
+            except FileNotFoundError:
+                continue  # Process exited during the read-only snapshot.
+            if name in {"dockerd", "containerd", "podman"}:
+                raise SmokeError("unexpected_container_runtime")
+    return "verified_absent_docker_containerd_podman"
+
+
+def i019_tables() -> list[list[str]]:
+    rows = json.loads(run(["/usr/sbin/nft", "-j", "list", "tables"]))["nftables"]
+    return [[row["table"]["family"], row["table"]["name"]] for row in rows if "table" in row]
+
+
+def cleanup_i019_tables(original: list[list[str]]) -> None:
+    """B-only: remove only our newly created, now-empty iptables-nft tables.
+
+    Never flush an existing table or delete any table containing foreign objects.
+    A pristine B may have no filter/nat table before our first iptables rule.
+    """
+    if not I019 or HOST != "85.209.132.205":
+        raise SmokeError("empty_table_cleanup_not_approved")
+    expected = {
+        "filter": {
+            "INPUT": ("input", "filter", 0),
+            "FORWARD": ("forward", "filter", 0),
+            "OUTPUT": ("output", "filter", 0),
+        },
+        "nat": {
+            "PREROUTING": ("prerouting", "nat", -100),
+            "INPUT": ("input", "nat", 100),
+            "OUTPUT": ("output", "nat", -100),
+            "POSTROUTING": ("postrouting", "nat", 100),
+        },
+    }
+    current = i019_tables()
+    for table, chains in expected.items():
+        if ["ip", table] in original or ["ip", table] not in current:
+            continue
+        rows = json.loads(run(["/usr/sbin/nft", "-j", "list", "table", "ip", table]))["nftables"]
+        for row in rows:
+            if "metainfo" in row:
+                continue
+            if "table" in row:
+                if set(row["table"]) - {"family", "name", "handle"}:
+                    raise SmokeError("foreign_table_metadata")
+                continue
+            if set(row) != {"chain"}:
+                raise SmokeError("foreign_firewall_object")
+            chain = row["chain"]
+            name = chain.get("name")
+            if (
+                name not in chains
+                or chain.get("policy") != "accept"
+                or (chain.get("hook"), chain.get("type"), chain.get("prio")) != chains[name]
+                or set(chain)
+                - {"family", "table", "name", "handle", "type", "hook", "prio", "policy"}
+            ):
+                raise SmokeError("foreign_firewall_chain")
+        run(["/usr/sbin/nft", "delete", "table", "ip", table])
 
 
 def checkpoint(name: str) -> None:
@@ -48,7 +140,7 @@ def checkpoint(name: str) -> None:
 
 
 # Conservative IPv4 special/private ranges, plus the staging host itself.
-BLOCKED = (
+BLOCKED: tuple[str, ...] = (
     "0.0.0.0/8",
     "10.0.0.0/8",
     "100.64.0.0/10",
@@ -178,7 +270,7 @@ def rule_command(operation: str, rule: tuple[str, str, list[str]]) -> list[str]:
         "-m",
         "comment",
         "--comment",
-        "project-vpn-i011",
+        LABEL,
         *args,
     ]
 
@@ -200,18 +292,20 @@ def snapshot(*, legacy: bool = False) -> dict[str, str]:
         "routes6": [IP, "-j", "-6", "route", "show", "table", "all"],
         "links": [IP, "-o", "link", "show"],
         "namespaces": [IP, "netns", "list"],
-        "containers": [
+    }
+    if CONTAINERS:
+        probes["containers"] = [
             "/usr/bin/docker",
             "inspect",
             "--format",
             "{{.Id}} {{.State.Pid}} {{.State.Running}} {{.State.StartedAt}}",
-            "amnezia-awg2",
-            "amnezia-wireguard",
-        ],
-    }
+            *CONTAINERS,
+        ]
     values = {name: run(argv) for name, argv in probes.items()}
+    if not CONTAINERS:
+        values["containers"] = no_docker_baseline()
     rows = [row.split() for row in values["containers"].splitlines()]
-    if len(rows) != 2 or any(len(row) != 4 or row[2] != "true" for row in rows):
+    if CONTAINERS and (len(rows) != 2 or any(len(row) != 4 or row[2] != "true" for row in rows)):
         raise SmokeError("existing_containers_not_running")
     # Interface indices can change on legitimate restarts: report drift, never restore blindly.
     for key in ("filter_nat", "ipv6_filter"):
@@ -321,9 +415,9 @@ def check_container_routes(name: str) -> None:
     check_routes(rows)
 
 
-def preflight() -> dict[str, str]:
+def preflight(*, allow_disabled_forwarding: bool = False) -> dict[str, str]:
     checkpoint("environment")
-    require_environment(HOST)
+    require_environment(HOST, i019=I019)
     checkpoint("trusted_paths")
     for path in (Path(__file__).absolute(), Path(__file__).with_name("awg_local_smoke.py")):
         trusted(path)
@@ -337,14 +431,15 @@ def preflight() -> dict[str, str]:
         raise SmokeError("namespace_or_socket_collision")
     checkpoint("host_links")
     links = json.loads(run([IP, "-j", "link", "show"]))
-    if any(row["ifname"] in (VETH, "v11ns", TUN) for row in links):
+    if any(row["ifname"] in (VETH, VETH_NS, TUN) for row in links):
         raise SmokeError("interface_collision")
     checkpoint("host_default_route")
     defaults = json.loads(run([IP, "-j", "-4", "route", "show", "default"]))
     if len(defaults) != 1 or defaults[0].get("dev") != "ens3":
         raise SmokeError("unexpected_default_route")
     checkpoint("host_forwarding")
-    if run(["/usr/sbin/sysctl", "-n", "net.ipv4.ip_forward"]).strip() != "1":
+    forwarding = run(["/usr/sbin/sysctl", "-n", "net.ipv4.ip_forward"]).strip()
+    if forwarding not in ({"0", "1"} if I019 and allow_disabled_forwarding else {"1"}):
         raise SmokeError("host_forwarding_not_enabled")
     checkpoint("udp_listener")
     if PORT in run(["/usr/bin/ss", "-H", "-lun"]):
@@ -352,13 +447,17 @@ def preflight() -> dict[str, str]:
     checkpoint("host_firewall")
     firewall = run(["/usr/sbin/iptables-save"])
     nftables = run(["/usr/sbin/nft", "-j", "list", "ruleset"])
-    if "project-vpn-i011" in firewall or PORT in firewall or PORT in nftables:
+    if LABEL in firewall or PORT in firewall or PORT in nftables:
         raise SmokeError("firewall_collision")
     checkpoint("host_routes")
     check_routes(json.loads(run([IP, "-j", "-4", "route", "show", "table", "all"])))
     # Include Docker IPAM and each existing container's network namespace routes.
     checkpoint("docker_ipam")
-    networks = run(["/usr/bin/docker", "network", "ls", "-q"]).split()
+    networks = run(["/usr/bin/docker", "network", "ls", "-q"]).split() if CONTAINERS else []
+    if not CONTAINERS:
+        no_docker_baseline()
+        if "nf_tables" not in run([IPT, "--version"]):
+            raise SmokeError("i019_b_requires_iptables_nft")
     for network in networks:
         ipam = json.loads(
             run(
@@ -375,7 +474,7 @@ def preflight() -> dict[str, str]:
         check_routes(
             [{"dst": item["Subnet"]} for item in (ipam or []) if ":" not in item["Subnet"]]
         )
-    for container in ("amnezia-awg2", "amnezia-wireguard"):
+    for container in CONTAINERS:
         checkpoint("container_routes")
         check_container_routes(container)
     for name, expected in HASHES.items():
@@ -431,11 +530,14 @@ def serve() -> None:
     baseline = preflight()
     # Marker precedes the first mutation so ExecStopPost also handles partial setup.
     checkpoint("namespace_setup")
-    private_file("baseline.json", json.dumps({"schema_version": 2, "hashes": baseline}))
+    metadata: dict[str, Any] = {"schema_version": 2, "hashes": baseline}
+    if I019 and HOST == "85.209.132.205":
+        metadata["original_nft_tables"] = i019_tables()
+    private_file("baseline.json", json.dumps(metadata))
     run([IP, "netns", "add", NS])
-    run([IP, "link", "add", VETH, "type", "veth", "peer", "name", "v11ns", "netns", NS])
+    run([IP, "link", "add", VETH, "type", "veth", "peer", "name", VETH_NS, "netns", NS])
     run([IP, "address", "add", "10.203.72.1/30", "dev", VETH])
-    run([IP, "-n", NS, "address", "add", "10.203.72.2/30", "dev", "v11ns"])
+    run([IP, "-n", NS, "address", "add", "10.203.72.2/30", "dev", VETH_NS])
     # Install host isolation BEFORE bringing either link up; public DNAT goes last.
     checkpoint("host_firewall_setup")
     for rule in reversed(firewall_rules()):
@@ -443,18 +545,18 @@ def serve() -> None:
     checkpoint("namespace_firewall_setup")
     for chain in ("INPUT", "FORWARD"):
         nsrun([IPT, "-P", chain, "DROP"])
-    nsrun([IPT, "-A", "INPUT", "-i", "v11ns", "-p", "udp", "--dport", PORT, "-j", "ACCEPT"])
+    nsrun([IPT, "-A", "INPUT", "-i", VETH_NS, "-p", "udp", "--dport", PORT, "-j", "ACCEPT"])
     nsrun([IPT, "-A", "FORWARD", "-i", TUN, "!", "-s", "10.203.71.2/32", "-j", "DROP"])
     for cidr in BLOCKED:
         nsrun([IPT, "-A", "FORWARD", "-i", TUN, "-d", cidr, "-j", "DROP"])
-    nsrun([IPT, "-A", "FORWARD", "-i", TUN, "-o", "v11ns", "-j", "ACCEPT"])
+    nsrun([IPT, "-A", "FORWARD", "-i", TUN, "-o", VETH_NS, "-j", "ACCEPT"])
     nsrun(
         [
             IPT,
             "-A",
             "FORWARD",
             "-i",
-            "v11ns",
+            VETH_NS,
             "-o",
             TUN,
             "-m",
@@ -475,13 +577,13 @@ def serve() -> None:
             "-s",
             "10.203.71.2/32",
             "-o",
-            "v11ns",
+            VETH_NS,
             "-j",
             "MASQUERADE",
         ]
     )
     nsrun(["/usr/sbin/sysctl", "-q", "-w", "net.ipv4.ip_forward=1"])
-    for prefix, interface in (([], VETH), (["-n", NS], "v11ns"), (["-n", NS], "lo")):
+    for prefix, interface in (([], VETH), (["-n", NS], VETH_NS), (["-n", NS], "lo")):
         run([IP, *prefix, "link", "set", interface, "up"])
     run([IP, "-n", NS, "route", "add", "default", "via", "10.203.72.1"])
     checkpoint("core_start")
@@ -591,6 +693,8 @@ def cleanup() -> bool:
             path.unlink(missing_ok=True)
         except OSError:
             ok = False
+    if I019 and HOST == "85.209.132.205":
+        cleanup_i019_tables(saved["original_nft_tables"])
     current = snapshot(legacy=True) if legacy else snapshot()
     restored = {name: value == current.get(name) for name, value in baseline.items()}
     complete = ok and all(restored.values())
@@ -637,7 +741,7 @@ def recover() -> bool:
         path.exists() for path in (Path(f"/run/netns/{NS}"), Path(f"/sys/class/net/{VETH}"), SOCKET)
     ):
         raise SmokeError("owned_resources_remain")
-    if "project-vpn-i011" in run(["/usr/sbin/iptables-save"]):
+    if LABEL in run(["/usr/sbin/iptables-save"]):
         raise SmokeError("owned_rules_remain")
     if marker.exists():
         archive = INPUT.parent / "recovered-baseline-v1.json"
@@ -686,11 +790,14 @@ def revoke() -> None:
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("action", choices=("preflight", "serve", "cleanup", "recover", "revoke"))
+    parser.add_argument("--i019-host", choices=("45.10.166.106", "85.209.132.205"))
     args = parser.parse_args()
     try:
-        require_environment(HOST)
+        if args.i019_host:
+            configure_i019(args.i019_host)
+        require_environment(HOST, i019=I019)
         if args.action == "preflight":
-            preflight()
+            preflight(allow_disabled_forwarding=I019)
             print('{"preflight_passed":true,"network_changed":false}')
         elif args.action == "serve":
             serve()

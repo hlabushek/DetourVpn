@@ -13,6 +13,7 @@ from uuid import uuid4
 import pytest
 from alembic import command
 from sqlalchemy import Engine, func, select, text
+from sqlalchemy.exc import DBAPIError
 from test_migrations import migration_config
 from test_quota import event
 from test_usage import Harness, audit, report, usage, used
@@ -123,7 +124,7 @@ def test_outer_transaction_rollback_discards_all_accounting(usage: Harness) -> N
     audit(h)
 
 
-def test_empty_usage_downgrade_preserves_existing_quota(engine: Engine) -> None:
+def test_funding_prevents_legacy_usage_downgrade_and_preserves_quota(engine: Engine) -> None:
     config = migration_config(engine)
     command.upgrade(config, "head")
     with transaction(engine) as session:
@@ -132,9 +133,14 @@ def test_empty_usage_downgrade_preserves_existing_quota(engine: Engine) -> None:
         session.flush()
         user_id = user.id
     LedgerService(engine).apply(user_id, event("credit", 10))
-    command.downgrade(config, "0004_quota_ledger")
+    # Since 0012, even an unused credit has funding provenance. Removing it is
+    # intentionally forbidden; the failed downgrade must preserve the whole schema.
+    with pytest.raises(DBAPIError, match="Refusing downgrade"):
+        command.downgrade(config, "0004_quota_ledger")
     with engine.connect() as connection:
-        assert connection.scalar(text("SELECT to_regprocedure('reject_usage_mutation()')")) is None
+        assert (
+            connection.scalar(text("SELECT to_regprocedure('reject_usage_mutation()')")) is not None
+        )
     command.upgrade(config, "head")
     command.check(config)
     with transaction(engine) as session:

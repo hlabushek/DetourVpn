@@ -1,0 +1,21 @@
+{
+  "issue": "I-019",
+  "measured_at": "2026-10-22T18:23:51.787600+00:00",
+  "failed_run": "i-019-staging-failure-20261022-clock.json",
+  "vpn_endpoints_started_in_failed_run": false,
+  "both_grants_removed_and_owned_resources_absent": true,
+  "windows_time_resync": "owner-reported success; measured SSH bounds confirmed below",
+  "clock_upper_bounds_seconds": {
+    "45.10.166.106": 0.0836,
+    "85.209.132.205": 0.0918
+  },
+  "required_upper_bound_seconds": 1,
+  "clock_gate_weakened": false,
+  "ps5_ps7_ordinal_source_digest_matched": true,
+  "clock_pipe_cleanup_tests_passed": 4,
+  "targeted_controller_and_clock_tests_passed": 26,
+  "mypy_files_passed": 109,
+  "normal_and_physical_apk_builds_passed": true,
+  "new_grants_required": true,
+  "live_failover_passed": false
+}

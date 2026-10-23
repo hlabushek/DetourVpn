@@ -1,0 +1,12 @@
+# Template only. Set an existing approved hostname locally; never register DNS automatically.
+{$DETOURVPN_HOST} {
+    header {
+        Strict-Transport-Security "max-age=31536000"
+        X-Content-Type-Options "nosniff"
+        Referrer-Policy "no-referrer"
+    }
+    @internal path /api/internal/* /api/v1/ready
+    respond @internal 404
+    reverse_proxy 127.0.0.1:8000
+    # Access logging is intentionally not enabled.
+}

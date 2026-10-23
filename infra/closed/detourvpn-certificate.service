@@ -1,0 +1,12 @@
+[Unit]
+Description=Renew DetourVpn IP certificate and check remaining lifetime
+After=network-online.target caddy.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/opt/detourvpn-certbot/bin/certbot renew --quiet
+ExecStart=/usr/bin/openssl x509 -checkend 172800 -noout -in /etc/detourvpn/tls/fullchain.pem
+UMask=0077
+PrivateTmp=true
+ProtectHome=true

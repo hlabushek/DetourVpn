@@ -1,0 +1,58 @@
+{
+  "task": "Android Soft Orbit UI",
+  "measured_at": "2026-10-22T14:16:38.259603+00:00",
+  "scope": "local UI, widget tests and Android build",
+  "passed": true,
+  "live_staging": false,
+  "physical_device_test_run": false,
+  "infrastructure_changed": false,
+  "preview_data": "TEST ONLY synthetic API/node/native adapter",
+  "flutter_tests_passed": 47,
+  "format_passed": true,
+  "analyze_passed": true,
+  "android_native_tests": {
+    "tests": 10,
+    "failures": 0,
+    "errors": 0
+  },
+  "android_lint_passed": true,
+  "debug_built": true,
+  "unsigned_release_built": true,
+  "api_origin_configured_in_apk": false,
+  "apk_checks_limit": "Selected test strings only; not a supply-chain audit or signing/public release approval",
+  "artifacts": {
+    "app-debug.apk": {
+      "sha256": "5d51309dc23fd17275db8116de9356684f8117ca79aff8e352787a656b94c0af",
+      "selected_test_markers_present": false,
+      "checked_entries": [
+        "assets/flutter_assets/kernel_blob.bin"
+      ]
+    },
+    "app-release.apk": {
+      "sha256": "5cbf0cff2646ddb39772f070442708e909d91b0e464c6f9719c5caa4260bfd01",
+      "selected_test_markers_present": false,
+      "checked_entries": [
+        "lib/arm64-v8a/libapp.so",
+        "lib/x86_64/libapp.so"
+      ]
+    }
+  },
+  "source_sha256": {
+    "apps/client/lib/api.dart": "3ac0c8bbb10030512dd0ab84c2e02f79364c03b04a034fb62d9a0e5099c5f60f",
+    "apps/client/lib/connection.dart": "c18566481ab57d8db95b5460342b0ea7c1a226d587b8df4981064fe92952afd1",
+    "apps/client/lib/connection_screen.dart": "5c682c8c20c1517b9dbeeaeafcb5e07b1ca21c95c2a434d831a96b4b24933098",
+    "apps/client/lib/main.dart": "f0cf72e2184a4da79f37554688f3c44989bf9d16450b9c72180099dc7b482d3a",
+    "apps/client/lib/native_tunnel.dart": "d8cd7b6b76d02dc9b6d4b19bf5c3820ac6d33e823a057cdcef1fb95ebe9488bb",
+    "apps/client/lib/orbit_theme.dart": "652483bb120c003910a08ea54482d9a110eab6fe19746b0e043b2c6d3f78b8e1",
+    "apps/client/lib/orbit_widgets.dart": "9eebd79dc49c92607f0d7af6b4ca5e629967974884d55fcd5e0803e8ba789cab",
+    "apps/client/lib/quota.dart": "5b1754deaeee488fca97ea87548b41d15073e6a70934f2ace1a135c218ea33a9",
+    "apps/client/lib/quota_screen.dart": "ef753e42b7650a1ae52fa89f5322c8afd77803e2b3fe2aa4fad0f9bba8107030",
+    "apps/client/test/api_test.dart": "08a148c02833955f40e8fd969c5feef6cf799c914d6ea0d37655eb73c8976d13",
+    "apps/client/test/connection_test.dart": "515c2aa4ef05ad42a1b97e76584010d6c64b86368edfcd139df45fcafc933ee8",
+    "apps/client/test/node_failover_test.dart": "98a15a071f055af71b4027cbf0f20acc36c95c49320b26508c25c19e570af0b5",
+    "apps/client/test/orbit_theme_test.dart": "957dc237bb575384349f0769996437a1376966c7f4358de656fb986c88165363",
+    "apps/client/test/quota_test.dart": "94df79eabb742b848fae147d0cf14f11d2b2723c2158a4a0cdceae35d9eae85c",
+    "apps/client/test/ui_preview_test.dart": "7231cded72a49504bd4a94fc22c99526da646c3b68a1cd6717b214919b050ae1",
+    "apps/client/test/widget_test.dart": "8d3d5153c82282e61b1206125799bd88da5dd7a456d3440165ec2ee72e1afc1a"
+  }
+}

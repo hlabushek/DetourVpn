@@ -1,0 +1,10 @@
+# HTTP-01 bootstrap only; no public API. Install only after explicit approval.
+http://{$DETOURVPN_IP} {
+    handle /.well-known/acme-challenge/* {
+        root * /var/lib/detourvpn/acme
+        file_server
+    }
+    handle {
+        respond 404
+    }
+}

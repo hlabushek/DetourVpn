@@ -1,0 +1,88 @@
+{
+  "issue": "I-019",
+  "measured_at": "2026-10-22T18:30:05.299998+00:00",
+  "passed": false,
+  "telegram_delivery": "TEST FAKE ONLY",
+  "real_postgresql": true,
+  "physical_android": true,
+  "same_provider": true,
+  "provider_independence_verified": false,
+  "facts": {
+    "a_handshake_egress": true,
+    "early_recovery_denied": true,
+    "second_peer_denied": true,
+    "kernel_expiry_without_agent_or_api": true,
+    "normal_network_after_expiry": true,
+    "first_recovery": true,
+    "a_restart_egress": true,
+    "node_failure_cutoff_before_expiry": true,
+    "normal_network_after_node_failure": true,
+    "second_recovery": true
+  },
+  "cleanup": {
+    "45.10.166.106": {
+      "cleanup_complete": true,
+      "forwarding_restored": true,
+      "cleanup_receipt": {
+        "invocation_id": "db859fc5596d473e8e80b4de624ef52d",
+        "events": [
+          {
+            "endpoint_ready": true,
+            "egress_verified": false
+          },
+          {
+            "cleanup_complete": true,
+            "restored": {
+              "containers": true,
+              "filter_nat": true,
+              "ipv6_filter": true,
+              "links": true,
+              "namespaces": true,
+              "routes4": true,
+              "routes6": true
+            }
+          }
+        ]
+      },
+      "owned_resources_absent": true,
+      "control_grant_removed": true
+    },
+    "85.209.132.205": {
+      "cleanup_complete": true,
+      "forwarding_restored": true,
+      "cleanup_receipt": {
+        "invocation_id": "e00b00e45f0f4a16980d4e63f4e2c76e",
+        "events": [
+          {
+            "endpoint_ready": true,
+            "egress_verified": false
+          },
+          {
+            "cleanup_complete": true,
+            "restored": {
+              "containers": true,
+              "filter_nat": true,
+              "ipv6_filter": true,
+              "links": true,
+              "namespaces": true,
+              "routes4": true,
+              "routes6": true
+            }
+          }
+        ]
+      },
+      "owned_resources_absent": true,
+      "control_grant_removed": true
+    }
+  },
+  "clock_offset_upper_bounds_seconds": {
+    "45.10.166.106": 0.058158158,
+    "85.209.132.205": 0.046601684
+  },
+  "agent_frozen_and_api_transport_removed": true,
+  "kernel_gate_empty_with_agent_frozen_and_api_absent": true,
+  "node_a_runtime_stopped_before_expiry": true,
+  "phone_failure_stage": "b_connect",
+  "phone_stopped_and_reverse_removed": true,
+  "failed_at": "physical_failover"
+}

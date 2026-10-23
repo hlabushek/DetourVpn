@@ -13,6 +13,7 @@ from vpn_api.db.models import (
     Device,
     PeerCommand,
     SessionFamily,
+    Subscription,
     Tunnel,
     TunnelReservation,
     User,
@@ -59,6 +60,15 @@ def request_tunnel(auth: AuthService, access: str, body: TunnelInput) -> TunnelR
             if prior.budget_bytes is not None and prior.budget_bytes != body.budget_bytes:
                 raise AuthError("tunnel_idempotency_conflict", 409)
             return TunnelResponse.model_validate(prior)
+        # v2 cannot pin reservations to expiring quota lots. Never silently reuse it
+        # for subscriptions; v3 must negotiate per-lot leases and kernel enforcement.
+        if (
+            session.scalar(
+                select(Subscription.id).where(Subscription.user_id == principal.user_id).limit(1)
+            )
+            is not None
+        ):
+            raise AuthError("entitlement_requires_peer_protocol_v3", 409)
         existing = session.scalar(
             select(Tunnel.id).where(Tunnel.device_id == device.id, Tunnel.state != "revoked")
         )

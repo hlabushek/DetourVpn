@@ -1,0 +1,16 @@
+[Unit]
+Description=DetourVpn persistent PostgreSQL
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+WorkingDirectory=/opt/detourvpn
+ExecStart=/usr/bin/docker compose -f infra/closed/compose.yaml up -d --wait
+ExecStop=/usr/bin/docker compose -f infra/closed/compose.yaml stop
+TimeoutStartSec=180
+TimeoutStopSec=90
+
+[Install]
+WantedBy=multi-user.target

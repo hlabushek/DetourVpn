@@ -27,15 +27,17 @@ class QuotaSnapshot {
       used = _integer(json['used_bytes']),
       available = _integer(json['available_bytes']),
       reserved = _integer(json['reserved_bytes']),
+      unavailable = _integer(json['unavailable_bytes'] ?? 0),
       revision = _integer(json['revision']) {
     // Subtractions avoid overflowing signed int64 when checking remote values.
     if (used > granted ||
         reserved > granted - used ||
-        available != granted - used - reserved) {
+        unavailable > granted - used - reserved ||
+        available != granted - used - reserved - unavailable) {
       throw const ClientError('invalid_response');
     }
   }
-  final int granted, used, available, reserved, revision;
+  final int granted, used, available, reserved, unavailable, revision;
 }
 
 class QuotaEntry {
