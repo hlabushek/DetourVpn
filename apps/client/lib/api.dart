@@ -4,6 +4,7 @@ import 'dart:io';
 import 'dart:math';
 
 import 'package:flutter/foundation.dart';
+import 'session_store.dart';
 
 class ClientError implements Exception {
   const ClientError(this.code);
@@ -31,7 +32,8 @@ abstract interface class TunnelApi {
 
 /// No logging, redirects, disk cache, certificate override or release HTTP mode.
 class Api implements TunnelApi {
-  Api(this.origin, {HttpClient? client}) : _client = client ?? HttpClient() {
+  Api(this.origin, {HttpClient? client, this.store})
+    : _client = client ?? HttpClient() {
     final loopback =
         kDebugMode &&
         origin.scheme == 'http' &&
@@ -49,27 +51,63 @@ class Api implements TunnelApi {
   }
   final Uri origin;
   final HttpClient _client;
+  final SessionStore? store;
+  Future<void> _storage = Future.value();
+  Future<void> _persist(Map<String, dynamic>? value) {
+    final work = _storage.then((_) => store?.write(value));
+    _storage = work.catchError((Object _) {});
+    return work;
+  }
+
+  Future<void> restoreSession() async {
+    final epoch = _sessionEpoch;
+    final saved = await store?.read();
+    if (epoch != _sessionEpoch || saved == null) return;
+    if (saved['origin'] != origin.toString() ||
+        saved['refresh_token'] is! String) {
+      await _persist(null);
+      return;
+    }
+    _refresh = saved['refresh_token'] as String;
+    // Always validate/rotate with the server; never restore an old access token.
+    final pending = _refreshing ??= _renew();
+    try {
+      await pending;
+    } finally {
+      if (identical(_refreshing, pending)) _refreshing = null;
+    }
+  }
+
   String? _access;
   String? _refresh;
   Future<void>? _refreshing;
   int _sessionEpoch = 0;
   bool get authenticated => _access != null;
-  void acceptSession(Map<String, dynamic> value) {
+  Future<void> acceptSession(Map<String, dynamic> value) async {
     final access = value['access_token'] as String;
     final refresh = value['refresh_token'] as String;
     ++_sessionEpoch;
     _access = access;
     _refresh = refresh;
+    try {
+      await _persist({'origin': origin.toString(), 'refresh_token': refresh});
+    } catch (_) {
+      await forgetSession();
+      throw const ClientError('session_storage_failed');
+    }
   }
 
-  void forgetSession() {
+  Future<void> forgetSession() {
     ++_sessionEpoch;
     _access = null;
     _refresh = null;
+    return _persist(null);
   }
 
   void close() {
-    forgetSession();
+    ++_sessionEpoch;
+    _access = null;
+    _refresh = null;
     _client.close(force: true);
   }
 
@@ -102,14 +140,19 @@ class Api implements TunnelApi {
     // A lost response may have rotated the refresh token. Fail closed, require login.
     _refresh = null;
     try {
+      // Consume durable refresh before the request. Crash/response loss requires login.
+      await _persist(null);
+      if (epoch != _sessionEpoch) throw const ClientError('session_expired');
       final value = await _request('POST', '/api/v1/auth/refresh', {
         'refresh_token': token,
       });
       if (epoch != _sessionEpoch) throw const ClientError('session_expired');
       _access = value['access_token'] as String;
       _refresh = value['refresh_token'] as String;
+      await _persist({'origin': origin.toString(), 'refresh_token': _refresh});
+      if (epoch != _sessionEpoch) throw const ClientError('session_expired');
     } catch (_) {
-      if (epoch == _sessionEpoch) forgetSession();
+      if (epoch == _sessionEpoch) await forgetSession();
       throw const ClientError('session_expired');
     }
   }
@@ -168,6 +211,11 @@ class Api implements TunnelApi {
                 ? code
                 : 'api_unavailable',
           );
+        }
+        if (parsed is List &&
+            method == 'GET' &&
+            path == '/api/v1/window-tunnels') {
+          return {'items': parsed};
         }
         if (parsed is! Map<String, dynamic>)
           throw const ClientError('invalid_response');

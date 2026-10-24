@@ -1,0 +1,25 @@
+{
+  "vpn_dataplane_acceptance": false,
+  "test_apk_removed": true,
+  "direct_network_ready": true,
+  "passed": true,
+  "scope": "physical phone-only independent UID diagnostics; no server setup",
+  "facts": {
+    "active_network_available": true,
+    "active_network_is_vpn": false,
+    "active_network_validated": true,
+    "application_initialized": true,
+    "dns_failure": "none",
+    "egress_is_staging": false,
+    "fixed_udp_dns_response": true,
+    "ipv4_available": true,
+    "ipv4_failure": "none",
+    "ipv4_primary_failure": "none",
+    "ipv6_available": false,
+    "probe_complete": true,
+    "process_uid_matches_target": true,
+    "test_internet_permission_declared": true,
+    "vpn_dns_configured": false
+  },
+  "measured_at": "2026-10-24T12:34:17.8921639+00:00"
+}

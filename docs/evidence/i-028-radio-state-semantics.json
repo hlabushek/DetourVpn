@@ -1,0 +1,11 @@
+{
+  "scope": "phone-only radio state semantics during svc loss; no VPN or server",
+  "before_wifi_pref": "1",
+  "before_mobile_pref": "1",
+  "wifi_command_reports_disabled": false,
+  "mobile_setting_reports_disabled": false,
+  "wifi_preference_reports_disabled": true,
+  "wifi_restored": true,
+  "mobile_restored": true,
+  "measured_at": "2026-10-24T16:56:36.1160246+00:00"
+}

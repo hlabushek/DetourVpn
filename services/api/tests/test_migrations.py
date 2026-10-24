@@ -71,6 +71,11 @@ def test_empty_database_upgrade_repeat_and_no_schema_drift(engine: Engine) -> No
         "admin_identities",
         "admin_sessions",
         "admin_actions",
+        "peer_window_holds",
+        "peer_window_allocations",
+        "peer_window_receipts",
+        "peer_runtime_epochs",
+        "peer_connections",
     }
     assert {item["name"] for item in inspect(engine).get_indexes("users")} == {
         "ix_users_created_at"
@@ -107,7 +112,10 @@ def test_downgrade_with_data_fails_without_losing_rows_or_revision(engine: Engin
         command.downgrade(config, "base")
     with transaction(engine) as session:
         assert session.scalar(select(func.count()).select_from(User)) == 1
-        assert session.scalar(text("SELECT version_num FROM alembic_version")) == "0013_admin"
+        assert (
+            session.scalar(text("SELECT version_num FROM alembic_version"))
+            == "0015_window_admission"
+        )
 
 
 def test_downgrade_cannot_delete_a_concurrently_committing_account(engine: Engine) -> None:
@@ -141,7 +149,10 @@ def test_downgrade_cannot_delete_a_concurrently_committing_account(engine: Engin
                 result.result(timeout=10)
     with transaction(engine) as session:
         assert session.scalar(select(func.count()).select_from(User)) == 1
-        assert session.scalar(text("SELECT version_num FROM alembic_version")) == "0013_admin"
+        assert (
+            session.scalar(text("SELECT version_num FROM alembic_version"))
+            == "0015_window_admission"
+        )
 
 
 @pytest.mark.parametrize("subject", [0, -1])

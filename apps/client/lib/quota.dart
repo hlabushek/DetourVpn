@@ -53,6 +53,7 @@ class QuotaEntry {
           'internal',
           'usage',
           'tunnel_lease',
+          'peer_window',
           'reward',
         }.contains(source) ||
         (kind != 'credit' && kind != 'debit') ||
@@ -69,6 +70,7 @@ class QuotaEntry {
     'internal' => 'Начисление или корректировка',
     'usage' => 'Расход трафика',
     'tunnel_lease' => 'Расчёт подключения',
+    'peer_window' => 'Расход VPN-трафика',
     'reward' => 'Бонусный трафик',
     _ => 'Операция',
   };

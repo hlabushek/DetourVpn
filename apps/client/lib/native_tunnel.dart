@@ -31,8 +31,41 @@ abstract interface class NativeTunnel {
   Future<void> openLogin(String url);
 }
 
-class PlatformTunnel implements NativeTunnel {
+abstract interface class WindowNative implements NativeTunnel {
+  Future<void> connectWindow(
+    String config,
+    Map<String, dynamic> grant,
+    int remainingMs,
+  );
+  Future<void> advanceWindow(Map<String, dynamic> grant, int remainingMs);
+}
+
+class PlatformTunnel implements WindowNative {
   static const channel = MethodChannel('project.vpn/tunnel.v1');
+  Map<String, dynamic> _windowArgs(
+    Map<String, dynamic> grant,
+    int remainingMs,
+  ) => {
+    'connection': grant['connection_id'],
+    'runtime': grant['runtime_id'],
+    'generation': grant['generation'],
+    'remainingMs': remainingMs,
+  };
+  @override
+  Future<void> connectWindow(
+    String config,
+    Map<String, dynamic> grant,
+    int remainingMs,
+  ) => channel.invokeMethod<void>('connectWindow', {
+    ..._windowArgs(grant, remainingMs),
+    'config': config,
+  });
+  @override
+  Future<void> advanceWindow(Map<String, dynamic> grant, int remainingMs) =>
+      channel.invokeMethod<void>(
+        'advanceWindow',
+        _windowArgs(grant, remainingMs),
+      );
   @override
   Future<bool> permission() async =>
       await channel.invokeMethod<bool>('permission') ?? false;

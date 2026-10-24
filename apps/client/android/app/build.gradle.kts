@@ -13,6 +13,7 @@ android {
         targetSdk = 36
         versionCode = 1
         versionName = "0.1-i013"
+        testInstrumentationRunner = "org.example.vpnpoc.I025DeviceTests"
         ndk { abiFilters += listOf("arm64-v8a", "x86_64") }
     }
     compileOptions {

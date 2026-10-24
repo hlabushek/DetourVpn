@@ -1,0 +1,346 @@
+{
+  "accounting_after_revoke": {
+    "ledger_consistent": true,
+    "measured_receipt_bytes": "2606215",
+    "open_connections": 0,
+    "receipt_count": 19,
+    "reserved_bytes": "0",
+    "unknown_receipts": 0,
+    "used_bytes": "2606215",
+    "violations": 0
+  },
+  "cleanup_steps": {
+    "agent_revoke_and_stop": true,
+    "device_scenarios_restored": {
+      "activity_resumed": false,
+      "battery_reset": false,
+      "data_restored": false,
+      "display_woken": false,
+      "idle_unforced": false,
+      "restoration_observation_complete": false,
+      "wifi_restored": false
+    },
+    "local_api_stopped": true,
+    "phone_restored": false,
+    "root_stop": {
+      "cleanup_complete": true,
+      "gate_close_errors_before_core_stop": 0,
+      "journal_preserved": true,
+      "temporary_grant_removed": true,
+      "timeout_timer_disarmed": true
+    },
+    "ssh_transport": true
+  },
+  "control_plane_settlement_complete": true,
+  "different_android_process_same_real_account_family_and_device": true,
+  "facts": {
+    "background_window_safe_and_real_recovery": true,
+    "forced_doze_window_safe_and_real_recovery": true,
+    "real_account_refresh_after_android_process_restart": true,
+    "screen_off_window_safe_and_real_recovery": true
+  },
+  "failed_at": "flutter_lifecycle",
+  "independent_probes": [
+    {
+      "active_network_available": true,
+      "active_network_is_vpn": false,
+      "active_network_validated": true,
+      "active_transport_cellular": false,
+      "active_transport_wifi": true,
+      "application_initialized": true,
+      "dns_failure": "none",
+      "egress_is_staging": false,
+      "fixed_udp_dns_response": true,
+      "ipv4_available": true,
+      "ipv4_failure": "none",
+      "ipv4_primary_failure": "none",
+      "ipv6_available": false,
+      "probe_complete": true,
+      "process_uid_matches_target": true,
+      "test_internet_permission_declared": true,
+      "vpn_dns_configured": false
+    },
+    {
+      "active_network_available": true,
+      "active_network_is_vpn": true,
+      "active_network_validated": true,
+      "active_transport_cellular": false,
+      "active_transport_wifi": true,
+      "application_initialized": true,
+      "dns_failure": "none",
+      "egress_is_staging": true,
+      "fixed_udp_dns_response": true,
+      "ipv4_available": true,
+      "ipv4_failure": "none",
+      "ipv4_primary_failure": "none",
+      "ipv6_available": false,
+      "probe_complete": true,
+      "process_uid_matches_target": true,
+      "test_internet_permission_declared": true,
+      "vpn_dns_configured": true
+    },
+    {
+      "application_initialized": true,
+      "egress_is_staging": true,
+      "ipv4_available": true,
+      "ipv4_failure": "none",
+      "ipv4_primary_failure": "none",
+      "probe_complete": true,
+      "process_uid_matches_target": true,
+      "test_internet_permission_declared": true
+    },
+    {
+      "application_initialized": true,
+      "egress_is_staging": true,
+      "ipv4_available": true,
+      "ipv4_failure": "none",
+      "ipv4_primary_failure": "none",
+      "probe_complete": true,
+      "process_uid_matches_target": true,
+      "test_internet_permission_declared": true
+    },
+    {
+      "application_initialized": true,
+      "egress_is_staging": true,
+      "ipv4_available": true,
+      "ipv4_failure": "none",
+      "ipv4_primary_failure": "none",
+      "probe_complete": true,
+      "process_uid_matches_target": true,
+      "test_internet_permission_declared": true
+    },
+    {
+      "application_initialized": true,
+      "egress_is_staging": true,
+      "ipv4_available": true,
+      "ipv4_failure": "none",
+      "ipv4_primary_failure": "none",
+      "probe_complete": true,
+      "process_uid_matches_target": true,
+      "test_internet_permission_declared": true
+    },
+    {
+      "application_initialized": true,
+      "egress_is_staging": true,
+      "ipv4_available": true,
+      "ipv4_failure": "none",
+      "ipv4_primary_failure": "none",
+      "probe_complete": true,
+      "process_uid_matches_target": true,
+      "test_internet_permission_declared": true
+    },
+    {
+      "application_initialized": true,
+      "egress_is_staging": true,
+      "ipv4_available": true,
+      "ipv4_failure": "none",
+      "ipv4_primary_failure": "none",
+      "probe_complete": true,
+      "process_uid_matches_target": true,
+      "test_internet_permission_declared": true
+    },
+    {
+      "active_network_available": true,
+      "active_network_is_vpn": true,
+      "active_network_validated": true,
+      "active_transport_cellular": false,
+      "active_transport_wifi": true,
+      "application_initialized": true,
+      "dns_failure": "none",
+      "egress_is_staging": true,
+      "fixed_udp_dns_response": true,
+      "ipv4_available": true,
+      "ipv4_failure": "none",
+      "ipv4_primary_failure": "none",
+      "ipv6_available": false,
+      "probe_complete": true,
+      "process_uid_matches_target": true,
+      "test_internet_permission_declared": true,
+      "vpn_dns_configured": true
+    },
+    {
+      "active_network_available": true,
+      "active_network_is_vpn": true,
+      "active_network_validated": true,
+      "active_transport_cellular": true,
+      "active_transport_wifi": false,
+      "application_initialized": true,
+      "dns_failure": "none",
+      "egress_is_staging": true,
+      "fixed_udp_dns_response": true,
+      "ipv4_available": true,
+      "ipv4_failure": "none",
+      "ipv4_primary_failure": "none",
+      "ipv6_available": false,
+      "probe_complete": true,
+      "process_uid_matches_target": true,
+      "test_internet_permission_declared": true,
+      "vpn_dns_configured": true
+    }
+  ],
+  "independent_unprivileged_remote_postcheck": true,
+  "lifecycle_observations": {
+    "background": {
+      "elapsed_seconds": 100,
+      "mode": "background",
+      "natural_sleep_acceptance": false,
+      "restoration": {
+        "activity_resumed": true,
+        "display_woken": true,
+        "network_switches_match_baseline": true
+      },
+      "server_observation_before_wake": {
+        "agent_active": true,
+        "live_slots": [
+          1
+        ],
+        "live_slots_have_unexpired_current_window": true,
+        "native_transfer_bytes": [
+          {
+            "received": "798532",
+            "sent": "1092956",
+            "slot": 1
+          },
+          {
+            "received": "0",
+            "sent": "0",
+            "slot": 2
+          }
+        ],
+        "peer_counts": [
+          1,
+          0
+        ],
+        "prepared": true,
+        "remaining_seconds": 1433,
+        "slot_count": 2
+      }
+    },
+    "forced_doze": {
+      "deep_idle_observed": true,
+      "elapsed_seconds": 100,
+      "mode": "forced_doze",
+      "natural_sleep_acceptance": false,
+      "restoration": {
+        "activity_resumed": true,
+        "battery_override_absent": true,
+        "battery_reset": true,
+        "display_woken": true,
+        "idle_force_released": true,
+        "idle_unforced": true,
+        "network_switches_match_baseline": true
+      },
+      "server_observation_before_wake": {
+        "agent_active": true,
+        "live_slots": [
+          1
+        ],
+        "live_slots_have_unexpired_current_window": true,
+        "native_transfer_bytes": [
+          {
+            "received": "15156",
+            "sent": "29420",
+            "slot": 1
+          },
+          {
+            "received": "0",
+            "sent": "0",
+            "slot": 2
+          }
+        ],
+        "peer_counts": [
+          1,
+          0
+        ],
+        "prepared": true,
+        "remaining_seconds": 1187,
+        "slot_count": 2
+      }
+    },
+    "screen_off": {
+      "elapsed_seconds": 100,
+      "mode": "screen_off",
+      "natural_sleep_acceptance": false,
+      "restoration": {
+        "activity_resumed": true,
+        "display_woken": true,
+        "network_switches_match_baseline": true
+      },
+      "server_observation_before_wake": {
+        "agent_active": true,
+        "live_slots": [
+          1
+        ],
+        "live_slots_have_unexpired_current_window": true,
+        "native_transfer_bytes": [
+          {
+            "received": "61748",
+            "sent": "93188",
+            "slot": 1
+          },
+          {
+            "received": "0",
+            "sent": "0",
+            "slot": 2
+          }
+        ],
+        "peer_counts": [
+          1,
+          0
+        ],
+        "prepared": true,
+        "remaining_seconds": 1311,
+        "slot_count": 2
+      }
+    }
+  },
+  "measured_at": "2026-10-24T13:25:12.629397+00:00",
+  "node_before_cleanup": {
+    "agent_active": true,
+    "live_slots": [
+      1
+    ],
+    "native_transfer_bytes": [
+      {
+        "received": "28996",
+        "sent": "50328",
+        "slot": 1
+      },
+      {
+        "received": "0",
+        "sent": "0",
+        "slot": 2
+      }
+    ],
+    "peer_counts": [
+      1,
+      0
+    ],
+    "prepared": true,
+    "remaining_seconds": 1109,
+    "slot_count": 2
+  },
+  "open_cases": [
+    "Wi-Fi/mobile transition",
+    "system VPN permission revoke",
+    "Disconnect during in-flight renewal",
+    "two simultaneous physical devices",
+    "independent provider failure",
+    "comprehensive DNS leak capture",
+    "natural sleep (forced Doze is separate)"
+  ],
+  "passed": false,
+  "quota_funding": "TEST FREE GRANT ONLY",
+  "scope": "bounded staging A, one physical Android, local disposable API/PostgreSQL",
+  "source_sha256": {
+    "apps/android/app/src/androidTest/java/org/example/vpnpoc/I028Probe.java": "94fe899ce6e08f1a7e984ed7580d5baf45bc4cf2e55447427833a3920226b776",
+    "apps/client/integration_test/i028_live_test.dart": "1e0689e2521a6d0939ba0f1d865c7adc5329a3a9579eff7f752088bc0fe653fa",
+    "infra/staging-v3/runtime.py": "1898bb981c09b64f546a7b35635493d113e19f75c6f552fa10e0254552e24094",
+    "scripts/i028_device_scenarios.py": "688b7cd0b70024b47534546dd022b9d0fbfcfd5701b072961f80224437432a10",
+    "scripts/run_i028_staging.ps1": "e0e527ea094c34f8d02361b24aec2062954b627b67bda654b27e7a2db498364e",
+    "services/api/tests/test_i028_live.py": "ab92373992f7c1ff448dc1f6e26c99891189998397edc3241b39ca985176914a"
+  },
+  "suite": "Lifecycle",
+  "telegram": "TEST FAKE ONLY",
+  "temporary_staging_transport_and_phone_cleanup": false
+}

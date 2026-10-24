@@ -1,0 +1,19 @@
+{
+  "measured_at": "2026-10-24T12:59:41.3553367+00:00",
+  "cleanup": {
+    "cleanup_complete": true,
+    "timeout_timer_disarmed": true,
+    "journal_preserved": true,
+    "temporary_grant_removed": true,
+    "gate_close_errors_before_core_stop": 0
+  },
+  "scope": "actual staging A preparation and corrected root cleanup only; no phone or traffic",
+  "root_runtime_sha256": "1898bb981c09b64f546a7b35635493d113e19f75c6f552fa10e0254552e24094",
+  "passed": true,
+  "independent_unprivileged_postcheck": {
+    "all_own_services_and_timer_inactive": true,
+    "own_namespaces_and_links_absent": true,
+    "own_udp_and_reverse_listeners_absent": true,
+    "temporary_sudo_grant_absent": true
+  }
+}

@@ -44,7 +44,7 @@ select = ["E", "F", "I", "UP", "B", "S"]
 python_version = "3.13"
 strict = true
 mypy_path = "services/api/src"
-files = ["services/api/src", "services/api/tests", "services/api/migrations", "services/node-agent/agent.py", "scripts", "infra/ansible/files"]
+files = ["services/api/src", "services/api/tests", "services/api/migrations", "services/node-agent", "scripts", "infra/ansible/files"]
 plugins = ["pydantic.mypy"]
 
 [tool.pytest.ini_options]

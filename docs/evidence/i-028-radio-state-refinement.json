@@ -1,0 +1,9 @@
+{
+  "wifi_status_category": "disabled",
+  "telephony_data_states": [
+    "0"
+  ],
+  "route_available": false,
+  "restored": true,
+  "measured_at": "2026-10-24T16:56:58.5303488+00:00"
+}

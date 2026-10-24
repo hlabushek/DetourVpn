@@ -271,6 +271,9 @@ class EntitlementService:
         )
         # No network I/O in this transaction. Existing outbox is reused.
         from vpn_api.tunnels.service import enqueue_revoke
+        from vpn_api.tunnels.window_service import revoke_connections
+
+        revoke_connections(session, user_id)
 
         for tunnel in session.scalars(
             select(Tunnel)

@@ -1,6 +1,7 @@
 # ADR-038 — renewable peer windows and isolated slots (I-024)
 
-2026-10-23. Local protocol work in progress; no remote node rollout acceptance.
+2026-10-23. Implemented locally; acceptance evidence is in verification-i-024.md.
+No remote node rollout or Android v3 acceptance.
 
 The v2 node endpoint-wide quota cannot account independently for multiple peers.
 Do not widen its 60s lease or remove the subscription compatibility gate.
@@ -17,8 +18,12 @@ commands, executable paths, namespaces, endpoints or firewall programs.
 
 Technical access is a sequence of windows of at most 90s and 64 MiB. Reserve
 the next window before dispatch; renew before the previous deadline with a
-5s operation margin. The grant deadline is further bounded by funding expiry,
-subscription/device/user status and operator runtime. Long subscription periods
+5s protocol renewal margin. Native opening additionally subtracts 6s from the
+absolute deadline: at most 5s native operation plus 1s allowed server-ahead skew.
+Clients must renew well before that cutoff; the actual kernel gate must still be
+live, even if a grant's wall-clock validation would pass. The grant deadline is
+bounded by funding expiry, subscription/device/user status and operator runtime.
+Long subscription periods
 do not create long kernel leases. A late renewal cannot reopen an expired peer;
 it requires a fresh admission. Replayed windows must match the complete original
 grant; changing budget/deadline under the same ID is a conflict. Runtime changes,
@@ -30,6 +35,13 @@ Do not add AWG native transfer counters to it: that would double-count. The UI
 must disclose this metering policy before ordinary use. Counter behavior,
 concurrent packet boundary and budget overrun tolerance require real Linux tests.
 Existing v2 native-meter evidence does not validate this new meter.
+
+The passed counter follows the shared quota expression; the quota object's own
+`used` value is not final measured traffic because rejected packets can increase
+it. Local concurrent packet-boundary tests verify passed bytes stay within budget.
+An open slot also meters unsolicited UDP accepted at its endpoint before native
+authentication. This is an outer endpoint meter, not authenticated payload-only
+billing or DDoS protection. Disclose the policy and retain audited compensation.
 
 Rotation closes the slot gate, records its final kernel counter durably, then
 atomically installs the next budget/deadline and reopens the existing peer.
@@ -64,6 +76,8 @@ meter trust model; the agent must not be an arbitrary remote execution endpoint.
 First implement strict contracts and their negatives; then DB holds/receipts and
 concurrency/restore; then the fixed-operation Linux slot adapter and crash tests;
 then Android renewal/lifecycle and physical multiuser/expiry/revoke drills.
-The contract module is not mounted by the API before those boundaries exist.
+V3 public admission and hidden authenticated agent routes now exist, explicitly
+disabled by default. I-024 validates backend/agent/Linux locally; Android lifecycle
+belongs to I-025 and permanent physical multiuser acceptance belongs to I-028.
 No mocks count as VPN egress, measured kernel enforcement or uninterrupted use.
 Permanent node/firewall rollout needs a separate baseline/approval under I-028.

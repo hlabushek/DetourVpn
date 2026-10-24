@@ -3,6 +3,7 @@ param(
     [string]$AndroidSdk = "$env:LOCALAPPDATA\Android\Sdk",
     [string]$JavaHome = 'C:\Program Files\Android\Android Studio\jbr',
     [string]$ApiOrigin = '',
+    [switch]$WindowTunnels,
     [switch]$DeviceChecks
 )
 $ErrorActionPreference = 'Stop'
@@ -81,6 +82,7 @@ try {
     try {
         $taskArguments = @('build', 'apk', '--debug', '--no-pub', '--target', 'lib/main.dart', '--target-platform', 'android-arm64,android-x64')
         if ($ApiOrigin) { $taskArguments += "--dart-define=VPN_API_ORIGIN=$ApiOrigin" }
+        if ($WindowTunnels) { $taskArguments += "--dart-define=VPN_WINDOW_TUNNELS=true" }
         & $taskFlutter @taskArguments
         if ($LASTEXITCODE -ne 0) { throw 'Flutter Android build failed' }
         # Flutter CLI rewrites Windows paths without escaping drive colons;
@@ -103,6 +105,7 @@ try {
         $taskReleaseArguments = @('build', 'apk', '--release', '--target', 'lib/main.dart', '--target-platform', 'android-arm64,android-x64')
         if ($ApiOrigin) { $taskReleaseArguments += "--dart-define=VPN_API_ORIGIN=$ApiOrigin" }
         $taskPubLockHash = (Get-FileHash -LiteralPath (Join-Path $taskClient 'pubspec.lock') -Algorithm SHA256).Hash
+        if ($WindowTunnels) { $taskReleaseArguments += "--dart-define=VPN_WINDOW_TUNNELS=true" }
         & $taskFlutter @taskReleaseArguments
         if ($LASTEXITCODE -ne 0) { throw 'Flutter Android release build failed' }
         if ((Get-FileHash -LiteralPath (Join-Path $taskClient 'pubspec.lock') -Algorithm SHA256).Hash -ne $taskPubLockHash) {

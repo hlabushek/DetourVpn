@@ -1,0 +1,88 @@
+{
+  "issue": "I-024",
+  "tested_on": "2026-10-23",
+  "scope": "local backend/agent/Linux; separate PostgreSQL HTTP composition and native AWG lab",
+  "status": "local_acceptance_passed",
+  "physical_android_v3": false,
+  "remote_dataplane_rollout": false,
+  "wan_egress_tested": false,
+  "daily_service_accepted": false,
+  "telegram_delivery_in_backend_tests": "TEST FAKE ONLY",
+  "postgresql": {
+    "real_disposable_server": true,
+    "targeted_final_passed": 72,
+    "targeted_final_seconds": 84.83,
+    "full_regression": {
+      "passed": 719,
+      "skipped": 5,
+      "seconds": 626.20,
+      "temporary_cluster_stopped_and_removed": true,
+      "skipped_scopes": ["admin_browser", "mini_app_browser", "I-012_remote", "I-019_remote", "I-013_physical"]
+    },
+    "migrations": ["0014_peer_windows", "0015_window_admission"],
+    "existing_hold_backfill_tested": true,
+    "encrypted_restore_with_connection_epoch_history": true,
+    "protected_history_and_downgrade": true,
+    "http_daemon_composition_kernel": "TEST ONLY simulated gate/peer, real HTTP/PostgreSQL/SQLite"
+  },
+  "kernel_gate_lab": {
+    "scope": "local WSL Linux kernel; synthetic UDP; no AWG or VPN",
+    "passed": true,
+    "budget_bytes": 65536,
+    "concurrent_passed_bytes": 64764,
+    "concurrent_boundary_exact": true,
+    "duplex_outer_ip_bytes": 4112,
+    "independent_kernel_deadline": true,
+    "expired_gate_reports_not_live": true,
+    "private_journal_lock_links_permissions_persistence": true,
+    "restart_closes_gate": true,
+    "slot_isolation": true,
+    "starts_closed": true,
+    "namespace_processes_closed": true
+  },
+  "native_awg_runtime_lab": {
+    "scope": "local isolated WSL, pinned AWG, synthetic IPv4 packets and grants; no WAN/Android/backend billing",
+    "passed": true,
+    "two_real_awg_tunnels_transfer": true,
+    "one_closed_slot_preserves_other": true,
+    "rotation_preserves_key_and_address": true,
+    "kernel_expiry_and_native_revoke_block_packets": true,
+    "runtime_restart_closed_and_measured": true,
+    "runtime_two_slots_rotation_receipts_revoke": true,
+    "sigkill_active_kernel_expiry_measured_recovery": true,
+    "sigkill_intent_preserves_unknown": true,
+    "sustained_two_tunnels_seconds": 105,
+    "sustained_renewals_per_tunnel": 4,
+    "sustained_unique_measured_receipts": 10,
+    "sustained_measured_outer_bytes": 239864,
+    "cores_stopped": true
+  },
+  "static_checks": {
+    "ruff": "passed",
+    "mypy_source_files": 146,
+    "explicit_linux_mypy_files": 6,
+    "openapi_current": true,
+    "internal_json_schemas_current": true
+  },
+  "flutter_compatibility": {
+    "build_script": "scripts/build_flutter_client.ps1",
+    "exit_code": 0,
+    "snapshot_id": "7249eb264c874ee1ad0705afbc0dbb90",
+    "format_and_analyze_passed": true,
+    "tests_passed": 51,
+    "native_unit_and_lint_passed": true,
+    "debug_and_release_builds_passed": true,
+    "release_apk_reported_mb": 42.9,
+    "physical_v3_installation": false
+  },
+  "final_process_cleanup": {
+    "postgresql_processes": 0,
+    "local_awg_core_processes": 0
+  },
+  "remaining_issue_boundaries": {
+    "I-025": "Android secure persistence, renewable client and physical lifecycle/network tests",
+    "I-026": "real trusted Telegram auth relay",
+    "I-027": "durable jobs, off-host backups and operational recovery/fencing",
+    "I-028": "approved persistent dataplane rollout and full multiuser physical acceptance"
+  }
+}

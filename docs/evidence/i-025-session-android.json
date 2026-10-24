@@ -1,0 +1,18 @@
+{
+  "api_stopped_reverse_removed_ordinary_app_restored": true,
+  "database_session_rotation_and_logout_consistent": true,
+  "facts": {
+    "lost_committed_refresh_response_no_durable_replay": true,
+    "real_flutter_api_keystore_refresh_rotation": true,
+    "real_flutter_logout_erases_and_server_revokes": true
+  },
+  "flutter_test_exit_success": true,
+  "measured_at": "2026-10-23T19:19:30.373137+00:00",
+  "passed": true,
+  "real_android_keystore": true,
+  "real_api": true,
+  "real_postgresql": true,
+  "remote_changes": false,
+  "telegram_delivery": "TEST FAKE ONLY",
+  "vpn_dataplane_acceptance": false
+}

@@ -1,0 +1,62 @@
+{
+  "$id": "urn:project-vpn:peer-window-start.v3.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "capabilities": {
+      "items": {
+        "type": "string"
+      },
+      "maxItems": 4,
+      "minItems": 4,
+      "title": "Capabilities",
+      "type": "array"
+    },
+    "contract_version": {
+      "maximum": 3,
+      "minimum": 3,
+      "title": "Contract Version",
+      "type": "integer"
+    },
+    "gates_closed": {
+      "title": "Gates Closed",
+      "type": "boolean"
+    },
+    "previous_runtime_id": {
+      "anyOf": [
+        {
+          "format": "uuid",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Previous Runtime Id"
+    },
+    "runtime_id": {
+      "format": "uuid",
+      "title": "Runtime Id",
+      "type": "string"
+    },
+    "server_public_keys": {
+      "items": {
+        "type": "string"
+      },
+      "maxItems": 16,
+      "minItems": 1,
+      "title": "Server Public Keys",
+      "type": "array"
+    }
+  },
+  "required": [
+    "contract_version",
+    "runtime_id",
+    "previous_runtime_id",
+    "capabilities",
+    "server_public_keys",
+    "gates_closed"
+  ],
+  "title": "EpochStart",
+  "type": "object"
+}

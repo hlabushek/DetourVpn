@@ -225,7 +225,8 @@ class QuotaOperation(Base):
         UniqueConstraint("user_id", "source_type", "source_id", name="uq_quota_operations_source"),
         CheckConstraint("kind IN ('credit', 'debit')", name="ck_quota_operations_kind"),
         CheckConstraint(
-            "source_type IN ('registration', 'internal', 'usage', 'tunnel_lease', 'reward')",
+            "source_type IN ('registration', 'internal', 'usage', 'tunnel_lease', "
+            "'reward', 'peer_window')",
             name="ck_quota_operations_source",
         ),
         CheckConstraint(
@@ -252,7 +253,7 @@ class QuotaOperation(Base):
         CheckConstraint("revision_before >= 0", name="ck_quota_operations_revision"),
         CheckConstraint("unavailable_before_bytes >= 0", name="ck_quota_operations_unavailable"),
         CheckConstraint(
-            "source_type NOT IN ('usage', 'tunnel_lease') OR kind = 'debit'",
+            "source_type NOT IN ('usage', 'tunnel_lease', 'peer_window') OR kind = 'debit'",
             name="ck_quota_operations_usage",
         ),
         Index("ix_quota_operations_created_at", "created_at"),
@@ -293,7 +294,8 @@ class QuotaLedger(Base):
             name="ck_quota_ledger_direction",
         ),
         CheckConstraint(
-            "source_type IN ('registration', 'internal', 'usage', 'tunnel_lease', 'reward')",
+            "source_type IN ('registration', 'internal', 'usage', 'tunnel_lease', "
+            "'reward', 'peer_window')",
             name="ck_quota_ledger_source",
         ),
         CheckConstraint(
@@ -310,7 +312,7 @@ class QuotaLedger(Base):
         ),
         CheckConstraint("balance_after_bytes >= 0", name="ck_quota_ledger_balance"),
         CheckConstraint(
-            "source_type NOT IN ('usage', 'tunnel_lease') OR kind = 'debit'",
+            "source_type NOT IN ('usage', 'tunnel_lease', 'peer_window') OR kind = 'debit'",
             name="ck_quota_ledger_usage",
         ),
         Index("ix_quota_ledger_created_at", "created_at"),
@@ -380,6 +382,160 @@ class QuotaFundingUse(Base):
     lot_id: Mapped[UUID] = mapped_column(primary_key=True)
     user_id: Mapped[UUID] = mapped_column(ForeignKey("users.id", ondelete="RESTRICT"))
     amount_bytes: Mapped[int] = mapped_column(BigInteger)
+
+
+class PeerWindowHold(Base):
+    """Immutable funding authority, not proof of node dispatch or admission."""
+
+    __tablename__ = "peer_window_holds"
+    __table_args__ = (
+        UniqueConstraint("id", "user_id", name="uq_peer_window_hold_owner"),
+        UniqueConstraint("connection_id", "generation", name="uq_peer_window_generation"),
+        CheckConstraint("amount_bytes BETWEEN 65536 AND 67108864", name="ck_peer_window_bytes"),
+        CheckConstraint("generation > 0", name="ck_peer_window_generation"),
+        CheckConstraint("not_after > created_at", name="ck_peer_window_deadline"),
+        Index("ix_peer_window_hold_user", "user_id"),
+        Index("ix_peer_window_hold_runtime", "node_id", "runtime_id"),
+    )
+    id: Mapped[UUID] = mapped_column(primary_key=True)
+    user_id: Mapped[UUID] = mapped_column(ForeignKey("users.id", ondelete="RESTRICT"))
+    connection_id: Mapped[UUID] = mapped_column()
+    generation: Mapped[int] = mapped_column(BigInteger)
+    node_id: Mapped[UUID] = mapped_column()
+    runtime_id: Mapped[UUID] = mapped_column()
+    slot_id: Mapped[int] = mapped_column(Integer)
+    amount_bytes: Mapped[int] = mapped_column(BigInteger)
+    grant: Mapped[dict[str, object]] = mapped_column(JSON)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    not_after: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+
+class PeerWindowAllocation(Base):
+    __tablename__ = "peer_window_allocations"
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["window_id", "user_id"],
+            ["peer_window_holds.id", "peer_window_holds.user_id"],
+            name="fk_peer_window_allocation_owner",
+            ondelete="RESTRICT",
+        ),
+        ForeignKeyConstraint(
+            ["lot_id", "user_id"],
+            ["quota_funding_lots.id", "quota_funding_lots.user_id"],
+            name="fk_peer_window_allocation_lot",
+            ondelete="RESTRICT",
+        ),
+        UniqueConstraint("window_id", "position", name="uq_peer_window_allocation_position"),
+        CheckConstraint("amount_bytes > 0 AND position >= 0", name="ck_peer_window_allocation"),
+        Index("ix_peer_window_allocation_lot", "lot_id"),
+    )
+    window_id: Mapped[UUID] = mapped_column(primary_key=True)
+    lot_id: Mapped[UUID] = mapped_column(primary_key=True)
+    user_id: Mapped[UUID] = mapped_column(ForeignKey("users.id", ondelete="RESTRICT"))
+    position: Mapped[int] = mapped_column(Integer)
+    amount_bytes: Mapped[int] = mapped_column(BigInteger)
+
+
+class PeerWindowReceipt(Base):
+    __tablename__ = "peer_window_receipts"
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["window_id", "user_id"],
+            ["peer_window_holds.id", "peer_window_holds.user_id"],
+            name="fk_peer_window_receipt_owner",
+            ondelete="RESTRICT",
+        ),
+        ForeignKeyConstraint(
+            ["operation_id", "user_id"],
+            ["quota_operations.id", "quota_operations.user_id"],
+            name="fk_peer_window_receipt_operation",
+            ondelete="RESTRICT",
+        ),
+        UniqueConstraint("operation_id", name="uq_peer_window_receipt_operation"),
+        CheckConstraint(
+            "(observation = 'unknown' AND observed_bytes IS NULL AND operation_id IS NULL) OR "
+            "(observation = 'measured' AND observed_bytes IS NOT NULL "
+            "AND observed_bytes BETWEEN 0 AND 67108864 AND "
+            "((observed_bytes = 0 AND operation_id IS NULL) OR "
+            "(observed_bytes > 0 AND operation_id IS NOT NULL)))",
+            name="ck_peer_window_receipt_evidence",
+        ),
+    )
+    window_id: Mapped[UUID] = mapped_column(primary_key=True)
+    user_id: Mapped[UUID] = mapped_column(ForeignKey("users.id", ondelete="RESTRICT"))
+    observation: Mapped[str] = mapped_column(String(16))
+    observed_bytes: Mapped[int | None] = mapped_column(BigInteger)
+    operation_id: Mapped[UUID | None] = mapped_column()
+    receipt: Mapped[dict[str, object]] = mapped_column(JSON)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+
+class PeerRuntimeEpoch(Base):
+    __tablename__ = "peer_runtime_epochs"
+    node_id: Mapped[UUID] = mapped_column(
+        ForeignKey("vpn_nodes.id", ondelete="RESTRICT"), primary_key=True
+    )
+    runtime_id: Mapped[UUID] = mapped_column(primary_key=True)
+    previous_runtime_id: Mapped[UUID | None] = mapped_column()
+    manifest_digest: Mapped[str] = mapped_column(String(64))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+
+class PeerConnection(Base):
+    __tablename__ = "peer_connections"
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["device_id", "user_id"],
+            ["devices.id", "devices.user_id"],
+            name="fk_peer_connection_device_owner",
+            ondelete="RESTRICT",
+        ),
+        ForeignKeyConstraint(
+            ["window_id", "user_id"],
+            ["peer_window_holds.id", "peer_window_holds.user_id"],
+            name="fk_peer_connection_window_owner",
+            ondelete="RESTRICT",
+        ),
+        ForeignKeyConstraint(
+            ["node_id", "runtime_id"],
+            ["peer_runtime_epochs.node_id", "peer_runtime_epochs.runtime_id"],
+            name="fk_peer_connection_epoch",
+            ondelete="RESTRICT",
+        ),
+        UniqueConstraint("user_id", "idempotency_key", name="uq_peer_connection_key"),
+        CheckConstraint(
+            "slot_id BETWEEN 1 AND 16 AND generation > 0", name="ck_peer_connection_slot"
+        ),
+        CheckConstraint(
+            "state IN ('pending','active','revoke_pending','closed')",
+            name="ck_peer_connection_state",
+        ),
+        Index(
+            "uq_peer_connection_live_slot",
+            "node_id",
+            "slot_id",
+            unique=True,
+            postgresql_where=text("state <> 'closed'"),
+        ),
+        Index(
+            "uq_peer_connection_live_device",
+            "device_id",
+            unique=True,
+            postgresql_where=text("state <> 'closed'"),
+        ),
+        Index("ix_peer_connection_owner", "user_id", "created_at"),
+    )
+    id: Mapped[UUID] = mapped_column(primary_key=True)
+    user_id: Mapped[UUID] = mapped_column(ForeignKey("users.id", ondelete="RESTRICT"))
+    device_id: Mapped[UUID] = mapped_column()
+    node_id: Mapped[UUID] = mapped_column()
+    runtime_id: Mapped[UUID] = mapped_column()
+    slot_id: Mapped[int] = mapped_column(Integer)
+    window_id: Mapped[UUID] = mapped_column()
+    generation: Mapped[int] = mapped_column(BigInteger)
+    state: Mapped[str] = mapped_column(String(24))
+    idempotency_key: Mapped[UUID] = mapped_column()
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
 
 
 class PlanRevision(Base):

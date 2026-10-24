@@ -397,10 +397,50 @@ receipt `docs/evidence/telegram-bot-deployment.json`.
 
 Владелец разрешил последовательную реализацию I-021–I-028 без платежей.
 Пробелы, зависимости и acceptance: `docs/issues/I-021.md`.
-I-021: локальный постоянный control-plane config/systemd/PostgreSQL roles,
-readiness и migration wrapper реализованы; targeted real PostgreSQL passed.
-Это не remote deploy, не длительный multiuser VPN и не приёмка эксплуатации.
-I-022 и следующие выполняются последовательно; I-020 payment не активирован.
+Текущая точка: **I-024 реализован и принят локально**, см.
+`docs/issues/I-024.md`, `docs/verification-i-024.md` и `docs/runbooks/peer-windows-v3.md`.
+Backend/agent/Linux: 719 passed, 5 opt-in skipped; два настоящих изолированных
+AWG-туннеля, 105 секунд передачи, четыре продления на каждый и crash recovery.
+Это не VPS rollout и не physical/daily acceptance; они остаются I-028.
+I-025 назначен владельцем 2026-10-23: **реализован и проверен локально**;
+телефон подключат позже. Финальные 70 Flutter tests, 17 native unit tests,
+format/analyze/lint/debug/unsigned release — passed. Ключ/refresh сохраняются
+зашифрованно через Android Keystore, v3 renewal требует active ACK, native
+monotonic deadline/fencing; локальные split apps, IPv4 DNS и IPv6 blocking policy.
+Физические native Keystore/corruption/process/permission-denial проверки прошли
+(10 фаз, 11 фактов); local Flutter/API/PostgreSQL session/refresh/logout/lost-reply
+прошёл (1 passed, 68.84s). Реальный v3 tunnel/lifecycle/Doze/network/DNS/IPv6/split
+routing остаётся открыт: на обоих узлах нет v3 slots. Remote изменений не было.
+Подробности: `docs/verification-i-025-physical.md`.
+См. `docs/issues/I-025.md`, `docs/verification-i-025.md`, ADR-040 и local receipt.
+Одна попытка была остановлена C: full; финальный повтор в existing snapshot прошёл.
+I-026/I-027 не начаты. Владелец 2026-10-23 разрешил ограниченный временный I-028
+staging на A и physical-проверки: подготовка идёт по ADR-041 и
+`docs/runbooks/v3-android-staging.md`; локальные receipts не означают remote
+acceptance. На 2026-10-24 выполнен реальный Android-сценарий I-028: IPv4/DNS,
+продления до поколения 7, split routing, Disconnect/remote revoke, потеря
+API/агента с закрытием по сроку и восстановление; 4 189 203 измеренных байта
+сошлись в ledger. Общий runner сохранил false из-за ошибки проверки уже
+остановленного таймера. Исправление отдельно проверено на A с успешной очисткой
+и независимым post-check; это два отдельных receipt, не один успешный прогон.
+Doze, смена сети, системный отзыв и остальные открытые случаи I-028 ещё нужны.
+Новый единый основной прогон I-028 прошёл 2026-10-24: 1 passed за 474.23s,
+включая Disconnect с задержанным renewal/реальным ACK и исправленную очистку.
+13 квитанций, 1 810 465 измеренных байт, ноль резервов/unknown/open/нарушений;
+`docs/evidence/i-028-main-success.json`. Старые failed receipts сохранены.
+Отдельный NetworkRevoke run прошёл 2026-10-24: 1 passed за 277.73s,
+реальные Wi-Fi/сотовая связь/потеря обеих сетей/возврат Wi-Fi и системный
+отзыв разрешения без самоподключения; 5 квитанций, 31 799 704 байта,
+ноль резервов/unknown/open/нарушений, полная очистка A/Pixel и независимая
+проверка. `docs/evidence/i-028-network-revoke-success.json`; более ранние
+ошибки сохранены. Lifecycle runner зафиксировал background, screen-off и
+forced Doze, но весь прогон failed из-за потери ADB/USB при восстановлении;
+отдельный follow-up подтвердил последующее восстановление телефона.
+Естественный сон, полный успешный lifecycle-прогон, comprehensive DNS/IPv6
+leak capture, два физических устройства и независимый провайдер остаются
+обязательными. См. `docs/i-028-acceptance-matrix.md`. I-028 не закрыт.
+См. `docs/verification-i-028.md`. I-020 payment
+не активирован.
 
 1. Передать контекст (`TECHNICAL_SPEC.md`, ADR, `AGENTS.md`) и **одну** issue.
 2. Попросить 3–8 конкретных шагов, затрагиваемые файлы, риски, тесты; без немедленного огромного изменения.

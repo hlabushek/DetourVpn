@@ -1,0 +1,90 @@
+{
+  "$id": "urn:project-vpn:peer-window-receipt.v3.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "connection_id": {
+      "format": "uuid",
+      "title": "Connection Id",
+      "type": "string"
+    },
+    "contract_version": {
+      "default": 3,
+      "maximum": 3,
+      "minimum": 3,
+      "title": "Contract Version",
+      "type": "integer"
+    },
+    "gate_closed": {
+      "title": "Gate Closed",
+      "type": "boolean"
+    },
+    "generation": {
+      "maximum": 9223372036854775807,
+      "minimum": 1,
+      "title": "Generation",
+      "type": "integer"
+    },
+    "meter": {
+      "const": "kernel-outer-ip.v1",
+      "title": "Meter",
+      "type": "string"
+    },
+    "node_id": {
+      "format": "uuid",
+      "title": "Node Id",
+      "type": "string"
+    },
+    "observation": {
+      "enum": [
+        "measured",
+        "unknown"
+      ],
+      "title": "Observation",
+      "type": "string"
+    },
+    "observed_bytes": {
+      "anyOf": [
+        {
+          "maximum": 9223372036854775807,
+          "minimum": 0,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Observed Bytes"
+    },
+    "runtime_id": {
+      "format": "uuid",
+      "title": "Runtime Id",
+      "type": "string"
+    },
+    "slot_id": {
+      "maximum": 16,
+      "minimum": 1,
+      "title": "Slot Id",
+      "type": "integer"
+    },
+    "window_id": {
+      "format": "uuid",
+      "title": "Window Id",
+      "type": "string"
+    }
+  },
+  "required": [
+    "connection_id",
+    "window_id",
+    "node_id",
+    "runtime_id",
+    "slot_id",
+    "generation",
+    "gate_closed",
+    "observation",
+    "meter"
+  ],
+  "title": "ClosedWindow",
+  "type": "object"
+}

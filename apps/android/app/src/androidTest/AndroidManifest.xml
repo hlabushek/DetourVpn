@@ -1,0 +1,4 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Test process performs fixed HTTPS/UDP probes under the target POC UID. -->
+    <uses-permission android:name="android.permission.INTERNET" />
+</manifest>

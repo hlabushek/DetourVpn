@@ -48,6 +48,16 @@ class QuotaApi implements TunnelApi {
 }
 
 void main() {
+  test('peer window history preserves exact integer byte debit', () {
+    final json = entry(2);
+    json['kind'] = 'debit';
+    json['source_type'] = 'peer_window';
+    json['delta_bytes'] = -65536;
+    final value = QuotaEntry.fromJson(json);
+    expect(value.delta, -65536);
+    expect(value.label, 'Расход VPN-трафика');
+  });
+
   test('unavailable funding is exact and separate from measured usage', () {
     final json = summary();
     json['unavailable_bytes'] = 9007199254740000;

@@ -14,7 +14,7 @@ concurrency:
 jobs:
   checks:
     runs-on: ubuntu-24.04
-    timeout-minutes: 10
+    timeout-minutes: 20
     env:
       # Disposable loopback-only test service. No production credentials or user data.
       VPN_TEST_DATABASE_URL: postgresql+psycopg://vpn_i004_test@127.0.0.1:15432/vpn_i004_admin

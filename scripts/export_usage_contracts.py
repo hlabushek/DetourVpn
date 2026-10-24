@@ -15,6 +15,13 @@ from vpn_api.tunnels.contracts import (  # noqa: E402
     PeerPollResponse,
 )
 from vpn_api.tunnels.lifecycle import LifecycleAck, LifecycleCommands, LifecyclePoll  # noqa: E402
+from vpn_api.tunnels.v3_contracts import (  # noqa: E402
+    ClosedWindow,
+    WindowCommands,
+    WindowGrant,
+    WindowPoll,
+)
+from vpn_api.tunnels.window_service import EpochStart  # noqa: E402
 from vpn_api.usage.contracts import UsageResult, UsageSampleInput  # noqa: E402
 
 
@@ -32,6 +39,11 @@ def main() -> int:
         ("peer-lifecycle-poll.v2.json", LifecyclePoll),
         ("peer-lifecycle-commands.v2.json", LifecycleCommands),
         ("peer-lifecycle-ack.v2.json", LifecycleAck),
+        ("peer-window-grant.v3.json", WindowGrant),
+        ("peer-window-receipt.v3.json", ClosedWindow),
+        ("peer-window-poll.v3.json", WindowPoll),
+        ("peer-window-commands.v3.json", WindowCommands),
+        ("peer-window-start.v3.json", EpochStart),
     ):
         schema = model.model_json_schema()
         schema["$schema"] = "https://json-schema.org/draft/2020-12/schema"

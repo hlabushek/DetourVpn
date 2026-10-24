@@ -1,0 +1,21 @@
+{
+  "measured_at": "2026-10-23T19:26:06.791378+00:00",
+  "scope": "read-only staging prerequisites; no changes",
+  "node_a": {
+    "run_detourvpn_node_parent": "ENOENT",
+    "opt_detourvpn_node_parent": "ENOENT"
+  },
+  "node_b": {
+    "run_detourvpn_node_parent": "ENOENT",
+    "opt_detourvpn_node_parent": "ENOENT",
+    "api_unit": "active",
+    "database_unit": "active",
+    "caddy_unit": "active",
+    "queried_detourvpn_node_unit": "inactive"
+  },
+  "v3_dataplane_ready": false,
+  "full_rollout_baseline_performed": false,
+  "secrets_or_database_contents_read": false,
+  "remote_changes": false,
+  "remaining_gate": "prepared separately approved v3 staging for Android VPN matrix"
+}

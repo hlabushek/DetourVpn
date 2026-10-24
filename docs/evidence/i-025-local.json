@@ -1,0 +1,45 @@
+{
+  "issue": "I-025",
+  "date": "2026-10-23",
+  "scope": "local Android implementation only",
+  "local_checks_passed": true,
+  "physical_acceptance": "partial: native and local real-session checks passed; v3 dataplane pending prepared staging",
+  "deployment_performed": false,
+  "flutter_tests": 70,
+  "android_jvm_tests": 17,
+  "analyze": "passed",
+  "lint": "passed",
+  "debug_build": "passed",
+  "unsigned_release_build": "passed",
+  "apk_zip_entry_audit": "passed; absence of listed paths is not a full secret scan",
+  "contracts": "unchanged/current",
+  "artifacts": {
+    "apps/client/build/app/outputs/flutter-apk/app-debug.apk": {
+      "sha256": "bcb06c6cd77c2abe371600e9c81de111483d9ff623ff5ad1d797ecedfe852b6f",
+      "bytes": 141268184
+    },
+    "apps/client/build/app/outputs/apk/release/app-release-unsigned.apk": {
+      "sha256": "456892a9bb408ac0b49ddf446c34dfb3245c5d748f8fa3403d9593ef1ca10715",
+      "bytes": 45066243
+    }
+  },
+  "intermediate_failure": "OS error 112 disk full; final rerun passed reusing existing ASCII snapshot",
+  "cleanup": {
+    "authorized_by_owner": true,
+    "performed": false,
+    "reason": "automatic review blocked deletion by policy; no detailed reason provided"
+  },
+  "limitations": [
+    "no physical Keystore persistence proof",
+    "no physical DNS/IPv6 or split-routing evidence",
+    "no reliable deep-Doze renewal claim",
+    "no always-on kill switch",
+    "16MiB may exhaust before time-based renewal",
+    "outer UDP meter includes headers/handshake/unsolicited endpoint UDP",
+    "unknown counters retain holds"
+  ],
+  "physical_receipts": [
+    "i-025-native-android.json",
+    "i-025-session-android.json"
+  ]
+}

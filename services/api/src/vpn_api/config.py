@@ -35,6 +35,18 @@ class Settings(BaseSettings):
     telegram_bot_id: int = 0
     initial_quota_bytes: int = Field(default=0, ge=0, le=2**63 - 1)
     tunnel_profile_file: Path | None = Field(default=None, repr=False)
+    enable_window_tunnels: bool = False
+    window_manifest_file: Path | None = Field(default=None, repr=False)
+
+    @model_validator(mode="after")
+    def validate_window_tunnels(self) -> "Settings":
+        if self.enable_window_tunnels and (
+            not self.enable_auth or self.window_manifest_file is None
+        ):
+            raise ValueError(
+                "Window tunnels require authentication and explicit operator inventory"
+            )
+        return self
 
     @model_validator(mode="after")
     def validate_closed_environment(self) -> "Settings":
@@ -71,7 +83,7 @@ class Settings(BaseSettings):
             )
         return self
 
-    @field_validator("mini_app_static_dir", mode="before")
+    @field_validator("mini_app_static_dir", "window_manifest_file", mode="before")
     @classmethod
     def validate_static_dir(cls, value: object) -> object:
         # An empty env example must never turn into Path('.') and expose the checkout.

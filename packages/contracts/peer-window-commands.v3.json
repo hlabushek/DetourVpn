@@ -1,0 +1,240 @@
+{
+  "$defs": {
+    "ClosedWindow": {
+      "additionalProperties": false,
+      "properties": {
+        "connection_id": {
+          "format": "uuid",
+          "title": "Connection Id",
+          "type": "string"
+        },
+        "contract_version": {
+          "default": 3,
+          "maximum": 3,
+          "minimum": 3,
+          "title": "Contract Version",
+          "type": "integer"
+        },
+        "gate_closed": {
+          "title": "Gate Closed",
+          "type": "boolean"
+        },
+        "generation": {
+          "maximum": 9223372036854775807,
+          "minimum": 1,
+          "title": "Generation",
+          "type": "integer"
+        },
+        "meter": {
+          "const": "kernel-outer-ip.v1",
+          "title": "Meter",
+          "type": "string"
+        },
+        "node_id": {
+          "format": "uuid",
+          "title": "Node Id",
+          "type": "string"
+        },
+        "observation": {
+          "enum": [
+            "measured",
+            "unknown"
+          ],
+          "title": "Observation",
+          "type": "string"
+        },
+        "observed_bytes": {
+          "anyOf": [
+            {
+              "maximum": 9223372036854775807,
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Observed Bytes"
+        },
+        "runtime_id": {
+          "format": "uuid",
+          "title": "Runtime Id",
+          "type": "string"
+        },
+        "slot_id": {
+          "maximum": 16,
+          "minimum": 1,
+          "title": "Slot Id",
+          "type": "integer"
+        },
+        "window_id": {
+          "format": "uuid",
+          "title": "Window Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "connection_id",
+        "window_id",
+        "node_id",
+        "runtime_id",
+        "slot_id",
+        "generation",
+        "gate_closed",
+        "observation",
+        "meter"
+      ],
+      "title": "ClosedWindow",
+      "type": "object"
+    },
+    "WindowCommand": {
+      "additionalProperties": false,
+      "properties": {
+        "grant": {
+          "$ref": "#/$defs/WindowGrant"
+        },
+        "operation": {
+          "enum": [
+            "window",
+            "revoke",
+            "recover"
+          ],
+          "title": "Operation",
+          "type": "string"
+        }
+      },
+      "required": [
+        "operation",
+        "grant"
+      ],
+      "title": "WindowCommand",
+      "type": "object"
+    },
+    "WindowGrant": {
+      "additionalProperties": false,
+      "properties": {
+        "budget_bytes": {
+          "maximum": 67108864,
+          "minimum": 65536,
+          "title": "Budget Bytes",
+          "type": "integer"
+        },
+        "connection_id": {
+          "format": "uuid",
+          "title": "Connection Id",
+          "type": "string"
+        },
+        "contract_version": {
+          "default": 3,
+          "maximum": 3,
+          "minimum": 3,
+          "title": "Contract Version",
+          "type": "integer"
+        },
+        "generation": {
+          "maximum": 9223372036854775807,
+          "minimum": 1,
+          "title": "Generation",
+          "type": "integer"
+        },
+        "issued_at": {
+          "format": "date-time",
+          "title": "Issued At",
+          "type": "string"
+        },
+        "node_id": {
+          "format": "uuid",
+          "title": "Node Id",
+          "type": "string"
+        },
+        "not_after": {
+          "format": "date-time",
+          "title": "Not After",
+          "type": "string"
+        },
+        "public_key": {
+          "maxLength": 44,
+          "minLength": 44,
+          "title": "Public Key",
+          "type": "string"
+        },
+        "runtime_id": {
+          "format": "uuid",
+          "title": "Runtime Id",
+          "type": "string"
+        },
+        "slot_id": {
+          "maximum": 16,
+          "minimum": 1,
+          "title": "Slot Id",
+          "type": "integer"
+        },
+        "window_id": {
+          "format": "uuid",
+          "title": "Window Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "connection_id",
+        "window_id",
+        "node_id",
+        "runtime_id",
+        "slot_id",
+        "generation",
+        "public_key",
+        "issued_at",
+        "not_after",
+        "budget_bytes"
+      ],
+      "title": "WindowGrant",
+      "type": "object"
+    }
+  },
+  "$id": "urn:project-vpn:peer-window-commands.v3.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "acknowledged_receipts": {
+      "items": {
+        "$ref": "#/$defs/ClosedWindow"
+      },
+      "maxItems": 32,
+      "title": "Acknowledged Receipts",
+      "type": "array"
+    },
+    "commands": {
+      "items": {
+        "$ref": "#/$defs/WindowCommand"
+      },
+      "maxItems": 32,
+      "title": "Commands",
+      "type": "array"
+    },
+    "contract_version": {
+      "default": 3,
+      "maximum": 3,
+      "minimum": 3,
+      "title": "Contract Version",
+      "type": "integer"
+    },
+    "ready": {
+      "title": "Ready",
+      "type": "boolean"
+    },
+    "runtime_id": {
+      "format": "uuid",
+      "title": "Runtime Id",
+      "type": "string"
+    }
+  },
+  "required": [
+    "runtime_id",
+    "ready",
+    "commands",
+    "acknowledged_receipts"
+  ],
+  "title": "WindowCommands",
+  "type": "object"
+}

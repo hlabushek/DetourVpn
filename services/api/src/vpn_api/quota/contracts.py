@@ -50,7 +50,9 @@ class LedgerEntryResponse(BaseModel):
     sequence: int
     kind: Literal["credit", "debit"]
     delta_bytes: int
-    source_type: Literal["registration", "internal", "usage", "tunnel_lease", "reward"]
+    source_type: Literal[
+        "registration", "internal", "usage", "tunnel_lease", "reward", "peer_window"
+    ]
     source_id: UUID
     idempotency_key: UUID
     balance_after_bytes: BytesAmount

@@ -188,6 +188,19 @@ def negotiate(
     node = session.get(VPNNode, node_id)
     if node is None:
         raise NodeError("agent_unauthorized", 401)
+    from vpn_api.db.models import PeerRuntimeEpoch
+
+    if (
+        session.scalar(
+            select(PeerRuntimeEpoch.runtime_id)
+            .where(
+                PeerRuntimeEpoch.node_id == node_id,
+            )
+            .limit(1)
+        )
+        is not None
+    ):
+        raise NodeError("agent_protocol_downgrade_forbidden")
     node.peer_protocol_version = 2
     if node.peer_runtime_id is not None and node.peer_runtime_id != body.runtime_id:
         for tunnel in list(

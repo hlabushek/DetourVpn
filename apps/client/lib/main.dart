@@ -9,6 +9,8 @@ import 'quota_screen.dart';
 import 'connection_screen.dart';
 import 'orbit_theme.dart';
 import 'orbit_widgets.dart';
+import 'session_store.dart';
+import 'window_connection.dart';
 export 'connection_screen.dart' show ConnectionScreen;
 
 void main() {
@@ -16,7 +18,7 @@ void main() {
   const origin = String.fromEnvironment('VPN_API_ORIGIN');
   Api? api;
   try {
-    api = Api(Uri.parse(origin));
+    api = Api(Uri.parse(origin), store: PlatformSessionStore());
   } catch (_) {
     /* Explicit setup screen. */
   }
@@ -36,10 +38,31 @@ class _VpnAppState extends State<VpnApp> with WidgetsBindingObserver {
   bool showLogin = true;
   ThemeMode theme = ThemeMode.dark;
   int tab = 0;
+  bool restoring = false;
+  static const windows = bool.fromEnvironment('VPN_WINDOW_TUNNELS');
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    if (widget.api?.store != null) {
+      restoring = true;
+      unawaited(restore());
+    }
+  }
+
+  Future<void> restore() async {
+    try {
+      await widget.api!.restoreSession();
+      if (mounted && widget.api!.authenticated) signedIn();
+    } catch (_) {
+      try {
+        await widget.api!.forgetSession();
+      } catch (_) {
+        /* Login remains closed. */
+      }
+    } finally {
+      if (mounted) setState(() => restoring = false);
+    }
   }
 
   @override
@@ -52,7 +75,13 @@ class _VpnAppState extends State<VpnApp> with WidgetsBindingObserver {
 
   void signedIn() {
     final value =
-        connection ?? ConnectionController(widget.api!, widget.native);
+        connection ??
+        (windows
+            ? WindowConnectionController(
+                widget.api!,
+                widget.native as WindowNative,
+              )
+            : ConnectionController(widget.api!, widget.native));
     value.startPolling();
     setState(() {
       connection = value;
@@ -73,7 +102,13 @@ class _VpnAppState extends State<VpnApp> with WidgetsBindingObserver {
     } catch (_) {
       /* Local session still erased. */
     }
-    widget.api!.forgetSession();
+    try {
+      await widget.api!.forgetSession();
+    } catch (_) {
+      value.error = 'session_erasure_failed';
+      if (mounted) setState(() {});
+      return;
+    } // Do not claim durable logout if erasure failed.
     value.quota.clear();
     value.pausePolling();
     // Keep unresolved revoke intent in RAM so reauthentication can finish it.
@@ -152,7 +187,9 @@ class _VpnAppState extends State<VpnApp> with WidgetsBindingObserver {
         child: Center(
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 520),
-            child: widget.api == null
+            child: restoring
+                ? const CircularProgressIndicator()
+                : widget.api == null
                 ? const Padding(
                     padding: EdgeInsets.all(24),
                     child: Text(
@@ -249,7 +286,7 @@ class _LoginScreenState extends State<LoginScreen> {
       const Text(
         'Войдите через Telegram. Ключ устройства создаётся на телефоне. '
         'Android запросит разрешение VPN только после нажатия «Подключить». '
-        'Этот клиент использует тестовый узел и подключения до 60 секунд.',
+        'Доступ зависит от подписки, квоты и готовности узла.',
       ),
       const SizedBox(height: 24),
       FilledButton(
@@ -300,7 +337,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         'verifier': challenge!['verifier'],
                         'code': code.text.trim(),
                       });
-                  widget.api.acceptSession(value);
+                  await widget.api.acceptSession(value);
                   code.clear();
                   challenge = null;
                   widget.onSignedIn();
@@ -320,7 +357,7 @@ class _LoginScreenState extends State<LoginScreen> {
         ),
       const SizedBox(height: 24),
       const Text(
-        'Сессия и ключ хранятся только в памяти. После завершения процесса потребуется новый вход. '
+        'Ключ устройства и сессия зашифрованы на телефоне с помощью Android Keystore. После перезапуска приложения VPN подключается вручную. '
         'Просмотренные сайты и DNS-запросы не отправляются в API приложения.',
       ),
     ],

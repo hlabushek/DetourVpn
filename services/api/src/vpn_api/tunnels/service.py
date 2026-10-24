@@ -237,6 +237,9 @@ def enqueue_revoke(session: Session, tunnel: Tunnel) -> None:
 
 def revoke_device_tunnels(session: Session, user_id: UUID, device_id: UUID) -> None:
     # Public device revocation already holds User and Device locks.
+    from vpn_api.tunnels.window_service import revoke_connections
+
+    revoke_connections(session, user_id, device_id)
     tunnels = session.scalars(
         select(Tunnel)
         .where(Tunnel.user_id == user_id, Tunnel.device_id == device_id, Tunnel.state != "revoked")

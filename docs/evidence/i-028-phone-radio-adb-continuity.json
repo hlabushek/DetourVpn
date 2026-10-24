@@ -1,0 +1,10 @@
+{
+  "scope": "phone-only ADB continuity under bounded Wi-Fi and mobile-data loss",
+  "server_or_vpn_acceptance": false,
+  "initial_wifi": "1",
+  "initial_mobile": "1",
+  "adb_after_switches": true,
+  "restored_wifi": true,
+  "restored_mobile": true,
+  "measured_at": "2026-10-24T16:46:11.6243425+00:00"
+}

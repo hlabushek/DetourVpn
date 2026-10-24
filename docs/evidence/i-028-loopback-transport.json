@@ -1,0 +1,7 @@
+{
+  "passed": true,
+  "real_wsl_windows_loopback_pipe": true,
+  "synthetic_local_http_only": true,
+  "forbidden_path_rejected": true,
+  "child_and_listener_cleanup": true
+}

@@ -1,0 +1,11 @@
+{
+  "scope": "phone-only USB reverse continuity during simultaneous radio loss",
+  "vpn_acceptance": false,
+  "original_wifi": "1",
+  "original_mobile": "1",
+  "reverse_connected_without_radios": true,
+  "wifi_restored": true,
+  "mobile_restored": true,
+  "reverse_removed": true,
+  "measured_at": "2026-10-24T16:47:22.8999969+00:00"
+}

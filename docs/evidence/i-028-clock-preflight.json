@@ -1,0 +1,11 @@
+{
+  "scope": "read-only UDP NTP reachability from staging A before runtime time-source selection",
+  "kernel_clock_gate_bypassed": false,
+  "ubuntu_valid_response": false,
+  "google_valid_response": false,
+  "pool_valid_response": false,
+  "both_fixed_cloudflare_ipv4_endpoints_answered": true,
+  "cloudflare_valid_response": true,
+  "measured_at": "2026-10-24T11:57:31.1323666+00:00",
+  "cloudflare_clock_within_one_second": true
+}

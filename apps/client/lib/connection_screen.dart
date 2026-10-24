@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'connection.dart';
+import 'window_connection.dart';
+import 'split_apps.dart';
 import 'orbit_widgets.dart';
 import 'quota.dart';
 import 'quota_screen.dart';
@@ -53,11 +55,12 @@ class ConnectionScreen extends StatelessWidget {
                   },
                   child: Column(
                     children: [
-                      RadioListTile<String?>(
-                        value: null,
-                        title: const Text('Первый доступный узел'),
-                        enabled: !c.busy && !c.hasLease,
-                      ),
+                      if (c is! WindowConnectionController)
+                        RadioListTile<String?>(
+                          value: null,
+                          title: const Text('Первый доступный узел'),
+                          enabled: !c.busy && !c.hasLease,
+                        ),
                       for (final node in c.nodes)
                         RadioListTile<String?>(
                           value: node.id,
@@ -166,7 +169,9 @@ class ConnectionScreen extends StatelessWidget {
                   const SizedBox(height: 16),
                   Text(
                     chosen == null
-                        ? 'Первый доступный узел'
+                        ? (c is WindowConnectionController
+                              ? 'Выберите сервер'
+                              : 'Первый доступный узел')
                         : '${chosen.name} · ${chosen.region}',
                     textAlign: TextAlign.center,
                     style: Theme.of(context).textTheme.titleMedium,
@@ -288,21 +293,24 @@ class ConnectionScreen extends StatelessWidget {
                     ),
                     const SizedBox(height: 8),
                     const Text(
-                      'Если узел потерян, после истечения lease можно завершить его с полным списанием резерва 1 048 576 байт. Это позволит выбрать другой узел.',
+                      'Дождитесь подтверждения закрытия соединения. При потере счётчиков резерв удерживается до операторской сверки.',
                     ),
-                    TextButton(
-                      onPressed: c.canRecover ? c.recoverExpired : null,
-                      child: const Text(
-                        'Завершить истёкший lease со списанием резерва',
+                    if (c is! WindowConnectionController)
+                      TextButton(
+                        onPressed: c.canRecover ? c.recoverExpired : null,
+                        child: const Text(
+                          'Завершить истёкший lease со списанием резерва',
+                        ),
                       ),
-                    ),
                   ],
                 ),
               ),
             ],
             const SizedBox(height: 20),
-            const Text(
-              'Внешний IP и DNS проверяются отдельно. Автоматического продления нет.',
+            Text(
+              c is WindowConnectionController
+                  ? 'Продление требует связи с API и подтверждения узла. Учёт включает внешний UDP, заголовки и handshake. DNS идёт через VPN; IPv6 внутри VPN блокируется. Физическая проверка ещё требуется.'
+                  : 'Внешний IP и DNS проверяются отдельно. Автоматического продления нет.',
               textAlign: TextAlign.center,
             ),
           ],
@@ -339,7 +347,7 @@ class ProfileScreen extends StatelessWidget {
               Text('Вход через Telegram'),
               SizedBox(height: 8),
               Text(
-                'Сессия и ключ устройства хранятся в памяти. После завершения процесса потребуется новый вход.',
+                'Ключ устройства и сессия зашифрованы с помощью Android Keystore. После перезапуска VPN подключается вручную.',
               ),
             ],
           ),
@@ -360,14 +368,16 @@ class ProfileScreen extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 16),
-        const OrbitPanel(
+        OrbitPanel(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('О тестовой версии'),
+              const Text('О тестовой версии'),
               SizedBox(height: 12),
               Text(
-                'Подключения до 60 секунд с резервом 1 048 576 байт. Статус VPN учитывает системный интерфейс, свежий handshake и активный lease. Проверка внешнего IP и DNS выполняется отдельно.',
+                controller is WindowConnectionController
+                    ? 'Доступ продлевается ограниченными окнами с серверным подтверждением. Учитывается внешний UDP, включая заголовки и handshake. При неизвестном расходе резерв удерживается для сверки. Без API окно истекает; DNS/IPv6 и фон требуют физической проверки.'
+                    : 'Подключения до 60 секунд с резервом 1 048 576 байт. Статус VPN учитывает системный интерфейс, свежий handshake и активный lease. Проверка внешнего IP и DNS выполняется отдельно.',
               ),
               SizedBox(height: 12),
               Text(
@@ -377,6 +387,18 @@ class ProfileScreen extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 24),
+        if (controller is WindowConnectionController)
+          ListTile(
+            title: const Text('Приложения вне VPN'),
+            subtitle: const Text(
+              'Исключённые приложения используют обычную сеть',
+            ),
+            enabled: !controller.busy && !controller.hasLease,
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute<void>(builder: (_) => const SplitAppsScreen()),
+            ),
+          ),
         OutlinedButton.icon(
           onPressed: controller.busy ? null : onSignOut,
           icon: const Icon(Icons.logout),

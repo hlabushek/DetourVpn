@@ -19,19 +19,13 @@ from sqlalchemy.orm import Session
 from vpn_api.auth.security import AuthError, Principal
 from vpn_api.auth.service import AuthService, database_now
 from vpn_api.db.models import Device, DeviceKeyProof, SessionFamily
+from vpn_api.tunnels.keys import canonical_key as canonical_key
 
 DOMAIN = "project-vpn:key-confirmation:v1:"
 AWG_PARAMETERS = (
     "Jc = 4\nJmin = 64\nJmax = 96\nS1 = 16\nS2 = 24\nS3 = 32\nS4 = 40\n"
     "H1 = 101234\nH2 = 202345\nH3 = 303456\nH4 = 404567\n"
 )
-
-
-def canonical_key(value: str) -> str:
-    raw = base64.b64decode(value, validate=True)
-    if len(raw) != 32 or raw == bytes(32) or base64.b64encode(raw).decode() != value:
-        raise ValueError("Invalid canonical public key")
-    return value
 
 
 class NodeProfile(BaseModel):

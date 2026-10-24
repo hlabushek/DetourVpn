@@ -1,0 +1,66 @@
+{
+  "android_api": 37,
+  "api_auth_session_acceptance": false,
+  "facts": {
+    "backup_disabled_and_no_backup_storage": true,
+    "corrupt_device_fails_closed_without_identity_replacement": true,
+    "distinct_android_processes_verified": true,
+    "durable_session_erasure": true,
+    "encrypted_session_and_split_settings_survive_process_restart": true,
+    "erasure_survives_process_restart": true,
+    "no_plaintext_marker_or_device_private_key_in_ciphertext": true,
+    "real_keystore_roundtrip_and_randomized_authenticated_encryption": true,
+    "real_system_vpn_permission_denial_no_tunnel": true,
+    "same_device_identity_after_process_restart_no_auto_vpn": true,
+    "tampered_gcm_session_rejected": true
+  },
+  "measured_at": "2026-10-23T19:15:10.138007+00:00",
+  "ordinary_app_restored_test_installation_removed": true,
+  "passed": true,
+  "phases": {
+    "corrupt_device": {
+      "passed": true,
+      "process_id": 24961
+    },
+    "corrupt_session": {
+      "passed": true,
+      "process_id": 24852
+    },
+    "logout": {
+      "passed": true,
+      "process_id": 24744
+    },
+    "permission": {
+      "passed": true,
+      "process_id": 25106
+    },
+    "restart": {
+      "passed": true,
+      "process_id": 24672
+    },
+    "restored_identity": {
+      "passed": true,
+      "process_id": 25041
+    },
+    "seed": {
+      "passed": true,
+      "process_id": 24613
+    },
+    "verify_device_corruption": {
+      "passed": true,
+      "process_id": 25005
+    },
+    "verify_logout": {
+      "passed": true,
+      "process_id": 24797
+    },
+    "verify_session_corruption": {
+      "passed": true,
+      "process_id": 24907
+    }
+  },
+  "remote_changes": false,
+  "scope": "physical Android native storage/lifecycle/permission only",
+  "test_session": "TEST ONLY noncredential marker, no real auth",
+  "vpn_dataplane_acceptance": false
+}

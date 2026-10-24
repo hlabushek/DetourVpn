@@ -42,7 +42,8 @@ public final class ClientActivity extends FlutterActivity {
             } catch (RuntimeException ignored) { result.error("login_unavailable", "Не удалось открыть Telegram", null); }
             return;
         }
-        if (!java.util.Set.of("publicKey", "prove", "connect", "disconnect", "snapshot").contains(call.method)) {
+        if (!java.util.Set.of("publicKey", "prove", "connect", "connectWindow", "advanceWindow",
+                "disconnect", "snapshot", "sessionRead", "sessionWrite", "splitRead", "splitWrite", "apps").contains(call.method)) {
             result.notImplemented(); return;
         }
         ClientApplication app = owner();
@@ -54,22 +55,65 @@ public final class ClientActivity extends FlutterActivity {
         final long submittedAt = SystemClock.elapsedRealtime();
         app.worker.execute(() -> {
             try {
-                if (app.provider == null) throw new IllegalStateException();
+                // Session erasure must remain available even when native SDK init fails.
+                boolean storage = call.method.equals("sessionRead") || call.method.equals("sessionWrite");
+                if (storage ? app.vault == null : app.provider == null) throw new IllegalStateException();
                 Object value = null;
                 switch (call.method) {
+                    case "sessionRead":
+                        String saved = app.vault.read("session");
+                        value = saved == null ? null : jsonMap(new org.json.JSONObject(saved));
+                        break;
+                    case "sessionWrite":
+                        java.util.Map<String, Object> record = call.argument("value");
+                        app.vault.write("session", record == null ? null : new org.json.JSONObject(record).toString());
+                        break;
+                    case "apps":
+                        var intent = new Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER);
+                        var names = new java.util.TreeSet<String>();
+                        for (var entry : getPackageManager().queryIntentActivities(intent, 0))
+                            if (!entry.activityInfo.packageName.equals(getPackageName())) names.add(entry.activityInfo.packageName);
+                        value = new java.util.ArrayList<>(names); break;
+                    case "splitRead": value = exclusions(); break;
+                    case "splitWrite":
+                        if (app.provider.isUp() || app.deadline != 0) throw new IllegalStateException();
+                        java.util.List<String> selected = call.argument("packages");
+                        if (selected == null || selected.size() > 63) throw new IllegalArgumentException();
+                        for (String name : selected) {
+                            if (!name.matches("[a-zA-Z][a-zA-Z0-9_]*(\\.[a-zA-Z][a-zA-Z0-9_]*)+")
+                                    || name.equals(getPackageName())) throw new IllegalArgumentException();
+                            getPackageManager().getApplicationInfo(name, 0);
+                        }
+                        if (!getSharedPreferences("routing", MODE_PRIVATE).edit()
+                                .putStringSet("excluded", new java.util.HashSet<>(selected)).commit()) throw new IllegalStateException();
+                        break;
+                    case "advanceWindow":
+                        if (generation != app.generation.get() || !app.provider.isUp()) throw new IllegalStateException();
+                        app.window.advance(call.argument("connection"), call.argument("runtime"),
+                            ((Number) call.argument("generation")).longValue(),
+                            submittedAt + ((Number) call.argument("remainingMs")).longValue(), SystemClock.elapsedRealtime());
+                        app.deadline = app.window.deadline;
+                        break;
                     case "publicKey": value = app.key.getPublicKey().toBase64(); break;
                     case "prove": value = KeyConfirmation.answer(app.key,
                         call.argument("ephemeralKey"), call.argument("transcript")); break;
                     case "snapshot": value = app.snapshot(); break;
                     case "disconnect": app.stop(); break;
                     case "connect":
+                    case "connectWindow":
+                        boolean renewable = call.method.equals("connectWindow");
                         Number duration = call.argument("remainingMs");
-                        if (duration == null || duration.longValue() <= 0 || duration.longValue() > 60000
+                        if (duration == null || duration.longValue() <= 0 || duration.longValue() > (renewable ? 90000 : 60000)
                                 || generation != app.generation.get() || app.provider.isUp()
                                 || VpnService.prepare(this) != null) throw new IllegalStateException();
                         long deadline = submittedAt + duration.longValue();
-                        var config = Profile.parse(call.argument("config"), app.key);
+                        var excluded = exclusions();
+                        if (renewable) excluded.add(getPackageName()); // Control-plane renewal bypasses its own budgeted VPN.
+                        var config = renewable ? ClientProfile.parse(call.argument("config"), app.key, excluded)
+                            : Profile.parse(call.argument("config"), app.key);
                         if (SystemClock.elapsedRealtime() >= deadline) throw new IllegalStateException();
+                        if (renewable) app.window.start(call.argument("connection"), call.argument("runtime"),
+                            ((Number) call.argument("generation")).longValue(), deadline, SystemClock.elapsedRealtime());
                         app.deadline = deadline;
                         try {
                             app.provider.connect(config);
@@ -87,6 +131,15 @@ public final class ClientActivity extends FlutterActivity {
                 runOnUiThread(() -> result.error("native_operation_failed", "Операция VPN не выполнена", null));
             }
         });
+    }
+    private java.util.ArrayList<String> exclusions() {
+        return new java.util.ArrayList<>(getSharedPreferences("routing", MODE_PRIVATE)
+            .getStringSet("excluded", java.util.Collections.emptySet()));
+    }
+    private static java.util.Map<String, Object> jsonMap(org.json.JSONObject record) throws Exception {
+        var value = new java.util.HashMap<String, Object>();
+        for (String key : java.util.List.of("origin", "refresh_token")) value.put(key, record.getString(key));
+        return value;
     }
     @Override protected void onActivityResult(int request, int response, Intent data) {
         super.onActivityResult(request, response, data);

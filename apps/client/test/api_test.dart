@@ -4,8 +4,162 @@ import 'dart:async';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:vpn_client/api.dart';
+import 'package:vpn_client/session_store.dart';
+
+// TEST ONLY in-memory persistence, not an Android Keystore proof.
+class MemoryStore implements SessionStore {
+  Map<String, dynamic>? value;
+  final writes = <Map<String, dynamic>?>[];
+  bool fail = false;
+  @override
+  Future<Map<String, dynamic>?> read() async => value;
+  @override
+  Future<void> write(Map<String, dynamic>? record) async {
+    if (fail) throw StateError('TEST ONLY storage error');
+    value = record;
+    writes.add(record);
+  }
+}
 
 void main() {
+  test(
+    'storage failure clears RAM and never authenticates a saved session',
+    () async {
+      final store = MemoryStore()..fail = true;
+      final api = Api(Uri.parse('https://example.invalid'), store: store);
+      await expectLater(
+        api.acceptSession({
+          'access_token': 'TEST ONLY',
+          'refresh_token': 'TEST ONLY',
+        }),
+        throwsA(anything),
+      );
+      expect(api.authenticated, false);
+      api.close();
+    },
+  );
+  test(
+    'logout during startup rotation cannot restore durable credentials',
+    () async {
+      final store = MemoryStore()
+        ..value = {
+          'origin': 'http://127.0.0.1:18766',
+          'refresh_token': 'TEST ONLY OLD',
+        };
+      final entered = Completer<void>();
+      final release = Completer<void>();
+      final server = await HttpServer.bind('127.0.0.1', 18766);
+      server.listen((request) async {
+        entered.complete();
+        await release.future;
+        request.response.write(
+          jsonEncode({
+            'access_token': 'TEST ONLY ACCESS',
+            'refresh_token': 'TEST ONLY NEW',
+          }),
+        );
+        await request.response.close();
+      });
+      final api = Api(Uri.parse('http://127.0.0.1:18766'), store: store);
+      addTearDown(() async {
+        api.close();
+        await server.close(force: true);
+      });
+      final restoring = expectLater(
+        api.restoreSession(),
+        throwsA(isA<ClientError>()),
+      );
+      await entered.future;
+      await api.forgetSession();
+      release.complete();
+      await restoring;
+      expect(api.authenticated, false);
+      expect(store.value, null);
+    },
+  );
+  test(
+    'persist only origin and refresh; close preserves and logout erases',
+    () async {
+      final store = MemoryStore();
+      final api = Api(Uri.parse('https://example.invalid'), store: store);
+      await api.acceptSession({
+        'access_token': 'TEST ONLY ACCESS',
+        'refresh_token': 'TEST ONLY REFRESH',
+      });
+      expect(store.value!.keys.toSet(), {'origin', 'refresh_token'});
+      api.close();
+      expect(store.value, isNotNull);
+      await api.forgetSession();
+      expect(store.value, null);
+    },
+  );
+  test('origin mismatch erases without sending a refresh request', () async {
+    final store = MemoryStore()
+      ..value = {
+        'origin': 'https://other.invalid',
+        'refresh_token': 'TEST ONLY',
+      };
+    final api = Api(Uri.parse('https://example.invalid'), store: store);
+    await api.restoreSession();
+    expect(api.authenticated, false);
+    expect(store.value, null);
+    api.close();
+  });
+  test(
+    'refresh is consumed durably before request and replaced after validation',
+    () async {
+      final store = MemoryStore()
+        ..value = {
+          'origin': 'http://127.0.0.1:18766',
+          'refresh_token': 'TEST ONLY OLD',
+        };
+      final server = await HttpServer.bind('127.0.0.1', 18766);
+      var consumed = false;
+      server.listen((request) async {
+        consumed = store.value == null;
+        request.response.write(
+          jsonEncode({
+            'access_token': 'TEST ONLY ACCESS',
+            'refresh_token': 'TEST ONLY NEW',
+          }),
+        );
+        await request.response.close();
+      });
+      final api = Api(Uri.parse('http://127.0.0.1:18766'), store: store);
+      addTearDown(() async {
+        api.close();
+        await server.close(force: true);
+      });
+      await api.restoreSession();
+      expect(consumed, true);
+      expect(api.authenticated, true);
+      expect(store.value!['refresh_token'], 'TEST ONLY NEW');
+    },
+  );
+  test(
+    'lost response leaves no durable token to replay on next startup',
+    () async {
+      final store = MemoryStore()
+        ..value = {
+          'origin': 'http://127.0.0.1:18766',
+          'refresh_token': 'TEST ONLY OLD',
+        };
+      final server = await HttpServer.bind('127.0.0.1', 18766);
+      server.listen((request) async {
+        request.response.statusCode = 503;
+        await request.response.close();
+      });
+      final api = Api(Uri.parse('http://127.0.0.1:18766'), store: store);
+      addTearDown(() async {
+        api.close();
+        await server.close(force: true);
+      });
+      await expectLater(api.restoreSession(), throwsA(isA<ClientError>()));
+      expect(store.value, null);
+      expect(api.authenticated, false);
+    },
+  );
+
   test(
     'history cursor query is sent intact; other queries are rejected',
     () async {
@@ -120,7 +274,7 @@ void main() {
       await request.response.close();
     });
     final api = Api(Uri.parse('http://127.0.0.1:18766'));
-    api.acceptSession({
+    await api.acceptSession({
       'access_token': 'TEST-ONLY-OLD',
       'refresh_token': 'TEST-ONLY-REFRESH',
     });
@@ -156,7 +310,7 @@ void main() {
       await request.response.close();
     });
     final api = Api(Uri.parse('http://127.0.0.1:18766'));
-    api.acceptSession({
+    await api.acceptSession({
       'access_token': 'TEST-ONLY-OLD',
       'refresh_token': 'TEST-ONLY-REFRESH',
     });
@@ -167,7 +321,7 @@ void main() {
     final pending = api.call('GET', '/api/v1/me');
     final check = expectLater(pending, throwsA(isA<ClientError>()));
     await entered.future;
-    api.forgetSession();
+    await api.forgetSession();
     release.complete();
     await check;
     expect(api.authenticated, false);

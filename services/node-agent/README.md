@@ -50,3 +50,16 @@ quota enforcement.
 - Исследовать ограничения сетей и поведения выбранных версий движка.
 - Тестировать только сети и инфраструктуру, на которую есть полномочия.
 - Не обещать универсальный обход строгого allowlist.
+
+## V3 peer windows (I-024)
+
+`window_daemon.py` is the separate fixed v3 runtime. It consumes authenticated
+HTTPS window commands, persists intents/receipts in a root-private SQLite journal,
+and drives `window_peer.py`/`window_gate.py` in operator-pinned slot namespaces.
+It neither provisions native cores nor changes host routing. V2 subscription
+compatibility gating stays enabled; do not use `agent.py` to bypass it.
+
+Setup prerequisites, exact local reproductions, failure handling and rollout
+boundaries: [peer-windows-v3 runbook](../../docs/runbooks/peer-windows-v3.md).
+Minimal pinned node dependencies: `window-requirements.txt` (Linux x86_64,
+CPython 3.13). No deployment or Android v3 acceptance is implied by local tests.

@@ -1,0 +1,13 @@
+{
+  "server_services_and_timeout_inactive": true,
+  "phone_test_session_absent": true,
+  "phone_test_apk_absent": true,
+  "original_cleanup_failure_cause": "not retained by previous runner",
+  "local_api_listener_absent": true,
+  "temporary_sudo_grant_absent": true,
+  "adb_reverse_absent": true,
+  "measured_at": "2026-10-24T12:44:09.6313442+00:00",
+  "scope": "read-only follow-up after failed sustained renewal",
+  "original_cleanup_result_preserved": true,
+  "phone_activate_vpn_mode": "default"
+}

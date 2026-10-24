@@ -9,7 +9,8 @@ android {
         targetSdk = 36
         versionCode = 1
         versionName = "0.1-i011"
-        testInstrumentationRunner = "org.example.vpnpoc.PocDeviceTests"
+        testInstrumentationRunner = if (providers.gradleProperty("i028Probe").orNull == "true")
+            "org.example.vpnpoc.I028Probe" else "org.example.vpnpoc.PocDeviceTests"
         ndk { abiFilters += listOf("arm64-v8a", "x86_64") }
     }
     compileOptions {

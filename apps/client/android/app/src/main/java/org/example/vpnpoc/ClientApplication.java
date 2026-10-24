@@ -19,7 +19,9 @@ import org.amnezia.awg.crypto.KeyPair;
 public final class ClientApplication extends Application implements Tunnel {
     final ScheduledExecutorService worker = Executors.newSingleThreadScheduledExecutor();
     final AtomicLong generation = new AtomicLong();
-    final KeyPair key = new KeyPair();
+    KeyPair key;
+    SecureVault vault;
+    final WindowDeadline window = new WindowDeadline();
     TunnelProviderV1 provider;
     long deadline;
     String reason = "";
@@ -29,8 +31,10 @@ public final class ClientApplication extends Application implements Tunnel {
             try {
                 // Process restart never resumes a peer without its owner/lease.
                 stopService(new Intent(this, GoBackend.VpnService.class));
+                vault = new SecureVault(this);
+                key = vault.device();
                 provider = new AwgProviderV1(this, this);
-            } catch (RuntimeException | LinkageError ignored) { reason = "native_unavailable"; }
+            } catch (Exception | LinkageError ignored) { reason = "native_unavailable"; }
         });
         worker.scheduleWithFixedDelay(() -> {
             if (deadline > 0 && SystemClock.elapsedRealtime() >= deadline) {
@@ -42,6 +46,7 @@ public final class ClientApplication extends Application implements Tunnel {
     void stop() throws Exception {
         if (provider != null) provider.disconnect();
         deadline = 0;
+        window.clear();
     }
     Map<String, Object> snapshot() {
         if (provider == null) throw new IllegalStateException();

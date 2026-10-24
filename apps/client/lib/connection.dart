@@ -15,6 +15,15 @@ enum ConnectionPhase {
 }
 
 String messageFor(String code) => switch (code) {
+  'window_node_required' => 'Выберите сервер перед подключением.',
+  'window_tunnels_unavailable' || 'window_node_unavailable' =>
+    'Сервис продлеваемых подключений пока недоступен. Повторите после подготовки узла.',
+  'window_not_active' || 'window_generation_conflict' =>
+    'Продление не подтверждено. VPN остановлен; дождитесь закрытия соединения.',
+  'session_storage_failed' =>
+    'Не удалось сохранить защищённую сессию. Повторите вход.',
+  'session_erasure_failed' =>
+    'Не удалось подтвердить удаление сессии с телефона. Повторите выход; при повторной ошибке потребуется очистка данных приложения в Android.',
   'permission_denied' =>
     'Разрешение VPN не выдано. Нажмите «Подключить» и подтвердите запрос Android.',
   'insufficient_quota' =>

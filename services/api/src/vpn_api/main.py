@@ -33,6 +33,9 @@ from vpn_api.schemas import ErrorDetail, ErrorResponse, HealthResponse
 from vpn_api.subscriptions import router as subscriptions_router
 from vpn_api.tunnels.routes import agent_router as peer_agent_router
 from vpn_api.tunnels.routes import router as tunnels_router
+from vpn_api.tunnels.v3_contracts import ContractError
+from vpn_api.tunnels.window_routes import agent_router as window_agent_router
+from vpn_api.tunnels.window_routes import router as window_router
 
 
 def create_app(
@@ -95,6 +98,8 @@ def create_app(
     app.include_router(nodes_router)
     app.include_router(tunnels_router)
     app.include_router(peer_agent_router)
+    app.include_router(window_router)
+    app.include_router(window_agent_router)
     app.include_router(subscriptions_router)
     app.include_router(admin_router)
     if config.enable_admin:
@@ -133,6 +138,10 @@ def create_app(
     @app.exception_handler(NodeError)
     async def node_error(request: Request, exc: NodeError) -> JSONResponse:
         return error_response(request, exc.status, exc.code)
+
+    @app.exception_handler(ContractError)
+    async def window_contract_error(request: Request, exc: ContractError) -> JSONResponse:
+        return error_response(request, 409, str(exc))
 
     @app.exception_handler(RequestValidationError)
     async def validation_error(request: Request, exc: RequestValidationError) -> JSONResponse:

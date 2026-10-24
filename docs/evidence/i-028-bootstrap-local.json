@@ -1,0 +1,32 @@
+{
+  "scope": "isolated WSL net/mount namespace, real AWG/NAT/kernel; simulated systemd",
+  "wan_or_android_acceptance": false,
+  "passed": true,
+  "root_runtime_sha256": "1898bb981c09b64f546a7b35635493d113e19f75c6f552fa10e0254552e24094",
+  "source_hashes": {
+    "infra/staging-v3/runtime.py": "1898bb981c09b64f546a7b35635493d113e19f75c6f552fa10e0254552e24094",
+    "infra/staging-v3/archive_closed.py": "d1134ae4445fd6390082c4d6a19c099ccc760aae91410adb5e8f84c78cfe7385",
+    "infra/staging-v3/tls_relay.py": "f539738c1852df7b469146c1e1ed6afe9e627cc10120b45bb4bd9ed176b2bbd9",
+    "services/node-agent/window_gate.py": "7f055892a77d47e03c0ea4f1b820ce1ed1399c06a3156e8f9bc70f3594030dd7",
+    "services/node-agent/window_peer.py": "67139fa37cebe00308efd485542f7d1d259b415324cb26da4d4bcb69e0335f5e",
+    "services/api/src/vpn_api/tunnels/window_runtime.py": "0517631da34332117ef4145877e75d980781db9c988f4b88280c99823317f8b0",
+    "services/api/src/vpn_api/tunnels/window_journal.py": "8bf501339b0c9a02e9fddf4db4a05bdfd98c2f0dc4fab570a2b52ba41a9ddfa8",
+    "services/api/src/vpn_api/tunnels/v3_contracts.py": "b2fd8de6817cdb6c217e0d9cc7b1cd4a9ac458b529e250982caa44f84f473468",
+    "services/api/src/vpn_api/tunnels/keys.py": "6f4e00245e598860ef681d13a90e342b148172da51181c2dd3d59b54e98c3d5c"
+  },
+  "independent_timer_scheduled_before_exposure": true,
+  "two_real_closed_slots_bootstrapped": true,
+  "real_immutable_private_configuration": true,
+  "real_no_follow_and_no_overwrite": true,
+  "real_certificate_verified_without_system_trust_change": true,
+  "real_native_tunnel_and_double_nat_transfer": true,
+  "real_udp_dns_packets_through_awg_and_double_nat": true,
+  "dns_responder_is_local_synthetic_only": true,
+  "other_slot_and_metadata_destinations_blocked": true,
+  "closed_gate_and_independent_kernel_timeout_block_transfer": true,
+  "closed_gate_and_kernel_timeout_also_block_udp_dns": true,
+  "simulated_timeout_disarmed_after_cleanup_and_retry": true,
+  "operator_cleanup_and_idempotent_retry": true,
+  "real_closed_archive_preserves_private_files_and_refuses_unsafe_state": true,
+  "real_archive_copies_private_run_tmpfs_to_persistent_filesystem": true
+}

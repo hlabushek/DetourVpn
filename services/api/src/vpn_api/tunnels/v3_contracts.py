@@ -6,7 +6,7 @@ from uuid import UUID
 
 from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, StrictBool, StrictInt
 
-from vpn_api.tunnels.admission import canonical_key
+from vpn_api.tunnels.keys import canonical_key
 
 CAPABILITIES = frozenset(
     {"peer-window.v3", "per-slot-udp-budget.v1", "kernel-deadline.v1", "durable-close-receipt.v1"}
@@ -143,3 +143,23 @@ def validate_capabilities(version: int, capabilities: list[str]) -> None:
         raise ContractError("peer_protocol_unsupported")
     if len(capabilities) != len(CAPABILITIES) or frozenset(capabilities) != CAPABILITIES:
         raise ContractError("peer_capability_mismatch")
+
+
+class WindowCommand(FrozenInput):
+    operation: Literal["window", "revoke", "recover"]
+    grant: WindowGrant
+
+
+class WindowPoll(FrozenInput):
+    contract_version: StrictInt = Field(default=3, ge=3, le=3)
+    runtime_id: UUID
+    receipts: list[ClosedWindow] = Field(default_factory=list, max_length=32)
+    active_windows: list[UUID] = Field(default_factory=list, max_length=16)
+
+
+class WindowCommands(FrozenInput):
+    contract_version: StrictInt = Field(default=3, ge=3, le=3)
+    runtime_id: UUID
+    ready: StrictBool
+    commands: list[WindowCommand] = Field(max_length=32)
+    acknowledged_receipts: list[ClosedWindow] = Field(max_length=32)

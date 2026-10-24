@@ -33,3 +33,18 @@ VPN / Трафик / Профиль используют существующи�
 светлая тема; оформление и навигация не меняют живое подключение. Новый профиль
 не добавляет постоянное хранение сессии или управление аккаунтом.
 Проверки и ограничения: [UI report](../../docs/verification-android-soft-orbit.md).
+
+## I-025 Android v3 (2026-10-23)
+
+Persistent Keystore-wrapped identity/session, opt-in renewable windows and local
+split-app selection: see `../../docs/runbooks/android-windows-v3.md` and ADR-040.
+Use `scripts/build_flutter_client.ps1 -WindowTunnels` from repository root.
+Earlier sections describe the bounded v2 harness; v3 never falls back to v2.
+Local checks passed (70 Flutter / 17 Android JVM tests, analyze/lint/debug/release).
+Physical acceptance remains pending. Actual results and the resolved intermediate
+disk-space failure are recorded in `../../docs/verification-i-025.md`.
+
+Physical follow-up: native Keystore/process/permission checks passed on Pixel
+(API 37), plus real local Flutter/API/PostgreSQL refresh/logout/lost-response.
+See `../../docs/verification-i-025-physical.md`; v3 dataplane remains pending
+prepared staging, and no remote changes were performed.

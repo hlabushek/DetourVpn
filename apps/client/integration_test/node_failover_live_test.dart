@@ -218,7 +218,7 @@ void main() {
         await step('authentication');
         final challenge = await api.call('POST', '/api/v1/auth/start');
         final issued = await api.call('POST', '/api/v1/__i019__/issue');
-        api.acceptSession(
+        await api.acceptSession(
           await api.call('POST', '/api/v1/auth/verify', {
             'request_id': challenge['request_id'],
             'verifier': challenge['verifier'],

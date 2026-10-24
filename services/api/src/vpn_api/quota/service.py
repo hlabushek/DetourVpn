@@ -6,6 +6,8 @@ from sqlalchemy.orm import Session
 
 from vpn_api.db.connection import transaction
 from vpn_api.db.models import (
+    PeerWindowAllocation,
+    PeerWindowReceipt,
     QuotaFundingLot,
     QuotaFundingUse,
     QuotaLedger,
@@ -32,6 +34,28 @@ class LedgerService:
         self.engine = engine
 
     @staticmethod
+    def held_lots(session: Session, user_id: UUID) -> dict[UUID, int]:
+        """Unknown receipts retain their entire hold, including after expiry/revoke."""
+        return {
+            lot_id: int(amount)
+            for lot_id, amount in session.execute(
+                select(PeerWindowAllocation.lot_id, func.sum(PeerWindowAllocation.amount_bytes))
+                .outerjoin(
+                    PeerWindowReceipt,
+                    PeerWindowReceipt.window_id == PeerWindowAllocation.window_id,
+                )
+                .where(
+                    PeerWindowAllocation.user_id == user_id,
+                    or_(
+                        PeerWindowReceipt.window_id.is_(None),
+                        PeerWindowReceipt.observation == "unknown",
+                    ),
+                )
+                .group_by(PeerWindowAllocation.lot_id)
+            )
+        }
+
+    @staticmethod
     def _lock_owner(session: Session, user_id: UUID, *, active: bool = True) -> None:
         owner = session.scalar(
             select(User)
@@ -45,6 +69,8 @@ class LedgerService:
     @staticmethod
     def _state(session: Session, user_id: UUID, now: datetime | None = None) -> QuotaResponse:
         now = now if now is not None else session.scalar(select(func.clock_timestamp()))
+        if not isinstance(now, datetime):
+            raise QuotaError("database_clock_unavailable", 503)
         row = session.execute(
             select(
                 func.coalesce(
@@ -99,28 +125,24 @@ class LedgerService:
             )
             or 0
         )
-        funded, unavailable = session.execute(
-            select(
-                func.coalesce(func.sum(QuotaFundingLot.remaining_bytes), 0),
-                func.coalesce(
-                    func.sum(
-                        case(
-                            (
-                                or_(
-                                    QuotaFundingLot.revoked_at.is_not(None),
-                                    QuotaFundingLot.starts_at > now,
-                                    QuotaFundingLot.expires_at <= now,
-                                ),
-                                QuotaFundingLot.remaining_bytes,
-                            ),
-                            else_=0,
-                        )
-                    ),
-                    0,
-                ),
-            ).where(QuotaFundingLot.user_id == user_id)
-        ).one()
-        unavailable = int(unavailable)
+        held = LedgerService.held_lots(session, user_id)
+        reserved += sum(held.values())
+        funded = unavailable = 0
+        for lot in session.scalars(
+            select(QuotaFundingLot).where(QuotaFundingLot.user_id == user_id)
+        ):
+            locked = held.pop(lot.id, 0)
+            if not 0 <= locked <= lot.remaining_bytes:
+                raise QuotaError("quota_inconsistent", 503)
+            funded += lot.remaining_bytes
+            if (
+                lot.revoked_at is not None
+                or lot.starts_at > now
+                or (lot.expires_at is not None and lot.expires_at <= now)
+            ):
+                unavailable += lot.remaining_bytes - locked
+        if held:
+            raise QuotaError("quota_inconsistent", 503)
         if int(funded) != granted - used or not 0 <= reserved <= granted - used - unavailable:
             raise QuotaError("quota_inconsistent", 503)
         return QuotaResponse(
@@ -217,7 +239,10 @@ class LedgerService:
         *,
         starts_at: datetime | None = None,
         expires_at: datetime | None = None,
+        pinned: dict[UUID, int] | None = None,
     ) -> OperationResult:
+        if (source_type == "peer_window") != (pinned is not None):
+            raise QuotaError("invalid_window_funding", 503)
         existing = session.scalar(
             select(QuotaOperation).where(
                 QuotaOperation.user_id == user_id, QuotaOperation.idempotency_key == key
@@ -244,7 +269,9 @@ class LedgerService:
         now = session.scalar(select(func.clock_timestamp()))
         current = self._state(session, user_id, now)
         error: str | None = None
-        if kind == "debit" and amount > current.available_bytes:
+        if kind == "debit" and amount > (
+            sum(pinned.values()) if pinned is not None else current.available_bytes
+        ):
             error = "insufficient_quota"
         elif (
             current.revision == MAX_BYTES
@@ -266,7 +293,7 @@ class LedgerService:
             error_code=error,
             balance_after_bytes=balance,
             revision_before=current.revision,
-            reserved_before_bytes=current.reserved_bytes,
+            reserved_before_bytes=current.reserved_bytes - (sum(pinned.values()) if pinned else 0),
             unavailable_before_bytes=current.unavailable_bytes,
             created_at=now,
         )
@@ -302,14 +329,24 @@ class LedgerService:
                 )
             else:
                 remaining = amount
+                held = self.held_lots(session, user_id)
                 lots = session.scalars(
                     select(QuotaFundingLot)
                     .where(
                         QuotaFundingLot.user_id == user_id,
                         QuotaFundingLot.remaining_bytes > 0,
-                        QuotaFundingLot.starts_at <= now,
-                        QuotaFundingLot.revoked_at.is_(None),
-                        or_(QuotaFundingLot.expires_at.is_(None), QuotaFundingLot.expires_at > now),
+                        *(
+                            [QuotaFundingLot.id.in_(pinned)]
+                            if pinned is not None
+                            else [
+                                QuotaFundingLot.starts_at <= now,
+                                QuotaFundingLot.revoked_at.is_(None),
+                                or_(
+                                    QuotaFundingLot.expires_at.is_(None),
+                                    QuotaFundingLot.expires_at > now,
+                                ),
+                            ]
+                        ),
                     )
                     .order_by(
                         QuotaFundingLot.expires_at.asc().nulls_last(),
@@ -318,8 +355,16 @@ class LedgerService:
                     )
                     .with_for_update()
                 )
-                for lot in lots:
-                    spent = min(remaining, lot.remaining_bytes)
+                ordered = list(lots)
+                if pinned is not None:
+                    ordered.sort(key=lambda lot: list(pinned).index(lot.id))
+                for lot in ordered:
+                    capacity = (
+                        pinned[lot.id]
+                        if pinned is not None
+                        else (lot.remaining_bytes - held.get(lot.id, 0))
+                    )
+                    spent = min(remaining, capacity)
                     if spent:
                         lot.remaining_bytes -= spent
                         session.add(
@@ -477,6 +522,7 @@ class LedgerService:
             )
             or 0
         )
+        reserved += sum(self.held_lots(session, user_id).values())
         violations += int(not 0 <= reserved <= granted - used)
         lease_ops = {
             row.source_id: row for row in receipts.values() if row.source_type == "tunnel_lease"
@@ -518,19 +564,21 @@ class LedgerService:
                 or credit.status != "applied"
                 or credit.amount_bytes != lot.granted_bytes
             )
-        unavailable = int(
-            session.scalar(
-                select(func.coalesce(func.sum(QuotaFundingLot.remaining_bytes), 0)).where(
-                    QuotaFundingLot.user_id == user_id,
-                    or_(
-                        QuotaFundingLot.revoked_at.is_not(None),
-                        QuotaFundingLot.starts_at > func.clock_timestamp(),
-                        QuotaFundingLot.expires_at <= func.clock_timestamp(),
-                    ),
-                )
-            )
-            or 0
+        now = session.scalar(select(func.clock_timestamp()))
+        if not isinstance(now, datetime):
+            raise QuotaError("database_clock_unavailable", 503)
+        held = self.held_lots(session, user_id)
+        unavailable = sum(
+            lot.remaining_bytes - held.get(lot.id, 0)
+            for lot in lots
+            if lot.revoked_at is not None
+            or lot.starts_at > now
+            or (lot.expires_at is not None and lot.expires_at <= now)
         )
+        violations += sum(int(held.get(lot.id, 0) > lot.remaining_bytes) for lot in lots)
+        from vpn_api.tunnels.window_funding import reconcile_windows
+
+        violations += reconcile_windows(session, user_id, receipts)
         violations += int(not 0 <= reserved <= granted - used - unavailable)
         for operation_id, amount in session.execute(
             select(QuotaFundingUse.operation_id, func.sum(QuotaFundingUse.amount_bytes))

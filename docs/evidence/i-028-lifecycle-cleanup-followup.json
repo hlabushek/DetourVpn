@@ -1,0 +1,17 @@
+{
+  "scope": "separate phone and staging cleanup follow-up after failed lifecycle run; does not change prior passed=false",
+  "prior_receipt_sha256": "dae0ea09052ec592e5cd73e1bcf7b2047cebcd2b1ea2ef2ddc0fb992be150c83",
+  "measured_at": "2026-10-24T16:49:06.6854684+00:00",
+  "phone_connected": true,
+  "wifi_restored": true,
+  "mobile_restored": true,
+  "idle_active": true,
+  "battery_override_absent": true,
+  "appop_default": true,
+  "test_apk_absent": true,
+  "reverse_absent": true,
+  "test_session_absent": true,
+  "direct_probe_passed": true,
+  "remote_postcheck": true,
+  "passed": true
+}
