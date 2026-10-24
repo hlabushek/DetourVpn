@@ -14,6 +14,14 @@ You are developing a privacy-preserving, modular VPN service. This is a real inf
 4. Never claim a working VPN connection, payment flow, DDoS protection, or allowlist compatibility from a mock.
 5. Label all test mocks clearly. No mock code or dev keys in production builds.
 
+## Reuse and delivery pace
+- Before implementing, inspect the existing code and check for a suitable maintained upstream project or library. Do not reimplement a solved capability without a concrete reason.
+- Prefer mature components with compatible licenses and clear security boundaries. Check compatibility with `TECHNICAL_SPEC.md` and the architecture constraints before adopting a dependency; do not add one solely to save time.
+- Write new code only for missing behavior or integration that existing components do not satisfy. Briefly explain the choice when reporting the work.
+- Choose the smallest verifiable result within the assigned issue. Keep scope bounded and do not start future issues.
+- Run checks relevant to the changed code and acceptance criteria. Avoid repeating the full suite without a concrete reason; report what passed and what remains unverified.
+- Avoid extra design work when ambiguity does not affect security, architecture, or a contract: make a reasonable choice and proceed. For material ambiguities, record assumptions in a brief ADR as required above.
+
 ## Architecture constraints
 - Control plane (FastAPI/PostgreSQL/Redis) is distinct from VPN data plane (node + tunnel engine).
 - No user browsing content/history in control-plane logs.
