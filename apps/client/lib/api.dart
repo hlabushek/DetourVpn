@@ -4,6 +4,7 @@ import 'dart:io';
 import 'dart:math';
 
 import 'package:flutter/foundation.dart';
+import 'protected_api_transport.dart';
 import 'session_store.dart';
 
 class ClientError implements Exception {
@@ -49,6 +50,17 @@ class Api implements TunnelApi {
     }
     _client.connectionTimeout = const Duration(seconds: 5);
   }
+
+  Api.protected(
+    Uri origin, {
+    required ProtectedRelayProvider relayProvider,
+    SessionStore? store,
+  }) : this(
+         origin,
+         client: protectedApiHttpClient(origin, relayProvider),
+         store: store,
+       );
+
   final Uri origin;
   final HttpClient _client;
   final SessionStore? store;
