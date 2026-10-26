@@ -1,9 +1,11 @@
 """Materialize an exact, reviewed SDK tree. No downloads, secrets, or remote actions."""
 
+import argparse
 import difflib
 import hashlib
 import io
 import json
+import shutil
 import subprocess
 import tarfile
 from pathlib import Path
@@ -13,16 +15,33 @@ REVISION = "ff15093bf3856fea0947923474870b86efb682f0"
 
 
 def main() -> None:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--target-dir",
+        default=".cache/i-011/sdk-go-only",
+        help="prepared output directory; an existing prepared tree is never overwritten",
+    )
+    args = parser.parse_args()
     source = ROOT / ".cache/i-011/awg-android"
-    target = ROOT / ".cache/i-011/sdk-go-only"
+    target = (ROOT / args.target_dir).resolve()
+    try:
+        target.relative_to(ROOT)
+    except ValueError as failure:
+        raise SystemExit("Prepared SDK target must stay inside the repository cache") from failure
     patch = ROOT / "apps/android/patches/go-only.patch"
+    git_executable = shutil.which("git")
+    if git_executable is None:
+        raise SystemExit("git is required to apply the reviewed SDK patch")
     archive = subprocess.check_output(  # noqa: S603
         ["git", "-C", str(source), "archive", REVISION, "tunnel", "COPYING"]  # noqa: S607
     )
     target.mkdir(parents=True, exist_ok=True)
+    prepared_manifest = target / "PREPARED.json"
+    if not prepared_manifest.exists() and any(target.iterdir()):
+        raise SystemExit("Refusing to overwrite a non-empty unprepared SDK target")
     # Never overwrite a prepared tree: preserve native artifacts and fail on source drift.
-    if (target / "PREPARED.json").exists():
-        receipt = json.loads((target / "PREPARED.json").read_text())
+    if prepared_manifest.exists():
+        receipt = json.loads(prepared_manifest.read_text())
         if receipt["patch_sha256"] != hashlib.sha256(patch.read_bytes()).hexdigest():
             raise SystemExit("Prepared patch differs; use a fresh sdk-go-only directory")
         for name, digest in receipt["source_sha256"].items():
@@ -33,7 +52,12 @@ def main() -> None:
     with tarfile.open(fileobj=io.BytesIO(archive)) as bundle:
         bundle.extractall(target, filter="data")
     subprocess.run(  # noqa: S603
-        ["git", "apply", "--directory=.cache/i-011/sdk-go-only", str(patch)],  # noqa: S607
+        [
+            git_executable,
+            "apply",
+            f"--directory={target.relative_to(ROOT).as_posix()}",
+            str(patch),
+        ],
         cwd=ROOT,
         check=True,
     )

@@ -1,0 +1,16 @@
+{
+  "issue": "I-030",
+  "verified_at": "2026-10-26",
+  "scope": "bounded owner-only Android acceptance credit",
+  "admin_action": {
+    "operation": "credit",
+    "added_bytes": 4194304,
+    "total_granted_bytes": 6291456,
+    "active_account_count": 1,
+    "reserved_bytes": 0,
+    "secrets_entered_locally": true,
+    "payment": false
+  },
+  "verification": "scripts/start_beta_owner_acceptance_credit.ps1 checked the unique active account and previous 2 MiB ledger, then confirmed the 6 MiB total grant and zero reserved bytes",
+  "secrets": "No password, TOTP, access token, account identifier, or private key recorded"
+}

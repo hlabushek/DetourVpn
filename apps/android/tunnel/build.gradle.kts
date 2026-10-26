@@ -1,6 +1,16 @@
 plugins { id("com.android.library") }
-val prepared = project.file("../../../.cache/i-011/sdk-go-only")
+val preparedPath = providers.gradleProperty("awgPreparedDir").orNull
+    ?.takeIf { it.isNotBlank() }
+    ?: "../../../.cache/i-011/sdk-go-only"
+val prepared = project.file(preparedPath)
 check(prepared.resolve("PREPARED.json").isFile) { "Run scripts/prepare_android_poc.py first" }
+val preparedReceipt = groovy.json.JsonSlurper().parse(prepared.resolve("PREPARED.json")) as Map<*, *>
+// Keep this fingerprint in sync with apps/android/patches/go-only.patch.
+// Build snapshots intentionally omit patch files, so the reviewed hash is pinned here.
+val expectedPatchHash = "523e726eb306af84addfa7c2ef6f4e0b6f89c8e4e9db7d015147752f843c2000"
+check(preparedReceipt["patch_sha256"] == expectedPatchHash) {
+    "Prepared GoBackend SDK patch hash is stale; prepare a fresh SDK tree matching apps/android/patches/go-only.patch and pass -PawgPreparedDir=<path>"
+}
 android {
     namespace = "org.amnezia.awg.tunnel"
     compileSdk = 36

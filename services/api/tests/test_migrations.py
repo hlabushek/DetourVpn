@@ -2,6 +2,7 @@
 
 import time
 from concurrent.futures import ThreadPoolExecutor
+from datetime import UTC, datetime
 from pathlib import Path
 from threading import Barrier
 from uuid import uuid4
@@ -13,7 +14,7 @@ from sqlalchemy import Engine, func, inspect, select, text
 from sqlalchemy.exc import DBAPIError, IntegrityError
 
 from vpn_api.db.connection import transaction
-from vpn_api.db.models import AuthIdentity, User
+from vpn_api.db.models import AdminIdentity, AuthIdentity, BetaInvite, User
 
 pytestmark = pytest.mark.postgres
 ROOT = Path(__file__).resolve().parents[3]
@@ -71,6 +72,7 @@ def test_empty_database_upgrade_repeat_and_no_schema_drift(engine: Engine) -> No
         "admin_identities",
         "admin_sessions",
         "admin_actions",
+        "beta_invites",
         "peer_window_holds",
         "peer_window_allocations",
         "peer_window_receipts",
@@ -82,6 +84,11 @@ def test_empty_database_upgrade_repeat_and_no_schema_drift(engine: Engine) -> No
     }
     assert "uq_auth_identities_user_provider" in {
         item["name"] for item in inspect(engine).get_indexes("auth_identities")
+    }
+    login_columns = {item["name"] for item in inspect(engine).get_columns("login_attempts")}
+    assert {"delivery_status", "delivery_recorded_at"} <= login_columns
+    assert "ck_login_attempts_delivery_status" in {
+        item["name"] for item in inspect(engine).get_check_constraints("login_attempts")
     }
     command.check(config)
     with transaction(engine) as session:
@@ -104,6 +111,32 @@ def test_empty_downgrade_and_reupgrade(engine: Engine) -> None:
     command.check(config)
 
 
+def test_beta_invite_migration_refuses_downgrade_after_invites_exist(engine: Engine) -> None:
+    config = upgrade(engine)
+    test_password_hash = uuid4().hex
+    with transaction(engine) as session:
+        admin = AdminIdentity(
+            username="migration-test",
+            password_hash=test_password_hash,
+            totp_ciphertext="TEST ONLY",
+            role="admin",
+            created_at=datetime.now(UTC),
+        )
+        session.add(admin)
+        session.flush()
+        session.add(
+            BetaInvite(
+                subject_digest="a" * 64,
+                admin_id=admin.id,
+                reason="TEST ONLY migration guard",
+                created_at=datetime.now(UTC),
+            )
+        )
+    with pytest.raises(RuntimeError, match="beta_invites_data_requires_reviewed_forward_migration"):
+        command.downgrade(config, "0015_window_admission")
+    assert "beta_invites" in inspect(engine).get_table_names()
+
+
 def test_downgrade_with_data_fails_without_losing_rows_or_revision(engine: Engine) -> None:
     config = upgrade(engine)
     with transaction(engine) as session:
@@ -114,7 +147,7 @@ def test_downgrade_with_data_fails_without_losing_rows_or_revision(engine: Engin
         assert session.scalar(select(func.count()).select_from(User)) == 1
         assert (
             session.scalar(text("SELECT version_num FROM alembic_version"))
-            == "0015_window_admission"
+            == "0017_login_delivery_receipt"
         )
 
 
@@ -151,7 +184,7 @@ def test_downgrade_cannot_delete_a_concurrently_committing_account(engine: Engin
         assert session.scalar(select(func.count()).select_from(User)) == 1
         assert (
             session.scalar(text("SELECT version_num FROM alembic_version"))
-            == "0015_window_admission"
+            == "0017_login_delivery_receipt"
         )
 
 

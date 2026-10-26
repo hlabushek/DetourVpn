@@ -1,0 +1,23 @@
+# Trusted IP TLS, but no API/static content until invite/auth acceptance passes.
+{
+	auto_https disable_certs
+}
+http://{$DETOURVPN_BETA_IP} {
+	handle /.well-known/acme-challenge/* {
+		root * /var/lib/detourvpn-beta/acme
+		file_server
+	}
+	handle {
+		redir https://{$DETOURVPN_BETA_IP}{uri} permanent
+	}
+}
+https://{$DETOURVPN_BETA_IP} {
+	tls /etc/detourvpn-beta/tls/fullchain.pem /etc/detourvpn-beta/tls/privkey.pem
+	header {
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "no-referrer"
+	}
+	handle {
+		respond 404
+	}
+}

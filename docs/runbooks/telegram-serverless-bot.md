@@ -61,17 +61,32 @@ webhook status, если проект привязан. Это не полнос
 Полный `push` удаляет remote modules, отсутствующие локально; не запускать его
 на неизвестном чужом/действующем проекте. Сначала установить baseline/rollback.
 
-## Публикация — здесь не выполнялась
+## Beta-публикация 2026-10-26
 
-Следующие команды относятся только к согласованному staging bot, после review:
+Отдельный Serverless app для `@uysdgyfudf_bot` связан через новый CLI Access
+token; `status` подтвердил revision 0 и отсутствие модулей. Основной
+`@DetourVpnBot` не затрагивался. Beta push создал 8 модулей, `migrate --safe`
+добавил только две таблицы operational dedupe/rate-limit. Итог: revision 1,
+webhook in sync, рабочая папка clean. Hosted `runtimeProbe` не обнаружил env/
+secret интерфейса. Receipt:
+`../evidence/i-030-beta-serverless-deployment-20261026.json`.
+
+Реальный user chat, `/start <request_id>`, Mini App initData, OTP и Android
+verification остаются непроверенными. Не считать публикацию Serverless готовым
+входом или доставкой OTP.
+
+## Публикация для другого разрешённого окружения
+
+Сначала review cloud baseline и module diff. Не публиковать в неизвестный или
+используемый бот.
 
 ```powershell
 npx --no-install tgcloud push
-npx --no-install tgcloud migrate
+npx --no-install tgcloud migrate --safe
 ```
 
-Проверить создание только `bot_menu_updates`, `bot_menu_limits` и их expiry
-indexes. Не использовать `--force`, `migrate --yes`, автоматическое принятие
+Для beta уже приняты только `bot_menu_updates`, `bot_menu_limits` и их expiry
+indexes. Для остальных окружений сверять миграцию отдельно. Не использовать `--force`, `migrate --yes`, автоматическое принятие
 DROP или `--drop-pending`. Возможна краткая недоступность между push и migrate:
 handler fail closed при отсутствии таблиц. Не публиковать для реальной аудитории
 до миграции и platform QA.
@@ -107,11 +122,23 @@ privacy - Данные и приватность
 
 ## Auth relay gate
 
-Нужно выяснить в early-access панели Telegram, есть ли runtime Secrets/env,
-их точный SDK, access control и политика логирования. Открытая reference/CLI 0.2.0
-не описывают secret injection. Браузерная проверка в текущей сессии не состоялась
-из-за ошибки инициализации инструмента. Это **не доказательство отсутствия**
-функции в аккаунте владельца.
+Владелец и Codex проверили Serverless UI BotFather 2026-10-25. На странице
+показаны CLI Access, Handlers, Endpoints, Library, Database и Mini App Files;
+отдельного Secrets/env раздела не видно. Runtime probe в endpoint Console также
+не обнаружил известных env/secret globals, context fields или SDK exports.
+Официальная документация описывает вызов endpoint из Mini App с платформенно
+проверенным `initData`, но не обещает общий secret injection или доставку `/start`
+Updates к endpoint. Это не исключает скрытую/непривязанную настройку или
+недокументированную возможность. Не помещать bot token в endpoint source,
+database, URL или логи. Для текущей OTP схемы FastAPI должен получать token через
+секретное хранилище отдельной beta-среды и сам отправлять код через Bot API.
+
+Во время просмотра CLI Access его скрытое значение появилось в accessibility
+output. Оно не копировалось и не использовалось; владелец отложил ротацию.
+Считать credential потенциально раскрытым, не использовать и не открывать его
+повторно; вернуться к решению о ротации до будущих cloud CLI операций.
+Подробности без значения токена:
+`docs/evidence/i-026-serverless-runtime-probe.json`.
 
 После выяснения: отдельный reviewed relay контракт к существующему HTTPS auth
 API, scoped credential (никаких admin/session keys), сохранение update_id и

@@ -1,6 +1,7 @@
 import hmac
 import re
 import secrets
+from dataclasses import dataclass
 from datetime import datetime, timedelta
 from uuid import UUID
 
@@ -17,6 +18,7 @@ from vpn_api.auth.contracts import (
 from vpn_api.auth.security import (
     AuthError,
     Principal,
+    beta_invite_digest,
     digest,
     keyed_digest,
     require_permission,
@@ -27,6 +29,7 @@ from vpn_api.config import Settings
 from vpn_api.db.connection import transaction
 from vpn_api.db.models import (
     AuthIdentity,
+    BetaInvite,
     BotUpdate,
     CodeIssue,
     Device,
@@ -48,6 +51,31 @@ def database_now(session: Session) -> datetime:
     return value
 
 
+@dataclass(frozen=True)
+class PreparedLoginCode:
+    message: str
+    issued: bool
+    generation: int | None = None
+
+
+def cleanup_retained_auth_rows(engine: Engine) -> dict[str, int]:
+    """Delete only authentication records beyond their established retention cutoffs."""
+    result: dict[str, int] = {}
+    with transaction(engine) as session:
+        now = database_now(session)
+        for model, condition in (
+            (RateBucket, RateBucket.expires_at < now),
+            (MiniAppExchange, MiniAppExchange.expires_at < now),
+            (LoginAttempt, LoginAttempt.expires_at < now - timedelta(days=1)),
+            (CodeIssue, CodeIssue.created_at < now - timedelta(days=1)),
+            (BotUpdate, BotUpdate.created_at < now - timedelta(days=7)),
+            (SessionFamily, SessionFamily.expires_at < now - timedelta(days=1)),
+        ):
+            ids = session.execute(delete(model).where(condition).returning(model.__table__.c[0]))
+            result[model.__tablename__] = len(ids.all())
+    return result
+
+
 class AuthService:
     def __init__(self, engine: Engine, settings: Settings, sender: Sender) -> None:
         self.engine = engine
@@ -62,6 +90,22 @@ class AuthService:
         if key >= 2**63:
             key -= 2**64
         session.execute(text("SELECT pg_advisory_xact_lock(:key)"), {"key": key})
+
+    def beta_subject_allowed(self, session: Session, subject: int) -> bool:
+        if not self.settings.beta_invites_only:
+            return True
+        if self.settings.auth_pepper is None:
+            return False
+        invite_digest = beta_invite_digest(self.settings.auth_pepper.get_secret_value(), subject)
+        # FOR SHARE serializes authorization with admin revocation through commit.
+        return (
+            session.scalar(
+                select(BetaInvite.id)
+                .where(BetaInvite.subject_digest == invite_digest, BetaInvite.revoked_at.is_(None))
+                .with_for_update(read=True)
+            )
+            is not None
+        )
 
     def rate(self, operation: str, network: str) -> None:
         limits = {
@@ -112,6 +156,104 @@ class AuthService:
                 expires_at=attempt.expires_at,
             )
 
+    def prepare_login_code(
+        self, session: Session, request_id: UUID, subject: int
+    ) -> PreparedLoginCode:
+        """Build the OTP message and persist its digest inside the caller's transaction."""
+        attempt = session.scalar(
+            select(LoginAttempt).where(LoginAttempt.id == request_id).with_for_update()
+        )
+        now = database_now(session)
+        if (
+            attempt is None
+            or attempt.expires_at <= now
+            or attempt.consumed_at is not None
+            or attempt.checks >= 5
+            or (attempt.subject is not None and attempt.subject != subject)
+        ):
+            return PreparedLoginCode("Попытка недоступна. Начните новый вход в приложении.", False)
+        if not self.beta_subject_allowed(session, subject):
+            return PreparedLoginCode(
+                "Вход доступен только участникам закрытого теста. Обратитесь к организатору.",
+                False,
+            )
+
+        recent = (
+            session.scalar(
+                select(func.count())
+                .select_from(CodeIssue)
+                .where(
+                    CodeIssue.subject == subject,
+                    CodeIssue.created_at > now - timedelta(minutes=15),
+                )
+            )
+            or 0
+        )
+        daily = (
+            session.scalar(
+                select(func.count())
+                .select_from(CodeIssue)
+                .where(
+                    CodeIssue.subject == subject,
+                    CodeIssue.created_at > now - timedelta(days=1),
+                )
+            )
+            or 0
+        )
+        if (
+            recent >= 5
+            or daily >= 20
+            or (attempt.issued_at is not None and attempt.issued_at > now - timedelta(seconds=60))
+        ):
+            return PreparedLoginCode("Лимит запросов кода. Подождите перед новой попыткой.", False)
+
+        code = f"{secrets.randbelow(100_000_000):08d}"
+        while attempt.code_digest is not None and hmac.compare_digest(
+            attempt.code_digest,
+            keyed_digest(self.pepper, "otp", attempt.id.hex, attempt.generation, code),
+        ):
+            code = f"{secrets.randbelow(100_000_000):08d}"
+        attempt.subject = subject
+        attempt.generation += 1
+        attempt.code_digest = keyed_digest(
+            self.pepper, "otp", attempt.id.hex, attempt.generation, code
+        )
+        attempt.issued_at = now
+        attempt.code_expires_at = min(attempt.expires_at, now + timedelta(minutes=5))
+        attempt.delivery_status = "pending"
+        attempt.delivery_recorded_at = None
+        session.add(CodeIssue(subject=subject, created_at=now))
+        return PreparedLoginCode(
+            message=(
+                f"Код входа: {code}\nДействует до 5 минут. Введите только в нашем "
+                f"приложении. Telegram ID аккаунта: {subject}. "
+                "Если вход начали не вы, не передавайте код."
+            ),
+            issued=True,
+            generation=attempt.generation,
+        )
+
+    def deliver_login_code(
+        self, request_id: UUID, generation: int, subject: int, message: str
+    ) -> str:
+        status = "api_accepted"
+        try:
+            self.sender.send(subject, message)
+        except DeliveryUnknown:
+            status = "unknown"
+        with transaction(self.engine) as session:
+            now = database_now(session)
+            session.execute(
+                update(LoginAttempt)
+                .where(
+                    LoginAttempt.id == request_id,
+                    LoginAttempt.generation == generation,
+                    LoginAttempt.delivery_status == "pending",
+                )
+                .values(delivery_status=status, delivery_recorded_at=now)
+            )
+        return "delivery_unknown" if status == "unknown" else "processed"
+
     def webhook(self, payload: TelegramUpdate, network: str) -> WebhookResponse:
         self.rate("webhook", network)
         message = payload.message
@@ -139,8 +281,8 @@ class AuthService:
         )
         if command is None:
             return WebhookResponse(status="ignored")
-        code: str | None = None
         reply = "Начните вход в нашем приложении и откройте ссылку на бота из него."
+        delivery_attempt: tuple[UUID, int] | None = None
         with transaction(self.engine) as session:
             now = database_now(session)
             age = now.timestamp() - message.date
@@ -162,85 +304,18 @@ class AuthService:
                 return WebhookResponse(status="duplicate")
             if command[1] is not None:
                 self.lock(session, "subject", message.sender.id)
-                attempt = session.scalar(
-                    select(LoginAttempt)
-                    .where(LoginAttempt.id == UUID(hex=command[1]))
-                    .with_for_update()
-                )
-                now = database_now(session)
-                if (
-                    attempt is None
-                    or attempt.expires_at <= now
-                    or attempt.consumed_at is not None
-                    or attempt.checks >= 5
-                    or (attempt.subject is not None and attempt.subject != message.sender.id)
-                ):
-                    reply = "Попытка недоступна. Начните новый вход в приложении."
-                else:
-                    recent = (
-                        session.scalar(
-                            select(func.count())
-                            .select_from(CodeIssue)
-                            .where(
-                                CodeIssue.subject == message.sender.id,
-                                CodeIssue.created_at > now - timedelta(minutes=15),
-                            )
-                        )
-                        or 0
-                    )
-                    daily = (
-                        session.scalar(
-                            select(func.count())
-                            .select_from(CodeIssue)
-                            .where(
-                                CodeIssue.subject == message.sender.id,
-                                CodeIssue.created_at > now - timedelta(days=1),
-                            )
-                        )
-                        or 0
-                    )
-                    if (
-                        recent >= 5
-                        or daily >= 20
-                        or (
-                            attempt.issued_at is not None
-                            and attempt.issued_at > now - timedelta(seconds=60)
-                        )
-                    ):
-                        reply = "Лимит запросов кода. Подождите перед новой попыткой."
-                    else:
-                        code = f"{secrets.randbelow(100_000_000):08d}"
-                        # Resend must not accidentally reproduce the previous numeric code.
-                        while attempt.code_digest is not None and hmac.compare_digest(
-                            attempt.code_digest,
-                            keyed_digest(
-                                self.pepper, "otp", attempt.id.hex, attempt.generation, code
-                            ),
-                        ):
-                            code = f"{secrets.randbelow(100_000_000):08d}"
-                        attempt.subject = message.sender.id
-                        attempt.generation += 1
-                        attempt.code_digest = keyed_digest(
-                            self.pepper, "otp", attempt.id.hex, attempt.generation, code
-                        )
-                        attempt.issued_at = now
-                        attempt.code_expires_at = min(
-                            attempt.expires_at, now + timedelta(minutes=5)
-                        )
-                        session.add(CodeIssue(subject=message.sender.id, created_at=now))
-                        reply = (
-                            f"Код входа: {code}\nДействует до 5 минут. Введите только в нашем "
-                            f"приложении. Telegram ID аккаунта: {message.sender.id}. "
-                            "Если вход начали не вы, не передавайте код."
-                        )
+                request_id = UUID(hex=command[1])
+                prepared = self.prepare_login_code(session, request_id, message.sender.id)
+                reply = prepared.message
+                if prepared.issued and prepared.generation is not None:
+                    delivery_attempt = (request_id, prepared.generation)
         status: str = "sent"
         try:
             self.sender.send(message.chat.id, reply)
         except DeliveryUnknown:
             status = "unknown"
-        finally:
-            code = None
         with transaction(self.engine) as session:
+            now = database_now(session)
             session.execute(
                 update(BotUpdate)
                 .where(
@@ -249,6 +324,20 @@ class AuthService:
                 )
                 .values(status=status)
             )
+            if delivery_attempt is not None:
+                request_id, generation = delivery_attempt
+                session.execute(
+                    update(LoginAttempt)
+                    .where(
+                        LoginAttempt.id == request_id,
+                        LoginAttempt.generation == generation,
+                        LoginAttempt.delivery_status == "pending",
+                    )
+                    .values(
+                        delivery_status="unknown" if status == "unknown" else "api_accepted",
+                        delivery_recorded_at=now,
+                    )
+                )
         return WebhookResponse(status="delivery_unknown" if status == "unknown" else "processed")
 
     def issue_tokens(self, session: Session, family: SessionFamily, now: datetime) -> TokenResponse:
@@ -302,6 +391,8 @@ class AuthService:
         if not hmac.compare_digest(attempt.code_digest, candidate):
             attempt.checks += 1
             return AuthError("invalid_login")
+        if not self.beta_subject_allowed(session, attempt.subject):
+            return AuthError("beta_invite_required", 403)
         # Subject lock serializes initial account creation across different challenges.
         self.lock(session, "identity", attempt.subject)
         identity = session.scalar(
@@ -352,6 +443,11 @@ class AuthService:
         family = session.get(SessionFamily, credential.family_id)
         if family is None:
             raise AuthError("unauthorized")
+        identity = session.scalar(
+            select(AuthIdentity).where(AuthIdentity.user_id == family.user_id)
+        )
+        if identity is None or not self.beta_subject_allowed(session, identity.provider_subject):
+            raise AuthError("unauthorized")
         user = session.scalar(select(User).where(User.id == family.user_id).with_for_update())
         session.refresh(family, with_for_update=True)
         session.refresh(credential)
@@ -365,7 +461,6 @@ class AuthService:
             or credential.rotated_at is not None
         ):
             raise AuthError("unauthorized")
-        identity = session.scalar(select(AuthIdentity).where(AuthIdentity.user_id == user.id))
         device = session.get(Device, family.device_id) if family.device_id is not None else None
         if family.device_id is not None and (
             device is None or device.revoked_at is not None or device.user_id != user.id
@@ -405,6 +500,11 @@ class AuthService:
         family = session.get(SessionFamily, credential.family_id)
         if family is None:
             return AuthError("invalid_refresh")
+        identity = session.scalar(
+            select(AuthIdentity).where(AuthIdentity.user_id == family.user_id)
+        )
+        if identity is None or not self.beta_subject_allowed(session, identity.provider_subject):
+            return AuthError("invalid_refresh")
         user = session.scalar(select(User).where(User.id == family.user_id).with_for_update())
         session.refresh(family, with_for_update=True)
         session.refresh(credential, with_for_update=True)
@@ -432,19 +532,4 @@ class AuthService:
 
     def cleanup(self) -> dict[str, int]:
         """Run explicitly on a local schedule; no data-plane or account deletion."""
-        result: dict[str, int] = {}
-        with transaction(self.engine) as session:
-            now = database_now(session)
-            for model, condition in (
-                (RateBucket, RateBucket.expires_at < now),
-                (MiniAppExchange, MiniAppExchange.expires_at < now),
-                (LoginAttempt, LoginAttempt.expires_at < now - timedelta(days=1)),
-                (CodeIssue, CodeIssue.created_at < now - timedelta(days=1)),
-                (BotUpdate, BotUpdate.created_at < now - timedelta(days=7)),
-                (SessionFamily, SessionFamily.expires_at < now - timedelta(days=1)),
-            ):
-                ids = session.execute(
-                    delete(model).where(condition).returning(model.__table__.c[0])
-                )
-                result[model.__tablename__] = len(ids.all())
-        return result
+        return cleanup_retained_auth_rows(self.engine)

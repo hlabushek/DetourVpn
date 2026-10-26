@@ -1,0 +1,62 @@
+{
+  "issue": "I-030",
+  "scope": "challenge-only bootstrap and trusted IP TLS on the isolated beta API host; no API ingress",
+  "accepted": false,
+  "verified_at": "2026-10-26",
+  "host": "separate beta API VM; details in i-030-beta-api-host-20261026.json",
+  "software": {
+    "caddy": "2.11.7 from official stable apt repository",
+    "certbot": "5.8.0 official snap",
+    "certbot_snap_renew_timer": "disabled to avoid duplicate schedulers",
+    "beta_certificate_timer": "enabled; runs every 12 hours and after boot"
+  },
+  "certificate": {
+    "issuer": "Let's Encrypt",
+    "identifier_type": "IPv4 subjectAltName",
+    "ip_san_matches_beta_api_host": true,
+    "profile": "shortlived",
+    "not_after": "2026-11-01T13:35:56Z",
+    "deploy_hook_installs_private_key_root_caddy_0640": true,
+    "renewal_dry_run": "passed against ACME staging",
+    "periodic_timer_service_run": "passed; no renewal was due, certificate expiry guard passed"
+  },
+  "public_probe": {
+    "http_root": "301 redirect to HTTPS",
+    "https_tls_verification": "passed without insecure mode",
+    "https_root": 404,
+    "https_api_ready": 404,
+    "https_mini_app_path": 404,
+    "http01_webroot_probe": "passed from an external client; temporary marker removed"
+  },
+  "future_api_proxy_template": {
+    "target_caddy_version": "2.11.7",
+    "validation": "passed read-only on beta API host; config streamed to stdin with actual beta API/node IP values",
+    "written_or_installed": false,
+    "active_config_reloaded": false,
+    "active_https_behavior_changed": false,
+    "api_host_auth_invites_admin_mfa": "disabled; do not expose API yet",
+    "proof_scope": "Caddy syntax and referenced TLS path validation only; no public route behavior accepted"
+  },
+  "security_boundaries": {
+    "api_and_database_bindings": "loopback only",
+    "caddy_configuration": "closed TLS template; all HTTPS paths return 404",
+    "api_or_mini_app_publicly_proxied": false,
+    "telegram_or_botfather_changed": false,
+    "dns_changed": false,
+    "acme_account_contact_email": "not supplied; no-email Certbot registration used; external alerting remains required",
+    "private_key_or_acme_credentials_in_repo_or_receipt": false
+  },
+  "failures_and_recovery": [
+    "First certificate-renewal systemd run failed because ProtectHome=true prevented the official Certbot snap from writing its root-user runtime state under /root/snap. The unit now explicitly allows the snap's root state directory; service run and expiry guard passed.",
+    "The first non-interactive renewal dry-run waited for Certbot's built-in random delay and was terminated after confirming it was only the dry-run process. Repeating with a TTY avoided that delay; staging dry-run then passed. No certificate or service was changed by the terminated run."
+  ],
+  "not_accepted": [
+    "independent certificate-expiry monitoring and alert delivery",
+    "public API or Mini App service",
+    "Telegram BotFather URL or live Telegram webview compatibility for an IP URL",
+    "live Telegram initData to OTP delivery to Android verify",
+    "admin MFA, invite setup and API-to-node credential binding",
+    "friend traffic or any VPN traffic",
+    "I-027 off-host backup/restore and outage drills"
+  ]
+}

@@ -1,0 +1,46 @@
+{
+  "date": "2026-10-26",
+  "scope": "isolated-beta-api-and-ingress-only",
+  "api_host": "193.68.88.239",
+  "vpn_node_host": "95.81.73.183",
+  "mini_app_release": "a55e2128caf6499a88d2d36777bad260",
+  "api_env_backup": "api.env.pre-auth-bdbcc3c4fd494130b1c86a4feb8d6c01",
+  "caddy_backup": "Caddyfile.pre-beta-auth-4f4d1469cc00483b8cebcd52ceec028f",
+  "auth_enabled": true,
+  "mini_app_enabled": true,
+  "beta_invites_only": true,
+  "closed_admin_only": false,
+  "admin_mfa_identity_retained": true,
+  "api_readiness_local": 200,
+  "mini_app_local": 200,
+  "trusted_tls": true,
+  "external_routes": {
+    "/mini-app/": 200,
+    "/api/v1/auth/mini-app/request-code GET": 405,
+    "/api/v1/auth/mini-app/request-code POST empty JSON": 422,
+    "/api/v1/ready": 404,
+    "/api/internal/v3/windows/poll": 404,
+    "/api/v1/not-allowed": 404,
+    "/api/v1/webhooks/telegram": 404,
+    "/": 404
+  },
+  "local_checks": {
+    "mini_app_build": "passed",
+    "beta_auth_activation_tests": "5 passed",
+    "telegram_bot_tests": "58 passed",
+    "bot_runtime_check": "blocked_by_preexisting_symlink_directories",
+    "powershell_activation_syntax": "passed",
+    "target_caddy_2_11_7_validation": "passed"
+  },
+  "not_verified": [
+    "Telegram-issued initData",
+    "real OTP delivery to a started private bot chat",
+    "Telegram Serverless cloud deployment and /start delivery",
+    "invited user Android verification and device pairing",
+    "VPN data-plane connectivity or privacy acceptance",
+    "I-027 off-host restore and monitoring acceptance",
+    "I-028 full DNS/IPv6/two-device/independent-provider acceptance"
+  ],
+  "production_or_b_hosts_changed": false,
+  "secrets_recorded": false
+}

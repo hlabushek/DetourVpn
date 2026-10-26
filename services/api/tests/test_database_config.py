@@ -14,6 +14,11 @@ def test_database_is_optional_for_liveness(monkeypatch: pytest.MonkeyPatch) -> N
         create_database_engine(Settings(_env_file=None))
 
 
+def test_beta_invites_require_closed_or_test_authenticated_mode() -> None:
+    with pytest.raises(ValidationError):
+        Settings(_env_file=None, beta_invites_only=True)
+
+
 @pytest.mark.parametrize(
     "url",
     [

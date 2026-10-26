@@ -14,19 +14,20 @@ const input = (text = '/start', id = 1, user = 123) => {
   const payload = { message_id: 1, date: now(), from: { id: user, is_bot: false }, chat: { id: user, type: 'private' }, text };
   return [payload, { update: { update_id: id, message: payload } }];
 };
+const withoutMiniApp = { ...config, miniAppUrl: '' };
 const button = (data = 'detour:connect', id = 1, user = 123) => {
   const payload = { id: 'test-only-query', from: { id: user, is_bot: false }, data, message: { message_id: 1, date: now() - 86400, from: { id: 456, is_bot: true }, chat: { id: user, type: 'private' } } };
   return [payload, { update: { update_id: id, callback_query: payload } }];
 };
 beforeEach(reset);
 
-test('start returns welcome and a usable menu without public links', async () => {
+test('start returns welcome and the configured beta Mini App button', async () => {
   assert.equal((await message(...input())).status, 'processed');
   assert.equal(calls.length, 1);
   assert.equal(calls[0].method, 'sendMessage');
   assert.equal(calls[0].params.protect_content, true);
   assert.match(calls[0].params.text, /DetourVpn/);
-  assert.equal(calls[0].params.reply_markup.inline_keyboard[0][0].callback_data, 'detour:cabinet');
+  assert.equal(calls[0].params.reply_markup.inline_keyboard[0][0].web_app.url, config.miniAppUrl);
   assert.equal(calls[0].params.parse_mode, undefined);
 });
 
@@ -49,17 +50,33 @@ test('configured links open the Mini App and published operator URLs', () => {
   assert.equal(view('android', configured).reply_markup.inline_keyboard[0][0].url, configured.androidUrl);
   assert.equal(view('help', configured).reply_markup.inline_keyboard[0][0].url, configured.supportUrl);
   assert.equal(view('privacy', configured).reply_markup.inline_keyboard[0][0].url, configured.privacyUrl);
+  assert.match(view('connect', configured).text, /Продолжить вход/);
+});
+
+test('a public IPv4 HTTPS origin is permitted only for the beta Mini App URL', () => {
+  const configured = validateConfig({ ...config, miniAppUrl: 'https://193.68.88.239/mini-app/' });
+  const attempt = '0123456789abcdef0123456789abcdef';
+  assert.equal(view('login', configured, attempt).reply_markup.inline_keyboard[0][0].web_app.url,
+    `https://193.68.88.239/mini-app/#login_attempt=${attempt}`);
+  assert.throws(() => validateConfig({ ...configured, supportUrl: 'https://193.68.88.239/' }), /bot_configuration_invalid/);
 });
 
 test('unset links have explicit unavailable text and no invented URLs or balances', () => {
-  assert.match(view('cabinet', config).text, /адрес пока не настроен/);
-  assert.match(view('android', config).text, /ссылка.*не опубликована/);
-  assert.match(view('help', config).text, /не создают обращение/);
-  assert.ok(!JSON.stringify(view('home', config)).includes('url'));
+  assert.match(view('cabinet', withoutMiniApp).text, /адрес пока не настроен/);
+  assert.match(view('android', withoutMiniApp).text, /ссылка.*не опубликована/);
+  assert.match(view('help', withoutMiniApp).text, /не создают обращение/);
+  assert.match(view('connect', withoutMiniApp).text, /не включён/);
+  assert.ok(!JSON.stringify(view('home', withoutMiniApp)).includes('url'));
 });
 
 for (const bad of ['http://detourvpn.org/', 'https://user:pass@detourvpn.org/', 'https://127.0.0.1/', 'https://127.1/', 'https://0x7f.1/', 'https://localhost/', 'https://example.invalid/', 'https://example.org:8443/', 'https://example.org/#bad\n', 'javascript:alert(1)', 'https://-bad.example.org/', 'https://example.org/"']) {
   test(`reject unsafe operator URL: ${bad.replace(/\n/g, '')}`, () => {
+    assert.throws(() => validateConfig({ ...config, miniAppUrl: bad }), /bot_configuration_invalid/);
+  });
+}
+
+for (const bad of ['https://10.0.0.1/', 'https://192.168.1.2/', 'https://169.254.1.1/', 'https://100.64.0.1/', 'https://198.51.100.2/', 'https://203.0.113.3/', 'https://224.0.0.1/', 'https://256.1.1.1/', 'https://01.2.3.4/', 'https://193.68.88.239:8443/', 'https://193.68.88.239/?x=1']) {
+  test(`reject non-public or non-canonical Mini App IP URL: ${bad}`, () => {
     assert.throws(() => validateConfig({ ...config, miniAppUrl: bad }), /bot_configuration_invalid/);
   });
 }
@@ -96,17 +113,34 @@ test('private user text and code-like strings are never echoed or persisted', as
   assert.ok(!JSON.stringify(rows('bot_menu_limits')).includes(text));
 });
 
-test('login deep links fail closed; no fake OTP or attempt UUID is echoed', async () => {
+test('login challenge exposes its ID only in the Mini App fragment', async () => {
   const attempt = '0123456789abcdef0123456789abcdef';
   await message(...input(`/start ${attempt}`));
-  assert.match(calls[0].params.text, /Код не выпущен/);
-  assert.ok(!JSON.stringify(calls).includes(attempt));
+  assert.match(calls[0].params.text, /Продолжите вход в Mini App/);
+  assert.equal(calls[0].params.reply_markup.inline_keyboard[0][0].web_app.url,
+    `${config.miniAppUrl}#login_attempt=${attempt}`);
+  assert.ok(!calls[0].params.text.includes(attempt));
+});
+
+test('valid login challenge opens only the configured Mini App fragment', async () => {
+  const attempt = '0123456789abcdef0123456789abcdef';
+  const configured = { ...config, miniAppUrl: 'https://beta.example.org/mini-app/' };
+  const content = view('login', configured, attempt);
+  assert.ok(!content.text.includes(attempt));
+  assert.equal(content.reply_markup.inline_keyboard[0][0].web_app.url,
+    `https://beta.example.org/mini-app/#login_attempt=${attempt}`);
 });
 
 test('commands addressed to another bot are ignored', async () => {
   await message(...input('/start@OtherBot'));
   assert.equal(calls.length, 0);
   assert.equal(route('/help@DetourBot', 'detourbot'), 'help');
+});
+
+test('beta config accepts commands addressed to the beta bot only', () => {
+  assert.equal(config.botUsername, 'uysdgyfudf_bot');
+  assert.equal(route('/start@uysdgyfudf_bot', config.botUsername), 'home');
+  assert.equal(route('/start@DetourVpnBot', config.botUsername), null);
 });
 
 test('callback acknowledges spinner and edits menu instead of sending new chat messages', async () => {

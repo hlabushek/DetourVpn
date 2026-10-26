@@ -1,0 +1,59 @@
+{
+  "date": "2026-10-26",
+  "issue": "I-027",
+  "scope": "isolated beta API backup to owner PC",
+  "environment": "beta API only",
+  "result": "initial encrypted archive pulled and restore-verified",
+  "deployment": {
+    "backup_service": "passed",
+    "postgres_client": "PostgreSQL 17 client installed; server/container unchanged",
+    "api_readiness_before_after": 200,
+    "api_restarted": false,
+    "database_migrated": false,
+    "key": "local Fernet key reused; restricted server path separate from shared secrets directory",
+    "archive_remote_bytes": 1748196,
+    "archive_local_bytes": 1748196,
+    "archive_sha256_equal": true
+  },
+  "restore_verification": {
+    "result": "passed",
+    "target": "disposable local PostgreSQL cluster and drill database",
+    "source": "actual encrypted archive downloaded from beta API",
+    "database_rows_or_identifiers_logged": false,
+    "temporary_cluster_removed": true
+  },
+  "schedule": {
+    "task": "DetourVpn Beta Backup Daily",
+    "registered": true,
+    "cadence": "daily at 07:00 Europe/Moscow",
+    "start_when_available": true,
+    "wake_to_run": true,
+    "action_runtime": "built-in Windows PowerShell 5.1",
+    "principal": "current interactive Windows user, limited",
+    "first_scheduled_execution": "pending 2026-10-27"
+  },
+  "failed_attempts": [
+    "First install rolled back because PostgreSQL client binaries were absent; PostgreSQL 17 client was installed from the signed official PGDG repository.",
+    "Second install rolled back because the shared secrets directory was root-only; backup key moved to a dedicated restricted directory without changing shared secrets permissions."
+  ],
+  "checks": {
+    "beta_backup_restore_postgres_tests": "9 passed",
+    "actual_beta_archive_restore_test": "1 passed",
+    "beta_config_tests": "7 passed",
+    "PowerShell_parser": "passed",
+    "bash_syntax": "passed",
+    "ruff_check_and_format": "passed"
+  },
+  "not_verified": [
+    "first scheduled Windows task execution",
+    "long-term archive retention policy",
+    "independent monitoring or notifications"
+  ],
+  "explicitly_untouched": [
+    "B and production",
+    "temporary staging A",
+    "beta VPN node",
+    "beta database schema and contents",
+    "DNS, accounts, payments, and external publication"
+  ]
+}

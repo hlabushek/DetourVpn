@@ -1,0 +1,45 @@
+{
+  "issue": "I-030",
+  "scope": "local future Caddy template path allowlist review",
+  "verified_at": "2026-10-26",
+  "accepted": false,
+  "local_checks": {
+    "command": ".venv/Scripts/python.exe -m pytest infra/ansible/tests/test_beta_config.py -q",
+    "result": "7 passed",
+    "ruff": "passed"
+  },
+  "target_validation": {
+    "caddy_version": "2.11.7",
+    "validation": "passed",
+    "adapted_api_path_matcher": "single allowlist containing Android/Mini App user API and MFA admin paths",
+    "temporary_review_file_removed": true,
+    "active_caddyfile_changed": false,
+    "caddy_reloaded": false
+  },
+  "allowlisted_path_groups": [
+    "/mini-app and /mini-app/*",
+    "/api/v1/auth/*",
+    "/api/v1/me",
+    "/api/v1/devices and /api/v1/devices/*",
+    "/api/v1/nodes",
+    "/api/v1/quota and /api/v1/quota/*",
+    "/api/v1/tunnels and /api/v1/tunnels/*",
+    "/api/v1/window-tunnels and /api/v1/window-tunnels/*",
+    "/api/v1/plans",
+    "/api/v1/subscriptions",
+    "/api/v1/rewards/*",
+    "/api/v1/referrals/*",
+    "/admin and /admin/*",
+    "/api/admin/v1/*"
+  ],
+  "deny_behavior": [
+    "unknown paths return 404",
+    "/api/internal/* and /api/v1/ready return 404 except the exact source-IP scoped v3 node POST routes",
+    "Telegram webhook, docs, OpenAPI and root path are not proxied"
+  ],
+  "limitations": [
+    "validates future template syntax and matcher expansion only",
+    "does not prove public route behavior, auth/invite runtime or Telegram OTP",
+    "does not enable ingress or change the active closed 404-only site"
+  ]
+}

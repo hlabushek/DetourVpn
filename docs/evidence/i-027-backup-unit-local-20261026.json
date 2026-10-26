@@ -1,0 +1,41 @@
+{
+  "issue": "I-027",
+  "scope": "local static backup systemd template isolation checks",
+  "verified_at": "2026-10-26",
+  "checks": {
+    "command": ".venv\\Scripts\\python.exe -m pytest infra/ansible/tests/test_beta_config.py -q",
+    "result": "passed",
+    "passed": 7,
+    "failed": 0,
+    "assertions_added": [
+      "backup runs as the dedicated beta service user",
+      "runtime database settings come from the beta operations EnvironmentFile",
+      "no inline database URL is embedded in the service unit",
+      "systemd service sandbox hardening remains enabled",
+      "backup key is read-only and only the off-host mount is writable",
+      "daily persistent timer points to the backup service"
+    ],
+    "git_diff_check": "passed"
+  },
+  "postgresql_integration": {
+    "command": "scripts/test_with_postgres.py --postgres-bin .cache/i-004/portable/pgsql/bin -- services/api/tests/test_beta_backup.py services/api/tests/test_maintenance.py",
+    "result": "passed",
+    "passed": 6,
+    "failed": 0,
+    "database": "temporary isolated PostgreSQL on IPv4 loopback",
+    "cluster_stopped_and_removed": true,
+    "coverage": [
+      "unmounted target fails before database dump",
+      "archive names remain unique",
+      "encrypted snapshot decrypts and restores to a disposable drill database",
+      "drill database is removed",
+      "maintenance reconciliation and advisory-lock behavior"
+    ],
+    "mount_check": "TEST ONLY; temporary local directory, not off-host storage"
+  },
+  "limits": [
+    "static template checks only; systemd-analyze verify on target Linux host not performed",
+    "no off-host mount, backup key escrow, timer installation, backup run, alert delivery, restore drill, or outage drill was performed",
+    "this receipt does not accept I-027 or permit inviting friends"
+  ]
+}

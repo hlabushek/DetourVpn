@@ -1,0 +1,49 @@
+{
+  "issue": "I-028",
+  "observed_at_utc": "2026-10-26T20:04:38Z",
+  "scope": "TEST ONLY direct-network positive-control probes; no VPN tunnel, API server, node, or account changes",
+  "source": {
+    "probe": "apps/android/app/src/androidTest/java/org/example/vpnpoc/I028Probe.java",
+    "probe_sha256": "94FE899CE6E08F1A7E984ED7580D5BAF45BC4CF2E55447427833A3920226B776",
+    "target_apk_sha256": "F2B655C93AADAA2C4F59842A891F7B9999262AEEABA890E6AC74E3F5ECD03EDE",
+    "probe_apk_sha256": "C06C9BBF296F9CE53FA10E0E60501E46424232F8F86039D22DB8F73753300DE9"
+  },
+  "results": {
+    "tablet_wifi": {
+      "active_network_is_vpn": false,
+      "active_transport_wifi": true,
+      "ipv4_available": true,
+      "ipv6_available": false,
+      "fixed_udp_dns_response": true,
+      "probe_complete": true,
+      "temporary_target_and_probe_packages_removed": true
+    },
+    "owner_phone_wifi": {
+      "active_network_is_vpn": false,
+      "active_transport_wifi": true,
+      "ipv4_available": true,
+      "ipv6_available": false,
+      "fixed_udp_dns_response": true,
+      "probe_complete": true,
+      "preexisting_target_package_hash_unchanged": true,
+      "temporary_probe_package_removed": true
+    },
+    "owner_phone_cellular": {
+      "active_network_is_vpn": false,
+      "active_transport_cellular": true,
+      "ipv4_available": true,
+      "ipv6_available": false,
+      "fixed_udp_dns_response": true,
+      "probe_complete": true,
+      "wifi_and_mobile_data_original_switches_restored": true,
+      "temporary_probe_package_removed": true
+    }
+  },
+  "interpretation": "The tablet was tested on Wi-Fi only; it has no SIM. The owner phone was tested separately on Wi-Fi and cellular. Direct IPv4 and the fixed UDP DNS control worked on all three paths; a positive direct IPv6 control was not observed in these probes.",
+  "limitations": [
+    "This is not a packet capture or DNS/IPv6 leak audit.",
+    "No included/excluded VPN traffic was captured before NAT.",
+    "Earlier receipts remain separate; this result does not replace or invalidate them."
+  ],
+  "privacy": "No device serials, account identifiers, IP addresses, DNS names, MAC addresses, or packet contents are stored."
+}

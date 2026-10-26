@@ -1,0 +1,30 @@
+[Unit]
+Description=Create isolated persistent beta AWG slots
+Before=detourvpn-beta-node-agent.service
+After=local-fs.target
+RequiresMountsFor=/opt/detourvpn-node /etc/detourvpn-node
+
+[Service]
+Type=oneshot
+User=root
+Group=root
+WorkingDirectory=/opt/detourvpn-node
+RuntimeDirectory=detourvpn-node
+RuntimeDirectoryMode=0700
+RuntimeDirectoryPreserve=yes
+ExecStart=/opt/detourvpn-node/.venv/bin/python /opt/detourvpn-node/beta_slot_bootstrap.py start
+ExecStop=/opt/detourvpn-node/.venv/bin/python /opt/detourvpn-node/beta_slot_bootstrap.py stop
+RemainAfterExit=yes
+TimeoutStartSec=90
+TimeoutStopSec=30
+UMask=0077
+NoNewPrivileges=true
+RestrictSUIDSGID=true
+LockPersonality=true
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX AF_NETLINK
+CapabilityBoundingSet=CAP_SYS_ADMIN CAP_NET_ADMIN CAP_KILL CAP_SYS_PTRACE
+DevicePolicy=closed
+DeviceAllow=/dev/net/tun rw
+
+[Install]
+WantedBy=multi-user.target

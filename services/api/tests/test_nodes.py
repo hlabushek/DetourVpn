@@ -39,6 +39,31 @@ def test_provisioning_is_idempotent_and_secret_is_returned_once(engine: Engine) 
         )
 
 
+def test_beta_staged_provision_is_disabled_and_replay_does_not_reveal_secret(
+    engine: Engine,
+) -> None:
+    command.upgrade(migration_config(engine), "head")
+    registry = NodeRegistry(engine)
+    request = ProvisionNodeInput(idempotency_key=uuid4(), name="beta-node", region="helsinki")
+    staged = registry.provision(request, initial_status="disabled")
+    replay = registry.provision(request, initial_status="disabled")
+    assert staged.secret is not None and len(staged.secret) == 43
+    assert replay.node_id == staged.node_id
+    assert replay.secret is None and replay.replayed
+    with transaction(engine) as session:
+        row = session.get(VPNNode, staged.node_id)
+        assert row is not None and row.status == "disabled"
+    with pytest.raises(NodeError, match="agent_unauthorized"):
+        with transaction(engine) as session:
+            NodeRegistry.verify_and_consume(
+                session,
+                node_id=staged.node_id,
+                timestamp=str(int(datetime.now(UTC).timestamp())),
+                nonce=uuid4(),
+                credential=staged.secret,
+            )
+
+
 def test_agent_nonce_is_one_time_and_credential_is_verified(engine: Engine) -> None:
     command.upgrade(migration_config(engine), "head")
     registry = NodeRegistry(engine)

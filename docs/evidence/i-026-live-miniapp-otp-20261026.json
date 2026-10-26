@@ -1,0 +1,44 @@
+{
+  "issue": "I-026",
+  "verified_at": "2026-10-26",
+  "scope": "single owner-only live Telegram Mini App to Android OTP happy path",
+  "observed": {
+    "telegram_android_app_foreground": true,
+    "beta_bot_login_message_visible": true,
+    "mini_app_webview_opened_in_telegram": true,
+    "mini_app_safe_otp_instructions_visible": true,
+    "owner_confirmed_start_and_otp_entry_only_in_android_app": true,
+    "android_authenticated_beta_cabinet_visible_after_otp": true,
+    "android_vpn_state": "off",
+    "android_quota_remaining_bytes": 337868,
+    "android_quota_granted_bytes": 1048576
+  },
+  "evidence_source": "owner-confirmed interaction plus observed Telegram webview and Android app states; no backend event correlation captured",
+  "follow_up_owner_login_after_usb_reconnect": {
+    "owner_reported_code_entry_completed": true,
+    "android_beta_client_authenticated_state_observed": true,
+    "profile_logout_action_visible": true,
+    "vpn_state": "off",
+    "telegram_network_path": "owner enabled Sota Connect so Telegram could reach the bot; this was not a direct-network or DetourVpn tunnel test",
+    "observation_method": "accessibility state markers only; FLAG_SECURE screenshot protection respected",
+    "otp_or_init_data_read_or_saved": false,
+    "independent_backend_delivery_receipt": false
+  },
+  "not_verified": [
+    "Independent Bot API delivery receipt or correlation ID",
+    "Hosted initData replay rejection",
+    "Hosted duplicate OTP rejection",
+    "Friend account onboarding",
+    "I-027 off-host backup, restore, monitoring, and outage drills",
+    "I-028 complete DNS/IPv6, two-device, and independent-provider acceptance"
+  ],
+  "privacy": {
+    "otp_saved": false,
+    "raw_init_data_saved": false,
+    "telegram_id_saved": false,
+    "attempt_fragment_saved": false,
+    "api_tokens_saved": false
+  },
+  "production_or_b_hosts_changed": false,
+  "friends_invited": false
+}

@@ -27,6 +27,7 @@ class Settings(BaseSettings):
     database_url: SecretStr | None = None
     enable_auth: bool = False
     enable_mini_app: bool = False
+    beta_invites_only: bool = False
     mini_app_static_dir: Path | None = None
     auth_pepper: SecretStr | None = None
     telegram_webhook_secret: SecretStr | None = None
@@ -137,6 +138,16 @@ class Settings(BaseSettings):
             )
         ):
             raise ValueError("Authentication requires a matching Telegram bot configuration")
+        return self
+
+    @model_validator(mode="after")
+    def validate_beta_invites(self) -> "Settings":
+        if self.environment == "closed" and self.enable_mini_app and not self.beta_invites_only:
+            raise ValueError("Closed Mini App requires beta invite enforcement")
+        if self.beta_invites_only and (
+            self.environment not in {"closed", "test"} or not self.enable_auth
+        ):
+            raise ValueError("Beta invite enforcement requires closed/test authenticated mode")
         return self
 
     @field_validator("database_url")

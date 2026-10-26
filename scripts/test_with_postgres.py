@@ -34,6 +34,11 @@ def run_control(command: list[str], env: dict[str, str], log_path: Path) -> None
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--postgres-bin", type=Path, required=True)
+    parser.add_argument(
+        "pytest_args",
+        nargs=argparse.REMAINDER,
+        help="optional pytest targets/options after --; defaults to the full suite",
+    )
     args = parser.parse_args()
     binary_dir = args.postgres_bin.resolve()
     suffix = ".exe" if os.name == "nt" else ""
@@ -102,7 +107,15 @@ def main() -> int:
             f"postgresql+psycopg://vpn_i004_test:{password}@127.0.0.1:{port}/postgres"
         )
         print("Running tests against an isolated real PostgreSQL server.", flush=True)
-        result = subprocess.run([sys.executable, "-m", "pytest"], cwd=ROOT, env=env, check=False)
+        pytest_args = args.pytest_args
+        if pytest_args[:1] == ["--"]:
+            pytest_args = pytest_args[1:]
+        result = subprocess.run(
+            [sys.executable, "-m", "pytest", *pytest_args],
+            cwd=ROOT,
+            env=env,
+            check=False,
+        )
         return result.returncode
     finally:
         try:

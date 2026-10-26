@@ -1,0 +1,20 @@
+{
+  "date": "2026-10-26",
+  "issue": "I-026",
+  "scope": "owner-reported-live-beta-android-sign-in",
+  "result": "owner reported successful Android sign-in after using the beta Telegram login flow",
+  "supporting_context": [
+    "the error reported afterward was isolated to native AWG engine initialization",
+    "the beta app session was present in app-private encrypted storage"
+  ],
+  "evidence_source": "direct owner report; no raw Telegram or API event captured",
+  "secrets_recorded": false,
+  "not_verified": [
+    "independent Bot API delivery receipt",
+    "device pairing or first tunnel challenge",
+    "OTP replay and duplicate rejection",
+    "refresh/revoke behavior",
+    "VPN handshake, egress, DNS or IPv6 privacy"
+  ],
+  "production_or_b_hosts_changed": false
+}

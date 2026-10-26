@@ -1,0 +1,36 @@
+{
+  "issue": "I-030",
+  "scope": "local beta-only staged node provisioning CLI",
+  "verified_at": "2026-10-26",
+  "changes": [
+    "NodeRegistry supports explicit disabled initial status while retaining active default",
+    "beta CLI requires closed authenticated Mini App and invite-only settings",
+    "credential output is exclusive root-private runtime file; stdout contains only non-secret metadata",
+    "replay returns no credential and leaves the node disabled"
+  ],
+  "checks": {
+    "beta_node_provisioning_cli_tests": "12 passed",
+    "ruff": "passed",
+    "ruff_format": "passed",
+    "mypy": "passed",
+    "powershell_deployment_script_parse": "passed; corrected helper update remains pending"
+  },
+  "hosted_code_deployment": {
+    "beta_api_service_module_updated": true,
+    "api_restarted_and_readiness_200": true,
+    "rollback_backup": "service.py.pre-beta-node-binding-5822f1acf54d42d197e82b413d58319e",
+    "node_credential_provisioning": "refused before database access because the initial origin guard did not match the beta api.env value",
+    "database_row_or_credential_created": false,
+    "followup_helper_target_guard": "local source now checks detourvpn_beta/vpn_api/loopback:25433; helper-only atomic update pending"
+  },
+  "database_test_status": "test_nodes.py collected; 4 skipped because VPN_TEST_DATABASE_URL is absent; no existing beta or production database was used",
+  "not_verified": [
+    "PostgreSQL integration for the changed NodeRegistry path",
+    "target Linux root-owned runtime file permissions",
+    "deployment of corrected database-target guard helper",
+    "API manifest and node credential transfer",
+    "node agent authenticated inventory/start/poll and replay rejection",
+    "provider UDP ingress, external peer handshake, Android privacy"
+  ],
+  "secrets": "No real credential, key, password, or database data in this receipt"
+}

@@ -16,7 +16,7 @@ async function scan(folder) {
     if (entry.isDirectory()) await scan(file);
     else {
       const name = relative(runtime, file).split(sep).join('/');
-      if (!/^(schema\.js|(?:lib\/(?:[a-z_]+\/)*[a-z_]+|handlers\/(?:message|callback_query))\.js)$/.test(name)) throw new Error('Unexpected runtime file');
+      if (!/^(?:schema\.js|(?:lib\/(?:[a-z_]+\/)*[a-z_]+|handlers\/(?:message|callback_query)|endpoints\/runtimeProbe)\.js)$/.test(name)) throw new Error('Unexpected runtime file');
       const source = await readFile(file, 'utf8');
       if (/\b(?:console|process|Buffer)\s*\.|\brequire\s*\(|\beval\s*\(|\bimport\s*\(|TEST ONLY|test-only-/i.test(source)) throw new Error('Forbidden runtime API or test marker');
       for (const match of source.matchAll(/\bfrom\s+['"]([^'"]+)['"]/g)) {

@@ -128,6 +128,46 @@ class FakeApi implements TunnelApi {
 }
 
 void main() {
+  test('window funding rejection has a clear user-facing message', () {
+    expect(
+      messageFor('insufficient_window_funding'),
+      contains('Недостаточно тестового трафика'),
+    );
+  });
+  test('diagnostic error code is bounded and debug-only', () {
+    expect(
+      diagnosticErrorCode('window_node_unavailable', debugBuild: true),
+      'window_node_unavailable',
+    );
+    expect(
+      diagnosticErrorCode('window_node_unavailable', debugBuild: false),
+      isNull,
+    );
+    expect(diagnosticErrorCode('token=secret', debugBuild: true), isNull);
+    expect(
+      diagnosticStageName('lease_create', debugBuild: true),
+      'lease_create',
+    );
+    expect(diagnosticStageName('lease_create', debugBuild: false), isNull);
+    expect(diagnosticStageName('https://host/id', debugBuild: true), isNull);
+    expect(
+      diagnosticErrorDetails(
+        'invalid_response',
+        'lease_create',
+        debugBuild: true,
+      ),
+      'Код для диагностики: invalid_response; этап: lease_create',
+    );
+    expect(
+      diagnosticErrorDetails(
+        'invalid_response',
+        'lease_create',
+        debugBuild: false,
+      ),
+      isNull,
+    );
+  });
+
   late FakeApi api;
   late FakeNative native;
   late ConnectionController c;

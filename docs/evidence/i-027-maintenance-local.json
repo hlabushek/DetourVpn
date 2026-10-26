@@ -1,0 +1,47 @@
+{
+  "issue": "I-027",
+  "scope": "local one-shot maintenance runner only",
+  "accepted": true,
+  "verified_at": "2026-10-25",
+  "checks": {
+    "disposable_real_postgresql": {
+      "passed": 3,
+      "failed": 0,
+      "cases": [
+        "synthetic account reconciliation and aggregate-only output",
+        "overlap is refused without running cleanup",
+        "session advisory lock is released after failure"
+      ],
+      "cluster_removed": true
+    },
+    "ruff_check": "passed",
+    "ruff_format_check": "passed",
+    "mypy_changed_files": "passed"
+  },
+  "auth_cleanup_regression": {
+    "test": "test_cleanup_preserves_live_sessions_and_identity",
+    "passed": true,
+    "temporary_postgresql_cluster_removed": true
+  },
+  "backup_template_follow_up_2026_10_25": {
+    "scope": "local command guard and systemd template only",
+    "checks": {
+      "unmounted_target_refused_before_dump": "passed",
+      "unique_archive_names": "passed with TEST ONLY writer stub",
+      "real_encrypted_backup_restore": "passed on disposable local PostgreSQL; Fernet encrypted archive, schema manifest, account reconciliation, and random drill DB cleanup verified; mount check TEST ONLY",
+      "beta_config_tests": "passed",
+      "ruff_format_mypy": "passed"
+    },
+    "systemd_timer_calendar": "03:17 UTC expression accepted by systemd-analyze calendar",
+    "systemd_unit_verify": "attempted from OneDrive mount in Kali WSL; not accepted because target docker.service and beta executable paths do not exist there, and mounted files appear world-writable; rerun after staging on target Linux host",
+    "mount_key_timer_or_external_storage": "not configured",
+    "real_encrypted_backup_or_restore": "not performed in this follow-up"
+  },
+  "limits": [
+    "No scheduler is installed; only a local systemd template exists, and no independent supervisor is configured",
+    "No off-host backup, key escrow, alert delivery, or outage drill was performed",
+    "No Telegram, Android, VPN data-plane, staging, or production behavior was tested",
+    "The runner performs retained auth cleanup and ledger reconciliation only; it does not close peers or prove kernel lease expiry"
+  ],
+  "data": "Synthetic accounts and an isolated temporary PostgreSQL cluster; no external services or credentials used"
+}

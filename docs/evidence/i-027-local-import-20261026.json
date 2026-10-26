@@ -1,0 +1,32 @@
+{
+  "date": "2026-10-26",
+  "issue": "I-027",
+  "scope": "local import and validation of an already-downloaded encrypted archive",
+  "test_only": true,
+  "commands": [
+    "python -m pytest services/api/tests/test_import_beta_backup.py -m \"not postgres\" -q",
+    "python -m pytest services/api/tests/test_beta_backup.py services/api/tests/test_maintenance.py -m \"not postgres\" -q",
+    "ruff check and format --check for the new script and tests",
+    "python -m compileall for the new script and tests"
+  ],
+  "results": {
+    "import_tests": "3 passed, 1 deselected",
+    "beta_backup_and_maintenance_unit_tests": "2 passed, 4 deselected",
+    "ruff_check": "passed",
+    "ruff_format_check": "passed",
+    "compileall": "passed",
+    "mypy": "not run; uv-managed mypy launcher failed before execution"
+  },
+  "verified": [
+    "Fernet-authenticated TEST ONLY archive is copied with a unique name",
+    "source archive remains unchanged",
+    "invalid ciphertext is rejected without creating a local copy",
+    "symlinked destination is rejected",
+    "no network, beta host, external storage, or production systems were accessed"
+  ],
+  "not_verified": [
+    "transfer from beta host to owner computer",
+    "daily scheduling",
+    "restore from the imported local archive; PostgreSQL test URL and binary path are not configured"
+  ]
+}

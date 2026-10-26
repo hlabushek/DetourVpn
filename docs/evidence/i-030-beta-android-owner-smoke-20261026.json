@@ -1,0 +1,42 @@
+{
+  "issue": "I-030",
+  "verified_at": "2026-10-26",
+  "scope": "single owner-only bounded beta-node Android smoke and fresh-OTP device-binding regression",
+  "physical_smoke": {
+    "device": "Pixel 8 Pro",
+    "vpn_window_limit_seconds": 60,
+    "reserved_budget_bytes": 1048576,
+    "icmp_external_probe": "passed",
+    "dns_name_resolution_probe": "passed",
+    "server_connection_state": "closed",
+    "server_live_connections": 0,
+    "server_measured_bytes": 710708,
+    "app_remaining_bytes": 337868,
+    "app_granted_bytes": 1048576,
+    "limitations": [
+      "No full packet-level DNS or IPv6 audit",
+      "No exit-IP verification",
+      "No two-device, lifecycle, or independent-provider outage acceptance"
+    ]
+  },
+  "fresh_otp_regression": {
+    "observed_error": "session_device_mismatch",
+    "cause": "The client queried per-device tunnel reconciliation before binding the fresh OTP session to this phone's public device key.",
+    "fix": "Register the local public device key before tunnel reconciliation; request Android VPN permission and create a tunnel only afterward.",
+    "targeted_flutter_tests": "14 passed",
+    "dart_analyze_changed_files": "passed with no issues",
+    "flutter_analyze": "analysis server exited on truncated JSON protocol; direct dart analyze passed",
+    "debug_apk_sha256": "981aec58dc8d348373686f2947dd4469b8aa799747f263a42e5431afe38ecea1",
+    "installed_over_existing_app_without_data_clear": true,
+    "post_restart_app_state": "After OTP reauthentication, app showed VPN off; session_device_mismatch not displayed; remaining bytes stayed 337868",
+    "additional_vpn_session_started": false
+  },
+  "not_accepted": [
+    "I-026 end-to-end Telegram OTP delivery acceptance",
+    "I-027 off-host restore and independent monitoring acceptance",
+    "I-028 comprehensive DNS/IPv6, two-device, lifecycle, and outage acceptance",
+    "Friends invited",
+    "Android Lockdown or safe Always-on recovery"
+  ],
+  "secrets": "No OTP, bot token, API token, private key, profile, or account identifier recorded"
+}

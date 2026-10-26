@@ -8,12 +8,14 @@ def test_probe_preserves_false_flags_and_bounded_categories() -> None:
     result = parse_probe(
         "INSTRUMENTATION_RESULT: probe_complete=true\r\n"
         "INSTRUMENTATION_RESULT: ipv4_available=false\r\n"
+        "INSTRUMENTATION_RESULT: ipv6_failure=route\r\n"
         "INSTRUMENTATION_RESULT: dns_failure=permission\r\n"
         "INSTRUMENTATION_RESULT: ipv4_failure=http_503\r\n"
     )
     assert result == {
         "probe_complete": True,
         "ipv4_available": False,
+        "ipv6_failure": "route",
         "dns_failure": "permission",
         "ipv4_failure": "http_503",
     }

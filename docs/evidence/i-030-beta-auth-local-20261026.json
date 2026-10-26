@@ -1,0 +1,36 @@
+{
+  "issue": "I-030",
+  "scope": "local verification of the isolated beta admin/MFA and invite-control-plane activation path",
+  "accepted": false,
+  "verified_at": "2026-10-26",
+  "checks": {
+    "command": ".venv/Scripts/python.exe scripts/test_with_postgres.py --postgres-bin .cache/i-004/portable/pgsql/bin -- services/api/tests/test_admin.py services/api/tests/test_closed_control_plane.py",
+    "result": "39 passed",
+    "database": "temporary isolated local PostgreSQL; stopped and generated cluster removed by runner",
+    "covered": [
+      "closed admin-only configuration keeps user authentication disabled",
+      "admin and MFA API authorization/negative cases",
+      "closed control-plane configuration and invite behavior"
+    ],
+    "test_accounts_and_secrets": "synthetic TEST ONLY"
+  },
+  "closed_mini_app_invite_guard": {
+    "code": "environment=closed with Mini App enabled now fails startup unless beta_invites_only=true",
+    "targeted_tests": "37 passed on temporary isolated PostgreSQL; generated cluster stopped and removed",
+    "ruff": "passed",
+    "format": "passed",
+    "mypy_config": "passed",
+    "adr": "ADR-056",
+    "beta_host_updated": false
+  },
+  "remote_side_effects": false,
+  "hosted_admin_mfa_enrollment": "not performed",
+  "hosted_invites_created": false,
+  "api_ingress_enabled": false,
+  "friend_access_or_traffic": false,
+  "limitations": [
+    "does not prove beta host configuration or admin enrollment",
+    "does not enable or validate public API routes",
+    "does not prove live Telegram OTP or VPN operation"
+  ]
+}

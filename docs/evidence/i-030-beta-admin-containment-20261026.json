@@ -1,0 +1,45 @@
+{
+  "issue": "I-030",
+  "scope": "beta-only containment of the initially enrolled admin after its MFA enrollment URI was disclosed",
+  "verified_at": "2026-10-26",
+  "accepted": false,
+  "local_checks": {
+    "command": ".venv/Scripts/python.exe scripts/test_with_postgres.py --postgres-bin .cache/i-004/portable/pgsql/bin -- services/api/tests/test_admin_mfa_containment.py",
+    "result": "4 passed",
+    "ruff": "passed",
+    "ruff_format_check": "passed",
+    "mypy": "passed",
+    "powershell_ast": "passed",
+    "embedded_bash_syntax": "passed",
+    "git_diff_check": "passed with existing line-ending warnings"
+  },
+  "beta_host": {
+    "api_service": "active",
+    "local_readiness": 200,
+    "external_readiness": 404,
+    "owner_disabled": true,
+    "active_admin_sessions": 0,
+    "containment_audit_events": 1,
+    "api_restart": false,
+    "caddy_or_environment_changed": false,
+    "bot_api_token_present": false
+  },
+  "secret_handling": {
+    "enrollment_uri_disclosed_in_chat": true,
+    "disclosed_seed_reused": false,
+    "secret_value_recorded": false,
+    "old_owner_identity_deleted": false
+  },
+  "fresh_enrollment": {
+    "beta_owner_admin_active": true,
+    "old_owner_remains_disabled": true,
+    "bootstrap_audit_events": 2,
+    "new_enrollment_secret_recorded": false
+  },
+  "next_gate": "Bot API token is staged under root-only beta api.env; I-026 hosted login and any API ingress/configuration changes remain disabled.",
+  "limitations": [
+    "does not complete I-030 or I-026 live Telegram OTP acceptance",
+    "does not enable API ingress or invite users",
+    "does not prove VPN operation or privacy acceptance"
+  ]
+}

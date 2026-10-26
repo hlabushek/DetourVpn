@@ -1,0 +1,51 @@
+# Explicit trusted IP certificate installed by the beta certificate deploy hook.
+{
+	auto_https disable_certs
+}
+http://{$DETOURVPN_BETA_IP} {
+	handle /.well-known/acme-challenge/* {
+		root * /var/lib/detourvpn-beta/acme
+		file_server
+	}
+	handle {
+		redir https://{$DETOURVPN_BETA_IP}{uri} permanent
+	}
+}
+https://{$DETOURVPN_BETA_IP} {
+	tls /etc/detourvpn-beta/tls/fullchain.pem /etc/detourvpn-beta/tls/privkey.pem
+	header {
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "no-referrer"
+	}
+	@beta_node_v3 {
+		remote_ip {$DETOURVPN_BETA_NODE_IP}
+		method POST
+		path /api/internal/v3/windows/inventory /api/internal/v3/windows/start /api/internal/v3/windows/poll
+	}
+	handle @beta_node_v3 {
+		reverse_proxy 127.0.0.1:28000
+	}
+	@internal path /api/internal/* /api/v1/ready
+	handle @internal {
+		respond 404
+	}
+	@beta_mini_app {
+		path /mini-app /mini-app/*
+	}
+	handle @beta_mini_app {
+		reverse_proxy 127.0.0.1:28000
+	}
+	@beta_api {
+		path /api/v1/auth/* /api/v1/me /api/v1/devices /api/v1/devices/*
+		path /api/v1/nodes /api/v1/quota /api/v1/quota/*
+		path /api/v1/tunnels /api/v1/tunnels/* /api/v1/window-tunnels /api/v1/window-tunnels/*
+		path /api/v1/plans /api/v1/subscriptions /api/v1/rewards/* /api/v1/referrals /api/v1/referrals/*
+		path /admin /admin/* /api/admin/v1/*
+	}
+	handle @beta_api {
+		reverse_proxy 127.0.0.1:28000
+	}
+	handle {
+		respond 404
+	}
+}

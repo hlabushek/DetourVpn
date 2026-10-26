@@ -18,6 +18,28 @@ public class ClientProfileTest {
         assertEquals(1, config.getPeers().get(0).getAllowedIps().size());
         assertEquals(1, config.getInterface().getDnsServers().size());
     }
+    @Test public void onlyLocalInclusionsKeepFullIpv4DnsAndDeviceKey() throws Exception {
+        var config = ClientProfile.parse(text(), key, List.of("org.example.selected"),
+            ClientProfile.RoutingMode.INCLUDE_SELECTED);
+        assertEquals(List.of("org.example.selected"), List.copyOf(config.getInterface().getIncludedApplications()));
+        assertTrue(config.getInterface().getExcludedApplications().isEmpty());
+        assertEquals(key.getPublicKey(), config.getInterface().getKeyPair().getPublicKey());
+        assertEquals(1, config.getPeers().get(0).getAllowedIps().size());
+        assertEquals(1, config.getInterface().getDnsServers().size());
+    }
+    @Test public void includedModeRejectsEmptySelectionToAvoidFailOpenRouting() {
+        assertThrows(Exception.class, () -> ClientProfile.parse(text(), key, List.of(),
+            ClientProfile.RoutingMode.INCLUDE_SELECTED));
+    }
+    @Test public void includedModeRejectsRemoteRoutingDirectivesAndOversizedLists() {
+        String remoteDirective = text().replace("DNS =", "IncludedApplications = org.bad.app\nDNS =");
+        assertThrows(Exception.class, () -> ClientProfile.parse(remoteDirective, key,
+            List.of("org.example.selected"), ClientProfile.RoutingMode.INCLUDE_SELECTED));
+        var many = java.util.stream.IntStream.range(0, 64)
+            .mapToObj(i -> "org.example.app" + i).toList();
+        assertThrows(Exception.class, () -> ClientProfile.parse(text(), key,
+            many, ClientProfile.RoutingMode.INCLUDE_SELECTED));
+    }
     @Test public void remoteBypassAndInjectedPackagesRejected() {
         assertThrows(Exception.class, () -> ClientProfile.parse(text().replace("DNS =", "ExcludedApplications = org.bad.app\nDNS ="), key, List.of()));
         assertThrows(Exception.class, () -> ClientProfile.parse(text(), key, List.of("org.good.app\nPrivateKey=x")));

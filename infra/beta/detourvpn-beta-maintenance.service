@@ -1,0 +1,26 @@
+[Unit]
+Description=DetourVpn closed beta retention cleanup and ledger reconciliation
+After=detourvpn-beta-database.service
+Requires=detourvpn-beta-database.service
+
+[Service]
+Type=oneshot
+User=detourvpn-beta
+Group=detourvpn-beta
+WorkingDirectory=/opt/detourvpn-beta
+EnvironmentFile=/etc/detourvpn-beta/operations.env
+Environment=PYTHONDONTWRITEBYTECODE=1
+ExecStart=/opt/detourvpn-beta/.venv/bin/python scripts/beta_maintenance.py
+TimeoutStartSec=600
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+LockPersonality=true
+CapabilityBoundingSet=
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX

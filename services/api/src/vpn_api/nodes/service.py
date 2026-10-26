@@ -2,6 +2,7 @@ import hashlib
 import secrets
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
+from typing import Literal
 from uuid import UUID, uuid4
 
 from sqlalchemy import Engine, select, text
@@ -30,7 +31,14 @@ class NodeRegistry:
     def __init__(self, engine: Engine) -> None:
         self.engine = engine
 
-    def provision(self, command: ProvisionNodeInput) -> ProvisionNodeResult:
+    def provision(
+        self,
+        command: ProvisionNodeInput,
+        *,
+        initial_status: Literal["active", "disabled"] = "active",
+    ) -> ProvisionNodeResult:
+        if initial_status not in {"active", "disabled"}:
+            raise ValueError("node_status_invalid")
         with transaction(self.engine) as session:
             session.execute(
                 text("SELECT pg_advisory_xact_lock(hashtext(:key))"),
@@ -49,6 +57,7 @@ class NodeRegistry:
                 provisioning_key=command.idempotency_key,
                 name=command.name,
                 region=command.region,
+                status=initial_status,
                 secret_digest=hashlib.sha256(raw_secret.encode("ascii")).hexdigest(),
             )
             session.add(node)

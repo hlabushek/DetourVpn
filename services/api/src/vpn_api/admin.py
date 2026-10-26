@@ -20,7 +20,7 @@ from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
 from vpn_api.auth.routes import Access
-from vpn_api.auth.security import AuthError, digest, keyed_digest, token
+from vpn_api.auth.security import AuthError, beta_invite_digest, digest, keyed_digest, token
 from vpn_api.auth.service import database_now
 from vpn_api.config import Settings
 from vpn_api.db.connection import transaction
@@ -29,8 +29,10 @@ from vpn_api.db.models import (
     AdminIdentity,
     AdminSession,
     AuthIdentity,
+    BetaInvite,
     Device,
     PeerCommand,
+    PeerConnection,
     PlanRevision,
     RateBucket,
     SessionFamily,
@@ -76,6 +78,8 @@ class AdminChange(BaseModel):
         "revoke_device",
         "revise_plan",
         "seed_demo_catalog",
+        "grant_beta_invite",
+        "revoke_beta_invite",
     ]
     idempotency_key: UUID
     reason: str = Field(min_length=3, max_length=500)
@@ -83,6 +87,7 @@ class AdminChange(BaseModel):
     resource_id: UUID | None = None
     amount_bytes: int | None = Field(default=None, strict=True, gt=0, le=MAX_BYTES)
     plan: PlanInput | None = None
+    telegram_subject: int | None = Field(default=None, strict=True, ge=1, lt=2**52)
 
 
 class AdminService:
@@ -90,6 +95,7 @@ class AdminService:
         if settings.admin_encryption_key is None:
             raise ValueError("admin_key_required")
         self.engine = engine
+        self.settings = settings
         self.key = settings.admin_encryption_key.get_secret_value()
         self.cipher = Fernet(self.key.encode("ascii"))
         # The single API process must not allocate 64 MiB per concurrent password
@@ -202,7 +208,15 @@ class AdminService:
         session.execute(
             text("SELECT pg_advisory_xact_lock(:key)"), {"key": body.idempotency_key.int % (2**63)}
         )
-        fingerprint = digest(str(identity.id) + ":" + body.model_dump_json())
+        fingerprint_body = body.model_dump_json(exclude={"telegram_subject"})
+        if body.telegram_subject is not None:
+            if self.settings.auth_pepper is None:
+                raise QuotaError("beta_invites_disabled", 409)
+            # Do not persist an enumerable SHA-256 of a Telegram numeric identifier.
+            fingerprint_body += ":" + beta_invite_digest(
+                self.settings.auth_pepper.get_secret_value(), body.telegram_subject
+            )
+        fingerprint = digest(str(identity.id) + ":" + fingerprint_body)
         prior = session.scalar(
             select(AdminAction).where(AdminAction.idempotency_key == body.idempotency_key)
         )
@@ -212,20 +226,29 @@ class AdminService:
             return prior.result
         op = body.operation
         required = {
-            "credit": (True, False, True, False),
-            "debit": (True, False, True, False),
-            "grant_subscription": (True, True, False, False),
-            "revoke_subscription": (True, True, False, False),
-            "revoke_device": (True, True, False, False),
-            "revise_plan": (False, False, False, True),
-            "seed_demo_catalog": (False, False, False, False),
+            "credit": (True, False, True, False, False),
+            "debit": (True, False, True, False, False),
+            "grant_subscription": (True, True, False, False, False),
+            "revoke_subscription": (True, True, False, False, False),
+            "revoke_device": (True, True, False, False, False),
+            "revise_plan": (False, False, False, True, False),
+            "seed_demo_catalog": (False, False, False, False, False),
+            "grant_beta_invite": (False, False, False, False, True),
+            "revoke_beta_invite": (False, False, False, False, True),
         }[op]
         if required != tuple(
             value is not None
-            for value in (body.user_id, body.resource_id, body.amount_bytes, body.plan)
+            for value in (
+                body.user_id,
+                body.resource_id,
+                body.amount_bytes,
+                body.plan,
+                body.telegram_subject,
+            )
         ):
             raise QuotaError("invalid_admin_action", 422)
         result: dict[str, object] = {}
+        action_user_id = body.user_id
         entitlements = EntitlementService(self.engine)
         actor = str(identity.id)
         if op in ("credit", "debit"):
@@ -291,13 +314,144 @@ class AdminService:
                 session, body.plan, body.idempotency_key, actor=actor, reason=body.reason
             )
             result = {"plan_revision_id": str(revision.id), "version": revision.version}
+        elif op == "grant_beta_invite":
+            if not self.settings.beta_invites_only or self.settings.auth_pepper is None:
+                raise QuotaError("beta_invites_disabled", 409)
+            assert body.telegram_subject is not None  # noqa: S101
+            subject = body.telegram_subject
+            if str(subject) in body.reason:
+                raise QuotaError("beta_invite_reason_must_not_contain_subject", 422)
+            pepper = self.settings.auth_pepper.get_secret_value()
+            # Use the same subject/identity locks as the auth flows before mutating invite state.
+            for domain in ("subject", "identity"):
+                lock_key = int(keyed_digest(pepper, domain, subject)[:16], 16)
+                if lock_key >= 2**63:
+                    lock_key -= 2**64
+                session.execute(text("SELECT pg_advisory_xact_lock(:key)"), {"key": lock_key})
+            subject_digest = beta_invite_digest(pepper, subject)
+            active_invite = session.scalar(
+                select(BetaInvite)
+                .where(
+                    BetaInvite.subject_digest == subject_digest,
+                    BetaInvite.revoked_at.is_(None),
+                )
+                .with_for_update()
+            )
+            if active_invite is not None:
+                raise QuotaError("beta_invite_exists", 409)
+            auth_identity = session.scalar(
+                select(AuthIdentity)
+                .where(
+                    AuthIdentity.provider == "telegram_bot",
+                    AuthIdentity.provider_subject == subject,
+                )
+                .with_for_update()
+            )
+            now = database_now(session)
+            if auth_identity is not None:
+                user = session.scalar(
+                    select(User).where(User.id == auth_identity.user_id).with_for_update()
+                )
+                if user is None:
+                    raise QuotaError("beta_invite_account_unavailable", 409)
+                if user.status == "disabled":
+                    unresolved_tunnel = session.scalar(
+                        select(Tunnel.id)
+                        .where(Tunnel.user_id == user.id, Tunnel.state != "revoked")
+                        .limit(1)
+                    )
+                    unresolved_connection = session.scalar(
+                        select(PeerConnection.id)
+                        .where(
+                            PeerConnection.user_id == user.id,
+                            PeerConnection.state != "closed",
+                        )
+                        .limit(1)
+                    )
+                    if unresolved_tunnel is not None or unresolved_connection is not None:
+                        raise QuotaError("beta_invite_revoke_pending", 409)
+                    user.status = "active"
+                    session.execute(
+                        update(SessionFamily)
+                        .where(SessionFamily.user_id == user.id)
+                        .values(revoked_at=now)
+                    )
+                elif user.status != "active":
+                    raise QuotaError("beta_invite_account_unavailable", 409)
+                action_user_id = user.id
+            invite = BetaInvite(
+                subject_digest=subject_digest,
+                admin_id=identity.id,
+                reason=body.reason,
+                created_at=now,
+            )
+            session.add(invite)
+            session.flush()
+            result = {"beta_invite_id": str(invite.id), "status": "active"}
+        elif op == "revoke_beta_invite":
+            if not self.settings.beta_invites_only or self.settings.auth_pepper is None:
+                raise QuotaError("beta_invites_disabled", 409)
+            assert body.telegram_subject is not None  # noqa: S101
+            if str(body.telegram_subject) in body.reason:
+                raise QuotaError("beta_invite_reason_must_not_contain_subject", 422)
+            subject_digest = beta_invite_digest(
+                self.settings.auth_pepper.get_secret_value(), body.telegram_subject
+            )
+            active_invite_to_revoke = session.scalar(
+                select(BetaInvite)
+                .where(
+                    BetaInvite.subject_digest == subject_digest,
+                    BetaInvite.revoked_at.is_(None),
+                )
+                .with_for_update()
+            )
+            if active_invite_to_revoke is None:
+                raise QuotaError("beta_invite_not_found", 404)
+            now = database_now(session)
+            active_invite_to_revoke.revoked_at = now
+            auth_identity = session.scalar(
+                select(AuthIdentity)
+                .where(
+                    AuthIdentity.provider == "telegram_bot",
+                    AuthIdentity.provider_subject == body.telegram_subject,
+                )
+                .with_for_update()
+            )
+            if auth_identity is not None:
+                LedgerService._lock_owner(session, auth_identity.user_id, active=False)
+                user = session.scalar(
+                    select(User).where(User.id == auth_identity.user_id).with_for_update()
+                )
+                if user is not None:
+                    action_user_id = user.id
+                    user.status = "disabled"
+                    session.execute(
+                        update(SessionFamily)
+                        .where(
+                            SessionFamily.user_id == user.id,
+                            SessionFamily.revoked_at.is_(None),
+                        )
+                        .values(revoked_at=now)
+                    )
+                    from vpn_api.tunnels.service import enqueue_revoke
+                    from vpn_api.tunnels.window_service import revoke_connections
+
+                    revoke_connections(session, user.id)
+                    for tunnel in session.scalars(
+                        select(Tunnel)
+                        .where(Tunnel.user_id == user.id, Tunnel.state != "revoked")
+                        .order_by(Tunnel.id)
+                        .with_for_update()
+                    ):
+                        enqueue_revoke(session, tunnel)
+            result = {"beta_invite_id": str(active_invite_to_revoke.id), "status": "revoked"}
         else:
             entitlements.seed_demonstration_catalog(session, actor=actor)
             result = {"catalog": "illustrative", "payments_enabled": False}
         session.add(
             AdminAction(
                 admin_id=identity.id,
-                user_id=body.user_id,
+                user_id=action_user_id,
                 operation=op,
                 reason=body.reason,
                 idempotency_key=body.idempotency_key,

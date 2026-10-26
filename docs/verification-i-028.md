@@ -1,5 +1,97 @@
 # I-028 physical scenario and corrected cleanup — 2026-10-24
 
+Current status as of 2026-10-26: the later source-bound NaturalSleep receipt
+passed on one Pixel 8 Pro, as recorded in the issue header and acceptance matrix.
+Older sections below preserve point-in-time status before that receipt; failed
+physical receipts remain failed and unchanged. Full I-028 is still open for
+packet-level DNS/IPv6 capture, two simultaneous devices and independent-provider
+failure.
+
+## 2026-10-25 NaturalSleep physical acceptance passed
+
+The source-bound NaturalSleep retry passed on one Pixel 8 Pro against bounded
+staging A: `evidence/i-028-natural-sleep-staging-20261025T192620Z-286a330b.json`.
+USB absence was confirmed for 392 seconds; the device observed natural deep idle
+without forced Doze. After wake, the native tunnel was down, then a new staging
+egress and window cutoff/recovery passed. The app-private timeline was valid
+(21 events, no malformed lines), showed Activity resume after the sleep wait and
+one process ID throughout. The server had zero live slots and peers after 182
+seconds while the phone was detached. Accounting settled exactly 29,662,774
+measured bytes across three receipts, with zero reserved bytes, unknown receipts,
+open connections or violations. Phone restoration, staging A cleanup, timer
+disarm and independent remote post-check all passed. The instrumentation shell
+exited 255 during USB detachment; the on-device completion marker and subsequent
+recovery facts passed, so that shell exit is recorded but is not a scenario
+failure. This closes only the NaturalSleep case; the other I-028 matrix items
+listed below remain open.
+
+## 2026-10-25 NaturalSleep diagnostics improved; physical rerun pending
+
+The test-only Android bridge now records a bounded JSONL timeline under the
+app's `no_backup` directory. Events contain fixed stage/lifecycle names, PID,
+`elapsedRealtime` and `uptimeMillis`; the Flutter test additionally records
+pre-sleep and post-wake native tunnel snapshots (`up`, network state, handshake
+age and remaining lease time). No wake lock is acquired and no device polling is
+performed during the sleep interval. After USB is reattached, the runner reads
+the app-private file with `run-as`, validates each event against a strict schema,
+and embeds only sanitized fields in the evidence receipt. Cleanup removes both
+the stage marker and diagnostic file.
+
+This should distinguish a resumed Android Activity from a Flutter test that
+remains at `natural_sleep_wait`, detect app process replacement, and preserve
+native state even when the host-side `am instrument` shell exits during USB
+detachment. It does not guarantee that the app or tunnel recovers. The updated
+source-bound physical run remains required. Local checks on this revision:
+`test_i028_device_scenarios.py` **14 passed**, Ruff and mypy passed, Dart analysis
+passed, and `testDebugUnitTest assembleDebugAndroidTest` succeeded. The build
+reported existing Kotlin/Gradle/NDK version notices; no dependency was added.
+
+The first attempt to prepare this build on staging A stopped before installation
+at the root-space guard: `df --output=avail /` returned 1,453,228 1-KiB blocks,
+below the strict 1,500,000-block minimum. Post-check confirmed NTP synchronized
+and every I-028 install path absent. No VPN resources, timer or physical sleep
+scenario were created. See `evidence/i-028-install-preflight-space-20261025.json`;
+resume only after additional safe space is available on A.
+
+## 2026-10-25 historical continuation before the final NaturalSleep receipt
+
+The phone-only USB-detached baseline observed a new unforced deep-idle entry
+after 609 seconds without USB (`i-028-natural-sleep-phone-baseline.json`). A
+direct probe first found another active VPN and timed-out UDP DNS; after the owner
+disabled it, the repeat direct IPv4/DNS/IPv6 probe passed. Both probe receipts
+are preserved separately and establish only a direct-network prerequisite.
+
+The first NaturalSleep staging attempt failed before its USB marker: Android Play
+Protect delayed test APK installation beyond the runner's 90-second timeout.
+The runner recorded `passed=false` at `phone_setup`; A cleanup and independent
+post-check passed. The APK installed only after the timeout and was removed in a
+separate cleanup follow-up. The second attempt preserved that receipt and wrote
+`i-028-natural-sleep-staging-20261024T224516Z-2a2902de.json`. It recorded real
+staging egress before sleep, 412 seconds of actual USB absence, a new unforced
+deep-idle event, and zero A live slots/peers after 181 seconds. Flutter failed
+after wake, before native-down and new recovery-egress assertions. The full
+NaturalSleep receipt remains `passed=false`. Two measured receipts settled
+92,831 bytes exactly, with zero reserved/unknown/open connections or violations.
+A root cleanup and independent post-check passed; the late test APK was removed
+and phone restoration checked separately in
+`i-028-natural-sleep-recovery-followup.json`. These component and follow-up
+facts do not complete NaturalSleep acceptance. Raw Flutter output was not
+retained or printed, so the specific post-wake assertion is undetermined.
+
+After a fresh direct phone probe and a separate bounded A installation, the
+complete Lifecycle retry passed as **one** physical receipt:
+`i-028-lifecycle-staging-20261024T225819Z-2a9ff221.json`, pytest **1 passed
+in 659.47s**. It includes 100-second background, screen-off and forced-Doze
+observations with real recovery, Wi-Fi/mobile/loss/Wi-Fi transfer, Android
+Settings permission revoke, native/server closure and no self-restart. All 20
+measured receipts settled exactly 1,172,946 bytes; reserved bytes, unknown
+receipts, open connections and reconciliation violations were zero. Phone/root
+cleanup, timer disarm, grant removal and independent A post-check passed in that
+same receipt. The older failed Lifecycle receipt is unchanged. At this point
+NaturalSleep, comprehensive DNS/IPv6 leak capture, two physical devices and an
+independent provider remained open. The later NaturalSleep pass supersedes only
+that gate; I-028 is not production acceptance.
+
 ## Current continuation: main and network/revoke runs passed separately
 
 The first separate lifecycle runner is preserved at
@@ -77,11 +169,14 @@ listeners. See `docs/evidence/i-028-fixed-cleanup-staging.json`, bound to runtim
 SHA-256 `1898bb981c09b64f546a7b35635493d113e19f75c6f552fa10e0254552e24094`.
 That check used no phone and no traffic; it does not retroactively turn the
 earlier full runner's false result into a pass. The physical receipt and fixed
-cleanup receipt have separate scopes. The phone can be disconnected. Full I-028
-remains open for natural sleep/Doze, network transition, system permission
-revoke, in-flight Disconnect, two physical devices, independent providers and
-comprehensive DNS leak capture. IPv6 blocking contrast was not demonstrated
-because the direct baseline had no IPv6.
+cleanup receipt have separate scopes. The phone could be disconnected at this
+point in the sequence. Then-open gates included natural sleep/Doze, network
+transition, system permission revoke, in-flight Disconnect, two physical
+devices, independent providers and comprehensive DNS leak capture. Later
+physical receipts passed natural sleep, network/revoke and main-run cases; the
+open gates are listed in the current acceptance matrix. IPv6 blocking contrast
+had not yet been demonstrated at that point because the direct baseline had no
+IPv6.
 
 Final local checks: Ruff/format and Linux/Windows-target mypy passed; operator
 and diagnostic tests 12 passed, 2 POSIX-only Windows skips; real namespace lab
@@ -266,7 +361,10 @@ The ignored `.cache/i028-ready.json` binds the physical runner build to current
 inputs. Raw build output is local under `%LOCALAPPDATA%/ProjectVpn`; live runner
 captures raw device/API/SSH results rather than echoing credentials.
 
-## Remaining work and risks
+## Remaining work and risks (pre-acceptance preparation snapshot)
+
+This section describes preparation before the successful physical runs
+documented above and below; it is retained as historical context.
 
 First connect/unlock/authorize the physical phone, then start the visible owner
 sudo terminal only when ready to immediately run the bounded Test action. The

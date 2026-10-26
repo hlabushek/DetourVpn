@@ -1,0 +1,12 @@
+[Unit]
+Description=Run closed beta retention cleanup and ledger reconciliation hourly
+
+[Timer]
+OnBootSec=10min
+OnUnitActiveSec=1h
+RandomizedDelaySec=10min
+Persistent=true
+Unit=detourvpn-beta-maintenance.service
+
+[Install]
+WantedBy=timers.target

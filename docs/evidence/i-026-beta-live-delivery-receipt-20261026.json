@@ -1,0 +1,88 @@
+{
+  "issue": "I-026",
+  "observed_on": "2026-10-26",
+  "scope": "read-only aggregate query on isolated beta API database after owner began a fresh Telegram sign-in",
+  "api_host_role": "isolated beta control plane",
+  "api_readiness_http": 200,
+  "database_revision": "0017_login_delivery_receipt",
+  "window": "last 15 minutes at query time",
+  "login_attempt_delivery_status": [
+    {
+      "status": "api_accepted",
+      "row_count": 1,
+      "row_count_with_recorded_time": 1
+    }
+  ],
+  "additional_read_only_window_30_minutes": {
+    "code_issue_count": 1,
+    "login_attempt_count_with_api_accepted": 1,
+    "login_attempt_count_with_recorded_time": 1,
+    "login_attempt_count_consumed": 1,
+    "native_session_count": 1,
+    "native_sessions_with_device_binding": 1,
+    "new_device_rows": 0,
+    "interpretation": "Counts show one OTP issue, one api_accepted delivery with a recorded time, one consumed login attempt, and one native session with a device binding. The API sets that binding during authenticated device registration; no new device key row was created in this interval, consistent with reuse of an already registered phone key. These aggregate-only counts are consistent with successful owner reauthentication but do not uniquely correlate each row to the same attempt or Android session."
+  },
+  "hosted_init_data_replay_check": {
+    "result": "owner-reported Mini App UI showed exact replay rejection message after refreshing the same Mini App",
+    "expected_ui_message": "Этот вход уже использован. Откройте Mini App заново.",
+    "source_mapping": "current Mini App maps backend code init_data_replayed to this exact message",
+    "backend_behavior": "current API code raises HTTP 409 init_data_replayed when the replay digest is already claimed",
+    "readiness_http_after_check": 200,
+    "aggregate_before_first_cabinet_open": {
+      "active_replay_digests": 1,
+      "mini_app_sessions_in_10_minutes": 1
+    },
+    "aggregate_after_first_cabinet_open": {
+      "active_replay_digests": 2,
+      "mini_app_sessions_in_10_minutes": 2
+    },
+    "aggregate_after_same_window_refresh": {
+      "active_replay_digests": 2,
+      "mini_app_sessions_in_10_minutes": 2
+    },
+    "interpretation": "Owner-reported exact UI error plus unchanged aggregate counters corroborate hosted initData replay rejection. No raw initData, response body, access log, screenshot, user identifier, or OTP was captured; this is not a raw HTTP receipt.",
+    "otp_duplicate_rejection": "not verified by this check",
+    "vpn_connection_started": false
+  },
+  "local_device_registration_verification": {
+    "command": "uv run --frozen python scripts/test_with_postgres.py --postgres-bin .cache/i-004/portable/pgsql/bin -- services/api/tests/test_devices.py",
+    "result": "19 passed in 32.68s",
+    "database": "temporary isolated real PostgreSQL on IPv4 loopback; stopped and removed by runner",
+    "ruff_check": "passed",
+    "ruff_format_check": "passed",
+    "mypy": "passed for services/api/src/vpn_api/devices.py",
+    "scope": "local device ownership, session binding, limits, and negative/concurrency behavior; not live beta evidence"
+  },
+  "new_device_rows_in_window": 0,
+  "owner_debug_duplicate_otp_probe": {
+    "result": "owner-reported probe UI said the server rejected reuse of the same OTP",
+    "raw_http_response_or_otp_saved": false,
+    "read_only_correlation_query": {
+      "recent_consumed_attempts_with_api_accepted_and_recorded_delivery_time": 1,
+      "recent_native_sessions": 1,
+      "exact_consumed_at_to_session_created_at_matches_joined_by_telegram_identity": 1,
+      "active_account_device_rows": 1,
+      "current_native_session_device_id_present": false
+    },
+    "query_output": "counts only; no attempt, subject, user, device, token, OTP, or raw initData values",
+    "query_mutated_state": false,
+    "vpn_connection_started": false
+  },
+  "interpretation": "One recent OTP delivery row records that Telegram Bot API returned ok=true. Timing is consistent with the owner's fresh sign-in, but this aggregate-only inspection did not read an attempt ID or establish unique correlation to the Android session. Bot API acceptance does not prove the user read the message.",
+  "not_verified": [
+    "VPN connection or privacy behavior"
+  ],
+  "query_data_minimized": {
+    "telegram_subject_read": false,
+    "attempt_id_read": false,
+    "device_id_or_public_key_read": false,
+    "otp_read": false,
+    "message_text_read": false,
+    "telegram_response_body_read": false,
+    "api_tokens_or_secrets_read": false
+  },
+  "query_mutated_state": false,
+  "host_b_or_production_changed": false,
+  "vpn_node_or_staging_a_changed": false
+}

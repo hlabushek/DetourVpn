@@ -414,7 +414,32 @@ routing остаётся открыт: на обоих узлах нет v3 slot
 Подробности: `docs/verification-i-025-physical.md`.
 См. `docs/issues/I-025.md`, `docs/verification-i-025.md`, ADR-040 и local receipt.
 Одна попытка была остановлена C: full; финальный повтор в existing snapshot прошёл.
-I-026/I-027 не начаты. Владелец 2026-10-23 разрешил ограниченный временный I-028
+I-026: owner-only live Mini App → Android OTP acceptance пройдена 2026-10-26;
+друзья и VPN data-plane этим не приняты. I-027: 2026-10-26 на beta API развёрнут
+backup-only service; зашифрованный архив скачан на ПК и восстановлен из него в
+disposable PostgreSQL. Windows-задача зарегистрирована на 07:00 ежедневно, первый
+плановый запуск ожидается 2026-10-27. S3, независимый монитор и автоудаление
+архивов отложены. I-030: отдельные control-plane/node
+  templates, invite gate, closed AWG bootstrap и scoped beta packet path прошли
+  локальную проверку; TEST ONLY AWG client и HTTP flow подтверждены в disposable
+  WSL namespaces. Beta host, provider firewall, reboot recovery и hosted deployment
+  не приняты. См.
+`docs/issues/I-027.md` и `docs/issues/I-030.md`.
+Update 2026-10-26 к I-030: две новые изолированные beta VM прошли частичную
+hosted acceptance. API/DB пережили container restart и reboot, оставаясь
+loopback-only. Отдельная VPN-нода прошла закрытый slot start/stop/start и reboot
+recovery; gate закрыт, у агента нет credential, provider ingress/client traffic
+не проверялись. На API VM развёрнут trusted shortlived IP TLS с challenge-only
+HTTP, renewal dry-run и custom timer; HTTPS пока отвечает 404 и API не открыт.
+Independent certificate alerting и I-027/I-028 acceptance открыты; I-026
+owner-only live OTP gate принят, без публичного запуска.
+I-030 остаётся открытым; receipts находятся в `docs/evidence/`.
+I-029: локально реализована headless Always-on lease revalidation с protected
+relay; debug manifest включает support только для контролируемой acceptance,
+release manifest выключает. Android callback/Lockdown и восстановление ещё не
+приняты физически; I-029 и kill-switch claim остаются открытыми. См.
+`docs/verification-i-029.md`.
+Владелец 2026-10-23 разрешил ограниченный временный I-028
 staging на A и physical-проверки: подготовка идёт по ADR-041 и
 `docs/runbooks/v3-android-staging.md`; локальные receipts не означают remote
 acceptance. На 2026-10-24 выполнен реальный Android-сценарий I-028: IPv4/DNS,
@@ -423,7 +448,8 @@ API/агента с закрытием по сроку и восстановле
 сошлись в ledger. Общий runner сохранил false из-за ошибки проверки уже
 остановленного таймера. Исправление отдельно проверено на A с успешной очисткой
 и независимым post-check; это два отдельных receipt, не один успешный прогон.
-Doze, смена сети, системный отзыв и остальные открытые случаи I-028 ещё нужны.
+На тот момент Doze, смена сети, системный отзыв и другие случаи I-028 ещё
+оставались открыты; дальнейшие записи ниже обновляют их по отдельным receipts.
 Новый единый основной прогон I-028 прошёл 2026-10-24: 1 passed за 474.23s,
 включая Disconnect с задержанным renewal/реальным ACK и исправленную очистку.
 13 квитанций, 1 810 465 измеренных байт, ноль резервов/unknown/open/нарушений;
@@ -436,11 +462,56 @@ Doze, смена сети, системный отзыв и остальные �
 ошибки сохранены. Lifecycle runner зафиксировал background, screen-off и
 forced Doze, но весь прогон failed из-за потери ADB/USB при восстановлении;
 отдельный follow-up подтвердил последующее восстановление телефона.
-Естественный сон, полный успешный lifecycle-прогон, comprehensive DNS/IPv6
-leak capture, два физических устройства и независимый провайдер остаются
-обязательными. См. `docs/i-028-acceptance-matrix.md`. I-028 не закрыт.
+На момент этой записи естественный сон, полный успешный lifecycle-прогон,
+comprehensive DNS/IPv6 leak capture, два физических устройства и независимый
+провайдер оставались обязательными. Следующая запись ниже фиксирует последующие
+Lifecycle и NaturalSleep passes; открытые ворота перечислены в матрице. I-028
+не закрыт.
+Продолжение 2026-10-25: отдельный NaturalSleep run подтвердил новый unforced
+deep-idle при 412 секундах без USB и ноль live slots/peers на A во время сна,
+но этот конкретный прогон завершился `passed=false` до проверки native down и
+нового egress после пробуждения; ранняя попытка остановилась на Play Protect.
+Полный повторный
+Lifecycle прошёл одной квитанцией за 659.47s: background, screen-off, forced
+Doze, Wi-Fi/mobile/loss/Wi-Fi, системный отзыв, 20 точных receipts на
+1 172 946 байт, полная очистка телефона и A. На тот момент NaturalSleep,
+comprehensive DNS/IPv6 leak capture, два физических устройства и независимый
+провайдер оставались открыты; более поздняя запись закрывает NaturalSleep.
+Staging не означает production-ready.
+NaturalSleep harness усилен bounded app-private lifecycle/native timeline;
+source-bound Android test build прошёл. Staging A install preflight остановился
+на минимуме свободного диска до создания VPN ресурсов; receipt в I-028.
 См. `docs/verification-i-028.md`. I-020 payment
 не активирован.
+
+Актуализация 2026-10-25: source-bound NaturalSleep прошёл на одном Pixel за
+11:37. Подтверждены 392 секунды без USB, естественный deep-idle, native tunnel
+down после пробуждения, новый staging egress и восстановление окна; 29 662 774
+байта сошлись, телефон/A cleanup и независимая проверка прошли. Квитанция:
+`docs/evidence/i-028-natural-sleep-staging-20261025T192620Z-286a330b.json`.
+Это закрывает только NaturalSleep. В I-028 остаются полный packet-level
+DNS/IPv6 аудит, два физических устройства и отказ независимого провайдера;
+I-028 не закрыт. Временный staging A очищен, но свободного места ниже порога
+повторной установки; он не является beta-площадкой для друзей.
+
+Актуализация 2026-10-26, I-026: на собственном Android устройстве владелец
+прошёл live Telegram Mini App → OTP → Android sign-in happy path на отдельном
+beta-боте; Telegram работал через включённый владельцем Sota Connect. Telegram
+webview и авторизованный Android кабинет наблюдались; OTP и `initData` не
+сохранялись. Privacy-minimal квитанция развернута на beta API; migration 0017,
+backup, readiness/health и Mini App route проверены. На момент той записи hosted
+OTP receipt, replay/duplicate rejection и pairing ещё не были подтверждены.
+Дополнение 2026-10-26: владелец прошёл debug-only live probe; UI сообщил, что
+сервер отклонил точный повтор OTP. Read-only сверка beta API дала одну consumed
+попытку с `api_accepted` и временем доставки, одну native-сессию с точным
+совпадением `consumed_at`/`created_at` и одну активную device row у аккаунта.
+Raw IDs, OTP и `initData` не читались; текущая сессия не получила `device_id`,
+так как VPN не запускали. I-026 принят только для owner-only login/replay scope;
+друзья и data plane не проверялись. Подробности: `docs/issues/I-026.md` и
+`docs/evidence/i-026-beta-live-delivery-receipt-20261026.json`.
+I-027 передача/restore зашифрованной копии с ПК и I-028 полный DNS/IPv6, второе
+физическое устройство и независимый провайдер по-прежнему блокируют приглашение
+друзей. Evidence I-026: `docs/evidence/i-026-live-miniapp-otp-20261026.json`.
 
 1. Передать контекст (`TECHNICAL_SPEC.md`, ADR, `AGENTS.md`) и **одну** issue.
 2. Попросить 3–8 конкретных шагов, затрагиваемые файлы, риски, тесты; без немедленного огромного изменения.

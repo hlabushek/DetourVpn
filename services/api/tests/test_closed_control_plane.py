@@ -40,6 +40,13 @@ def closed_settings(**overrides: object) -> Settings:
 
 def test_closed_config_accepts_dedicated_runtime() -> None:
     assert closed_settings().environment == "closed"
+    assert closed_settings(beta_invites_only=True).beta_invites_only
+
+
+def test_closed_mini_app_requires_beta_invites() -> None:
+    with pytest.raises(ValidationError, match="Closed Mini App requires beta invite enforcement"):
+        closed_settings(enable_mini_app=True)
+    assert closed_settings(enable_mini_app=True, beta_invites_only=True).beta_invites_only
 
 
 def test_closed_admin_setup_requires_explicit_mode_and_keeps_user_auth_closed() -> None:

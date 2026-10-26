@@ -1,0 +1,138 @@
+{
+  "accounting_after_revoke": {
+    "ledger_consistent": true,
+    "measured_receipt_bytes": "10095415",
+    "open_connections": 0,
+    "receipt_count": 5,
+    "reserved_bytes": "0",
+    "unknown_receipts": 0,
+    "used_bytes": "10095415",
+    "violations": 0
+  },
+  "cleanup_steps": {
+    "agent_revoke_and_stop": true,
+    "device_scenarios_restored": {
+      "network_switches_match_baseline": true
+    },
+    "local_api_stopped": true,
+    "phone_restored": true,
+    "phone_session_absent": true,
+    "phone_session_cleanup_entrypoint": true,
+    "root_stop": {
+      "cleanup_complete": true,
+      "gate_close_errors_before_core_stop": 0,
+      "journal_preserved": true,
+      "temporary_grant_removed": true,
+      "timeout_timer_disarmed": true
+    },
+    "ssh_transport": true
+  },
+  "control_plane_settlement_complete": true,
+  "different_android_process_same_real_account_family_and_device": true,
+  "facts": {
+    "real_account_refresh_after_android_process_restart": true
+  },
+  "failed_at": "flutter_natural_sleep",
+  "independent_probes": [
+    {
+      "active_network_available": true,
+      "active_network_is_vpn": false,
+      "active_network_validated": true,
+      "active_transport_cellular": false,
+      "active_transport_wifi": true,
+      "application_initialized": true,
+      "dns_failure": "none",
+      "egress_is_staging": false,
+      "fixed_udp_dns_response": true,
+      "ipv4_available": true,
+      "ipv4_failure": "none",
+      "ipv4_primary_failure": "none",
+      "ipv6_available": false,
+      "probe_complete": true,
+      "process_uid_matches_target": true,
+      "test_internet_permission_declared": true,
+      "vpn_dns_configured": false
+    },
+    {
+      "application_initialized": true,
+      "egress_is_staging": true,
+      "ipv4_available": true,
+      "ipv4_failure": "none",
+      "ipv4_primary_failure": "none",
+      "probe_complete": true,
+      "process_uid_matches_target": true,
+      "test_internet_permission_declared": true
+    }
+  ],
+  "independent_unprivileged_remote_postcheck": true,
+  "measured_at": "2026-10-25T13:19:11.361622+00:00",
+  "natural_sleep_observation": {
+    "forced_idle_absent": true,
+    "natural_deep_idle_observed": true,
+    "unplugged_seconds": 391,
+    "usb_absent_confirmed": true
+  },
+  "natural_sleep_server_observation": {
+    "closed": true,
+    "elapsed_after_detach_seconds": 181,
+    "live_slot_count": 0,
+    "peer_counts": [
+      0,
+      0
+    ]
+  },
+  "node_before_cleanup": {
+    "agent_active": true,
+    "live_slots": [],
+    "native_transfer_bytes": [
+      {
+        "received": "0",
+        "sent": "0",
+        "slot": 1
+      },
+      {
+        "received": "0",
+        "sent": "0",
+        "slot": 2
+      }
+    ],
+    "peer_counts": [
+      0,
+      0
+    ],
+    "prepared": true,
+    "remaining_seconds": 1153,
+    "slot_count": 2
+  },
+  "open_cases": [
+    "natural sleep and forced Doze",
+    "Wi-Fi/mobile transition",
+    "system VPN permission revoke",
+    "Disconnect during in-flight renewal",
+    "two simultaneous physical devices",
+    "independent provider failure",
+    "comprehensive DNS leak capture",
+    "natural sleep (forced Doze is separate)"
+  ],
+  "passed": false,
+  "phone_instrumentation_exit_code": 255,
+  "phone_instrumentation_last_stage": "natural_sleep_wait",
+  "preinstalled_instrumentation_apk_source_hash_verified": true,
+  "preinstalled_probe_apk_source_hash_verified": true,
+  "quota_funding": "TEST FREE GRANT ONLY",
+  "scope": "bounded staging A, one physical Android, local disposable API/PostgreSQL",
+  "source_sha256": {
+    "apps/android/app/src/androidTest/java/org/example/vpnpoc/I028Probe.java": "94fe899ce6e08f1a7e984ed7580d5baf45bc4cf2e55447427833a3920226b776",
+    "apps/client/android/app/build.gradle.kts": "305f30a306b1b92d18d66098990d8db035a9da3de5f1d4fde7c2149c544bbe49",
+    "apps/client/android/app/gradle.lockfile": "21dee1dad17adbfbf6e00388bba1dd5780a3d6cc90d7ebfbfe1ccaa409987a10",
+    "apps/client/android/app/src/androidTest/java/org/example/vpnpoc/I028FlutterInstrumentationTest.java": "3fa15bf8f665526e016fa4b731921bbc81093fa97894bed225529fa95f3ad282",
+    "apps/client/integration_test/i028_live_test.dart": "1d71f995d5a1973822d2529f82a00d9cc362a8e01e5c431860e5d7019c3d8d19",
+    "infra/staging-v3/runtime.py": "1898bb981c09b64f546a7b35635493d113e19f75c6f552fa10e0254552e24094",
+    "scripts/i028_device_scenarios.py": "a6e04db4760c53a852aff67ccabbfa655725f992c206cba46fb468457655722c",
+    "scripts/run_i028_staging.ps1": "c0ff84e7aea9d97c7bc8af7de65e373acbc45f5918ba214d70c6f05942f8efdc",
+    "services/api/tests/test_i028_live.py": "c5c93dabb3bd91311d6ea00fce000316997824791acee03f24538b401d682e87"
+  },
+  "suite": "NaturalSleep",
+  "telegram": "TEST FAKE ONLY",
+  "temporary_staging_transport_and_phone_cleanup": true
+}

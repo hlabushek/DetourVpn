@@ -40,7 +40,13 @@ abstract interface class WindowNative implements NativeTunnel {
   Future<void> advanceWindow(Map<String, dynamic> grant, int remainingMs);
 }
 
-class PlatformTunnel implements WindowNative {
+/// Local non-secret preference needed to select a node after process restart.
+abstract interface class NodePreferenceStore {
+  Future<String?> readSelectedNode();
+  Future<void> writeSelectedNode(String? id);
+}
+
+class PlatformTunnel implements WindowNative, NodePreferenceStore {
   static const channel = MethodChannel('project.vpn/tunnel.v1');
   Map<String, dynamic> _windowArgs(
     Map<String, dynamic> grant,
@@ -101,4 +107,17 @@ class PlatformTunnel implements WindowNative {
   @override
   Future<void> openLogin(String url) =>
       channel.invokeMethod<void>('openLogin', {'url': url});
+
+  @override
+  Future<String?> readSelectedNode() =>
+      channel.invokeMethod<String>('nodeRead');
+
+  @override
+  Future<void> writeSelectedNode(String? id) =>
+      id != null &&
+          !RegExp(
+            r'^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$',
+          ).hasMatch(id)
+      ? Future<void>.error(ArgumentError.value(id, 'id'))
+      : channel.invokeMethod<void>('nodeWrite', {'id': id});
 }

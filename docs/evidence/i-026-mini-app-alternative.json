@@ -1,0 +1,24 @@
+{
+  "issue": "I-026",
+  "executed_on": "2026-10-25",
+  "scope": "Evaluate existing Mini App signed-initData login as an alternative that does not need Serverless runtime secrets.",
+  "source_contract": {
+    "client_posts_init_data_to": "/api/v1/auth/mini-app",
+    "backend_verifies_telegram_hmac": true,
+    "serverless_shared_secret_required": false,
+    "mini_app_session_can_manage_vpn_or_device_keys": false
+  },
+  "checks": {
+    "mini_app_client_tests": "5 passed",
+    "typescript_strict_and_vite_build": "passed",
+    "api_mini_app_migration_tests": "44 passed, 1 skipped, 707 deselected",
+    "api_test_database": "disposable real PostgreSQL, stopped and removed by runner"
+  },
+  "limitations": [
+    "Signed initData in local tests is synthetic TEST ONLY data.",
+    "No Telegram-issued initData or real Telegram webview was tested.",
+    "A persistent isolated HTTPS beta origin and same-origin API/static hosting are not available yet.",
+    "Mini App sessions are restricted cabinet sessions and do not authenticate Android VPN/tunnel operations."
+  ],
+  "external_changes": false
+}

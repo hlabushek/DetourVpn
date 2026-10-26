@@ -1,0 +1,34 @@
+{
+  "date": "2026-10-26",
+  "issue": "I-030",
+  "scope": "beta-android-native-engine-load",
+  "cause": "The manually selected fresh source-only AWG cache had no jniLibs, so the debug APK omitted libwg-go.so.",
+  "diagnosis": {
+    "vault_and_device_key_init": "passed",
+    "failure_stage": "awg_backend",
+    "failure_class": "RuntimeException",
+    "exception_text_or_stack_recorded": false
+  },
+  "native_libraries": {
+    "source": "existing pinned I-011 native-build cache",
+    "arm64-v8a_sha256": "df0a0e3365d5f9b2a857165c4b09a3b7eb1c683c3337821c8107721a77a5893d",
+    "x86_64_sha256": "e321d2962e9f7b59c37974a10d21633a247acc01c53f6a6f5797c2c16826660c",
+    "hashes_match_i011_native_build_receipt": true
+  },
+  "verification": {
+    "apk_contains_arm64_libwg_go": true,
+    "apk_contains_x86_64_libwg_go": true,
+    "flutter_debug_build": "passed",
+    "adb_install_replace": "passed",
+    "app_process_after_restart": "running",
+    "new_native_init_failure_log": false
+  },
+  "not_verified": [
+    "live VPN handshake or egress",
+    "DNS or IPv6 privacy acceptance",
+    "Always-on/Lockdown recovery"
+  ],
+  "app_data_clear_performed": false,
+  "secrets_read_or_recorded": false,
+  "production_or_b_hosts_changed": false
+}

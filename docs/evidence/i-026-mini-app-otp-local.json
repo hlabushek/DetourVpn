@@ -1,0 +1,162 @@
+{
+  "issue": "I-026",
+  "executed_on": "2026-10-25",
+  "status": "local implementation only; hosted OTP login not accepted",
+  "historical_scope_note": "This receipt and its follow-ups below describe local checks at the time they ran. Later owner-only hosted happy-path evidence is recorded in i-026-live-miniapp-otp-20261026.json; it does not convert these synthetic tests into live evidence.",
+  "flow": "Android auth start -> Telegram /start request_id -> Web App button -> backend validates Telegram initData and emits OTP -> Android auth verify",
+  "implementation": {
+    "api_route": "/api/v1/auth/mini-app/request-code",
+    "challenge_in_web_app_url": "32-hex request_id in URL fragment only",
+    "otp_sender": "existing backend TelegramSender",
+    "session_scope": "no session issued to Mini App; Android verify issues Android session",
+    "webhook_changed": false,
+    "botfather_changed": false,
+    "published": false,
+    "external_calls": false
+  },
+  "security_checks": [
+    "HMAC and auth_date checked by backend",
+    "one-time initData replay claim",
+    "attempt expiry and consumed/check-count validation",
+    "attempt bound to one Telegram subject",
+    "existing subject cooldown and hourly/daily limits reused",
+    "delivery_unknown is not retried",
+    "OTP, initData, verifier and session tokens absent from URL/API response"
+  ],
+  "checks": {
+    "api_targeted_postgres_suite": "37 passed, 1 skipped, 719 deselected; includes delivery-unknown/no-retry and OpenAPI contract",
+    "mini_app_unit_tests": "7 passed",
+    "mini_app_typescript_and_vite_build": "passed",
+    "telegram_bot_tests": "45 passed",
+    "telegram_bot_runtime_check": "passed, 8 modules",
+    "ruff": "passed"
+  },
+  "follow_up_2026_10_25": {
+    "change": "Mini App OTP rejection no longer sends a Telegram message; webhook /start denial replies are preserved",
+    "targeted_api_postgres": "13 passed; disposable local PostgreSQL cluster stopped and removed",
+    "mini_app_unit_tests": "8 passed",
+    "typescript_vite_build": "passed",
+    "ruff_and_mypy": "passed",
+    "full_suite": "792 passed, 11 skipped, 2 failed; one I-026 assertion was updated for the no-DM behavior and targeted suite then passed 13/13; the remaining failure is services/api/tests/test_node_daemon.py::test_invalid_lease_never_installs_peer[change1], outside I-026",
+    "live_telegram_or_beta_acceptance": "not performed"
+  },
+  "follow_up_2026_10_26_public_ipv4_origin": {
+    "change": "Serverless config accepts canonical global IPv4 HTTPS only for miniAppUrl; private/special ranges and query/fragment are rejected; support/download/privacy URLs remain DNS-only",
+    "telegram_bot_tests": "57 passed",
+    "telegram_bot_runtime_check": "passed, 8 modules; no new dependencies",
+    "beta_ip_certificate_issued": true,
+    "public_https_serves_only_closed_404": true,
+    "api_or_mini_app_published": false,
+    "botfather_changed": false,
+    "live_telegram_webview_acceptance": "not performed"
+  },
+  "follow_up_2026_10_26_beta_bot_target": {
+    "change": "local Serverless config targets @uysdgyfudf_bot and tests addressed-command routing; menu revision on @DetourVpnBot remains unchanged",
+    "telegram_bot_tests": "58 passed",
+    "telegram_bot_runtime_check": "passed, 8 modules; no Node APIs, test adapters, static hosting or credentials",
+    "mini_app_url": "empty",
+    "botfather_settings_changed": false,
+    "published": false,
+    "token_requested_or_used": false,
+    "hosted_otp_acceptance": "not performed"
+  },
+  "follow_up_2026_10_26_local_otp_path_recheck": {
+    "api_mini_app_postgres_suite": "13 passed on temporary isolated PostgreSQL; runner stopped server and removed generated cluster",
+    "mini_app_tests": "8 passed",
+    "mini_app_typescript_and_vite_build": "passed",
+    "telegram_network_calls": false,
+    "telegram_init_data": "synthetic TEST ONLY fixtures",
+    "live_telegram_or_android_acceptance": "not performed"
+  },
+  "follow_up_2026_10_26_current_tree_replay_recheck": {
+    "command": "scripts/test_with_postgres.py --postgres-bin .cache/i-004/portable/pgsql/bin -- services/api/tests/test_mini_app.py",
+    "result": "13 passed",
+    "database": "temporary isolated PostgreSQL on IPv4 loopback",
+    "cluster_stopped_and_removed": true,
+    "coverage": [
+      "parallel duplicate initData claims produce one success and replay rejection for the rest",
+      "rejected/unknown OTP attempts do not send a code",
+      "duplicate OTP request does not resend",
+      "delivery-unknown is not retried"
+    ],
+    "telegram_init_data": "synthetic TEST ONLY fixtures",
+    "telegram_sender": "TEST ONLY in-memory sender",
+    "external_calls": false
+  },
+  "follow_up_2026_10_26_privacy_minimal_delivery_receipt": {
+    "change": "OTP attempt stores only pending/api_accepted/unknown and record time; update is guarded by attempt generation",
+    "api_accepted_meaning": "Telegram Bot API returned ok=true; does not establish user receipt or reading",
+    "api_mini_app_and_migration_tests": "26 passed on temporary isolated PostgreSQL; runner stopped server and removed generated cluster",
+    "webhook_authentication_tests": "33 passed on separate temporary isolated PostgreSQL; runner stopped server and removed generated cluster",
+    "ruff_check": "passed",
+    "ruff_format_check": "passed",
+    "telegram_init_data": "synthetic TEST ONLY fixtures",
+    "telegram_sender": "TEST ONLY in-memory sender",
+    "external_calls": false,
+    "migration_deployed": false,
+    "hosted_bot_api_receipt": "not verified"
+  },
+  "post_deployment_local_recheck_2026_10_26": {
+    "command": "uv run --frozen python scripts/test_with_postgres.py --postgres-bin .cache/i-004/portable/pgsql/bin -- services/api/tests/test_mini_app.py services/api/tests/test_migrations.py",
+    "result": "26 passed in 44.04s",
+    "database": "temporary isolated real PostgreSQL on IPv4 loopback",
+    "cluster_stopped_and_removed": true,
+    "ruff_check": "passed for changed auth, model, and test modules",
+    "ruff_format_check": "passed for the same modules",
+    "mypy": "passed for auth service, Mini App, and database model modules",
+    "telegram_init_data": "synthetic TEST ONLY fixtures",
+    "telegram_sender": "TEST ONLY in-memory sender",
+    "external_calls": false,
+    "live_beta_delivery_receipt": "not verified by this local run"
+  },
+  "combined_i026_local_recheck_2026_10_26": {
+    "command": "uv run --frozen python scripts/test_with_postgres.py --postgres-bin .cache/i-004/portable/pgsql/bin -- services/api/tests/test_authentication.py services/api/tests/test_mini_app.py services/api/tests/test_migrations.py services/api/tests/test_devices.py",
+    "result": "78 passed in 100.89s",
+    "database": "temporary isolated real PostgreSQL on IPv4 loopback",
+    "cluster_stopped_and_removed": true,
+    "coverage": [
+      "native OTP issue, verification, consumption and replay rejection",
+      "Mini App initData signature, expiry and replay handling",
+      "OTP request no-resend and uncertain delivery behavior",
+      "device ownership, session binding, limits and concurrency",
+      "migration upgrade and guarded downgrade behavior"
+    ],
+    "telegram_init_data": "synthetic TEST ONLY fixtures",
+    "telegram_sender": "TEST ONLY in-memory sender",
+    "external_calls": false,
+    "hosted_live_replay_or_duplicate": "not verified"
+  },
+  "follow_up_2026_10_26_debug_duplicate_otp_probe": {
+    "change": "Added an explicitly debug-only Android client probe that replays the exact in-memory OTP verify request once, without logging its contents; an unexpected second session is logged out and the first session restored",
+    "probe_enabled_only_when": "kDebugMode and I026_DUPLICATE_OTP_PROBE=true",
+    "probe_unit_tests": "4 passed",
+    "dart_analyze_probe_and_tests": "passed",
+    "api_authentication_and_mini_app_postgres_tests": "47 passed on a temporary isolated PostgreSQL cluster; runner stopped server and removed generated cluster",
+    "mini_app_unit_tests": "8 passed",
+    "debug_android_build": "passed using the already prepared sdk-go-only-beta-v3-20261026 tree via Flutter --android-project-arg; probe compile define enabled. First APK omitted VPN_API_ORIGIN and showed the expected API setup screen; it was replaced by a corrected build with the isolated beta API origin",
+    "device_install": "adb install -r succeeded over existing beta app; app data preserved; VPN not started; corrected beta-origin build installed",
+    "flutter_analyze": "analysis server exited with malformed/incomplete LSP JSON; standalone dart analyze passed for the new probe and its tests",
+    "hosted_duplicate_otp": "owner reported the installed debug probe dialog said the server rejected reuse of the same OTP; raw response and OTP were not captured; owner then reported the step complete",
+    "post_probe_continue": "owner reported the step complete; no protected screen capture was taken",
+    "telegram_init_data": "synthetic TEST ONLY fixtures in local tests; live initData not collected",
+    "external_calls": "one owner-initiated beta API sign-in and one exact duplicate auth/verify request through the installed app; no other external operation",
+    "beta_read_only_correlation_query": "1 consumed attempt with api_accepted and delivery timestamp | 1 native session | 1 exact consumed_at-to-created_at match joined through Telegram auth identity | 1 active account device; current session device_id is null because the VPN tunnel was not started",
+    "beta_query_output": "aggregate counts only; no attempt, subject, user, device, token, OTP, or raw initData values read into output; database unchanged"
+  },
+  "later_live_evidence": {
+    "receipt": "i-026-live-miniapp-otp-20261026.json",
+    "scope": "owner-only Telegram Android Mini App to OTP to authenticated Android cabinet happy path",
+    "not_included": "hosted replay/duplicate rejection, independent server-side delivery receipt, and device pairing"
+  },
+  "test_data": {
+    "telegram_init_data": "synthetic TEST ONLY HMAC with ephemeral test bot token",
+    "telegram_delivery": "TEST ONLY in-memory sender",
+    "postgres": "disposable real local PostgreSQL; temporary cluster removed"
+  },
+  "not_proven": [
+    "hosted replay/duplicate rejection using Telegram-issued initData and OTP",
+    "independent server-side delivery receipt correlated to the Android attempt",
+    "device pairing after owner login",
+    "friend account onboarding"
+  ]
+}

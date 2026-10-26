@@ -27,8 +27,13 @@ final class AwgProviderV1 implements TunnelProviderV1 {
         catch (Exception failure) { disconnect(); throw failure; }
     }
     @Override public void disconnect() throws Exception {
+        boolean wasUp = backend.getState(tunnel) == Tunnel.State.UP;
         try { backend.setState(tunnel, Tunnel.State.DOWN, null); }
-        finally { context.stopService(new Intent(context, GoBackend.VpnService.class)); }
+        finally {
+            // During Android system bootstrap the idle VPN service owns the protected API relay.
+            // Keep that service alive while no tunnel exists; active tunnels still stop normally.
+            if (wasUp) context.stopService(new Intent(context, GoBackend.VpnService.class));
+        }
     }
     @Override public boolean isUp() { return backend.getState(tunnel) == Tunnel.State.UP; }
     @Override public long lastHandshakeSeconds() { return backend.getLastHandshake(tunnel); }

@@ -47,7 +47,8 @@ from vpn_api.quota.service import LedgerService
 
 __all__ = ["harness"]
 ROOT = Path(__file__).resolve().parents[3]
-PACKAGE = "org.example.vpnclient"
+PACKAGE = "org.example.vpnclient.i028"
+TEST_PACKAGE = f"{PACKAGE}.test"
 SSH = [
     "wsl.exe",
     "-d",
@@ -91,6 +92,8 @@ NETWORK_REVOKE_FACTS = {
 }
 NATURAL_SLEEP_FACTS = {
     "real_account_refresh_after_android_process_restart",
+    "natural_sleep_native_down_after_wake",
+    "natural_sleep_new_staging_egress_after_recovery",
     "natural_sleep_window_cutoff_and_real_recovery",
 }
 PROBE_FLAGS = {
@@ -160,7 +163,12 @@ def parse_probe(output: str) -> dict[str, Any]:
         name, value = match.groups()
         if name in PROBE_FLAGS and value in ("true", "false"):
             result[name] = value == "true"
-        elif name in {"ipv4_failure", "ipv4_primary_failure", "dns_failure"} and re.fullmatch(
+        elif name in {
+            "ipv4_failure",
+            "ipv4_primary_failure",
+            "ipv6_failure",
+            "dns_failure",
+        } and re.fullmatch(
             r"none|dns|tls|timeout|connect|permission|io|route|http_[1-5][0-9]{2}", value
         ):
             result[name] = value
@@ -197,10 +205,32 @@ def test_i028_real_android(harness: Harness) -> None:
             return False
         return "session.vault" in adb("shell", "run-as", PACKAGE, "ls", "no_backup").splitlines()
 
+    def installed_apk_matches(package: str, artifact: str) -> bool:
+        package_path = adb("shell", "pm", "path", package).splitlines()
+        if len(package_path) != 1:
+            return False
+        match = re.fullmatch(r"package:(/data/app/[A-Za-z0-9_./=+~-]+/base\.apk)", package_path[0])
+        if match is None:
+            return False
+        installed_hash = adb("shell", "sha256sum", match[1]).split()[0]
+        return installed_hash == hashlib.sha256(Path(artifact).read_bytes()).hexdigest()
+
     assert adb("get-state").strip() == "device"
-    assert "package:org.example.vpnpoc.test" not in adb(
+    probe_installed = "package:org.example.vpnpoc.test" in adb(
         "shell", "pm", "list", "packages", "org.example.vpnpoc.test"
     )
+    if suite == "NaturalSleep":
+        # Play Protect approval happens before the 30-minute A window. Verify
+        # both installed test APKs are exactly the source-bound artifacts.
+        assert probe_installed
+        assert installed_apk_matches("org.example.vpnpoc.test", os.environ["VPN_I028_PROBE_APK"])
+        assert installed_apk_matches(TEST_PACKAGE, os.environ["VPN_I028_NATURAL_TEST_APK"])
+    else:
+        assert not probe_installed
+        assert f"package:{TEST_PACKAGE}" not in adb("shell", "pm", "list", "packages", TEST_PACKAGE)
+    # The isolated debug variant must be fresh. Never overwrite an earlier
+    # I-028 session whose private test state this runner cannot safely recover.
+    assert f"package:{PACKAGE}" not in adb("shell", "pm", "list", "packages", PACKAGE)
     assert "tcp:18766" not in adb("reverse", "--list")
     assert "package:org.example.vpnpoc" in adb(
         "shell", "pm", "list", "packages", "org.example.vpnpoc"
@@ -228,6 +258,10 @@ def test_i028_real_android(harness: Harness) -> None:
                 "scripts/run_i028_staging.ps1",
                 "scripts/i028_device_scenarios.py",
                 "apps/client/integration_test/i028_live_test.dart",
+                "apps/client/android/app/build.gradle.kts",
+                "apps/client/android/app/gradle.lockfile",
+                "apps/client/android/app/src/androidTest/java/org/example/vpnpoc/I028FlutterInstrumentationTest.java",
+                "apps/client/android/app/src/main/java/org/example/vpnpoc/ClientActivity.java",
                 "apps/android/app/src/androidTest/java/org/example/vpnpoc/I028Probe.java",
                 "infra/staging-v3/runtime.py",
             )
@@ -250,10 +284,12 @@ def test_i028_real_android(harness: Harness) -> None:
     state: dict[str, Any] = {"outage": False}
     renewal_arrived = threading.Event()
     renewal_release = threading.Event()
+    natural_sleep_reattached = threading.Event()
     executor = concurrent.futures.ThreadPoolExecutor(max_workers=1)
     job: concurrent.futures.Future[dict[str, Any]] | None = None
     api_thread: threading.Thread | None = None
     tunnel: subprocess.Popen[bytes] | None = None
+    instrumentation: subprocess.Popen[bytes] | None = None
     bridge: Any = None
     server: uvicorn.Server | None = None
     agent_started = False
@@ -497,6 +533,7 @@ def test_i028_real_android(harness: Harness) -> None:
                         "forced_idle_absent": "mForceIdle=false" in after_idle,
                         "natural_deep_idle_observed": idle_observed,
                     }
+                    natural_sleep_reattached.set()
                     return {
                         "usb_absent_confirmed": True,
                         "natural_idle_observed": idle_observed,
@@ -766,11 +803,14 @@ def test_i028_real_android(harness: Harness) -> None:
             stage = "phone_setup"
             phone_modified = True
             adb("reverse", "tcp:18766", "tcp:18766")
-            adb(
-                "install",
-                "-r",
-                os.environ["VPN_I028_PROBE_APK"],
-            )
+            if suite == "NaturalSleep":
+                report["preinstalled_probe_apk_source_hash_verified"] = True
+            else:
+                adb(
+                    "install",
+                    "-r",
+                    os.environ["VPN_I028_PROBE_APK"],
+                )
             adb("shell", "appops", "set", PACKAGE, "ACTIVATE_VPN", "allow")
             if lifecycle:
                 device_spec = importlib.util.spec_from_file_location(
@@ -796,6 +836,124 @@ def test_i028_real_android(harness: Harness) -> None:
             )
             for phase in ("seed", phase_name):
                 stage = "flutter_" + phase
+                if phase == "natural_sleep":
+                    marker_path = "no_backup/i028-natural-sleep-stage.txt"
+                    diagnostics_path = "no_backup/i028-natural-sleep-diagnostics.jsonl"
+
+                    def phone_stage(path: str = marker_path) -> str | None:
+                        try:
+                            value = adb("shell", "run-as", PACKAGE, "cat", path, timeout=10).strip()
+                        except (RuntimeError, subprocess.SubprocessError):
+                            return None
+                        return value if re.fullmatch(r"[a-z_]{1,64}", value) else None
+
+                    def collect_phone_diagnostics(path: str = diagnostics_path) -> None:
+                        try:
+                            raw = adb("shell", "run-as", PACKAGE, "cat", path, timeout=10)
+                            parsed = device_module.parse_phone_diagnostics(raw)
+                            report["phone_wake_diagnostics"] = parsed
+                            if parsed.get("last_stage") is not None:
+                                report["phone_instrumentation_last_stage"] = parsed["last_stage"]
+                            try:
+                                process = adb("shell", "pidof", "-s", PACKAGE, timeout=10).strip()
+                                report["phone_app_process_pid"] = (
+                                    int(process) if process.isdecimal() else None
+                                )
+                            except (RuntimeError, subprocess.SubprocessError):
+                                report["phone_app_process_pid"] = None
+                        except (RuntimeError, subprocess.SubprocessError):
+                            report["phone_wake_diagnostics"] = {
+                                "valid": False,
+                                "reason": "unavailable_after_reattach",
+                                "events": [],
+                            }
+
+                    adb("shell", "run-as", PACKAGE, "rm", "-f", marker_path)
+                    adb("shell", "run-as", PACKAGE, "rm", "-f", diagnostics_path)
+                    adb("install", "-r", os.environ["VPN_I028_NATURAL_APP_APK"])
+                    report["preinstalled_instrumentation_apk_source_hash_verified"] = True
+                    instrumentation = subprocess.Popen(  # noqa: S603 - fixed Android test runner.
+                        [
+                            str(adb_exe),
+                            "-s",
+                            serial,
+                            "shell",
+                            "am",
+                            "instrument",
+                            "-w",
+                            "-r",
+                            "-e",
+                            "class",
+                            "org.example.vpnpoc.I028FlutterInstrumentationTest",
+                            f"{TEST_PACKAGE}/androidx.test.runner.AndroidJUnitRunner",
+                        ],
+                        stdin=subprocess.DEVNULL,
+                        stdout=subprocess.DEVNULL,
+                        stderr=subprocess.DEVNULL,
+                    )
+                    deadline = time.monotonic() + 850
+                    initial_deadline = time.monotonic() + 150
+                    while True:
+                        current = phone_stage()
+                        if current == "natural_sleep_wait":
+                            break
+                        if current is not None and current.startswith("failed_"):
+                            report["phone_failure_stage"] = current.removeprefix("failed_")
+                            raise RuntimeError("i028_phone_instrumentation_failed")
+                        if (
+                            instrumentation.poll() is not None
+                            or time.monotonic() > initial_deadline
+                        ):
+                            if instrumentation.poll() is not None:
+                                report["adb_instrument_command_exit_code"] = (
+                                    instrumentation.returncode
+                                )
+                                report["phone_instrumentation_last_stage"] = current
+                            raise RuntimeError("i028_phone_instrumentation_did_not_start")
+                        time.sleep(2)
+                    # The device worker owns the unplugged interval. Never poll ADB during sleep.
+                    while not natural_sleep_reattached.wait(2):
+                        if job is not None and job.done():
+                            try:
+                                job.result()
+                            except Exception:
+                                raise RuntimeError(
+                                    "i028_natural_sleep_device_worker_failed"
+                                ) from None
+                        if time.monotonic() > deadline:
+                            raise RuntimeError("i028_natural_sleep_reattach_timeout")
+                    # Reattachment is not the same as the operator waking and
+                    # unlocking the phone. Give Android a separate bounded
+                    # recovery window instead of spending it during deep idle.
+                    completion_deadline = time.monotonic() + 300
+                    while True:
+                        collect_phone_diagnostics()
+                        current = phone_stage()
+                        if current == "complete":
+                            report["phone_on_device_instrumentation_complete"] = True
+                            break
+                        if current is not None and current.startswith("failed_"):
+                            report["phone_failure_stage"] = current.removeprefix("failed_")
+                            raise RuntimeError("i028_phone_instrumentation_failed")
+                        if current is not None:
+                            report["phone_instrumentation_last_stage"] = current
+                        if instrumentation.poll() is not None:
+                            exit_code = instrumentation.returncode
+                            report["adb_instrument_command_exit_code"] = exit_code
+                            # Unplugging USB can end the host-side adb shell
+                            # while the on-device instrumentation is still
+                            # sleeping. After verified reattachment, trust only
+                            # the bounded app-private stage marker; don't start
+                            # cleanup until it completes or the recovery deadline.
+                            if exit_code != 255:
+                                raise RuntimeError(
+                                    "i028_phone_instrumentation_exited_before_complete"
+                                )
+                        if time.monotonic() > completion_deadline:
+                            collect_phone_diagnostics()
+                            raise RuntimeError("i028_phone_instrumentation_completion_timeout")
+                        time.sleep(2)
+                    continue
                 result = subprocess.run(  # noqa: S603 - pinned Flutter/reviewed target.
                     [
                         str(flutter),
@@ -807,6 +965,9 @@ def test_i028_real_android(harness: Harness) -> None:
                         "--no-uninstall",
                         "--dart-define=VPN_WINDOW_TUNNELS=true",
                         "--dart-define=VPN_I028_PHASE=" + phase,
+                        "--android-project-arg=i028IsolatedPackage=true",
+                        "--android-project-arg=awgPreparedDir="
+                        + os.environ["VPN_I028_PREPARED_AWG"],
                     ],
                     cwd=client,
                     env=env,
@@ -950,7 +1111,10 @@ def test_i028_real_android(harness: Harness) -> None:
                 clean &= not api_thread.is_alive()
             if phone_modified:
                 try:
-                    if saved_session():
+                    installed_i028 = f"package:{PACKAGE}" in adb(
+                        "shell", "pm", "list", "packages", PACKAGE
+                    )
+                    if installed_i028 and saved_session():
                         # Only this run's account can exist: preflight refused any saved session.
                         # Cleanup entrypoint uses no network, never reads/prints vault contents.
                         cleared = subprocess.run(  # noqa: S603 - fixed test-only cleanup phase.
@@ -964,6 +1128,9 @@ def test_i028_real_android(harness: Harness) -> None:
                                 "--no-uninstall",
                                 "--dart-define=VPN_WINDOW_TUNNELS=true",
                                 "--dart-define=VPN_I028_PHASE=cleanup",
+                                "--android-project-arg=i028IsolatedPackage=true",
+                                "--android-project-arg=awgPreparedDir="
+                                + os.environ["VPN_I028_PREPARED_AWG"],
                             ],
                             cwd=client,
                             env=env,
@@ -975,21 +1142,61 @@ def test_i028_real_android(harness: Harness) -> None:
                         cleanup_steps["phone_session_cleanup_entrypoint"] = cleared.returncode == 0
                         del cleared
                         clean &= not saved_session()
-                    cleanup_steps["phone_session_absent"] = not saved_session()
-                    adb("shell", "am", "force-stop", PACKAGE)
-                    adb("shell", "appops", "set", PACKAGE, "ACTIVATE_VPN", previous_mode)
+                    cleanup_steps["phone_session_absent"] = (
+                        not installed_i028 or not saved_session()
+                    )
+                    if installed_i028:
+                        adb("shell", "am", "force-stop", PACKAGE)
+                    if suite == "NaturalSleep":
+                        if installed_i028:
+                            adb(
+                                "shell",
+                                "run-as",
+                                PACKAGE,
+                                "rm",
+                                "-f",
+                                "no_backup/i028-natural-sleep-stage.txt",
+                            )
+                            adb(
+                                "shell",
+                                "run-as",
+                                PACKAGE,
+                                "rm",
+                                "-f",
+                                "no_backup/i028-natural-sleep-diagnostics.jsonl",
+                            )
+                        if f"package:{TEST_PACKAGE}" in adb(
+                            "shell", "pm", "list", "packages", TEST_PACKAGE
+                        ):
+                            adb("uninstall", TEST_PACKAGE)
+                    if installed_i028:
+                        adb("shell", "appops", "set", PACKAGE, "ACTIVATE_VPN", previous_mode)
                     adb("reverse", "--remove", "tcp:18766")
-                    adb(
-                        "install",
-                        "-r",
-                        str(ROOT / "apps/client/build/app/outputs/flutter-apk/app-debug.apk"),
+                    if installed_i028:
+                        adb("uninstall", PACKAGE)
+                    cleanup_steps["isolated_i028_app_absent"] = PACKAGE not in adb(
+                        "shell", "pm", "list", "packages", PACKAGE
                     )
                     adb("uninstall", "org.example.vpnpoc.test")
                     clean &= "tcp:18766" not in adb("reverse", "--list")
-                    cleanup_steps["phone_restored"] = True
+                    cleanup_steps["owner_app_untouched"] = "package:org.example.vpnclient" in adb(
+                        "shell", "pm", "list", "packages", "org.example.vpnclient"
+                    )
+                    cleanup_steps["phone_restored"] = (
+                        cleanup_steps["isolated_i028_app_absent"]
+                        and cleanup_steps["owner_app_untouched"]
+                    )
+                    clean &= cleanup_steps["phone_restored"]
                 except (RuntimeError, subprocess.SubprocessError):
                     cleanup_steps["phone_restored"] = False
                     clean = False
+            if instrumentation is not None and instrumentation.poll() is None:
+                instrumentation.terminate()
+                try:
+                    instrumentation.wait(timeout=5)
+                except subprocess.TimeoutExpired:
+                    instrumentation.kill()
+                    instrumentation.wait(timeout=5)
             report["temporary_staging_transport_and_phone_cleanup"] = clean
             report["passed"] &= clean
             covered = {
@@ -1020,7 +1227,12 @@ def test_i028_real_android(harness: Harness) -> None:
                 if lifecycle
                 else "i-028-android-staging.json"
             )
-            (ROOT / "docs/evidence" / receipt_name).write_text(
+            receipt_path = ROOT / "docs/evidence" / receipt_name
+            if receipt_path.exists():
+                receipt_path = receipt_path.with_name(
+                    f"{receipt_path.stem}-{datetime.now(UTC):%Y%m%dT%H%M%SZ}-{uuid4().hex[:8]}.json"
+                )
+            receipt_path.write_text(
                 json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8"
             )
     assert report["passed"], "i028_acceptance_not_confirmed"

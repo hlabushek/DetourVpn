@@ -51,7 +51,10 @@ export async function handle(payload, ctx, kind) {
     return { status: 'ignored' };
   }
   if (kind === 'callback_query') await ack(payload.id);
-  const content = view(page, config);
+  const startPayload = kind === 'message'
+    ? /^\/start(?:@[A-Za-z0-9_]+)? ([0-9a-f]{32})$/.exec(payload.text ?? '')?.[1] ?? null
+    : null;
+  const content = view(page, config, startPayload);
   try {
     if (kind === 'callback_query') {
       await api.editMessageText({ chat_id: who.userId, message_id: who.message.message_id, ...content });

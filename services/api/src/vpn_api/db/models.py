@@ -82,6 +82,27 @@ class AdminAction(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
 
 
+class BetaInvite(Base):
+    __tablename__ = "beta_invites"
+    __table_args__ = (
+        CheckConstraint("subject_digest ~ '^[0-9a-f]{64}$'", name="ck_beta_invites_subject_digest"),
+        Index(
+            "uq_beta_invites_active_subject",
+            "subject_digest",
+            unique=True,
+            postgresql_where=text("revoked_at IS NULL"),
+        ),
+        Index("ix_beta_invites_admin_id_created", "admin_id", "created_at"),
+    )
+
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    subject_digest: Mapped[str] = mapped_column(String(64))
+    admin_id: Mapped[UUID] = mapped_column(ForeignKey("admin_identities.id", ondelete="RESTRICT"))
+    reason: Mapped[str] = mapped_column(String(500))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
 class AuthIdentity(Base):
     __tablename__ = "auth_identities"
     __table_args__ = (
@@ -112,6 +133,10 @@ class LoginAttempt(Base):
         CheckConstraint("subject IS NULL OR subject > 0", name="ck_login_attempts_subject"),
         Index("ix_login_attempts_expires_at", "expires_at"),
         Index("ix_login_attempts_subject_issued_at", "subject", "issued_at"),
+        CheckConstraint(
+            "delivery_status IS NULL OR delivery_status IN ('pending', 'api_accepted', 'unknown')",
+            name="ck_login_attempts_delivery_status",
+        ),
     )
     id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
     verifier_digest: Mapped[str] = mapped_column(String(64))
@@ -124,6 +149,8 @@ class LoginAttempt(Base):
     generation: Mapped[int] = mapped_column(Integer, server_default=text("0"))
     checks: Mapped[int] = mapped_column(Integer, server_default=text("0"))
     consumed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    delivery_status: Mapped[str | None] = mapped_column(String(16))
+    delivery_recorded_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
 class SessionFamily(Base):

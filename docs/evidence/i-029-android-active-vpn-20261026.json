@@ -1,0 +1,37 @@
+{
+  "issue": "I-029",
+  "observed_at": "2026-10-26",
+  "source": "read-only ADB dumpsys connectivity and /proc/net/dev on physical Pixel 8 Pro",
+  "vpn_network": {
+    "state": "CONNECTED",
+    "validated": true,
+    "interface": "tun0",
+    "ipv4_default_route_through_tun": true,
+    "ipv6_route": "unreachable",
+    "dns_server": "1.1.1.1",
+    "underlying_transport": "Wi-Fi"
+  },
+  "tun0_counters": {
+    "first_sample": {
+      "received_bytes": 200505,
+      "received_packets": 194,
+      "transmitted_bytes": 60389,
+      "transmitted_packets": 308
+    },
+    "second_sample_after_seconds": 8,
+    "second_sample": {
+      "received_bytes": 424311,
+      "received_packets": 377,
+      "transmitted_bytes": 97874,
+      "transmitted_packets": 530
+    },
+    "interpretation": "Counters increased while the Android VPN network remained connected and validated; packet contents and per-app attribution were not inspected."
+  },
+  "native_errors_in_filtered_log": false,
+  "limitations": [
+    "Framework route and DNS settings are not a packet-level leak audit",
+    "No independent server handshake receipt was collected",
+    "No app-specific attribution, TikTok, Always-on, or Lockdown check"
+  ],
+  "secrets": "No IP address, account identifier, key, profile, credential, or packet content recorded"
+}

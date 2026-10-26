@@ -1,0 +1,16 @@
+{
+  "measured_at_utc": "2026-10-25T18:57:48Z",
+  "issue": "I-028",
+  "action": "bounded staging A install preflight",
+  "passed": false,
+  "failure_line": 52,
+  "failure_reason": "root filesystem free space below installer minimum",
+  "available_1k_blocks": 1453228,
+  "required_1k_blocks_exclusive": 1500000,
+  "available_bytes": 1488134144,
+  "ntp_synchronized": true,
+  "i028_paths_absent": true,
+  "vpn_slot_or_agent_created": false,
+  "physical_natural_sleep_started": false,
+  "scope": "approved temporary staging A only; no B or production changes"
+}

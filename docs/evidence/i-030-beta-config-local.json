@@ -1,0 +1,161 @@
+{
+  "issue": "I-030",
+  "scope": "local unprovisioned beta control-plane templates, node ingress and agent-unit templates, and invite gate",
+  "accepted": false,
+  "verified_at": "2026-10-25",
+  "local_checks": {
+    "docker_compose_config_quiet": "passed",
+    "static_isolation_tests": {
+      "passed": 5,
+      "failed": 0
+    },
+    "beta_node_ingress_static_tests": {
+      "passed": 2,
+      "failed": 0,
+      "checks": [
+        "exact three v3 POST paths",
+        "single configured node source IP",
+        "node route before internal deny",
+        "all other internal and ready routes denied",
+        "bootstrap has no API proxy"
+      ]
+    },
+    "beta_node_agent_unit_static_tests": {
+      "passed": 3,
+      "failed": 0,
+      "checks": [
+        "fixed executable and config paths",
+        "credential excluded from arguments and environment",
+        "conditional startup on private slot metadata",
+        "private persistent state directory",
+        "filesystem and network-family restrictions",
+        "preflight fixed path runs before daemon"
+      ]
+    },
+    "beta_node_package_tests": {
+      "passed": 4,
+      "failed": 0,
+      "test_artifacts": "synthetic TEST ONLY bytes",
+      "checks": [
+        "allowlisted files only",
+        "dotenv and CLI credential files excluded",
+        "modified pinned binary rejected before output creation",
+        "existing output preserved",
+        "symlink input rejected",
+        "manifest and checksums agree"
+      ]
+    },
+    "beta_node_package_build": {
+      "output": ".cache/beta-node-v3-20261025-network2/",
+      "manifest_files": 18,
+      "checksum_rows": 18,
+      "checksum_failures": 0,
+      "deployable": false,
+      "contains_runtime_configuration_or_credentials": false
+    },
+    "beta_node_package_tooling": {
+      "pytest": "59 passed, 5 skipped on Windows across beta bootstrap, node units, config/package, tunnel admission and peer window tests; POSIX writer skipped, PostgreSQL cases skipped without VPN_TEST_DATABASE_URL",
+      "ruff": "passed",
+      "ruff_format": "passed",
+      "mypy": "passed for bootstrap, config compiler, package builder and shared AWG profile"
+    },
+    "beta_node_stable_slot_config": {
+      "synthetic_tests_passed": 9,
+      "server_public_key_matches_pinned_awg_pubkey": true,
+      "key_vector": "synthetic TEST ONLY; no network",
+      "private_key_in_api_manifest": false,
+      "real_beta_keys_generated": false,
+      "slot_bootstrap_consumes_config": true,
+      "posix_file_writer_runtime_test": "not_run_existing_kali_node_venv_lacks_cryptography; no dependencies installed",
+      "awg_config_output": "per-slot private AWG config emitted from shared API profile; synthetic keys only; no node install"
+    },
+    "beta_node_agent_systemd_verify": "Kali WSL systemd-analyze verify exit 0 for bootstrap/core/agent units; Windows mount emitted executable/world-writable metadata warnings; target Linux unit runtime unverified",
+    "caddy_syntax_validation": "passed via caddy validate on local Caddy 2.11.4",
+    "caddy_validate_local": {
+      "passed": true,
+      "version": "2.11.4 from Kali WSL package",
+      "files": [
+        "infra/beta/Caddyfile.ip",
+        "infra/beta/Caddyfile.ip-bootstrap"
+      ],
+      "test_inputs": "TEST ONLY reserved IP placeholders; temporary self-signed certificate; no live TLS",
+      "target_version_or_deployment": "not tested"
+    },
+    "postgres_init_shell_syntax": "passed",
+    "certificate_hook_shell_syntax": "passed",
+    "ruff": "passed",
+    "ruff_format": "passed",
+    "mypy": "passed",
+    "auth_cleanup_and_maintenance_postgresql_tests": {
+      "passed": 4,
+      "failed": 0,
+      "temporary_cluster_removed": true
+    },
+    "invite_auth_admin_migration_postgresql_tests": {
+      "passed": 75,
+      "failed": 0,
+      "temporary_cluster_removed": true
+    },
+    "beta_config_health_and_database_tests": {
+      "passed": 49,
+      "skipped": 3,
+      "skipped_reason": "closed-control-plane cases require VPN_TEST_DATABASE_URL",
+      "failed": 0
+    },
+    "systemd_analyze": "beta_node_unit_verified_in_kali_wsl_fixture_root; target_host_runtime_not_verified",
+    "beta_node_slot_preflight_tests": {
+      "passed": 2,
+      "failed": 0,
+      "checks": [
+        "canonical key format accepted/rejected",
+        "invalid values produce no key echo"
+      ]
+    },
+    "beta_node_slot_bootstrap_tests": {
+      "passed": 13,
+      "failed": 0,
+      "checks": [
+        "strict public endpoint/key schema",
+        "AWG config matches shared fixed profile",
+        "isolated namespace/core/gate/veth command order via TEST ONLY fake runner",
+        "host route/address/uplink/forwarding preflight fails closed",
+        "reserved destination, exact DNAT and established-return rules",
+        "failed start rolls back only created resources",
+        "agent/bootstrap/core systemd dependency and hardening contract"
+      ]
+    },
+    "beta_i030_local_acceptance_suite": {
+      "passed": 37,
+      "skipped": 1,
+      "failed": 0,
+      "skipped_reason": "POSIX private-file permissions require Linux"
+    },
+    "beta_node_slot_bootstrap_runtime": {
+      "passed": true,
+      "environment": "Kali WSL under outer unshare --mount --net; private /run tmpfs",
+      "scope": "real pinned AWG core/client, iproute2 netns, nft gate, synthetic veth uplink, scoped DNAT and two-stage NAT, TEST ONLY HTTP request and orderly teardown",
+      "systemd": "start/stop controller replaced by TEST ONLY dispatcher; systemd PID-1 not exercised",
+      "isolation": "slot namespace had lo, dv3s1 and outer0 only; private host destination blocked; IPv6 disabled in slot namespace",
+      "packet_acceptance": "client handshake and HTTP response passed through slot NAT, host DNAT/SNAT and established return; gate counter nonzero",
+      "repeat_runs": {
+        "passed": 2,
+        "failed": 0,
+        "note": "An earlier 5-second handshake poll timed out once; two consecutive runs passed after extending the TEST ONLY poll to 12 seconds"
+      },
+      "teardown": "slot namespace/veth/host nft tables removed; outer test namespace routes and nft ruleset restored to the pre-bootstrap baseline; final outer baseline restored",
+      "generated_keys": "TEST ONLY, transient private /run tmpfs; no repo or API use",
+      "physical_WAN_or_android": "not tested; simulated uplink existed only inside disposable namespaces"
+    }
+  },
+  "not_accepted": [
+    "No beta host, IP, certificate, firewall, account, or deployment was selected or changed",
+    "Caddy has only a local IP-scoped v3 ingress template; no node, firewall allowlist, credential, AWG slot bootstrap, core services or persistent runtime is provisioned, and target-version Caddy validation is still required",
+    "Invite gate is locally implemented but has not been deployed or accepted against live Telegram/admin/node flows",
+    "No Telegram BotFather menu or live Mini App/API origin was configured",
+    "I-026 live OTP, I-027 backup/restore/supervisor/outage drills, and I-028 privacy acceptance remain open",
+    "Beta preflight checks do not prove root-owned Linux filesystem execution, systemd startup, slot bootstrap or reboot recovery",
+    "Target host/provider ingress, persistent global forwarding configuration, Linux root-owned file modes, systemd boot ordering, shutdown/restart/reboot recovery are unverified",
+    "I-026 hosted Telegram OTP, I-027 off-host backup/restore/monitoring, I-028 physical privacy/network acceptance remain open"
+  ],
+  "data": "No credentials or production infrastructure used; pinned Pydantic test dependency was installed only into an ephemeral Kali WSL venv"
+}

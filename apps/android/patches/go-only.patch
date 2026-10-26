@@ -215,30 +215,39 @@
                  final Tunnel tunnel = owner.currentTunnel;
                  if (tunnel != null) {
                      if (owner.currentTunnelHandle != -1)
-@@ -515,19 +529,21 @@
+@@ -515,19 +529,22 @@
                      tunnel.onStateChange(State.DOWN);
                  }
              }
 +              }
++            if (alwaysOnCallback != null)
++                alwaysOnCallback.alwaysOnStopped(this);
              vpnService = vpnService.newIncompleteFuture();
              super.onDestroy();
          }
  
          @Override
          public int onStartCommand(@Nullable final Intent intent, final int flags, final int startId) {
-+            if (intent == null) { stopSelf(); return START_NOT_STICKY; }
              vpnService.complete(this);
              if (intent == null || intent.getComponent() == null || !intent.getComponent().getPackageName().equals(getPackageName())) {
 -                Log.d(TAG, "Service started by Always-on VPN feature");
 +
                  if (alwaysOnCallback != null)
-                     alwaysOnCallback.alwaysOnTriggered();
+-                    alwaysOnCallback.alwaysOnTriggered();
++                    alwaysOnCallback.alwaysOnTriggered(this);
              }
 -            return super.onStartCommand(intent, flags, startId);
 +            return START_NOT_STICKY;
          }
  
          public void setOwner(final GoBackend owner) {
+@@ -455,4 +455,5 @@
+      */
+     public interface AlwaysOnCallback {
+-        void alwaysOnTriggered();
++        void alwaysOnTriggered(VpnService service);
++        void alwaysOnStopped(VpnService service);
+     }
 --- a/tunnel/tools/libwg-go/api-android.go
 +++ b/tunnel/tools/libwg-go/api-android.go
 @@ -10,121 +10,43 @@

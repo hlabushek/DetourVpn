@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import 'api.dart';
+import 'auth_replay_probe.dart';
 import 'connection.dart';
 import 'native_tunnel.dart';
 import 'quota_screen.dart';
@@ -11,7 +12,11 @@ import 'orbit_theme.dart';
 import 'orbit_widgets.dart';
 import 'session_store.dart';
 import 'window_connection.dart';
+import 'always_on_recovery.dart';
 export 'connection_screen.dart' show ConnectionScreen;
+
+@pragma('vm:entry-point')
+Future<void> alwaysOnRecoveryMain() => runAlwaysOnRecovery();
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -82,15 +87,41 @@ class _VpnAppState extends State<VpnApp> with WidgetsBindingObserver {
                 widget.native as WindowNative,
               )
             : ConnectionController(widget.api!, widget.native));
-    value.startPolling();
+    if (value is WindowConnectionController) {
+      value.onAuthenticatedSessionChanged();
+    }
     setState(() {
       connection = value;
       showLogin = false;
       tab = 0;
     });
+    if (value is WindowConnectionController &&
+        widget.native is NodePreferenceStore) {
+      unawaited(_initializeWindowController(value));
+    } else {
+      value.startPolling();
+      unawaited(value.refresh());
+      unawaited(value.refreshQuota());
+      unawaited(value.refreshNodes());
+    }
+  }
+
+  Future<void> _initializeWindowController(
+    WindowConnectionController value,
+  ) async {
+    await value.refreshNodes();
+    if (!mounted || showLogin || !identical(connection, value)) return;
+    try {
+      final selected = await (widget.native as NodePreferenceStore)
+          .readSelectedNode();
+      if (selected != null) value.selectNode(selected);
+    } catch (_) {
+      // Node selection remains manual if the local preference cannot be read.
+    }
+    if (!mounted || showLogin || !identical(connection, value)) return;
+    value.startPolling();
     unawaited(value.refresh());
     unawaited(value.refreshQuota());
-    unawaited(value.refreshNodes());
   }
 
   Future<void> signOut() async {
@@ -111,6 +142,13 @@ class _VpnAppState extends State<VpnApp> with WidgetsBindingObserver {
     } // Do not claim durable logout if erasure failed.
     value.quota.clear();
     value.pausePolling();
+    if (widget.native is NodePreferenceStore) {
+      try {
+        await (widget.native as NodePreferenceStore).writeSelectedNode(null);
+      } catch (_) {
+        // The preference is non-secret and is revalidated against API nodes.
+      }
+    }
     // Keep unresolved revoke intent in RAM so reauthentication can finish it.
     if (mounted) setState(() => showLogin = true);
   }
@@ -331,15 +369,52 @@ class _LoginScreenState extends State<LoginScreen> {
           onPressed: working
               ? null
               : () => perform(() async {
-                  final value = await widget.api
-                      .call('POST', '/api/v1/auth/verify', {
-                        'request_id': challenge!['request_id'],
-                        'verifier': challenge!['verifier'],
-                        'code': code.text.trim(),
-                      });
+                  final dialogContext = context;
+                  final request = <String, dynamic>{
+                    'request_id': challenge!['request_id'],
+                    'verifier': challenge!['verifier'],
+                    'code': code.text.trim(),
+                  };
+                  final value = await widget.api.call(
+                    'POST',
+                    '/api/v1/auth/verify',
+                    request,
+                  );
+                  final probeResult = i026DuplicateOtpProbeEnabled
+                      ? await probeDuplicateOtpReplay(
+                          widget.api,
+                          request,
+                          value,
+                        )
+                      : null;
                   await widget.api.acceptSession(value);
                   code.clear();
                   challenge = null;
+                  if (probeResult != null && dialogContext.mounted) {
+                    final message = switch (probeResult) {
+                      DuplicateOtpReplayResult.rejected =>
+                        'Проверка пройдена: сервер отклонил повторное использование OTP.',
+                      DuplicateOtpReplayResult.accepted =>
+                        'ОШИБКА БЕЗОПАСНОСТИ: сервер принял OTP повторно. Вторичная сессия отозвана; друзей пока не приглашать.',
+                      DuplicateOtpReplayResult.inconclusive =>
+                        'Проверка не завершена: ответ на повторный запрос не удалось подтвердить.',
+                      DuplicateOtpReplayResult.cleanupFailed =>
+                        'Проверка не завершена: не удалось подтвердить отзыв повторной сессии.',
+                    };
+                    await showDialog<void>(
+                      context: dialogContext,
+                      builder: (context) => AlertDialog(
+                        title: const Text('Проверка повторного OTP'),
+                        content: Text(message),
+                        actions: [
+                          TextButton(
+                            onPressed: () => Navigator.of(context).pop(),
+                            child: const Text('Продолжить'),
+                          ),
+                        ],
+                      ),
+                    );
+                  }
                   widget.onSignedIn();
                 }),
           child: const Text('Подтвердить вход'),

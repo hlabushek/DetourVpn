@@ -1,0 +1,62 @@
+{
+  "issue": "I-030",
+  "scope": "isolated closed AWG slot bootstrap and systemd lifecycle on the newly purchased HIP Hosting beta VPN node",
+  "accepted": false,
+  "verified_at": "2026-10-26",
+  "host": {
+    "role": "beta_vpn_node",
+    "provider": "HIP Hosting",
+    "region": "Helsinki, Finland",
+    "os": "Ubuntu 24.04.5 LTS",
+    "plan": "2 vCPU, 2 GB RAM, 20 GB SSD"
+  },
+  "deployment_artifact": {
+    "archive_sha256": "96819182846f7f467b07df894781b954220916780758f4ff9fa4da4c1e8b4b19",
+    "pinned_binary_hashes_validated": true,
+    "package_contains_runtime_credentials": false
+  },
+  "slot": {
+    "configured_count": 1,
+    "systemd_target_host_start_stop_start": "passed",
+    "post_reboot_readiness": "valid_slot_1",
+    "post_reboot_gate": "closed",
+    "persistent_ipv4_forwarding": true,
+    "namespace_isolated": true,
+    "node_agent_active": false,
+    "agent_credential_or_api_binding_present": false,
+    "client_peer_or_private_key_created": false,
+    "external_peer_traffic": false
+  },
+  "target_host_checks": {
+    "systemd_analyze_verify": "passed",
+    "orderly_stop_removed_namespace": true,
+    "orderly_stop_removed_host_veth": true,
+    "orderly_stop_removed_owned_beta_nft_tables": true,
+    "provider_udp_ingress": "not tested",
+    "public_internet_traffic": "not tested"
+  },
+  "security_boundaries": {
+    "server_awg_private_and_header_keys": "generated on node; omitted from repository, API host and evidence",
+    "bootstrap_capability": "CAP_SYS_PTRACE is granted only to the one-shot root bootstrap unit for strict /proc identity checks",
+    "gate_opened": false,
+    "production_or_existing_A_or_B_changed": false
+  },
+  "implementation_fixes": [
+    "allow only the exact transient systemd-executor transition while waiting for the pinned AWG core identity",
+    "require CAP_SYS_PTRACE for UID, namespace inode and executable identity checks under the restricted unit capability set",
+    "allow teardown after the core unit has stopped only when the exact namespace identity remains confirmed",
+    "remove only the fixed beta-owned host veth during rollback and orderly stop",
+    "preserve the private runtime directory across failed stop so cleanup can be retried"
+  ],
+  "recovery": "An earlier failed closed-slot attempt left only its exact beta namespace/veth/nft resources. Read-only inventory confirmed the gate was closed and core/agent inactive; scoped teardown removed those resources. No user data or VPN traffic was present.",
+  "not_accepted": [
+    "provider UDP firewall and external peer handshake/traffic",
+    "API-to-node credential binding and authenticated node-agent operation",
+    "TLS origin and public HTTPS ingress",
+    "live Telegram OTP to Android login, admin MFA enrollment and invite flow",
+    "I-027 off-host encrypted backup, restore drill, independent monitoring and outage drills",
+    "I-028 packet-level DNS/IPv6 privacy audit, second physical device and independent provider",
+    "friend invitations or real user traffic",
+    "Android Always-on/Lockdown safe recovery or kill-switch acceptance"
+  ]
+}

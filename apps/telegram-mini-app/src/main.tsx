@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
-import { CabinetAPI, ApiError, bytes } from "./api.mjs";
+import { CabinetAPI, ApiError, bytes, loginAttemptFromFragment } from "./api.mjs";
 import "./style.css";
 
 type Rule = {
@@ -120,6 +120,8 @@ function message(error: unknown) {
                 "Не удалось подтвердить вход. Закройте и откройте Mini App заново.",
             init_data_replayed:
                 "Этот вход уже использован. Откройте Mini App заново.",
+            invalid_login_attempt:
+                "Попытка входа недействительна. Начните вход заново в Android-приложении.",
             mini_app_disabled: "Кабинет ещё не включён на сервере.",
             unauthorized: "Сессия истекла. Откройте Mini App заново.",
             invalid_refresh: "Сессия истекла. Откройте Mini App заново.",
@@ -140,6 +142,7 @@ function message(error: unknown) {
 
 function App() {
     const api = useRef(new CabinetAPI());
+    const [loginAttempt] = useState(() => loginAttemptFromFragment(window.location.hash));
     const [tab, setTab] = useState("home");
     const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
     const [error, setError] = useState("");
@@ -187,6 +190,30 @@ function App() {
                 return;
             }
             try {
+                if (loginAttempt.present) {
+                    window.history.replaceState(
+                        null,
+                        "",
+                        window.location.pathname + window.location.search,
+                    );
+                    if (!loginAttempt.requestId) {
+                        throw new ApiError("invalid_login_attempt", 400);
+                    }
+                    const result = await api.current.requestLoginCode(
+                        tg.initData,
+                        loginAttempt.requestId,
+                    );
+                    if (active.current) {
+                        setNotice(
+                            result.status === "rejected"
+                                ? "Код не выдан. Проверьте вход и приглашение в закрытый тест; при необходимости начните новую попытку в Android-приложении."
+                                : result.status === "delivery_unknown"
+                                ? "Запрос обработан, но доставку кода подтвердить не удалось. Проверьте чат с ботом; если кода нет, начните новый вход в Android позже."
+                                : "Проверьте личный чат с ботом и введите код в Android-приложении. Не пересылайте его и не вводите в Mini App.",
+                        );
+                    }
+                    return;
+                }
                 await api.current.login(tg.initData);
                 if (active.current) setSignedIn(true);
                 await load();
@@ -258,6 +285,27 @@ function App() {
             </button>
         </section>
     );
+    if (loginAttempt.present) {
+        return (
+            <div className={light ? "app light" : "app"}>
+                <div className="orbit orbit-one" aria-hidden="true" />
+                <div className="orbit orbit-two" aria-hidden="true" />
+                <main>
+                    <header>Detour<span>Vpn</span></header>
+                    <div className="eyebrow">ВХОД В ANDROID-ПРИЛОЖЕНИЕ</div>
+                    <section className="card">
+                        <h1>Код входа</h1>
+                        {busy && <p role="status">Запрашиваем код у сервера…</p>}
+                        {error && <div className="status error" role="alert">{error}</div>}
+                        {notice && <div className="status" role="status">{notice}</div>}
+                        <p>Код приходит в личный чат с ботом. Введите его только в Android-приложении.</p>
+                        <p>Mini App не получает Android-сессию и не управляет VPN.</p>
+                    </section>
+                    <footer>DetourVpn · Безопасный вход</footer>
+                </main>
+            </div>
+        );
+    }
     return (
         <div className={light ? "app light" : "app"}>
             <div className="orbit orbit-one" aria-hidden="true" />

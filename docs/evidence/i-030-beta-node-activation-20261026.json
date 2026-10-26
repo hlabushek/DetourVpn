@@ -1,0 +1,44 @@
+{
+  "issue": "I-030",
+  "scope": "guarded activation of the isolated beta API-to-node control plane",
+  "verified_at": "2026-10-26",
+  "activation": {
+    "completed": true,
+    "api_readiness": 200,
+    "closed_beta_invite_only": true,
+    "window_tunnels_enabled": true,
+    "manifest_configured_and_loaded": true,
+    "node_status": "active",
+    "runtime_identity_present": true,
+    "runtime_last_seen_fresh": true,
+    "authenticated_agent_polls_recent": 38,
+    "node_agent_service": "active",
+    "slot_bootstrap_service": "active",
+    "core_service": "active",
+    "active_peer_connections": 0,
+    "rollback_backup": {
+      "name": "api.env.pre-node-activation-3f701cc95cd24e9598df406ef73dda5f",
+      "owner": "root",
+      "mode": "0600",
+      "manual_rollback_tag": "3f701cc95cd24e9598df406ef73dda5f"
+    }
+  },
+  "checks": {
+    "activation_tests": "16 passed",
+    "provisioning_binding_activation_tests": "40 passed",
+    "local_postgresql_17_targeted_suite": "46 passed; disposable loopback-only cluster removed; beta DB unused",
+    "ruff": "passed",
+    "ruff_format": "passed",
+    "mypy": "passed",
+    "legacy_payload_archive_permissions": "4 trees retained; directories 0700; regular files 0600"
+  },
+  "not_verified": [
+    "user VPN peer handshake or successful tunnel traffic",
+    "provider UDP ingress from an external client",
+    "Android VPN session and DNS/IPv6 privacy acceptance",
+    "two-device, lifecycle, or provider-outage acceptance",
+    "I-027 off-host backup restore and independent monitoring",
+    "friends invited"
+  ],
+  "secrets": "No credentials, private keys, header protection key, bot token, admin secret, or database password included"
+}

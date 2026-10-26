@@ -1,0 +1,34 @@
+[Unit]
+Description=DetourVpn isolated beta control plane
+After=network-online.target detourvpn-beta-database.service
+Wants=network-online.target
+Requires=detourvpn-beta-database.service
+StartLimitIntervalSec=300
+StartLimitBurst=10
+
+[Service]
+Type=simple
+User=detourvpn-beta
+Group=detourvpn-beta
+WorkingDirectory=/opt/detourvpn-beta
+EnvironmentFile=/etc/detourvpn-beta/api.env
+Environment=PYTHONDONTWRITEBYTECODE=1
+ExecStart=/opt/detourvpn-beta/.venv/bin/python -m uvicorn vpn_api.main:create_app --factory --app-dir services/api/src --host 127.0.0.1 --port 28000 --limit-concurrency 32 --no-access-log --no-proxy-headers
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=30
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+LockPersonality=true
+CapabilityBoundingSet=
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+
+[Install]
+WantedBy=multi-user.target

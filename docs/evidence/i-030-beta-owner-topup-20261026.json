@@ -1,0 +1,18 @@
+{
+  "issue": "I-030",
+  "verified_at": "2026-10-26",
+  "scope": "one additional owner-only beta tunnel-test credit",
+  "admin_action": {
+    "operation": "credit",
+    "added_bytes": 1048576,
+    "total_granted_bytes": 2097152,
+    "active_account_count": 1,
+    "reserved_bytes": 0,
+    "used_bytes_unchanged": true,
+    "available_bytes_increased_by": 1048576,
+    "payment": false,
+    "secrets_entered_locally": true
+  },
+  "verification": "scripts/start_beta_owner_topup.ps1 confirmed the expected preconditions and post-credit ledger totals; admin session was logged out",
+  "secrets": "No password, TOTP, access token, account identifier, or private key recorded"
+}

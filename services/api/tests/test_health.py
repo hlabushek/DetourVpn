@@ -82,6 +82,34 @@ def test_local_docs_can_be_enabled_explicitly() -> None:
     assert "/api/v1/auth/verify" in schema["paths"]
 
 
+def test_openapi_documents_mini_app_android_otp_contract() -> None:
+    schema = create_app(
+        Settings(_env_file=None, environment="test", enable_api_docs=True)
+    ).openapi()
+    operation = schema["paths"]["/api/v1/auth/mini-app/request-code"]["post"]
+    body_schema = operation["requestBody"]["content"]["application/json"]["schema"]
+    assert body_schema["$ref"].endswith("/MiniAppCodeInput")
+    response_schema = operation["responses"]["200"]["content"]["application/json"]["schema"]
+    assert response_schema["$ref"].endswith("/MiniAppCodeResponse")
+    assert "request_id" in schema["components"]["schemas"]["MiniAppCodeInput"]["required"]
+    assert set(
+        schema["components"]["schemas"]["MiniAppCodeResponse"]["properties"]["status"]["enum"]
+    ) == {"processed", "delivery_unknown", "rejected"}
+
+
+def test_openapi_documents_mfa_beta_invite_actions() -> None:
+    schema = create_app(
+        Settings(_env_file=None, environment="test", enable_api_docs=True)
+    ).openapi()
+    operation = schema["paths"]["/api/admin/v1/actions"]["post"]
+    body = operation["requestBody"]["content"]["application/json"]["schema"]
+    assert body["$ref"].endswith("/AdminChange")
+    contract = schema["components"]["schemas"]["AdminChange"]
+    assert "telegram_subject" not in contract.get("required", [])
+    assert "grant_beta_invite" in contract["properties"]["operation"]["enum"]
+    assert "revoke_beta_invite" in contract["properties"]["operation"]["enum"]
+
+
 def test_invalid_environment_fails_at_startup() -> None:
     with pytest.raises(ValidationError):
         Settings(_env_file=None, environment="production")

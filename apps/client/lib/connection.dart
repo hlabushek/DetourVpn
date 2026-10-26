@@ -26,8 +26,8 @@ String messageFor(String code) => switch (code) {
     'Не удалось подтвердить удаление сессии с телефона. Повторите выход; при повторной ошибке потребуется очистка данных приложения в Android.',
   'permission_denied' =>
     'Разрешение VPN не выдано. Нажмите «Подключить» и подтвердите запрос Android.',
-  'insufficient_quota' =>
-    'Недостаточно свободного трафика для тестового подключения.',
+  'insufficient_quota' || 'insufficient_window_funding' =>
+    'Недостаточно тестового трафика для нового окна подключения. Дождитесь пополнения баланса.',
   'device_revoked' ||
   'session_expired' ||
   'unauthorized' => 'Доступ завершён. Отключите VPN и войдите снова.',
@@ -61,6 +61,37 @@ String messageFor(String code) => switch (code) {
   _ =>
     'Подключение не выполнено. Проверьте сеть, доступ и готовность тестового узла.',
 };
+
+String? diagnosticErrorCode(String? code, {required bool debugBuild}) {
+  if (!debugBuild ||
+      code == null ||
+      !RegExp(r'^[a-z_]{1,64}$').hasMatch(code)) {
+    return null;
+  }
+  return code;
+}
+
+String? diagnosticStageName(String? stage, {required bool debugBuild}) {
+  if (!debugBuild ||
+      stage == null ||
+      !RegExp(r'^[a-z_]{1,64}$').hasMatch(stage)) {
+    return null;
+  }
+  return stage;
+}
+
+String? diagnosticErrorDetails(
+  String? code,
+  String? stage, {
+  required bool debugBuild,
+}) {
+  final safeCode = diagnosticErrorCode(code, debugBuild: debugBuild);
+  if (safeCode == null) return null;
+  final safeStage = diagnosticStageName(stage, debugBuild: debugBuild);
+  return safeStage == null
+      ? 'Код для диагностики: $safeCode'
+      : 'Код для диагностики: $safeCode; этап: $safeStage';
+}
 
 String nodeMessage(String reason) => switch (reason) {
   'available' => 'Готов принять подключение',
@@ -99,6 +130,7 @@ class ConnectionController extends ChangeNotifier {
   final int leaseBudgetBytes;
   ConnectionPhase phase = ConnectionPhase.disconnected;
   String? error;
+  String? diagnosticStage;
   String detail = 'VPN выключен';
   final QuotaController quota;
   int? get availableBytes => quota.snapshot?.available;

@@ -1,0 +1,68 @@
+{
+  "issue": "I-030",
+  "scope": "beta-only staged API-to-node binding; no activation",
+  "verified_at": "2026-10-26",
+  "node": {
+    "id": "1d230f49-ed36-45f2-91ea-86fe212346f8",
+    "status": "disabled",
+    "agent_config_root_owned_mode": "0600",
+    "credential_root_owned_mode": "0600",
+    "agent_service": "inactive",
+    "one_time_credential_source_removed": true
+  },
+  "api": {
+    "host": "193.68.88.239",
+    "readiness": 200,
+    "database_target": "detourvpn_beta/vpn_api/loopback:25433",
+    "node_status": "disabled",
+    "manifest_root_owned_mode": "0640",
+    "manifest_nodes": 1,
+    "window_tunnels_enabled": false,
+    "manifest_configured_for_runtime": false,
+    "one_time_credential_source_removed": true
+  },
+  "transfer": {
+    "method": "pinned SSH; secret-bearing payloads passed in process memory/stdin",
+    "local_secret_files_created": false,
+    "secret_values_in_stdout_or_receipt": false,
+    "server_private_key_in_api_manifest": false,
+    "source_credential_removed_after_both_host_verifications": true
+  },
+  "checks": {
+    "beta_node_binding_and_provisioning_tests": "23 passed",
+    "node_registry_postgres_integration": "4 passed against disposable PostgreSQL 18 in Kali WSL",
+    "ruff": "passed",
+    "ruff_format": "passed",
+    "mypy": "passed",
+    "embedded_remote_program_syntax": "passed",
+    "live_api_node_metadata_and_modes": "passed",
+    "post_permission_service_state": "API ready; node disabled; node-agent inactive; bootstrap/core active"
+  },
+  "legacy_payload_permissions": {
+    "directories": 4,
+    "nested_directories_per_payload": 4,
+    "regular_files_per_payload": 20,
+    "owners": "root",
+    "unit_or_cron_references": 0,
+    "open_file_references": 0,
+    "mount_points_inside_payloads": 0,
+    "content_deleted": false,
+    "permissions_after": {
+      "directories": "0700",
+      "files": "0600"
+    }
+  },
+  "initial_verification_attempt": {
+    "result": "safely stopped before deleting the source credential",
+    "cause": "verification incorrectly expected no slot readiness markers; the separately managed slot bootstrap had published them",
+    "corrected_gate": "verified node-agent systemd service is inactive; valid slot readiness markers may exist"
+  },
+  "not_verified": [
+    "node-agent authenticated inventory/start/poll and replay rejection",
+    "node activation, API manifest runtime loading, or user tunnel flow",
+    "provider UDP ingress or external peer handshake",
+    "Android DNS/IPv6 privacy acceptance or two-device testing",
+    "I-027 backup restore and independent monitoring acceptance"
+  ],
+  "secrets": "No credential, private key, header protection key, admin token, or database secret is included"
+}

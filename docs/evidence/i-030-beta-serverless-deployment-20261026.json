@@ -1,0 +1,41 @@
+{
+  "date": "2026-10-26",
+  "scope": "beta-serverless-bot-only",
+  "bot_username": "uysdgyfudf_bot",
+  "main_bot_changed": false,
+  "local_cli_login": "completed",
+  "cloud_app_linked": true,
+  "revision": 1,
+  "webhook": "in_sync",
+  "modules_published": [
+    "schema.js",
+    "lib/config.js",
+    "lib/handle.js",
+    "lib/menu.js",
+    "lib/storage.js",
+    "handlers/callback_query.js",
+    "handlers/message.js",
+    "endpoints/runtimeProbe.js"
+  ],
+  "migration": {
+    "mode": "safe",
+    "applied": ["bot_menu_limits", "bot_menu_updates"],
+    "skipped": 0,
+    "drops": 0
+  },
+  "post_deployment_status": "working directory clean",
+  "hosted_runtime_probe": {
+    "has_process_global": false,
+    "has_env_global": false,
+    "has_deno_global": false,
+    "has_bun_global": false,
+    "has_secret_context_field": false,
+    "has_secret_sdk_export": false
+  },
+  "messages_sent_to_users": false,
+  "real_start_flow_tested": false,
+  "telegram_init_data_tested": false,
+  "otp_delivery_tested": false,
+  "android_verification_tested": false,
+  "secrets_recorded": false
+}

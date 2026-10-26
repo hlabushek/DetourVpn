@@ -1,0 +1,72 @@
+{
+  "issue": "I-026",
+  "date": "2026-10-26",
+  "scope": "approved update of isolated beta API host and its dedicated database only",
+  "api_host": "193.68.88.239",
+  "verified_host_role": "beta_api_control_plane",
+  "database": {
+    "name": "detourvpn_beta",
+    "runtime_role": "vpn_api",
+    "revision": "0017_login_delivery_receipt",
+    "backup_1": {
+      "path": "/root/detourvpn-i026-pre-0017-f465d1d3edc34c5a8fa7b34aeb46a8d2/database.dump",
+      "archive_list_validation": true,
+      "bytes": 539295,
+      "sha256": "a2e16001950a19affb2b5eae25e821565cf1ac08ad89b974e2d7eedeed223a56",
+      "directory_mode": "0700",
+      "file_mode": "0600",
+      "owner": "root:root"
+    },
+    "backup_2": {
+      "path": "/root/detourvpn-i026-pre-0017-bf8ec649840e42129c0401f10bee7c56/database.dump",
+      "archive_list_validation": true,
+      "bytes": 551108,
+      "sha256": "9ac3eb0ed760c5c5dff5c8fbfa49482920250128249d07bc698564679c578ab7",
+      "directory_mode": "0700",
+      "file_mode": "0600",
+      "owner": "root:root"
+    }
+  },
+  "deployment_attempts": [
+    {
+      "result": "migration_passed_then_immediate_readiness_check_failed",
+      "database_revision_after": "0017_login_delivery_receipt",
+      "api_source_restored": true,
+      "later_read_only_state": {
+        "api_unit": "active",
+        "api_health_http": 200,
+        "api_ready_http": 200
+      },
+      "interpretation": "API was checked before startup warm-up completed; no blind retry was made"
+    },
+    {
+      "result": "api_source_update_passed_with_resume_from_existing_migration",
+      "migration_reapplied": false,
+      "database_revision": "0017_login_delivery_receipt",
+      "api_unit": "active",
+      "database_unit": "active",
+      "api_health_http": 200,
+      "api_ready_http": 200,
+      "mini_app_http": 200,
+      "empty_request_code_payload_http": 422,
+      "empty_payload_triggered_sender": false
+    }
+  ],
+  "deployed_source_sha256": {
+    "mini_app.py": "69f72f659a26cfe6988fd2939c62ca48f3f4dcac3a2913c32923f0e0176c0d98",
+    "service.py": "3557cf2d087650bb78c28b8874a9202f587964dc32f5d599cdbe76a093d16921",
+    "models.py": "55232a72f35eb17d7e38e4dd66fcb30d9b0a00f8a2242bbe4fd08e2f49512ddd",
+    "0017_login_delivery_receipt.py": "2bbfa410e088ccea6a195d5befe07332bf1b5b340adade7d73a97308116fe0d6"
+  },
+  "live_otp_after_deployment": false,
+  "live_delivery_receipt": false,
+  "hosted_init_data_replay_rejection": "not verified",
+  "hosted_duplicate_otp_rejection": "not verified",
+  "device_pairing": "not verified",
+  "external_calls_to_telegram": false,
+  "botfather_or_bot_configuration_changed": false,
+  "beta_vpn_node_changed": false,
+  "staging_a_changed": false,
+  "host_b_or_production_changed": false,
+  "secrets_or_otp_saved": false
+}

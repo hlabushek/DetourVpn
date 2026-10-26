@@ -34,6 +34,15 @@ export function bytes(value) {
     return `${n / unit},${((n % unit) * 10n) / unit} ${unit === 1000000000n ? "ГБ" : "МБ"}`;
 }
 
+export function loginAttemptFromFragment(fragment) {
+    if (!fragment.startsWith("#")) return { present: false, requestId: null };
+    const value = new URLSearchParams(fragment.slice(1)).get("login_attempt");
+    if (value === null) return { present: false, requestId: null };
+    return /^[0-9a-f]{32}$/.test(value)
+        ? { present: true, requestId: value }
+        : { present: true, requestId: null };
+}
+
 export class ApiError extends Error {
     constructor(code, status) {
         super(code);
@@ -101,6 +110,13 @@ export class CabinetAPI {
         this.tokens = await this.request(
             "/api/v1/auth/mini-app",
             { init_data: initData },
+            false,
+        );
+    }
+    async requestLoginCode(initData, requestId) {
+        return this.request(
+            "/api/v1/auth/mini-app/request-code",
+            { init_data: initData, request_id: requestId },
             false,
         );
     }

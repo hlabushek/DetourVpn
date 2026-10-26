@@ -1,0 +1,10 @@
+# HTTP-01 bootstrap only. It serves the challenge and never proxies API traffic.
+http://{$DETOURVPN_BETA_IP} {
+	handle /.well-known/acme-challenge/* {
+		root * /var/lib/detourvpn-beta/acme
+		file_server
+	}
+	handle {
+		respond 404
+	}
+}

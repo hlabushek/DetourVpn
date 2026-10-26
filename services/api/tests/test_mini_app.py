@@ -1,5 +1,6 @@
 """Real local PostgreSQL/API; signed Telegram input is TEST SYNTHETIC ONLY."""
 
+import re
 from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC, datetime, timedelta
 from threading import Barrier
@@ -7,16 +8,17 @@ from uuid import uuid4
 
 import pytest
 from alembic import command
+from httpx2 import Response
 from sqlalchemy import func, select, update
 from sqlalchemy.exc import DBAPIError
-from test_authentication import Harness, begin, harness, headers, issue, login
+from test_authentication import Harness, begin, bot_update, harness, headers, issue, login, webhook
 from test_migrations import migration_config
 from test_mini_app_validation import signed
 from test_rewards import rule
 
 from vpn_api.auth.contracts import TokenResponse
 from vpn_api.db.connection import transaction
-from vpn_api.db.models import MiniAppExchange, SessionFamily, User
+from vpn_api.db.models import CodeIssue, LoginAttempt, MiniAppExchange, SessionFamily, User
 
 __all__ = ["harness"]
 pytestmark = pytest.mark.postgres
@@ -36,6 +38,14 @@ def exchange(h: Harness, raw: str) -> TokenResponse:
     result = h.client.post("/api/v1/auth/mini-app", json={"init_data": raw})
     assert result.status_code == 200
     return TokenResponse.model_validate(result.json())
+
+
+def request_code(h: Harness, raw: str, request_id: str) -> Response:
+    h.auth.settings.enable_mini_app = True
+    return h.client.post(
+        "/api/v1/auth/mini-app/request-code",
+        json={"init_data": raw, "request_id": request_id},
+    )
 
 
 def test_disabled_and_no_payload_echo(harness: Harness) -> None:
@@ -90,6 +100,159 @@ def test_existing_identity_shared_balance_and_restricted_session(harness: Harnes
     )
     with transaction(h.engine) as session:
         assert session.scalar(select(func.count()).select_from(User)) == 1
+
+
+def test_mini_app_identity_can_deliver_android_otp_without_creating_mini_session(
+    harness: Harness,
+) -> None:
+    h = harness
+    start = begin(h)
+    raw = payload(h, subject=123)
+    response = request_code(h, raw, start.request_id.hex)
+    assert response.status_code == 200
+    assert response.json() == {"status": "processed"}
+    assert raw not in response.text and start.verifier not in response.text
+    assert len(h.sender.messages) == 1 and h.sender.messages[0][0] == 123
+    match = re.search(r"Код входа: ([0-9]{8})", h.sender.messages[0][1])
+    assert match is not None
+    assert raw not in h.sender.messages[0][1]
+    with transaction(h.engine) as session:
+        assert session.scalar(select(func.count()).select_from(SessionFamily)) == 0
+        attempt = session.get(LoginAttempt, start.request_id)
+        assert attempt is not None
+        assert attempt.delivery_status == "api_accepted"
+        assert attempt.delivery_recorded_at is not None
+    tokens = h.auth.verify(start.request_id, start.verifier, match[1], "test-android")
+    assert h.client.get("/api/v1/me", headers=headers(tokens)).status_code == 200
+
+
+def test_mini_app_android_otp_rejects_bad_signature_and_replayed_init_data(
+    harness: Harness,
+) -> None:
+    h = harness
+    start = begin(h)
+    raw = payload(h, subject=123)
+    invalid = request_code(h, raw + "x", start.request_id.hex)
+    assert invalid.status_code == 401 and raw not in invalid.text
+    assert len(h.sender.messages) == 0
+
+    barrier = Barrier(10)
+
+    def worker(_: int) -> int:
+        barrier.wait(timeout=30)
+        return request_code(h, raw, start.request_id.hex).status_code
+
+    with ThreadPoolExecutor(max_workers=10) as pool:
+        statuses = list(pool.map(worker, range(10)))
+    assert statuses.count(200) == 1
+    assert statuses.count(409) == 9
+    assert len(h.sender.messages) == 1
+    with transaction(h.engine) as session:
+        assert session.scalar(select(func.count()).select_from(MiniAppExchange)) == 1
+        attempt = session.get(LoginAttempt, start.request_id)
+        assert attempt is not None and attempt.delivery_status == "api_accepted"
+
+
+def test_beta_invites_block_webhook_mini_app_otp_and_direct_session(harness: Harness) -> None:
+    h = harness
+    h.auth.settings.beta_invites_only = True
+    start = begin(h)
+
+    assert webhook(h, bot_update(start, subject=123)) == "processed"
+    assert "только участникам закрытого теста" in h.sender.messages[-1][1]
+    assert "Код входа:" not in h.sender.messages[-1][1]
+
+    messages_before = len(h.sender.messages)
+    response = request_code(h, payload(h, subject=123), start.request_id.hex)
+    assert response.status_code == 200
+    assert response.json() == {"status": "rejected"}
+    assert len(h.sender.messages) == messages_before
+
+    direct = h.client.post("/api/v1/auth/mini-app", json={"init_data": payload(h, subject=456)})
+    assert direct.status_code == 403
+    assert "456" not in direct.text
+
+    with transaction(h.engine) as session:
+        attempt = session.get(LoginAttempt, start.request_id)
+        assert attempt is not None and attempt.subject is None and attempt.generation == 0
+        assert session.scalar(select(func.count()).select_from(CodeIssue)) == 0
+        assert session.scalar(select(func.count()).select_from(User)) == 0
+
+
+def test_mini_app_rejected_or_rate_limited_code_request_does_not_message_user(
+    harness: Harness,
+) -> None:
+    h = harness
+    start = begin(h)
+    # A valid Telegram identity with an unknown attempt must not cause a bot DM.
+    unknown = request_code(h, payload(h), uuid4().hex)
+    assert unknown.status_code == 200
+    assert unknown.json() == {"status": "rejected"}
+    assert h.sender.messages == []
+
+    valid = request_code(h, payload(h), start.request_id.hex)
+    assert valid.status_code == 200 and valid.json() == {"status": "processed"}
+    assert len(h.sender.messages) == 1
+    limited = request_code(h, payload(h), start.request_id.hex)
+    assert limited.status_code == 200 and limited.json() == {"status": "rejected"}
+    assert len(h.sender.messages) == 1
+
+
+def test_mini_app_otp_attempt_cannot_be_rebound_to_another_telegram_user(
+    harness: Harness,
+) -> None:
+    h = harness
+    start = begin(h)
+    first = request_code(h, payload(h, subject=123), start.request_id.hex)
+    assert first.status_code == 200
+    first_code = re.search(r"Код входа: ([0-9]{8})", h.sender.messages[-1][1])
+    assert first_code is not None and h.sender.messages[-1][0] == 123
+
+    messages_before = len(h.sender.messages)
+    second = request_code(h, payload(h, subject=456), start.request_id.hex)
+    assert second.status_code == 200 and second.json() == {"status": "rejected"}
+    assert len(h.sender.messages) == messages_before
+    tokens = h.auth.verify(start.request_id, start.verifier, first_code[1], "test-android")
+    assert h.client.get("/api/v1/me", headers=headers(tokens)).json()["telegram_subject"] == 123
+
+
+def test_mini_app_otp_delivery_unknown_is_not_retried(harness: Harness) -> None:
+    h = harness
+    h.sender.fail = True
+    start = begin(h)
+    raw = payload(h, subject=123)
+    response = request_code(h, raw, start.request_id.hex)
+    assert response.status_code == 200
+    assert response.json() == {"status": "delivery_unknown"}
+    assert raw not in response.text and start.verifier not in response.text
+    assert request_code(h, raw, start.request_id.hex).status_code == 409
+    assert len(h.sender.messages) == 0
+    with transaction(h.engine) as session:
+        attempt = session.get(LoginAttempt, start.request_id)
+        assert attempt is not None
+        assert attempt.delivery_status == "unknown"
+        assert attempt.delivery_recorded_at is not None
+
+
+def test_late_delivery_receipt_cannot_overwrite_newer_code_generation(harness: Harness) -> None:
+    h = harness
+    start = begin(h)
+    response = request_code(h, payload(h), start.request_id.hex)
+    assert response.status_code == 200 and response.json() == {"status": "processed"}
+    with transaction(h.engine) as session:
+        attempt = session.get(LoginAttempt, start.request_id)
+        assert attempt is not None and attempt.generation == 1
+        attempt.generation = 2
+        attempt.delivery_status = "pending"
+        attempt.delivery_recorded_at = None
+
+    result = h.auth.deliver_login_code(start.request_id, 1, 123, "TEST ONLY delayed send")
+    assert result == "processed"
+    with transaction(h.engine) as session:
+        attempt = session.get(LoginAttempt, start.request_id)
+        assert attempt is not None
+        assert attempt.generation == 2 and attempt.delivery_status == "pending"
+        assert attempt.delivery_recorded_at is None
 
 
 def test_native_and_mini_app_concurrent_first_login_share_initial_grant(harness: Harness) -> None:

@@ -6,13 +6,14 @@ import json
 import re
 from datetime import timedelta
 from urllib.parse import parse_qsl
+from uuid import UUID
 
 from fastapi import APIRouter, Request
 from pydantic import Field, SecretStr
 from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert
 
-from vpn_api.auth.contracts import Input, TokenResponse
+from vpn_api.auth.contracts import Input, MiniAppCodeResponse, TokenResponse
 from vpn_api.auth.routes import Service, network
 from vpn_api.auth.security import AuthError
 from vpn_api.auth.service import database_now
@@ -57,6 +58,10 @@ class MiniAppInput(Input):
     init_data: SecretStr = Field(min_length=1, max_length=16384)
 
 
+class MiniAppCodeInput(MiniAppInput):
+    request_id: str = Field(pattern=r"^[0-9a-f]{32}$")
+
+
 router = APIRouter(
     tags=["authentication"],
     responses={code: {"model": ErrorResponse} for code in (401, 403, 409, 422, 429, 503)},
@@ -81,6 +86,8 @@ def exchange(body: MiniAppInput, request: Request, auth: Service) -> TokenRespon
         now = database_now(session)
         if now.timestamp() - issued > 300:
             raise AuthError("invalid_init_data")
+        if not auth.beta_subject_allowed(session, subject):
+            raise AuthError("beta_invite_required", 403)
         claimed = session.scalar(
             insert(MiniAppExchange)
             .values(digest=replay, expires_at=now + timedelta(minutes=6))
@@ -122,3 +129,41 @@ def exchange(body: MiniAppInput, request: Request, auth: Service) -> TokenRespon
         session.add(family)
         session.flush()
         return auth.issue_tokens(session, family, now)
+
+
+@router.post("/api/v1/auth/mini-app/request-code", response_model=MiniAppCodeResponse)
+def request_code(body: MiniAppCodeInput, request: Request, auth: Service) -> MiniAppCodeResponse:
+    if not auth.settings.enable_mini_app:
+        raise AuthError("mini_app_disabled", 503)
+    auth.rate("mini_app", network(request))
+    bot_token = auth.settings.telegram_bot_token
+    if bot_token is None:
+        raise AuthError("mini_app_disabled", 503)
+    with transaction(auth.engine) as session:
+        subject, replay, issued = validate_init_data(
+            body.init_data.get_secret_value(),
+            bot_token.get_secret_value(),
+            database_now(session).timestamp(),
+        )
+        auth.lock(session, "subject", subject)
+        now = database_now(session)
+        if now.timestamp() - issued > 300:
+            raise AuthError("invalid_init_data")
+        claimed = session.scalar(
+            insert(MiniAppExchange)
+            .values(digest=replay, expires_at=now + timedelta(minutes=6))
+            .on_conflict_do_nothing()
+            .returning(MiniAppExchange.digest)
+        )
+        if claimed is None:
+            raise AuthError("init_data_replayed", 409)
+        prepared = auth.prepare_login_code(session, UUID(hex=body.request_id), subject)
+    if not prepared.issued:
+        return MiniAppCodeResponse(status="rejected")
+    if prepared.generation is None:
+        raise RuntimeError("Issued login code has no generation")
+    return MiniAppCodeResponse(
+        status=auth.deliver_login_code(
+            UUID(hex=body.request_id), prepared.generation, subject, prepared.message
+        )
+    )

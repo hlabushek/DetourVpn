@@ -1,0 +1,23 @@
+{
+  "issue": "I-029",
+  "reported_at": "2026-10-26",
+  "source": "owner-reported physical Pixel 8 Pro observation; no packet capture",
+  "debug_window_budget_bytes": 262144,
+  "observed": {
+    "android_vpn_indicator": true,
+    "telegram_loaded_and_messages_arrived": true,
+    "approximate_ui_remaining_traffic_bytes": [1100000, 602000, 300000],
+    "traffic_stalled_at_low_remaining_balance": true,
+    "owner_manually_disconnected": true,
+    "next_lease_error": "insufficient_window_funding",
+    "error_stage": "lease_create"
+  },
+  "interpretation": "A real Android VPN session carried Telegram traffic. A later lease could not be funded from the remaining beta quota.",
+  "not_verified": [
+    "TikTok traffic",
+    "packet-level DNS and IPv6 behavior",
+    "independent handshake receipt",
+    "Always-on, Lockdown, and failure recovery"
+  ],
+  "secrets": "No credentials, account identifiers, keys, profiles, or packet contents recorded"
+}

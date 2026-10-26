@@ -1,6 +1,9 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'connection.dart';
+import 'native_tunnel.dart';
 import 'window_connection.dart';
 import 'split_apps.dart';
 import 'orbit_widgets.dart';
@@ -51,6 +54,17 @@ class ConnectionScreen extends StatelessWidget {
                   groupValue: c.selectedNode,
                   onChanged: (value) {
                     c.selectNode(value);
+                    if (c is WindowConnectionController &&
+                        c.selectedNode == value &&
+                        c.native is NodePreferenceStore) {
+                      unawaited(
+                        _saveNodePreference(
+                          context,
+                          c.native as NodePreferenceStore,
+                          value,
+                        ),
+                      );
+                    }
                     Navigator.pop(context);
                   },
                   child: Column(
@@ -274,11 +288,23 @@ class ConnectionScreen extends StatelessWidget {
                 padding: const EdgeInsets.symmetric(vertical: 16),
                 child: Semantics(
                   liveRegion: true,
-                  child: Text(
-                    messageFor(c.error!),
-                    style: TextStyle(
-                      color: Theme.of(context).colorScheme.error,
-                    ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        messageFor(c.error!),
+                        style: TextStyle(
+                          color: Theme.of(context).colorScheme.error,
+                        ),
+                      ),
+                      if (diagnosticErrorDetails(
+                            c.error,
+                            c.diagnosticStage,
+                            debugBuild: kDebugMode,
+                          )
+                          case final details?)
+                        Text(details),
+                    ],
                   ),
                 ),
               ),
@@ -318,6 +344,24 @@ class ConnectionScreen extends StatelessWidget {
       );
     },
   );
+
+  Future<void> _saveNodePreference(
+    BuildContext context,
+    NodePreferenceStore store,
+    String? selected,
+  ) async {
+    try {
+      await store.writeSelectedNode(selected);
+    } catch (_) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Выбор узла не сохранён на этом устройстве'),
+          ),
+        );
+      }
+    }
+  }
 }
 
 class ProfileScreen extends StatelessWidget {
@@ -330,6 +374,7 @@ class ProfileScreen extends StatelessWidget {
   final Future<void> Function() onSignOut;
   final VoidCallback onTheme;
   final ConnectionController controller;
+  static const _vpnSettings = MethodChannel('project.vpn/tunnel.v1');
   @override
   Widget build(BuildContext context) => ListenableBuilder(
     listenable: controller,
@@ -399,6 +444,28 @@ class ProfileScreen extends StatelessWidget {
               MaterialPageRoute<void>(builder: (_) => const SplitAppsScreen()),
             ),
           ),
+        ListTile(
+          leading: const Icon(Icons.security),
+          title: const Text('Системные настройки VPN'),
+          subtitle: const Text(
+            'Always-on и блокировку соединений настраивает пользователь в Android. '
+            'Восстановление проверяется только в debug-сборке и ещё не принято на устройстве. '
+            'С Lockdown Android может блокировать исключённые приложения; при сбое VPN доступ останется заблокированным.',
+          ),
+          onTap: () async {
+            try {
+              await _vpnSettings.invokeMethod<void>('openVpnSettings');
+            } on PlatformException {
+              if (context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Не удалось открыть настройки VPN Android'),
+                  ),
+                );
+              }
+            }
+          },
+        ),
         OutlinedButton.icon(
           onPressed: controller.busy ? null : onSignOut,
           icon: const Icon(Icons.logout),

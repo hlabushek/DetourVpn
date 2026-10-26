@@ -14,6 +14,7 @@ import pytest
 from alembic import command
 from cryptography.fernet import Fernet
 from fastapi.testclient import TestClient
+from pydantic import SecretStr
 from sqlalchemy import Engine, func, select, text
 from sqlalchemy.exc import DBAPIError
 from test_authentication import Harness as UserHarness
@@ -23,8 +24,8 @@ from test_operations import binaries, key
 
 from vpn_api import admin as admin_module
 from vpn_api import operations as ops
-from vpn_api.admin import AdminLogin, AdminService, otp, password_hash
-from vpn_api.auth.security import AuthError
+from vpn_api.admin import AdminChange, AdminLogin, AdminService, otp, password_hash
+from vpn_api.auth.security import AuthError, beta_invite_digest
 from vpn_api.auth.service import database_now
 from vpn_api.config import Settings
 from vpn_api.db.connection import transaction
@@ -32,6 +33,8 @@ from vpn_api.db.models import (
     AdminAction,
     AdminIdentity,
     AdminSession,
+    AuthIdentity,
+    BetaInvite,
     Device,
     PeerCommand,
     QuotaLedger,
@@ -41,6 +44,7 @@ from vpn_api.db.models import (
     VPNNode,
 )
 from vpn_api.main import create_app
+from vpn_api.quota.contracts import QuotaError
 from vpn_api.quota.service import LedgerService
 
 __all__ = ["harness", "binaries", "key"]
@@ -493,3 +497,107 @@ def test_admin_encrypted_backup_restores_identity_audit_and_quota(
     assert backup.tables["admin_identities"].rows == 1
     assert backup.tables["admin_actions"].rows == 1
     assert ops.restore_drill(h.engine, binaries, archive, key)["accounts_reconciled"] == 1
+
+
+def test_beta_invite_grant_revokes_sessions_and_allows_safe_reinvite(
+    admin: Harness, harness: UserHarness
+) -> None:
+    h = admin
+    user = harness
+    subject = 987654321
+    h.service.settings.beta_invites_only = True
+    h.service.settings.auth_pepper = user.settings.auth_pepper
+    user.auth.settings.beta_invites_only = True
+    admin_headers = authorization(h)
+    body = {
+        "operation": "grant_beta_invite",
+        "idempotency_key": str(uuid4()),
+        "reason": "TEST ONLY closed beta invite",
+        "telegram_subject": subject,
+    }
+    granted = h.client.post("/api/admin/v1/actions", headers=admin_headers, json=body)
+    assert granted.status_code == 200
+    assert str(subject) not in granted.text
+    granted_result = granted.json()
+    assert granted_result["status"] == "active"
+    assert h.client.post("/api/admin/v1/actions", headers=admin_headers, json=body).json() == (
+        granted_result
+    )
+
+    tokens = login(user, subject)
+    assert user.client.get("/api/v1/me", headers=headers(tokens)).status_code == 200
+    with transaction(h.engine) as session:
+        invite = session.get(BetaInvite, UUID(granted_result["beta_invite_id"]))
+        assert invite is not None
+        assert invite.subject_digest == beta_invite_digest(user.auth.pepper, subject)
+        assert str(subject) not in invite.subject_digest
+
+    revoked = change(
+        h,
+        admin_headers,
+        operation="revoke_beta_invite",
+        telegram_subject=subject,
+    )
+    assert revoked["status"] == "revoked"
+    assert user.client.get("/api/v1/me", headers=headers(tokens)).status_code == 401
+    assert (
+        user.client.post(
+            "/api/v1/auth/refresh", json={"refresh_token": tokens.refresh_token}
+        ).status_code
+        == 401
+    )
+    with transaction(h.engine) as session:
+        identity = session.scalar(
+            select(AuthIdentity).where(AuthIdentity.provider_subject == subject)
+        )
+        assert identity is not None
+        account = session.get(User, identity.user_id)
+        assert account is not None and account.status == "disabled"
+
+    reinvited = change(
+        h,
+        admin_headers,
+        operation="grant_beta_invite",
+        telegram_subject=subject,
+    )
+    assert reinvited["status"] == "active"
+    replacement = login(user, subject)
+    assert user.client.get("/api/v1/me", headers=headers(replacement)).status_code == 200
+    assert user.client.get("/api/v1/me", headers=headers(tokens)).status_code == 401
+
+
+def test_beta_invite_concurrent_grants_are_serialized(admin: Harness) -> None:
+    h = admin
+    h.service.settings.beta_invites_only = True
+    h.service.settings.auth_pepper = SecretStr("P" * 43)
+    subject = 987654322
+    barrier = Barrier(2, timeout=15)
+
+    def grant(_: int) -> str:
+        body = AdminChange(
+            operation="grant_beta_invite",
+            idempotency_key=uuid4(),
+            reason="TEST ONLY concurrent invite",
+            telegram_subject=subject,
+        )
+        barrier.wait()
+        try:
+            with transaction(h.engine) as session:
+                identity = session.get(AdminIdentity, h.identity_id)
+                assert identity is not None
+                h.service.change(session, identity, body)
+            return "created"
+        except QuotaError as error:
+            return error.code
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        outcomes = sorted(pool.map(grant, range(2)))
+    assert outcomes == ["beta_invite_exists", "created"]
+    with transaction(h.engine) as session:
+        rows = session.scalars(
+            select(BetaInvite).where(
+                BetaInvite.subject_digest == beta_invite_digest("P" * 43, subject),
+                BetaInvite.revoked_at.is_(None),
+            )
+        )
+        assert len(list(rows)) == 1

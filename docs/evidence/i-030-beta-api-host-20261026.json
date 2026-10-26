@@ -1,0 +1,78 @@
+{
+  "issue": "I-030",
+  "scope": "partial deployment of isolated beta control plane on the newly purchased HIP Hosting beta API host",
+  "accepted": false,
+  "verified_at": "2026-10-26",
+  "host": {
+    "role": "beta_api_control_plane",
+    "provider": "HIP Hosting",
+    "region": "Helsinki, Finland",
+    "os": "Ubuntu 24.04.5 LTS",
+    "plan": "2 vCPU, 4 GB RAM, 40 GB SSD"
+  },
+  "database": {
+    "container_health": "healthy",
+    "systemd_unit": "active",
+    "published_bind": "127.0.0.1:25433",
+    "schema_revision": "0016_beta_invites",
+    "roles": ["vpn_beta_bootstrap", "vpn_migrator", "vpn_api"],
+    "runtime_role_is_separate_from_migrator": true,
+    "initialization_recovery": "standard init script rerun against the empty beta cluster after initial SCRAM failure; volume was preserved",
+    "container_restart_acceptance": "passed; database remained healthy and schema revision stayed 0016_beta_invites"
+  },
+  "api": {
+    "systemd_unit": "active",
+    "readiness_http_status": 200,
+    "published_bind": "127.0.0.1:28000",
+    "environment": "closed admin-only setup",
+    "auth_enabled": false,
+    "mini_app_enabled": false,
+    "invite_only_enabled": false,
+    "external_api_ingress": false,
+    "https_origin_closed_404_only": true,
+    "admin_mfa_enrollment": "not performed",
+    "container_restart_acceptance": "passed; readiness HTTP 200 after API and database container restart",
+    "host_reboot_acceptance": "passed; Docker, PostgreSQL and API returned active with readiness HTTP 200"
+  },
+  "follow_up_2026_10_26_invite_guard_rollout": {
+    "target": "/opt/detourvpn-beta/services/api/src/vpn_api/config.py",
+    "change": "closed Mini App now refuses startup unless beta invite enforcement is enabled",
+    "deployed_sha256": "313c7ec31f762fbc7355c857c2aac4da43c1387e23d006b406bfaae2c43c95a0",
+    "rollback_copy": "/opt/detourvpn-beta/services/api/src/vpn_api/config.py.pre-i030-guard-ff44b61d576f4505b93ed882018dbbef",
+    "api_service_restart": "passed",
+    "local_readiness_after_restart": 200,
+    "external_https_api_ready_after_restart": 404,
+    "caddy_or_api_environment_changed": false,
+    "botfather_or_telegram_changed": false,
+    "production_or_b_changed": false
+  },
+  "maintenance": {
+    "oneshot_run": "passed",
+    "hourly_systemd_timer": "enabled; no off-host backup or independent alert delivery implied"
+  },
+  "security_boundaries": {
+    "secrets": "generated on the beta host; not recorded in repository or evidence",
+    "source_release": "beta-only allowlisted source snapshot; no credentials or runtime tunnel keys",
+    "ports": "API and database listen on loopback only",
+    "production_or_A_or_B_changed": false,
+    "botfather_or_telegram_changed": false,
+    "dns_changed": false,
+    "beta_ip_certificate_changed": true,
+    "separate_beta_vpn_node_changed": true,
+    "api_host_node_agent_or_tunnel_keys": false
+  },
+  "failures_and_recovery": [
+    "Initial PostgreSQL init hook failed SCRAM authentication. Inspection confirmed the beta database and application roles did not exist. The standard init script then completed without deleting or recreating the volume.",
+    "First migration attempt used the restricted runtime database role and was denied schema CREATE. Migration was rerun with vpn_migrator; runtime-role privileges were not elevated.",
+    "First API service start failed with systemd 203/EXEC because the app user could not traverse the private Python tree. Release permissions were corrected to root-owned, group-readable/executable files; API now starts and passes readiness."
+  ],
+  "not_accepted": [
+    "API/Mini App HTTPS service and independent certificate-expiry alerting; challenge-only TLS is documented separately",
+    "live Telegram Mini App initData to OTP to Android verification",
+    "admin MFA bootstrap and invite workflow",
+    "off-host encrypted backup, restore drill, independent monitoring and outage drills",
+    "API-to-node credential binding and provider UDP ingress on the separate beta VPN node",
+    "I-028 physical DNS/IPv6/privacy acceptance, second device, and independent provider",
+    "friend invitations or real user traffic"
+  ]
+}

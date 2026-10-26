@@ -1,0 +1,16 @@
+[Unit]
+Description=DetourVpn isolated beta PostgreSQL
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+WorkingDirectory=/opt/detourvpn-beta
+ExecStart=/usr/bin/docker compose -f infra/beta/compose.yaml up -d --wait
+ExecStop=/usr/bin/docker compose -f infra/beta/compose.yaml stop
+TimeoutStartSec=180
+TimeoutStopSec=90
+
+[Install]
+WantedBy=multi-user.target

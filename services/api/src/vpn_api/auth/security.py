@@ -23,6 +23,11 @@ def keyed_digest(pepper: str, *parts: str | int) -> str:
     return hmac.new(pepper.encode("ascii"), payload.encode("ascii"), hashlib.sha256).hexdigest()
 
 
+def beta_invite_digest(pepper: str, telegram_subject: int) -> str:
+    """Pseudonymize a beta invitee identity with explicit domain separation."""
+    return keyed_digest(pepper, "beta-invite", telegram_subject)
+
+
 def token() -> str:
     return secrets.token_urlsafe(32)
 

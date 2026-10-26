@@ -15,6 +15,13 @@ const runtime = '44444444-4444-4444-8444-444444444444';
 class Native extends FakeNative implements WindowNative {
   int advances = 0;
   int remaining = 59000;
+  bool failPublicKey = false;
+  @override
+  Future<String> publicKey() async {
+    if (failPublicKey) throw StateError('TEST ONLY native key failure');
+    return super.publicKey();
+  }
+
   @override
   Future<NativeSnapshot> snapshot() async => NativeSnapshot(
     up: up,
@@ -54,10 +61,15 @@ class WindowsApi implements TunnelApi {
   bool tamper = false;
   bool denied = false;
   bool oldConnection = false;
+  bool failDeletes = false;
+  bool deviceBound = false;
+  String? invalidResponsePath;
   int creates = 0;
   int deletes = 0;
+  final budgets = <int>[];
   final renewKeys = <String>[];
   final createKeys = <String>[];
+  final calls = <String>[];
   Completer<void>? renewalGate;
   late DateTime issued = DateTime.now().toUtc();
   Map<String, dynamic> view() => {
@@ -88,30 +100,42 @@ class WindowsApi implements TunnelApi {
     String path, [
     Map<String, dynamic>? body,
   ]) async {
+    calls.add('$method $path');
+    if (path == invalidResponsePath) {
+      throw const ClientError('invalid_response');
+    }
     if (path.endsWith('/quota') || path.contains('/quota/history')) return {};
-    if (path.endsWith('/devices')) return {'id': device};
+    if (path.endsWith('/devices')) {
+      deviceBound = true;
+      return {'id': device};
+    }
     if (path.contains('/key-challenge/'))
       return {
         'id': device,
         'ephemeral_public_key': 'TEST ONLY',
         'transcript': 'TEST ONLY',
       };
-    if (method == 'GET' && path == WindowConnectionController.root)
+    if (method == 'GET' && path == WindowConnectionController.root) {
+      if (!deviceBound) throw const ClientError('session_device_mismatch');
       return {
         'items': oldConnection ? [view()] : <Map<String, dynamic>>[],
       };
+    }
     if (method == 'DELETE') {
       deletes++;
+      if (failDeletes) throw const ClientError('network_unavailable');
       state = 'closed';
       return view();
     }
     if (path.endsWith('/renew')) {
-      renewKeys.add(body!['idempotency_key'] as String);
+      final request = body!;
+      budgets.add(request['budget_bytes'] as int);
+      renewKeys.add(request['idempotency_key'] as String);
       if (renewalGate != null) await renewalGate!.future;
       if (denied) throw const ClientError('insufficient_quota');
       if (generation == 1) {
         generation++;
-        window = body['idempotency_key'] as String;
+        window = request['idempotency_key'] as String;
         issued = issued.add(const Duration(seconds: 1));
       }
       if (lostRenew) {
@@ -123,7 +147,9 @@ class WindowsApi implements TunnelApi {
     }
     if (method == 'POST' && path == WindowConnectionController.root) {
       creates++;
-      createKeys.add(body!['idempotency_key'] as String);
+      final request = body!;
+      budgets.add(request['budget_bytes'] as int);
+      createKeys.add(request['idempotency_key'] as String);
       if (lostCreate) {
         lostCreate = false;
         throw const ClientError('network_unavailable');
@@ -150,13 +176,77 @@ void main() {
     c.selectedNode = node;
   });
   tearDown(() => c.dispose());
+  test('production window budget remains 1 MiB by default', () {
+    expect(WindowConnectionController.budgetBytes, 1048576);
+  });
+  test(
+    'invalid registration response identifies its bounded diagnostic stage',
+    () async {
+      api.invalidResponsePath = '/api/v1/devices';
+      await c.connect();
+      expect(c.error, 'invalid_response');
+      expect(c.diagnosticStage, 'device_registration');
+      expect(native.starts, 0);
+    },
+  );
+  test(
+    'native public-key failure is not reported as invalid API response',
+    () async {
+      native.failPublicKey = true;
+      await c.refresh();
+      expect(c.error, 'native_unavailable');
+      expect(c.diagnosticStage, 'device_key_read');
+      expect(api.calls.where((call) => call.contains('/devices')), isEmpty);
+      expect(
+        api.calls.where((call) => call.contains('/window-tunnels/')),
+        isEmpty,
+      );
+    },
+  );
   test('active ACK starts native; confirmed handshake drives status', () async {
     await c.connect();
+    expect(api.budgets, [WindowConnectionController.budgetBytes]);
     expect(native.starts, 1);
     await c.refresh();
+    expect(api.budgets, [
+      WindowConnectionController.budgetBytes,
+      WindowConnectionController.budgetBytes,
+    ]);
     expect(native.advances, 1);
     expect(c.phase, ConnectionPhase.connected);
   });
+  test(
+    'fresh OTP session binds phone key before reconciling connections',
+    () async {
+      await c.refresh();
+      expect(c.error, isNull);
+      expect(c.phase, ConnectionPhase.disconnected);
+      expect(
+        api.calls.indexOf('POST /api/v1/devices'),
+        lessThan(api.calls.indexOf('GET ${WindowConnectionController.root}')),
+      );
+    },
+  );
+  test(
+    'new OTP family rebinds the existing phone key before reconciliation',
+    () async {
+      await c.refresh();
+      api.deviceBound = false;
+      c.onAuthenticatedSessionChanged();
+      await c.refresh();
+      expect(
+        api.calls.where((call) => call == 'POST /api/v1/devices').length,
+        2,
+      );
+      expect(
+        api.calls
+            .where((call) => call == 'GET ${WindowConnectionController.root}')
+            .length,
+        2,
+      );
+      expect(c.error, isNull);
+    },
+  );
   test(
     'lost renewal response retries same intent and extends only once',
     () async {
@@ -207,6 +297,21 @@ void main() {
     expect(native.up, false);
     expect(api.deletes, 1);
   });
+  test(
+    'confirmed server close clears an earlier revoke-unconfirmed warning',
+    () async {
+      await c.connect();
+      api.failDeletes = true;
+      await c.disconnect();
+      expect(c.remotePending, true);
+      expect(c.error, 'revoke_unconfirmed');
+      api.failDeletes = false;
+      await c.refresh();
+      expect(c.hasLease, false);
+      expect(c.remotePending, false);
+      expect(c.error, isNull);
+    },
+  );
   test(
     'ambiguous create is reconciled with original idempotency key',
     () async {

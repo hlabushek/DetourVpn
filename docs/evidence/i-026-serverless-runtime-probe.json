@@ -1,0 +1,76 @@
+{
+  "issue": "I-026",
+  "executed_on": "2026-10-25",
+  "botfather_ui": {
+    "serverless_overview_has_dedicated_secrets_section": false,
+    "sections_observed": ["CLI Access", "Handlers", "Endpoints", "Library", "Database", "Mini App Files"],
+    "endpoints_was_empty_before_probe": true,
+    "runtime_probe_endpoint_saved": true,
+    "cloud_revision_after_save": 3,
+    "access_token_visible_in_accessibility_output": true,
+    "access_token_copied_or_used": false,
+    "rotation_status": "deferred_by_owner"
+  },
+  "cli_run_probe": {
+    "executed": true,
+    "deployed_by_run": false,
+    "module_name": "endpoints/runtimeProbe",
+    "request_context": {},
+    "result": {
+      "runtime_keys_matching_process_env_deno_bun_secrets_config": [],
+      "context_keys_matching_secret_env_config": [],
+      "sdk_exports_matching_secret_env_config": []
+    }
+  },
+  "botfather_console_probe": {
+    "executed": true,
+    "result": {
+      "hasProcessGlobal": false,
+      "hasEnvGlobal": false,
+      "hasDenoGlobal": false,
+      "hasBunGlobal": false,
+      "hasSecretContextField": false,
+      "hasSecretSdkExport": false
+    }
+  },
+  "local_project_run": {
+    "executed": true,
+    "deployed_by_run": false,
+    "result": {
+      "hasProcessGlobal": false,
+      "hasEnvGlobal": false,
+      "hasDenoGlobal": false,
+      "hasBunGlobal": false,
+      "hasSecretContextField": false,
+      "hasSecretSdkExport": false
+    }
+  },
+  "local_sync": {
+    "method": "tgcloud fetch and pull",
+    "pulled_modules": 1,
+    "local_check": "npm run check passed: 8 modules"
+  },
+  "security": {
+    "credential_value_copied_or_used": false,
+    "credential_value_included_in_evidence_or_source": false,
+    "cli_access_token_exposed_to_assistant_tool_output": true,
+    "bot_api_called": false,
+    "database_written": false,
+    "webhook_changed": false,
+    "vpn_api_called": false
+  },
+  "telegram_serverless_model": {
+    "official_documentation_url": "https://core.telegram.org/bots/webapps#serverless",
+    "documented_scope": "Mini App calls to bot endpoints carry platform-validated initData",
+    "does_not_establish": [
+      "A general secret-injection API for endpoints",
+      "A Bot API Update relay for /start messages"
+    ]
+  },
+  "conclusion": "No obvious runtime secrets or environment interface is available to the saved endpoint in the tested execution context. The documented Serverless endpoint auth model applies to Mini App calls and does not provide the missing /start Update relay.",
+  "limitations": [
+    "No disposable secret was configured, so actual secret injection could not be tested.",
+    "The probe does not rule out an undocumented or unbound account setting.",
+    "CLI Access is for CLI project operations and is not a documented runtime secret injection channel. Its token appeared in the BotFather accessibility output during UI inspection; the value was not copied or used and is omitted from this evidence. The owner chose not to rotate it now; do not use or inspect the current credential again. Revisit rotation before future cloud CLI operations."
+  ]
+}

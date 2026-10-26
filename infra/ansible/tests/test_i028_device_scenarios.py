@@ -1,6 +1,7 @@
 """Synthetic ADB fault tests only; never physical lifecycle acceptance."""
 
 import importlib.util
+import json
 from pathlib import Path
 from typing import Any
 
@@ -139,3 +140,66 @@ def test_natural_idle_requires_new_unforced_event() -> None:
     assert not device.natural_deep_idle_observed(
         base, new.replace("mForceIdle=false", "mForceIdle=true"), 480
     )
+
+
+def test_phone_diagnostics_distinguish_sleep_resume_and_native_state() -> None:
+    content = "\n".join(
+        json.dumps(item)
+        for item in (
+            {
+                "event": "stage",
+                "stage": "natural_sleep_wait",
+                "elapsed_realtime_ms": 1000,
+                "uptime_ms": 900,
+                "pid": 42,
+            },
+            {
+                "event": "activity_resumed",
+                "stage": "natural_sleep_wait",
+                "elapsed_realtime_ms": 490000,
+                "uptime_ms": 1200,
+                "pid": 42,
+            },
+            {
+                "event": "native_snapshot",
+                "stage": "natural_sleep_wake",
+                "elapsed_realtime_ms": 490100,
+                "uptime_ms": 1300,
+                "pid": 42,
+                "native": {
+                    "up": False,
+                    "network": False,
+                    "handshake_age_seconds": -1,
+                    "remaining_ms": 0,
+                },
+            },
+        )
+    )
+
+    parsed = device.parse_phone_diagnostics(content)
+
+    assert parsed["valid"]
+    assert parsed["last_stage"] == "natural_sleep_wait"
+    assert parsed["last_observed_stage"] == "natural_sleep_wake"
+    assert parsed["activity_resumed_after_sleep_wait"]
+    assert parsed["max_approx_suspended_interval_ms"] == 488700
+    assert parsed["distinct_process_ids"] == [42]
+    assert parsed["events"][-1]["native"]["up"] is False
+
+
+def test_phone_diagnostics_reject_bad_records_without_echoing_them() -> None:
+    parsed = device.parse_phone_diagnostics(
+        '{"event":"activity_resumed","stage":"natural_sleep_wait",'
+        '"elapsed_realtime_ms":1,"uptime_ms":1,"pid":1,"secret":"do-not-copy"}\n'
+        "{not-json"
+    )
+
+    assert not parsed["valid"]
+    assert parsed["invalid_line_count"] == 2
+    assert parsed["events"] == []
+    assert "secret" not in json.dumps(parsed)
+
+
+def test_phone_diagnostics_enforce_bounded_file_size() -> None:
+    parsed = device.parse_phone_diagnostics("x" * 32769)
+    assert parsed == {"valid": False, "reason": "size_limit", "events": []}

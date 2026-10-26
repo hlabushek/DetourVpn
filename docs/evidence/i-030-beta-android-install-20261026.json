@@ -1,0 +1,32 @@
+{
+  "date": "2026-10-26",
+  "issue": "I-030",
+  "scope": "owner-device-beta-client-install",
+  "device": "Pixel 8 Pro",
+  "package": "org.example.vpnclient",
+  "display_name": "DetourVpn Beta",
+  "version_code": 2,
+  "version_name": "0.1.0-beta.1",
+  "build": {
+    "mode": "debug",
+    "api_origin": "https://193.68.88.239",
+    "flutter_build_apk": "passed",
+    "awg_source": "fresh ignored prepared tree from pinned patch"
+  },
+  "install": {
+    "adb_install_replace": "passed",
+    "prior_version": "0.1-i013",
+    "uninstall_performed": false,
+    "app_data_clear_performed": false,
+    "activity_launch": "passed"
+  },
+  "not_verified": [
+    "live Telegram OTP delivery",
+    "Android account/device pairing",
+    "VPN data-plane connectivity",
+    "DNS or IPv6 privacy acceptance",
+    "Always-on/Lockdown recovery"
+  ],
+  "secrets_recorded": false,
+  "production_or_b_hosts_changed": false
+}

@@ -102,6 +102,7 @@ public final class I028Probe extends Instrumentation {
         if (mode.equals("all")) {
             String ipv6 = request("api6.ipify.org");
             result.putBoolean("ipv6_available", ipv6 != null && ipv6.indexOf(':') >= 0);
+            result.putString("ipv6_failure", failure);
             result.putBoolean("fixed_udp_dns_response", dns());
             result.putString("dns_failure", dnsFailure);
             try {

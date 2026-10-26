@@ -3,6 +3,26 @@
 Решения/риски: ADR-028. Это CLI для локального PostgreSQL, не HTTP endpoint.
 Запускать из корня проекта. API, VPN/Android, VPS и внешние аккаунты не нужны.
 
+## I-027: одноразовая beta maintenance команда
+
+`scripts/beta_maintenance.py` объединяет retention cleanup аутентификации и
+quota ledger reconciliation под PostgreSQL advisory lock. Команда не создаёт
+расписание и не отправляет уведомления. Загрузить локальные `VPN_*` настройки
+из secret manager и выполнить:
+
+```powershell
+uv run --frozen python scripts/beta_maintenance.py
+```
+
+Exit 0 — запуск завершён и inconsistency не найдена; exit 1 — найдена
+inconsistency; exit 2 — ошибка конфигурации/БД; exit 3 — другой экземпляр уже
+работает. При сбое часть cleanup/reconciliation могла завершиться; повторный
+запуск безопасен. Вывод агрегирован и не содержит account IDs. Этот runner не
+продлевает пользовательские сессии, не закрывает kernel peer и не заменяет
+проверку tunnel lease expiry. Для beta он должен запускаться из одобренного
+supervisor, контролирующего пропущенные запуски; сам supervisor пока не
+установлен.
+
 ## Автоматическое воспроизведение
 
 ```powershell

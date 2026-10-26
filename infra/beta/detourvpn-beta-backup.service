@@ -1,0 +1,29 @@
+[Unit]
+Description=Create encrypted DetourVpn beta PostgreSQL backup for owner-PC pull
+After=detourvpn-beta-database.service
+Requires=detourvpn-beta-database.service
+ConditionPathIsDirectory=/var/lib/detourvpn-beta-backups
+
+[Service]
+Type=oneshot
+User=detourvpn-beta
+Group=detourvpn-beta
+WorkingDirectory=/opt/detourvpn-beta
+EnvironmentFile=/etc/detourvpn-beta/operations.env
+Environment=PYTHONDONTWRITEBYTECODE=1
+ExecStart=/opt/detourvpn-beta/.venv/bin/python scripts/beta_backup.py --archive-dir /var/lib/detourvpn-beta-backups --key-file /etc/detourvpn-beta/backup-secrets/backup-key --postgres-bin /usr/bin --latest-slot
+TimeoutStartSec=180
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+LockPersonality=true
+CapabilityBoundingSet=
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+ReadOnlyPaths=/etc/detourvpn-beta/backup-secrets/backup-key
+ReadWritePaths=/var/lib/detourvpn-beta-backups

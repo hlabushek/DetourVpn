@@ -10,7 +10,8 @@ class SplitAppsScreen extends StatefulWidget {
 class _SplitAppsState extends State<SplitAppsScreen> {
   static const channel = MethodChannel('project.vpn/tunnel.v1');
   List<String> apps = [];
-  Set<String> excluded = {};
+  Set<String> selected = {};
+  String mode = 'exclude';
   bool loading = true;
   String? error;
   @override
@@ -22,12 +23,14 @@ class _SplitAppsState extends State<SplitAppsScreen> {
   Future<void> load() async {
     try {
       final listed = await channel.invokeListMethod<String>('apps') ?? [];
-      final selected =
-          await channel.invokeListMethod<String>('splitRead') ?? [];
+      final saved = await channel.invokeListMethod<String>('splitRead') ?? [];
+      final savedMode =
+          await channel.invokeMethod<String>('splitModeRead') ?? 'exclude';
       if (mounted)
         setState(() {
-          apps = {...listed, ...selected}.toList()..sort();
-          excluded = selected.toSet();
+          apps = {...listed, ...saved}.toList()..sort();
+          selected = saved.toSet();
+          mode = savedMode;
           loading = false;
         });
     } catch (_) {
@@ -46,7 +49,8 @@ class _SplitAppsState extends State<SplitAppsScreen> {
     });
     try {
       await channel.invokeMethod<void>('splitWrite', {
-        'packages': excluded.toList()..sort(),
+        'packages': selected.toList()..sort(),
+        'mode': mode,
       });
       if (mounted) Navigator.pop(context);
     } catch (_) {
@@ -61,34 +65,66 @@ class _SplitAppsState extends State<SplitAppsScreen> {
 
   @override
   Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: const Text('Приложения вне VPN')),
+    appBar: AppBar(title: const Text('Разделение трафика')),
     body: ListView(
       padding: const EdgeInsets.all(24),
       children: [
+        IgnorePointer(
+          ignoring: loading,
+          child: RadioGroup<String>(
+            groupValue: mode,
+            onChanged: (value) {
+              if (!loading && value != null) setState(() => mode = value);
+            },
+            child: const Column(
+              children: [
+                RadioListTile<String>(
+                  value: 'exclude',
+                  title: Text('Исключить выбранные приложения'),
+                  subtitle: Text('Они используют обычную сеть вне VPN.'),
+                ),
+                RadioListTile<String>(
+                  value: 'include',
+                  title: Text('Через VPN только выбранные'),
+                  subtitle: Text(
+                    'Остальные приложения используют обычную сеть.',
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
         const Text(
-          'Отмеченные приложения используют обычную сеть, включая DNS и IPv6. '
-          'Они не защищены VPN. Список хранится только на телефоне. Изменения доступны при отключённом VPN. '
-          'Служебные запросы DetourVpn идут напрямую для продления доступа.',
+          'Исключённые приложения, включая их DNS и IPv6, не защищены VPN. '
+          'Сам DetourVpn остаётся вне туннеля для управления подключением. '
+          'Android Lockdown может заблокировать приложения вне списка. '
+          'Настройки хранятся только на телефоне и меняются при отключённом VPN.',
         ),
         const SizedBox(height: 16),
         if (loading) const LinearProgressIndicator(),
         if (error != null) Text(error!),
+        if (mode == 'include' && selected.isEmpty)
+          const Text(
+            'Для режима «только выбранные» отметь хотя бы одно приложение.',
+          ),
         for (final name in apps)
           CheckboxListTile(
             title: Text(name),
-            value: excluded.contains(name),
+            value: selected.contains(name),
             onChanged: loading
                 ? null
                 : (value) => setState(() {
                     if (value == true) {
-                      excluded.add(name);
+                      selected.add(name);
                     } else {
-                      excluded.remove(name);
+                      selected.remove(name);
                     }
                   }),
           ),
         FilledButton(
-          onPressed: loading ? null : save,
+          onPressed: loading || (mode == 'include' && selected.isEmpty)
+              ? null
+              : save,
           child: const Text('Сохранить'),
         ),
       ],

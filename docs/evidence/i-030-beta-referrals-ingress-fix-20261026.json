@@ -1,0 +1,42 @@
+{
+  "date": "2026-10-26",
+  "scope": "isolated-beta-mini-app-ingress",
+  "cause": "Caddy beta API allowlist omitted exact GET path /api/v1/referrals while Mini App loads it directly",
+  "files": [
+    "infra/beta/Caddyfile.ip",
+    "infra/ansible/tests/test_beta_config.py",
+    "docs/adr/059-beta-api-ingress-path-allowlist.md",
+    "docs/issues/I-030.md"
+  ],
+  "local_checks": {
+    "ruff": "passed",
+    "beta_config_tests": "7 passed",
+    "git_diff_check": "passed"
+  },
+  "target": {
+    "caddy_version": "2.11.7",
+    "template_validation": "passed",
+    "reload": "passed",
+    "backup": "Caddyfile.pre-beta-auth-3d51fd1d900e4b6fb0d572285d9cd8c3"
+  },
+  "external_https_routes": {
+    "/mini-app/": 200,
+    "/api/v1/referrals unauthenticated": 401,
+    "/api/v1/quota unauthenticated": 401,
+    "/api/v1/rewards/rules unauthenticated": 401,
+    "/api/v1/devices unauthenticated": 401,
+    "/api/v1/ready": 404,
+    "/api/internal/v3/windows/poll": 404,
+    "/api/v1/not-allowed": 404,
+    "/": 404
+  },
+  "owner_invite_active": true,
+  "telegram_id_recorded": false,
+  "production_or_b_hosts_changed": false,
+  "remaining_live_acceptance": [
+    "owner Mini App login and initial dashboard load",
+    "real OTP delivery and Android verification",
+    "VPN data-plane and privacy acceptance"
+  ],
+  "secrets_recorded": false
+}

@@ -1,0 +1,15 @@
+[Unit]
+Description=Renew isolated beta IP certificate and check remaining lifetime
+After=network-online.target caddy.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/snap/bin/certbot renew --quiet --cert-name detourvpn-beta-live
+ExecStart=/usr/bin/openssl x509 -checkend 172800 -noout -in /etc/detourvpn-beta/tls/fullchain.pem
+TimeoutStartSec=15min
+TimeoutStopSec=30s
+UMask=0077
+PrivateTmp=true
+# The official Certbot snap stores its root-user runtime state under /root/snap.
+ProtectHome=false

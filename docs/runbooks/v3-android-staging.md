@@ -13,6 +13,14 @@ binding includes the device action module. `Test -Suite NaturalSleep` writes
 `i-028-natural-sleep-staging.json`; it has its own fresh Stage/Install window.
 Lifecycle records `i-028-lifecycle-staging.json` and requires an
 awake/unlocked physical phone, Wi-Fi/mobile switches enabled and working data.
+If a receipt already exists, the runner writes a new UTC-and-random-suffixed
+JSON filename rather than replacing historical evidence. Inspect the newest
+receipt and retain every failed attempt unchanged. Android Play Protect may
+pause probe APK installation; the owner must confirm the expected test APK on
+the phone within the runner's 90-second install timeout. A timeout fails the
+run. A late installation can leave that APK on the phone; remove only
+`org.example.vpnpoc.test` after checking actual package state, and record an
+independent cleanup follow-up before another attempt.
 The owner must act in Android VPN Settings when the runner opens it. The marker
 `.cache/i028-system-revoke-pending.json` signals this step without credentials.
 The runner never changes the app-op to manufacture this observation.
@@ -79,12 +87,40 @@ switch settings and wake. Do not reset an unrelated pre-existing override.
   approved observation network, with no unrelated packets, DNS names or payload
   capture retained. Check included/excluded routing on connect, transitions and
   failures; external IPv4 and a successful DNS answer alone are insufficient.
-  Excluded apps intentionally retain direct DNS/IPv6 per ADR-040.
+  Observe before NAT on a controlled test Wi-Fi gateway; the VPN node alone
+  cannot see traffic that bypasses it. Keep excluded-UID direct routing as a
+  separate positive control, not a leak. Do not retain PCAP, payload, DNS names,
+  full addresses or MAC. If pre-NAT observation or positive direct IPv6 is
+  unavailable, leave the criterion open. See ADR-064 and
+  `docs/i-028-acceptance-matrix.md`. Excluded apps intentionally retain direct
+  DNS/IPv6 per ADR-040.
+
+  Для агрегированного наблюдения на подготовленном Linux-шлюзе используйте
+  `scripts/i028_packet_audit.py` из корня репозитория:
+
+  ```sh
+  sudo python3 scripts/i028_packet_audit.py --interface wlan0 --phase baseline --duration 90 --max-packets 2000
+  ```
+
+  Укажите интерфейс, смотрящий в сторону Wi-Fi клиентов, до NAT. Утилита
+  интерактивно запрашивает IPv4/IPv6 тестового телефона и IP VPN endpoint без
+  отображения ввода; не передавайте эти адреса аргументами командной строки.
+  Она запускает `tcpdump` с пределом 256 байт на пакет, без записи PCAP, и
+  печатает только счётчики. Признак обрезанного IP-заголовка делает результат
+  непригодным для приёмки. Для
+  `included` повторите окно с подключённым VPN, для `excluded` — с исключённой
+  probe UID. Сначала нужен direct baseline с DNS и global IPv6, а затем отдельный
+  положительный `excluded` контроль. При нулевых счётчиках в baseline,
+  `packet_limit_reached=true`, ошибке/прерывании захвата или неясном результате
+  ничего не принимайте: сохраните только безопасные агрегаты и оставьте ворота
+  открытыми. Утилита не выставляет pass/fail и не заменяет физическую проверку.
 - Two devices: connect and authorize two actual physical Android devices, keep
   separate keys/accounts and disposable test sessions, compare windows/counters,
   deny cross-owner operations, revoke one and verify the other still transfers.
   The existing one-device runner deliberately refuses two devices; a dedicated
   two-device driver must be implemented and reviewed before that scenario.
+  A Wi-Fi-only tablet is suitable for this simultaneous-device scenario; a SIM
+  is needed only for cellular handover, which remains a separate test.
 - Provider failure: identify an existing separately approved independent provider
   and its fixed test resources first. Current A/B inventory is same-provider.
   Preserve manual node choice and v3 unknown-counter holds (ADR-039); do not add
@@ -276,3 +312,15 @@ No new app/runtime library was added. Local test tooling uses distro iptables
 (GPL-2.0); uv is a pinned upstream bootstrap tool with its upstream MIT/Apache
 licensing, and existing pinned Python/native dependencies retain their prior
 license/security review boundaries.
+
+## Two-device preflight (read-only)
+
+Run `scripts/run_i028_staging.ps1 -Action Build -Suite Main`, then
+`scripts/run_i028_staging.ps1 -Action TwoDevicePreflight` while both intended
+physical Android devices are ADB-authorized. This validates exactly two physical
+devices, source-bound probe APK hashes, absence of isolated test packages, and
+absence of an existing Android Always-on VPN policy. It makes no device or
+staging changes and does not run a tunnel. The current receipt records the Pixel
+8 Pro and Wi-Fi-only tablet as ready; the tablet needs the base probe APK. The
+dedicated simultaneous-window, cross-owner denial and isolated-revoke driver is
+still required before starting an I-028 staging window.

@@ -15,6 +15,10 @@ class WindowConnectionController extends ConnectionController {
     this.renewBeforeMs = 55000,
   });
   static const root = '/api/v1/window-tunnels';
+  static const budgetBytes = int.fromEnvironment(
+    'VPN_WINDOW_BUDGET_BYTES',
+    defaultValue: 1048576,
+  );
   final int renewBeforeMs;
   final _clock = Stopwatch()..start();
   Map<String, dynamic>? _createIntent;
@@ -44,6 +48,18 @@ class WindowConnectionController extends ConnectionController {
   bool get canRecover => false; // Unknown holds require operator reconciliation.
   void _emit() {
     if (!_dead) notifyListeners();
+  }
+
+  /// A new OTP session is a new server-side family even when this controller
+  /// and the phone's locally held key survive a sign-out/sign-in cycle.
+  void onAuthenticatedSessionChanged() {
+    _deviceId = null;
+    _synced = false;
+    if (error == 'session_device_mismatch') {
+      error = null;
+      if (phase == ConnectionPhase.failed) phase = ConnectionPhase.disconnected;
+    }
+    _emit();
   }
 
   bool _cancelled(int version) => _dead || version != _version || _closed;
@@ -109,9 +125,24 @@ class WindowConnectionController extends ConnectionController {
   }
 
   /// After process death, stop native and revoke old device connections before admission.
+  Future<void> _ensureDevice() async {
+    if (_deviceId != null) return;
+    diagnosticStage = 'device_key_read';
+    _key ??= await native.publicKey();
+    diagnosticStage = 'device_registration';
+    final device = await api.call('POST', '/api/v1/devices', {
+      'platform': 'android',
+      'key_type': 'x25519',
+      'public_key': _key,
+    });
+    _deviceId = _uuid(device['id']);
+  }
+
   Future<void> _reconcile() async {
     if (_synced) return;
+    diagnosticStage = 'native_disconnect';
     await native.disconnect();
+    diagnosticStage = 'connection_reconcile';
     final result = await api.call('GET', root);
     final rows = result['items'];
     if (rows is! List) throw const ClientError('invalid_response');
@@ -133,6 +164,7 @@ class WindowConnectionController extends ConnectionController {
     _working = true;
     final version = ++_version;
     error = null;
+    diagnosticStage = null;
     phase = ConnectionPhase.connecting;
     _emit();
     final work = _connect(version);
@@ -148,54 +180,59 @@ class WindowConnectionController extends ConnectionController {
 
   Future<void> _connect(int version) async {
     try {
+      diagnosticStage = 'selected_node';
+      if (selectedNode == null) throw const ClientError('window_node_required');
+      // A fresh OTP session has no device binding yet. Register this phone's
+      // public key before asking the API to enumerate connections for it.
+      await _ensureDevice();
+      if (_cancelled(version)) return;
       await _reconcile();
       if (_cancelled(version)) return;
       if (hasLease) {
+        diagnosticStage = 'old_lease_cleanup';
         await _cleanup();
         if (hasLease) throw const ClientError('revoke_unconfirmed');
       }
-      if (selectedNode == null) throw const ClientError('window_node_required');
+      diagnosticStage = 'android_vpn_permission';
       if (!await native.permission())
         throw const ClientError('permission_denied');
       if (_cancelled(version)) return;
-      _key = await native.publicKey();
-      final device = await api.call('POST', '/api/v1/devices', {
-        'platform': 'android',
-        'key_type': 'x25519',
-        'public_key': _key,
-      });
-      if (_cancelled(version)) return;
-      _deviceId = _uuid(device['id']);
+      diagnosticStage = 'key_challenge';
       final proof = await api.call(
         'POST',
-        '/api/v1/tunnels/key-challenge/${_uuid(device['id'])}',
+        '/api/v1/tunnels/key-challenge/$_deviceId',
       );
+      diagnosticStage = 'key_proof';
       final answer = await native.prove(
         proof['ephemeral_public_key'] as String,
         proof['transcript'] as String,
       );
       if (_cancelled(version)) return;
       _createIntent = {
-        'device_id': device['id'],
+        'device_id': _deviceId,
         'node_id': selectedNode,
         'idempotency_key': newId(),
         'proof_id': proof['id'],
         'proof_response': answer,
-        'budget_bytes': 16777216,
+        'budget_bytes': budgetBytes,
       };
       _intentAt = _clock.elapsedMilliseconds;
+      diagnosticStage = 'lease_create';
       var value = await _create();
       for (var attempt = 0; value['state'] == 'pending'; attempt++) {
         if (_cancelled(version)) return;
         if (attempt >= 10) throw const ClientError('window_node_unavailable');
         await Future<void>.delayed(pollInterval);
         if (_cancelled(version)) return;
+        diagnosticStage = 'lease_poll';
         value = await api.call('GET', '$root/$_id');
       }
       if (_cancelled(version)) return;
+      diagnosticStage = 'lease_validation';
       final grant = _validate(value, initial: true);
       final deadline = _bound(grant);
       _config = value['client_config'] as String;
+      diagnosticStage = 'native_tunnel_start';
       await _native.connectWindow(
         _config!,
         grant,
@@ -207,6 +244,7 @@ class WindowConnectionController extends ConnectionController {
       }
       _grant = grant;
       _deadline = deadline;
+      diagnosticStage = null;
       detail = 'Ожидается handshake';
       startPolling();
     } catch (e) {
@@ -332,6 +370,8 @@ class WindowConnectionController extends ConnectionController {
     if (remotePending) {
       error = 'revoke_unconfirmed';
       startPolling();
+    } else if (error == 'revoke_unconfirmed') {
+      error = null;
     }
     unawaited(refreshQuota());
   }
@@ -376,10 +416,15 @@ class WindowConnectionController extends ConnectionController {
 
   Future<void> _refresh(int version) async {
     try {
+      await _ensureDevice();
+      if (_cancelled(version)) return;
       if (remotePending) {
         await _cleanup();
         return;
       }
+      // Fresh OTP sessions are not bound to a device until this phone registers
+      // its local public key. Bind first so the per-device reconciliation query
+      // can safely return this phone's prior connections (if any).
       await _reconcile();
       if (_cancelled(version) || _id == null) return;
       var snapshot = await native.snapshot();
@@ -393,7 +438,7 @@ class WindowConnectionController extends ConnectionController {
         _renewIntent = {
           'previous_window_id': _grant!['window_id'],
           'idempotency_key': newId(),
-          'budget_bytes': 16777216,
+          'budget_bytes': budgetBytes,
         };
         _intentAt = _clock.elapsedMilliseconds;
       }
@@ -439,7 +484,11 @@ class WindowConnectionController extends ConnectionController {
           : 'Ожидается сеть и handshake';
     } catch (e) {
       if (_cancelled(version)) return;
-      final code = e is ClientError ? e.code : 'invalid_response';
+      // API shape failures are raised as ClientError('invalid_response'). Any
+      // other exception here can come from the native bridge (for example,
+      // reading the app-private device key) and must not be mislabeled as an
+      // API response failure.
+      final code = e is ClientError ? e.code : 'native_unavailable';
       error = code;
       phase = ConnectionPhase.reconnecting;
       if (!{

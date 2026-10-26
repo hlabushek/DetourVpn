@@ -140,6 +140,12 @@ void main() {
           ),
         ),
       );
+      await tester.scrollUntilVisible(
+        find.text('Системные настройки VPN'),
+        250,
+      );
+      expect(find.text('Системные настройки VPN'), findsOneWidget);
+      expect(find.textContaining('ещё не принято'), findsOneWidget);
       await tester.scrollUntilVisible(find.text('Выйти из аккаунта'), 250);
       await tester.tap(find.text('Выйти из аккаунта'));
       expect(signedOut, true);

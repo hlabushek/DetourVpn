@@ -1,7 +1,8 @@
 # Only existing staging A and bounded I-028 actions; never production/root SSH.
 param(
-    [ValidateSet('Build', 'Stage', 'Install', 'Status', 'Finish', 'Probe', 'Test')][string]$Action = 'Stage',
+    [ValidateSet('Build', 'Stage', 'Install', 'Status', 'Finish', 'Probe', 'Test', 'TwoDevicePreflight')][string]$Action = 'Stage',
     [string]$ClientDirectory = '',
+    [string]$PreparedAwgDirectory = '',
     [ValidateSet('Main', 'Lifecycle', 'NetworkRevoke', 'NaturalSleep')][string]$Suite = 'Main',
     [switch]$RestartClosed,
     [switch]$RunHere
@@ -14,11 +15,12 @@ $taskReadyPath = Join-Path $taskRoot '.cache\i028-ready.json'
 function Get-I028Inputs {
     $taskInputs = @('apps/client/integration_test/i028_live_test.dart', 'scripts/i028_pipe_relay.py',
         'scripts/i028_device_scenarios.py',
-        'services/api/tests/test_i028_live.py', 'infra/staging-v3/runtime.py',
+        'services/api/tests/test_i028_live.py', 'scripts/run_i028_staging.ps1', 'scripts/i028_two_device_preflight.py', 'infra/staging-v3/runtime.py',
         'infra/staging-v3/install.sh', 'infra/staging-v3/tls_relay.py',
         'infra/staging-v3/archive_closed.py',
         'services/node-agent/window_daemon.py', 'services/node-agent/window_gate.py',
         'services/node-agent/window_peer.py', 'apps/client/android/app/build.gradle.kts',
+        'apps/client/android/app/gradle.lockfile',
         'services/node-agent/window-requirements.txt', 'services/api/src/vpn_api/tunnels/keys.py',
         'services/api/src/vpn_api/tunnels/v3_contracts.py', 'services/api/src/vpn_api/tunnels/window_journal.py',
         'services/api/src/vpn_api/tunnels/window_runtime.py',
@@ -28,6 +30,7 @@ function Get-I028Inputs {
         'apps/android/gradle.properties', 'apps/android/gradle/wrapper/gradle-wrapper.jar',
         'apps/android/gradle/wrapper/gradle-wrapper.properties',
         'apps/android/app/gradle.lockfile', 'apps/android/tunnel/gradle.lockfile')
+    $taskInputs += 'apps/android/patches/go-only.patch'
     $taskInputs += @(Get-ChildItem -LiteralPath (Join-Path $taskRoot 'apps/client/lib'),
         (Join-Path $taskRoot 'apps/client/test'),
         (Join-Path $taskRoot 'apps/client/android/app/src/main/java'),
@@ -43,6 +46,15 @@ function Get-I028Inputs {
     return $taskResult
 }
 if ($Action -eq 'Build') {
+    if (!$PreparedAwgDirectory) {
+        $PreparedAwgDirectory = Join-Path $taskRoot '.cache\i-029-final3\sdk-go-only'
+    }
+    $PreparedAwgDirectory = (Resolve-Path -LiteralPath $PreparedAwgDirectory).Path
+    $taskPreparedReceiptPath = Join-Path $PreparedAwgDirectory 'PREPARED.json'
+    if (!(Test-Path -LiteralPath $taskPreparedReceiptPath)) { throw 'Prepared Android tunnel SDK receipt missing.' }
+    $taskPreparedReceipt = Get-Content -LiteralPath $taskPreparedReceiptPath | ConvertFrom-Json
+    $taskPatchHash = (Get-FileHash -LiteralPath (Join-Path $taskRoot 'apps/android/patches/go-only.patch')).Hash.ToLowerInvariant()
+    if ($taskPreparedReceipt.patch_sha256 -ne $taskPatchHash) { throw 'Prepared Android tunnel SDK does not match the reviewed patch.' }
     if (!$ClientDirectory) {
         $taskCandidates = @(Get-ChildItem -LiteralPath (Join-Path $env:LOCALAPPDATA 'ProjectVpn/i013-builds') -Directory |
             Sort-Object LastWriteTime -Descending | Where-Object { Test-Path -LiteralPath (Join-Path $_.FullName 'apps/client/.dart_tool/package_config.json') })
@@ -64,7 +76,7 @@ if ($Action -eq 'Build') {
     [IO.File]::WriteAllText((Join-Path $taskNativeAndroid 'local.properties'), ('sdk.dir=' + (Join-Path $env:LOCALAPPDATA 'Android/Sdk').Replace('\','/') + "`n"), [Text.UTF8Encoding]::new($false))
     foreach ($taskInput in (Get-I028Inputs).Keys) {
         if ($taskInput.StartsWith('apps/client/lib/') -or $taskInput.StartsWith('apps/client/android/app/src/main/') -or
-            $taskInput.StartsWith('apps/android/app/src/main/') -or $taskInput.EndsWith('pubspec.lock') -or $taskInput.EndsWith('build.gradle.kts')) {
+            $taskInput.StartsWith('apps/android/app/src/main/') -or $taskInput.EndsWith('pubspec.lock') -or $taskInput.EndsWith('build.gradle.kts') -or $taskInput.EndsWith('gradle.lockfile')) {
             if ((Get-FileHash -LiteralPath (Join-Path $taskRoot $taskInput)).Hash -ne
                 (Get-FileHash -LiteralPath (Join-Path $taskSnapshotRoot $taskInput)).Hash) { throw 'Reviewed app snapshot is stale; preserve it and prepare an explicit source copy.' }
         }
@@ -73,9 +85,13 @@ if ($Action -eq 'Build') {
     Copy-Item -LiteralPath (Join-Path $taskRoot 'apps/client/android/app/src/androidTest') -Destination (Join-Path $taskClient 'android/app/src') -Recurse -Force
     $taskSavedJava = $env:JAVA_HOME
     $taskSavedPub = $env:PUB_CACHE
+    $taskSavedI028Package = $env:ORG_GRADLE_PROJECT_i028IsolatedPackage
+    $taskSavedPreparedAwg = $env:ORG_GRADLE_PROJECT_awgPreparedDir
     try {
         $env:JAVA_HOME = 'C:\Program Files\Android\Android Studio\jbr'
         $env:PUB_CACHE = Join-Path $env:LOCALAPPDATA 'ProjectVpn/toolchains/pub-cache'
+        $env:ORG_GRADLE_PROJECT_i028IsolatedPackage = 'true'
+        $env:ORG_GRADLE_PROJECT_awgPreparedDir = $PreparedAwgDirectory
         $taskFlutter = Join-Path $env:LOCALAPPDATA 'ProjectVpn/toolchains/flutter/bin/flutter.bat'
         $taskPin = Get-Content -LiteralPath (Join-Path $taskRoot 'apps/client/toolchain.json') | ConvertFrom-Json
         if ((& git -C (Split-Path -Parent (Split-Path -Parent $taskFlutter)) rev-parse HEAD).Trim() -ne $taskPin.revision) { throw 'Flutter revision mismatch.' }
@@ -87,26 +103,94 @@ if ($Action -eq 'Build') {
             if ($LASTEXITCODE -ne 0) { throw 'Flutter analysis failed.' }
             & $taskFlutter test --no-pub
             if ($LASTEXITCODE -ne 0) { throw 'Flutter unit checks failed.' }
-            foreach ($taskPhase in @('seed', 'run', 'lifecycle', 'network_revoke', 'natural_sleep', 'cleanup')) {
-                & $taskFlutter build apk --debug --no-pub --target integration_test/i028_live_test.dart --target-platform android-arm64 --dart-define=VPN_WINDOW_TUNNELS=true "--dart-define=VPN_I028_PHASE=$taskPhase"
+            $taskPhases = if ($Suite -eq 'NaturalSleep') { @('seed', 'natural_sleep', 'cleanup') } else { @('seed', 'run', 'lifecycle', 'network_revoke', 'natural_sleep', 'cleanup') }
+            foreach ($taskPhase in $taskPhases) {
+                & $taskFlutter build apk --debug --no-pub --target integration_test/i028_live_test.dart --target-platform android-arm64 --dart-define=VPN_WINDOW_TUNNELS=true "--dart-define=VPN_I028_PHASE=$taskPhase" "--android-project-arg=awgPreparedDir=$PreparedAwgDirectory" '--android-project-arg=i028IsolatedPackage=true'
                 if ($LASTEXITCODE -ne 0) { throw 'Physical entrypoint compilation failed.' }
+            }
+            $taskNaturalApp = $null
+            $taskNaturalTest = $null
+            $taskNaturalAppHash = $null
+            $taskNaturalTestHash = $null
+            if ($Suite -eq 'NaturalSleep') {
+                $taskDefines = @('VPN_WINDOW_TUNNELS=true', 'VPN_I028_PHASE=natural_sleep') | ForEach-Object { [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($_)) }
+                Push-Location (Join-Path $taskClient 'android')
+                try {
+                    & .\gradlew.bat --offline :app:assembleDebug :app:assembleDebugAndroidTest '-Pi028FlutterInstrumentation=true' '-Pi028IsolatedPackage=true' '-Ptarget=integration_test/i028_live_test.dart' ('-Pdart-defines=' + ($taskDefines -join ',')) (('-PawgPreparedDir=' + $PreparedAwgDirectory))
+                    if ($LASTEXITCODE -ne 0) { throw 'On-device NaturalSleep instrumentation build failed.' }
+                } finally { Pop-Location }
+                $taskBuiltApp = Join-Path $taskClient 'build/app/outputs/apk/debug/app-debug.apk'
+                $taskBuiltTest = Join-Path $taskClient 'build/app/outputs/apk/androidTest/debug/app-debug-androidTest.apk'
+                if (!(Test-Path -LiteralPath $taskBuiltApp) -or !(Test-Path -LiteralPath $taskBuiltTest)) { throw 'NaturalSleep instrumentation APKs missing.' }
+                # Flutter seed rebuilds app-debug.apk during Test. Retain immutable,
+                # content-addressed copies before that phase can overwrite it.
+                $taskNaturalAppHash = (Get-FileHash -LiteralPath $taskBuiltApp -Algorithm SHA256).Hash.ToLowerInvariant()
+                $taskNaturalTestHash = (Get-FileHash -LiteralPath $taskBuiltTest -Algorithm SHA256).Hash.ToLowerInvariant()
+                $taskNaturalApp = Join-Path $taskRoot ('.cache/i028-natural-app-' + $taskNaturalAppHash + '.apk')
+                $taskNaturalTest = Join-Path $taskRoot ('.cache/i028-natural-test-' + $taskNaturalTestHash + '.apk')
+                if (!(Test-Path -LiteralPath $taskNaturalApp)) { Copy-Item -LiteralPath $taskBuiltApp -Destination $taskNaturalApp }
+                if (!(Test-Path -LiteralPath $taskNaturalTest)) { Copy-Item -LiteralPath $taskBuiltTest -Destination $taskNaturalTest }
+                if ((Get-FileHash -LiteralPath $taskNaturalApp).Hash.ToLowerInvariant() -ne $taskNaturalAppHash -or (Get-FileHash -LiteralPath $taskNaturalTest).Hash.ToLowerInvariant() -ne $taskNaturalTestHash) { throw 'NaturalSleep immutable APK hash mismatch.' }
             }
             Push-Location $taskNativeAndroid
             try {
-                & "$env:JAVA_HOME/bin/java.exe" -classpath gradle/wrapper/gradle-wrapper.jar org.gradle.wrapper.GradleWrapperMain --no-daemon '-Pi028Probe=true' :app:assembleDebugAndroidTest
+                & "$env:JAVA_HOME/bin/java.exe" -classpath gradle/wrapper/gradle-wrapper.jar org.gradle.wrapper.GradleWrapperMain --no-daemon '-Pi028Probe=true' (('-PawgPreparedDir=' + $PreparedAwgDirectory)) :app:assembleDebug :app:assembleDebugAndroidTest
                 if ($LASTEXITCODE -ne 0) { throw 'Independent UID probe compilation failed.' }
             } finally { Pop-Location }
         } finally { Pop-Location }
-        @{ client = $taskClient; probe_apk = (Join-Path $taskNativeAndroid 'app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk'); inputs = (Get-I028Inputs) } | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath $taskReadyPath
-    } finally { $env:JAVA_HOME = $taskSavedJava; $env:PUB_CACHE = $taskSavedPub }
+        $taskFinalAppApk = Join-Path $taskClient 'build/app/outputs/flutter-apk/app-debug.apk'
+        $taskAapt = Join-Path $env:LOCALAPPDATA 'Android/Sdk/build-tools/36.0.0/aapt.exe'
+        if (!(Test-Path -LiteralPath $taskAapt) -or !(Test-Path -LiteralPath $taskFinalAppApk)) { throw 'Isolated I-028 APK or aapt verifier missing.' }
+        $taskPackageLine = & $taskAapt dump badging $taskFinalAppApk | Where-Object { $_ -match "^package: name='" }
+        if ($LASTEXITCODE -ne 0 -or $taskPackageLine -notmatch "^package: name='org\.example\.vpnclient\.i028'") { throw 'Built APK is not the isolated I-028 package; refusing physical runner readiness.' }
+        $taskProbeBaseApk = Join-Path $taskNativeAndroid 'app/build/outputs/apk/debug/app-debug.apk'
+        $taskProbeTestApk = Join-Path $taskNativeAndroid 'app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk'
+        if (!(Test-Path -LiteralPath $taskProbeBaseApk) -or !(Test-Path -LiteralPath $taskProbeTestApk)) { throw 'Independent UID probe APK pair missing.' }
+        $taskBasePackageLine = & $taskAapt dump badging $taskProbeBaseApk | Where-Object { $_ -match "^package: name='" }
+        $taskProbeTestPackageLine = & $taskAapt dump badging $taskProbeTestApk | Where-Object { $_ -match "^package: name='" }
+        if ($taskBasePackageLine -notmatch "^package: name='org\.example\.vpnpoc'" -or $taskProbeTestPackageLine -notmatch "^package: name='org\.example\.vpnpoc\.test'") { throw 'Independent UID probe APK identity mismatch.' }
+        $taskProbeBaseHash = (Get-FileHash -LiteralPath $taskProbeBaseApk -Algorithm SHA256).Hash.ToLowerInvariant()
+        $taskProbeTestHash = (Get-FileHash -LiteralPath $taskProbeTestApk -Algorithm SHA256).Hash.ToLowerInvariant()
+        $taskImmutableProbeBase = Join-Path $taskRoot ('.cache/i028-probe-base-' + $taskProbeBaseHash + '.apk')
+        $taskImmutableProbeTest = Join-Path $taskRoot ('.cache/i028-probe-test-' + $taskProbeTestHash + '.apk')
+        if (!(Test-Path -LiteralPath $taskImmutableProbeBase)) { Copy-Item -LiteralPath $taskProbeBaseApk -Destination $taskImmutableProbeBase }
+        if (!(Test-Path -LiteralPath $taskImmutableProbeTest)) { Copy-Item -LiteralPath $taskProbeTestApk -Destination $taskImmutableProbeTest }
+        if ((Get-FileHash -LiteralPath $taskImmutableProbeBase -Algorithm SHA256).Hash.ToLowerInvariant() -ne $taskProbeBaseHash -or (Get-FileHash -LiteralPath $taskImmutableProbeTest -Algorithm SHA256).Hash.ToLowerInvariant() -ne $taskProbeTestHash) { throw 'Immutable probe APK hash mismatch.' }
+        @{ client = $taskClient; probe_apk = $taskImmutableProbeTest; probe_base_apk = $taskImmutableProbeBase; probe_base_sha256 = $taskProbeBaseHash; probe_test_sha256 = $taskProbeTestHash; natural_app_apk = $taskNaturalApp; natural_app_sha256 = $taskNaturalAppHash; natural_test_apk = $taskNaturalTest; natural_test_sha256 = $taskNaturalTestHash; prepared_awg_path = $PreparedAwgDirectory; prepared_awg_patch_sha256 = $taskPatchHash; inputs = (Get-I028Inputs) } | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath $taskReadyPath
+    } finally {
+        $env:JAVA_HOME = $taskSavedJava
+        $env:PUB_CACHE = $taskSavedPub
+        $env:ORG_GRADLE_PROJECT_i028IsolatedPackage = $taskSavedI028Package
+        $env:ORG_GRADLE_PROJECT_awgPreparedDir = $taskSavedPreparedAwg
+    }
     return
 }
 if ($Action -in @('Install', 'Probe', 'Test')) {
     if (!(Test-Path -LiteralPath $taskReadyPath)) { throw 'Build/verify the complete physical runner before starting the 30-minute timer.' }
     $taskReady = Get-Content -LiteralPath $taskReadyPath | ConvertFrom-Json
+    if (!$taskReady.prepared_awg_path -or !$taskReady.prepared_awg_patch_sha256) { throw 'Prepared tunnel SDK binding missing; rebuild the source-bound runner.' }
+    $taskReadyPatchHash = (Get-FileHash -LiteralPath (Join-Path $taskRoot 'apps/android/patches/go-only.patch')).Hash.ToLowerInvariant()
+    if ($taskReady.prepared_awg_patch_sha256 -ne $taskReadyPatchHash -or !(Test-Path -LiteralPath $taskReady.prepared_awg_path)) { throw 'Prepared tunnel SDK binding is stale; rebuild the source-bound runner.' }
     foreach ($taskEntry in (Get-I028Inputs).GetEnumerator()) {
         if ($taskReady.inputs.($taskEntry.Key) -ne $taskEntry.Value) { throw 'Sources changed after the physical runner build.' }
     }
+    if ($Action -eq 'Test' -and $Suite -eq 'NaturalSleep') {
+        if (!(Test-Path -LiteralPath $taskReady.natural_app_apk) -or !(Test-Path -LiteralPath $taskReady.natural_test_apk)) { throw 'Build NaturalSleep instrumentation before Test.' }
+        if ((Get-FileHash -LiteralPath $taskReady.natural_app_apk).Hash.ToLowerInvariant() -ne $taskReady.natural_app_sha256 -or (Get-FileHash -LiteralPath $taskReady.natural_test_apk).Hash.ToLowerInvariant() -ne $taskReady.natural_test_sha256) { throw 'NaturalSleep instrumentation APK changed after Build.' }
+    }
+}
+if ($Action -eq 'TwoDevicePreflight') {
+    if (!(Test-Path -LiteralPath $taskReadyPath)) { throw 'Build/verify the source-bound I-028 runner first.' }
+    $taskReady = Get-Content -LiteralPath $taskReadyPath | ConvertFrom-Json
+    foreach ($taskEntry in (Get-I028Inputs).GetEnumerator()) {
+        if ($taskReady.inputs.($taskEntry.Key) -ne $taskEntry.Value) { throw 'Sources changed after the I-028 runner build; rebuild first.' }
+    }
+    if (!$taskReady.probe_base_apk -or !$taskReady.probe_test_sha256) { throw 'Rebuild the probe APK pair before the two-device preflight.' }
+    Push-Location $taskRoot
+    try { & uv run --frozen python scripts/i028_two_device_preflight.py --ready .cache/i028-ready.json }
+    finally { Pop-Location }
+    if ($LASTEXITCODE -ne 0) { throw 'Two-device read-only preflight failed; no device or staging changes were made.' }
+    return
 }
 if ($Action -eq 'Install') {
     if (!$RunHere) {
@@ -171,14 +255,19 @@ if ($Action -eq 'Test') {
     $taskDevices = @(& $taskAdb devices | Where-Object { $_ -match '\tdevice\s*$' })
     if ($taskDevices.Count -ne 1) { throw 'Connect/unlock exactly one physical Android with USB debugging authorized.' }
     $taskOld = @{}
-    foreach ($taskName in @('VPN_I028_STAGING_APPROVED', 'VPN_I028_SERIAL', 'VPN_I028_CLIENT_DIR', 'VPN_I028_PROBE_APK', 'VPN_I028_SUITE', 'PYTEST_ADDOPTS')) { $taskOld[$taskName] = [Environment]::GetEnvironmentVariable($taskName) }
+    foreach ($taskName in @('VPN_I028_STAGING_APPROVED', 'VPN_I028_SERIAL', 'VPN_I028_CLIENT_DIR', 'VPN_I028_PROBE_APK', 'VPN_I028_NATURAL_APP_APK', 'VPN_I028_NATURAL_TEST_APK', 'VPN_I028_SUITE', 'VPN_I028_PREPARED_AWG', 'PYTEST_ADDOPTS', 'ORG_GRADLE_PROJECT_i028IsolatedPackage', 'ORG_GRADLE_PROJECT_awgPreparedDir')) { $taskOld[$taskName] = [Environment]::GetEnvironmentVariable($taskName) }
     try {
         $env:VPN_I028_STAGING_APPROVED = '45.10.166.106'
         $env:VPN_I028_SERIAL = ($taskDevices[0] -split '\s+')[0]
         $env:VPN_I028_CLIENT_DIR = $taskReady.client
         $env:VPN_I028_PROBE_APK = $taskReady.probe_apk
+        $env:VPN_I028_NATURAL_APP_APK = $taskReady.natural_app_apk
+        $env:VPN_I028_NATURAL_TEST_APK = $taskReady.natural_test_apk
         $env:VPN_I028_SUITE = $Suite
+        $env:VPN_I028_PREPARED_AWG = $taskReady.prepared_awg_path
         $env:PYTEST_ADDOPTS = 'services/api/tests/test_i028_live.py -q --tb=short'
+        $env:ORG_GRADLE_PROJECT_i028IsolatedPackage = 'true'
+        $env:ORG_GRADLE_PROJECT_awgPreparedDir = $taskReady.prepared_awg_path
         Push-Location $taskRoot
         try {
             & uv run --frozen python scripts/test_with_postgres.py --postgres-bin .cache/i-004/portable/pgsql/bin

@@ -1,0 +1,11 @@
+[Unit]
+Description=Run encrypted closed beta backup once per day
+
+[Timer]
+OnCalendar=*-*-* 03:17:00 UTC
+RandomizedDelaySec=20min
+Persistent=true
+Unit=detourvpn-beta-backup.service
+
+[Install]
+WantedBy=timers.target

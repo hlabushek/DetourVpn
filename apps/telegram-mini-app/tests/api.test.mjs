@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { CabinetAPI, exactJSON, bytes } from "../src/api.mjs";
+import { CabinetAPI, exactJSON, bytes, loginAttemptFromFragment } from "../src/api.mjs";
 
 test("int64 remains exact, strings and escaped quotes are not rewritten", () => {
     const result = exactJSON(
@@ -10,6 +10,36 @@ test("int64 remains exact, strings and escaped quotes are not rewritten", () => 
     assert.equal(result.s, '12 \\"3'.replace('\\"', '"'));
     assert.deepEqual(result.a, ["-17", true, null, 1.5]);
     assert.equal(bytes(result.n), "9223372036,8 ГБ");
+});
+
+test("login attempt is accepted only from a 32-hex URL fragment", () => {
+    const id = "0123456789abcdef0123456789abcdef";
+    assert.deepEqual(loginAttemptFromFragment(`#login_attempt=${id}`), {
+        present: true, requestId: id,
+    });
+    assert.deepEqual(loginAttemptFromFragment("?login_attempt=" + id), {
+        present: false, requestId: null,
+    });
+    assert.deepEqual(loginAttemptFromFragment("#login_attempt=bad"), {
+        present: true, requestId: null,
+    });
+});
+
+test("Android OTP request sends initData and challenge without Mini App session", async () => {
+    let sent;
+    const api = new CabinetAPI(async (path, options) => {
+        sent = { path, options };
+        return Response.json({ status: "processed" });
+    });
+    const response = await api.requestLoginCode("SYNTHETIC_TEST_INIT_DATA", "0123456789abcdef0123456789abcdef");
+    assert.equal(response.status, "processed");
+    assert.equal(sent.path, "/api/v1/auth/mini-app/request-code");
+    assert.equal(sent.options.credentials, "omit");
+    assert.equal(sent.options.headers.Authorization, undefined);
+    assert.deepEqual(JSON.parse(sent.options.body), {
+        init_data: "SYNTHETIC_TEST_INIT_DATA",
+        request_id: "0123456789abcdef0123456789abcdef",
+    });
 });
 
 test("unknown claim result retries the same key; success starts a fresh claim", async () => {
@@ -30,6 +60,14 @@ test("unknown claim result retries the same key; success starts a fresh claim", 
     await api.claim("rule");
     assert.equal(sent[0].idempotency_key, sent[1].idempotency_key);
     assert.notEqual(sent[1].idempotency_key, sent[2].idempotency_key);
+});
+
+test("rejected OTP request is represented as a non-delivery result", async () => {
+    const api = new CabinetAPI(async () => Response.json({ status: "rejected" }));
+    assert.deepEqual(
+        await api.requestLoginCode("SYNTHETIC_TEST_INIT_DATA", "0123456789abcdef0123456789abcdef"),
+        { status: "rejected" },
+    );
 });
 
 test("concurrent reads share one refresh and logout clears credentials on network failure", async () => {

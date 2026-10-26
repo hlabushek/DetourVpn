@@ -22,6 +22,32 @@ void main() {
       var seedSaved = false;
       var splitOwned = false;
       var stage = 'start';
+      var naturalCompleted = false;
+      Future<void> naturalStage(String value) async {
+        if (phase == 'natural_sleep') {
+          // Test-only, app-private status in Android's no-backup data folder.
+          // Never write credentials, probe data, or raw exceptions.
+          await PlatformTunnel.channel.invokeMethod<void>('i028StageWrite', {
+            'value': value,
+          });
+        }
+      }
+
+      Future<void> recordNaturalTunnelSnapshot(NativeSnapshot snapshot) async {
+        if (phase != 'natural_sleep') return;
+        try {
+          await PlatformTunnel.channel
+              .invokeMethod<void>('i028TunnelSnapshot', {
+                'up': snapshot.up,
+                'network': snapshot.network,
+                'handshakeAge': snapshot.handshakeAge,
+                'remainingMs': snapshot.remainingMs,
+              });
+        } catch (_) {
+          // Bounded diagnostics must never change the acceptance behavior.
+        }
+      }
+
       void check(bool value) {
         if (!value) throw StateError('i028_stage_$stage');
       }
@@ -69,6 +95,7 @@ void main() {
       }
 
       try {
+        await naturalStage('start');
         check(const bool.fromEnvironment('VPN_WINDOW_TUNNELS'));
         if (phase == 'cleanup') {
           await api.forgetSession();
@@ -131,15 +158,22 @@ void main() {
         controller = WindowConnectionController(api, native);
         if (phase == 'natural_sleep') {
           stage = 'natural_sleep_connect';
+          await naturalStage(stage);
           await connected();
           check((await action('probe_ipv4'))['egress_is_staging'] == true);
+          await recordNaturalTunnelSnapshot(await native.snapshot());
           await api.call('POST', '/api/v1/__i028__/action/natural_sleep');
+          stage = 'natural_sleep_wait';
+          await naturalStage(stage);
           // USB is intentionally absent during this interval. No local API call
           // is attempted until the operator reconnects the device.
           await Future<void>.delayed(const Duration(minutes: 8));
           stage = 'natural_sleep_wake';
+          await naturalStage(stage);
           final afterSleep = await native.snapshot();
+          await recordNaturalTunnelSnapshot(afterSleep);
           check(!afterSleep.up);
+          await fact('natural_sleep_native_down_after_wake');
           Map<String, dynamic>? observation;
           for (var i = 0; i < 20; i++) {
             try {
@@ -163,12 +197,15 @@ void main() {
           await controller.refresh().timeout(const Duration(seconds: 15));
           await closed().timeout(const Duration(seconds: 65));
           stage = 'natural_sleep_recovery';
+          await naturalStage(stage);
           await connected();
           check((await action('probe_ipv4'))['egress_is_staging'] == true);
+          await fact('natural_sleep_new_staging_egress_after_recovery');
           await closed();
           await fact('natural_sleep_window_cutoff_and_real_recovery');
           await api.call('POST', '/api/v1/__i028__/verify');
           await api.call('POST', '/api/v1/auth/logout');
+          naturalCompleted = true;
           return;
         }
         if (phase == 'lifecycle' || phase == 'network_revoke') {
@@ -393,19 +430,34 @@ void main() {
         await api.call('POST', '/api/v1/__i028__/verify');
         await api.call('POST', '/api/v1/auth/logout');
       } catch (_) {
+        try {
+          await naturalStage('failed_$stage');
+        } catch (_) {
+          /* Best effort. */
+        }
         throw StateError('i028_stage_$stage');
       } finally {
-        controller?.dispose();
-        await native.disconnect();
-        if (splitOwned) {
-          await PlatformTunnel.channel.invokeMethod<void>('splitWrite', {
-            'packages': <String>[],
-          });
+        try {
+          controller?.dispose();
+          await native.disconnect();
+          if (splitOwned) {
+            await PlatformTunnel.channel.invokeMethod<void>('splitWrite', {
+              'packages': <String>[],
+            });
+          }
+          if (phase != 'seed' || !seedSaved) {
+            await api.forgetSession();
+          }
+          api.close();
+          if (naturalCompleted) await naturalStage('complete');
+        } catch (_) {
+          try {
+            await naturalStage('failed_cleanup');
+          } catch (_) {
+            /* Best effort. */
+          }
+          rethrow;
         }
-        if (phase != 'seed' || !seedSaved) {
-          await api.forgetSession();
-        }
-        api.close();
       }
     });
   }, timeout: const Timeout(Duration(minutes: 14)));

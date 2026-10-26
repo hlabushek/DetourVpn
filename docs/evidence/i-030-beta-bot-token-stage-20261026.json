@@ -1,0 +1,43 @@
+{
+  "issue": "I-030",
+  "scope": "beta-only Bot API token staging with authentication and ingress closed",
+  "verified_at": "2026-10-26",
+  "accepted": false,
+  "local_checks": {
+    "command": ".venv/Scripts/python.exe -m pytest services/api/tests/test_beta_bot_token_store.py -q",
+    "result": "5 passed",
+    "ruff": "passed",
+    "ruff_format_check": "passed",
+    "mypy": "passed",
+    "powershell_ast": "passed",
+    "test_token": "synthetic TEST ONLY"
+  },
+  "beta_host": {
+    "target": "isolated beta API host only",
+    "api_env_mode": "root:root 0600",
+    "bot_token_present_and_format_valid": true,
+    "bot_id_matches_token_prefix": true,
+    "configured_username_matches_beta_bot": true,
+    "api_service": "active",
+    "local_readiness": 200,
+    "external_readiness": 404,
+    "auth_enabled": false,
+    "mini_app_enabled": false,
+    "beta_invites_only": false,
+    "api_restarted": false,
+    "bot_api_called": false,
+    "botfather_or_serverless_changed": false,
+    "production_or_b_host_changed": false
+  },
+  "secret_handling": {
+    "entered_in_hidden_local_prompt": true,
+    "transport": "SSH stdin; not argv, environment, URL, terminal output or repository",
+    "token_value_recorded": false
+  },
+  "limitations": [
+    "token staging does not prove Bot API validity or live Telegram delivery",
+    "does not enable I-026 auth/Mini App/invite login",
+    "does not change Caddy or open API routes",
+    "does not prove VPN operation or privacy acceptance"
+  ]
+}

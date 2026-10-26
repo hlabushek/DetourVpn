@@ -33,9 +33,10 @@ currently owns v3 lease reconciliation in a foreground Flutter controller.
   before any new admission. Clear it on logout; it never authorizes a lease.
 - Keep account/session secrets in `SecureVault`; never persist access tokens,
   lease grants, peer configs, or server authorization as restart authority.
-- Do not set `SUPPORTS_ALWAYS_ON` or remove the GoBackend null-intent stop until
-  the bootstrap path is implemented and reviewed. UI may link to Android VPN
-  settings and explain that only the user can enable Always-on/Lockdown.
+- Do not enable Always-on in release until the bootstrap path passes physical
+  acceptance. A null-intent service start may enter the same fresh-auth bootstrap;
+  it must never resume an old peer. UI may link to Android VPN settings and must
+  explain that only the user can enable Always-on/Lockdown.
 
 ## Consequences
 
@@ -45,10 +46,33 @@ headless entrypoint to work together. Therefore Always-on recovery is not
 implemented by manifest configuration alone and remains unverified until the
 local tests and later device acceptance pass.
 
-The Dart origin-restricted socket factory and Android opaque relay are now
-implemented as isolated components with local socket tests. The relay is not
-yet started by the VPN service or exposed to a headless engine, so the manifest
-continues to opt out of Always-on and the transport is not usable end to end.
+2026-10-25 implementation update: the pinned GoBackend callback now passes its
+`VpnService` instance into `ClientApplication`. The application starts a
+headless Flutter engine, opens `ProtectedApiRelay` from the encrypted session's
+HTTPS origin, and exposes only session storage, node preference, the opaque
+relay endpoint, and the existing native v3 tunnel operations on the method
+channel. Dart restores/rotates the refresh token, checks node availability,
+reconciles and revokes old server state through `WindowConnectionController`,
+then requests a fresh lease. It keeps that controller alive for renewal and
+native deadline enforcement. A missing or invalid session, node, permission,
+API response, or tunnel admission leads to local disconnect and service stop.
+
+The app's regular `onCreate` no longer stops a system-started service before its
+callback can run. A disconnected idle service is retained during bootstrap so
+the protected relay remains available while the controller first reconciles.
+An already active tunnel still closes through the existing backend lifecycle.
+The debug manifest advertises Always-on solely for controlled acceptance; the
+release manifest explicitly sets `SUPPORTS_ALWAYS_ON=false`.
+GoBackend notifies the application when the service is destroyed; only a matching
+system-start service identity may tear down the headless engine/relay and clear
+its deadline state.
+
+Local Flutter negatives cover missing session and non-HTTPS origin. Existing
+relay tests cover fixed-origin protection and invalid local token; the v3
+controller/split-routing suites and Android debug build/unit tests pass. This
+does not prove system callback delivery, DNS under Lockdown, Android service
+survival, lease recovery, or OEM behavior. Physical acceptance is still required
+before enabling this in release or making an Always-on/kill-switch claim.
 
 No API/database/schema or staging change is needed for the client-side design.
 The full AmneziaVPN client is a separate GPL-3.0 application and is not copied
@@ -57,10 +81,12 @@ component-level license review.
 
 ## Verification required before enabling
 
-- Focused tests prove process/service restart never reuses an old grant and all
-  bootstrap failures keep the tunnel down.
-- Native tests verify service-start policy and protected-socket restrictions.
-- Inspect the merged manifest and backend patch to prove Always-on is enabled
-  only with a functioning fail-closed bootstrap.
+- Add/run focused tests proving process/service restart never reuses an old grant
+  and all bootstrap failures keep the tunnel down; current local checks cover
+  missing-session and invalid-origin rejection, not every startup failure.
+- Native tests verify service-start policy and protected-socket restrictions;
+  local relay tests pass, but system-start callback behavior remains unverified.
+- Inspect merged manifests and the pinned backend patch: debug advertises
+  Always-on for controlled testing; release remains explicitly disabled.
 - Physical Android acceptance separately verifies Always-on, Lockdown,
   per-app routing, DNS/IPv6 policy, and recovery after service failure.

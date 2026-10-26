@@ -1,0 +1,32 @@
+[Unit]
+Description=DetourVpn beta AWG core in isolated slot %i
+PartOf=detourvpn-beta-slot-bootstrap.service
+After=local-fs.target
+RequiresMountsFor=/opt/detourvpn-node
+
+[Service]
+Type=simple
+User=root
+Group=root
+ExecStart=/usr/sbin/ip netns exec detourvpn-beta-slot-%i /opt/detourvpn-node/current/amneziawg-go -f dv3s%i
+Restart=on-failure
+RestartSec=2
+TimeoutStopSec=10
+KillMode=control-group
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+ProtectKernelLogs=true
+RestrictSUIDSGID=true
+LockPersonality=true
+ReadWritePaths=/run/netns /run/amneziawg
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX AF_NETLINK
+DevicePolicy=closed
+DeviceAllow=/dev/net/tun rw
+MemoryMax=128M
+TasksMax=32

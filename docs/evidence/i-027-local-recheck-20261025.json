@@ -1,0 +1,58 @@
+{
+  "issue": "I-027",
+  "scope": "local maintenance, backup/restore and systemd template recheck only",
+  "accepted_local_scope": true,
+  "checked_on": "2026-10-25",
+  "checks": {
+    "maintenance_and_beta_backup_postgresql": {
+      "result": "passed",
+      "passed": 6,
+      "failed": 0,
+      "database": "disposable local PostgreSQL",
+      "cluster_removed": true,
+      "coverage": [
+        "serialized maintenance and overlap refusal",
+        "lock release after failure",
+        "mounted-target fail-closed behavior",
+        "collision-resistant encrypted backup naming",
+        "encrypted dump, restore and account reconciliation",
+        "drill database cleanup"
+      ],
+      "mount_check": "TEST ONLY; no off-host mount used"
+    },
+    "beta_unit_configuration": {
+      "result": "passed",
+      "passed": 6,
+      "failed": 0
+    },
+    "ruff_check": "passed",
+    "ruff_format_check": "passed",
+    "mypy": {
+      "result": "passed",
+      "source_files": 4
+    },
+    "backup_timer_calendar": {
+      "result": "passed",
+      "schedule": "daily 03:17 UTC",
+      "tool": "systemd-analyze calendar"
+    },
+    "systemd_unit_verify": {
+      "result": "not_accepted_environment_mismatch",
+      "observations": [
+        "Kali WSL has no target docker.service",
+        "target /opt/detourvpn-beta/.venv executable is absent in this host",
+        "OneDrive mount reports unit files executable and world-writable"
+      ],
+      "target_linux_verification_required": true
+    }
+  },
+  "external_operations": {
+    "beta_host_or_vps": "not provisioned",
+    "off_host_mount_and_backup": "not configured",
+    "backup_key_escrow": "not configured",
+    "scheduler_installation": "not installed",
+    "independent_monitor_and_alert_delivery": "not configured",
+    "restore_or_outage_drill_on_beta_host": "not performed"
+  },
+  "clarification": "Encrypted dump/restore passed against disposable local PostgreSQL. It did not create or restore an off-host backup; the mount guard used a TEST ONLY injected check."
+}

@@ -4,10 +4,125 @@ No credentials, raw dumps, subscriber IDs or user network names are retained.
 Caller owns staging/settlement and must inspect actual tunnel/gate/probe evidence.
 """
 
+import json
 import re
 import time
 from collections.abc import Callable
 from typing import Any
+
+PHONE_DIAGNOSTIC_EVENTS = {
+    "stage",
+    "activity_created",
+    "activity_started",
+    "activity_resumed",
+    "activity_paused",
+    "activity_stopped",
+    "activity_destroyed",
+    "window_focused",
+    "window_unfocused",
+    "native_snapshot",
+}
+
+
+def parse_phone_diagnostics(content: str) -> dict[str, Any]:
+    """Validate and summarize the bounded, app-private NaturalSleep JSONL log."""
+    if len(content.encode("utf-8")) > 32768:
+        return {"valid": False, "reason": "size_limit", "events": []}
+    events: list[dict[str, Any]] = []
+    invalid_lines = 0
+    for line in content.splitlines():
+        if not line:
+            continue
+        try:
+            item = json.loads(line)
+        except (json.JSONDecodeError, TypeError):
+            invalid_lines += 1
+            continue
+        if not isinstance(item, dict):
+            invalid_lines += 1
+            continue
+        event = item.get("event")
+        stage = item.get("stage")
+        elapsed = item.get("elapsed_realtime_ms")
+        uptime = item.get("uptime_ms")
+        pid = item.get("pid")
+        if (
+            not isinstance(event, str)
+            or event not in PHONE_DIAGNOSTIC_EVENTS
+            or not isinstance(stage, str)
+            or not re.fullmatch(r"[a-z_]{1,64}", stage)
+            or not all(type(value) is int and value >= 0 for value in (elapsed, uptime, pid))
+            or pid == 0
+        ):
+            invalid_lines += 1
+            continue
+        expected_keys = {"event", "stage", "elapsed_realtime_ms", "uptime_ms", "pid"}
+        if event == "native_snapshot":
+            expected_keys.add("native")
+        if set(item) != expected_keys:
+            invalid_lines += 1
+            continue
+        result: dict[str, Any] = {
+            "event": event,
+            "stage": stage,
+            "elapsed_realtime_ms": elapsed,
+            "uptime_ms": uptime,
+            "pid": pid,
+        }
+        if event == "native_snapshot":
+            native = item.get("native")
+            if (
+                not isinstance(native, dict)
+                or set(native) != {"up", "network", "handshake_age_seconds", "remaining_ms"}
+                or type(native.get("up")) is not bool
+                or type(native.get("network")) is not bool
+                or type(native.get("handshake_age_seconds")) is not int
+                or type(native.get("remaining_ms")) is not int
+                or not -1 <= native["handshake_age_seconds"] <= 86400
+                or not 0 <= native["remaining_ms"] <= 3600000
+            ):
+                invalid_lines += 1
+                continue
+            result["native"] = {
+                "up": native["up"],
+                "network": native["network"],
+                "handshake_age_seconds": native["handshake_age_seconds"],
+                "remaining_ms": native["remaining_ms"],
+            }
+        if events and events[-1]["pid"] == pid:
+            previous = events[-1]
+            elapsed_delta = elapsed - previous["elapsed_realtime_ms"]
+            uptime_delta = uptime - previous["uptime_ms"]
+            result["approx_suspended_interval_ms"] = (
+                max(0, elapsed_delta - uptime_delta)
+                if elapsed_delta >= 0 and uptime_delta >= 0
+                else None
+            )
+        else:
+            result["approx_suspended_interval_ms"] = None
+        events.append(result)
+    last_stage_marker = next(
+        (event["stage"] for event in reversed(events) if event["event"] == "stage"), None
+    )
+    last_observed_stage = events[-1]["stage"] if events else None
+    resumed_after_wait = any(
+        event["event"] == "activity_resumed"
+        and event["stage"] in {"natural_sleep_wait", "natural_sleep_wake", "natural_sleep_recovery"}
+        for event in events
+    )
+    return {
+        "valid": bool(events) and invalid_lines == 0,
+        "event_count": len(events),
+        "invalid_line_count": invalid_lines,
+        "last_stage": last_stage_marker,
+        "last_observed_stage": last_observed_stage,
+        "activity_resumed_after_sleep_wait": resumed_after_wait,
+        "max_approx_suspended_interval_ms": max(
+            (event["approx_suspended_interval_ms"] or 0 for event in events), default=0
+        ),
+        "distinct_process_ids": sorted({event["pid"] for event in events}),
+        "events": events,
+    }
 
 
 def radio_loss_confirmed(wifi_status: str, telephony_status: str) -> bool:

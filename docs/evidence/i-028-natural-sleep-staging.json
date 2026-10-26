@@ -1,0 +1,67 @@
+{
+  "cleanup_steps": {
+    "agent_revoke_and_stop": true,
+    "local_api_stopped": true,
+    "phone_restored": false,
+    "phone_session_absent": true,
+    "root_stop": {
+      "cleanup_complete": true,
+      "gate_close_errors_before_core_stop": 0,
+      "journal_preserved": true,
+      "temporary_grant_removed": true,
+      "timeout_timer_disarmed": true
+    },
+    "ssh_transport": true
+  },
+  "facts": {},
+  "failed_at": "phone_setup",
+  "independent_unprivileged_remote_postcheck": true,
+  "measured_at": "2026-10-24T22:28:44.434852+00:00",
+  "node_before_cleanup": {
+    "agent_active": true,
+    "live_slots": [],
+    "native_transfer_bytes": [
+      {
+        "received": "0",
+        "sent": "0",
+        "slot": 1
+      },
+      {
+        "received": "0",
+        "sent": "0",
+        "slot": 2
+      }
+    ],
+    "peer_counts": [
+      0,
+      0
+    ],
+    "prepared": true,
+    "remaining_seconds": 1662,
+    "slot_count": 2
+  },
+  "open_cases": [
+    "natural sleep and forced Doze",
+    "Wi-Fi/mobile transition",
+    "system VPN permission revoke",
+    "Disconnect during in-flight renewal",
+    "two simultaneous physical devices",
+    "independent provider failure",
+    "comprehensive DNS leak capture",
+    "natural sleep (forced Doze is separate)"
+  ],
+  "passed": false,
+  "quota_funding": "TEST FREE GRANT ONLY",
+  "scope": "bounded staging A, one physical Android, local disposable API/PostgreSQL",
+  "source_sha256": {
+    "apps/android/app/src/androidTest/java/org/example/vpnpoc/I028Probe.java": "94fe899ce6e08f1a7e984ed7580d5baf45bc4cf2e55447427833a3920226b776",
+    "apps/client/integration_test/i028_live_test.dart": "58b530fd8074156ae497476ef21de03980c2cc7ac16df57a1eed960215b29444",
+    "infra/staging-v3/runtime.py": "1898bb981c09b64f546a7b35635493d113e19f75c6f552fa10e0254552e24094",
+    "scripts/i028_device_scenarios.py": "a6e04db4760c53a852aff67ccabbfa655725f992c206cba46fb468457655722c",
+    "scripts/run_i028_staging.ps1": "99c2f02f63e56fcba765263c186ba55a0d3446e4e5162dbc6b958a819eb6dae1",
+    "services/api/tests/test_i028_live.py": "345ca016158efe5446b3e126ec194fea407771a365dede3a9a7702bda92a4b1b"
+  },
+  "suite": "NaturalSleep",
+  "telegram": "TEST FAKE ONLY",
+  "temporary_staging_transport_and_phone_cleanup": false
+}

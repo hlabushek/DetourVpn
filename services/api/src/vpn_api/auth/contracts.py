@@ -58,6 +58,10 @@ class WebhookResponse(BaseModel):
     status: Literal["processed", "duplicate", "ignored", "delivery_unknown"]
 
 
+class MiniAppCodeResponse(BaseModel):
+    status: Literal["processed", "delivery_unknown", "rejected"]
+
+
 PositiveId = Annotated[int, Field(strict=True, gt=0, lt=2**63)]
 
 

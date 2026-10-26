@@ -5,16 +5,29 @@ cloud revision 2, две таблицы/indexes и 6 private-chat commands по�
 Hosted import/SQLite probe прошёл; user-chat `/start` acceptance ещё ожидается.
 Receipt: `../../docs/evidence/telegram-bot-deployment.json`.
 
+2026-10-26: beta Serverless отдельно включён для **@uysdgyfudf_bot**; revision 1
+содержит 8 модулей, применены две operational SQLite tables. `miniAppUrl`
+указывает на отдельный beta API host. Основной **@DetourVpnBot** остаётся на
+revision 2 без изменений. Hosted `runtimeProbe` подтвердил отсутствие env/secret
+globals. Реальное сообщение `/start`, Mini App initData и Android OTP ещё не
+проверены; приглашения друзьям не отправлялись.
+
 JS-проект меню для платформы из [документации Telegram](https://core.telegram.org/bots/serverless).
 Реализованы `/start`, `/cabinet`, `/android`, `/connect`, `/help`, `/privacy`,
 inline navigation и возврат в главное меню. Нажатия редактируют существующее
-сообщение. Ссылки задаются в `tgcloud/lib/config.js`; пока они пусты, бот явно
-объясняет недоступность, без неработающих URL.
+сообщение. Ссылки задаются в `tgcloud/lib/config.js`; beta Mini App URL задан,
+прочие ссылки остаются пустыми и явно обозначаются как недоступные.
 
-**Вход в Android через этот serverless handler пока недоступен.** Не переключать
-на него действующий auth-бот: новый handler не выдаёт OTP и не пересылает
-неподтверждённые Telegram ID в API. Проверяемый secret manager/relay — открытый
-gate ADR-032. Код FastAPI авторизации остаётся в прежнем состоянии.
+Serverless handler отвечает за меню и не принимает `/start` Updates для Android
+OTP. Локальный вход реализован отдельным Mini App → FastAPI → Android потоком:
+FastAPI сам проверяет Telegram `initData` и отправляет OTP через Bot API.
+`runtimeProbe` в разделе Endpoints — только диагностика runtime globals; Mini App
+его для входа не вызывает. Beta Serverless webhook синхронизирован и обрабатывает
+beta bot updates; webhook основного бота не менялся. Реальный Telegram/Android
+login ещё не принят.
+Текущий интерфейс BotFather не показывает отдельный Secrets раздел; CLI Access
+токен предназначен для CLI операций и не является runtime secret. См. I-026,
+ADR-043/046 и `docs/verification-telegram-bot.md`.
 
 ## Локальная проверка
 
