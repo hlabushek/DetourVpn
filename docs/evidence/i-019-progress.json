@@ -1,7 +1,7 @@
 {
   "issue": "I-019",
-  "attempt": "14652957080243ddab229e9cf37b59d8",
-  "updated_at": "2026-10-23T07:20:56.112217+00:00",
+  "attempt": "2df6394bc51e41e3b1fb066a1ba7e395",
+  "updated_at": "2026-11-01T16:52:30.905059+00:00",
   "stage": "completed",
   "facts": {
     "b_initial_handshake_egress": true,
@@ -34,54 +34,193 @@
   },
   "egress_probes": [
     {
-      "stage": "b_initial_connect_egress",
-      "phase": "body",
-      "result": "node_b"
+      "stage": "authentication",
+      "phase": "response",
+      "result": "other_address",
+      "trigger": "connected"
+    },
+    {
+      "stage": "authentication",
+      "phase": "response",
+      "result": "other_address",
+      "trigger": "connected"
+    },
+    {
+      "stage": "b_initial_connect_handshake",
+      "phase": "response",
+      "result": "node_b",
+      "trigger": "connected"
     },
     {
       "stage": "b_initial_connect_egress",
-      "phase": "body",
-      "result": "node_b"
+      "phase": "response",
+      "result": "node_b",
+      "trigger": "connected"
+    },
+    {
+      "stage": "b_initial_connect_egress",
+      "phase": "response",
+      "result": "node_b",
+      "trigger": "connected"
+    },
+    {
+      "stage": "b_initial_disconnect",
+      "phase": "response",
+      "result": "other_address",
+      "trigger": "connected"
+    },
+    {
+      "stage": "a_first_connect_handshake",
+      "phase": "response",
+      "result": "node_a",
+      "trigger": "connected"
     },
     {
       "stage": "a_first_connect_egress",
-      "phase": "body",
-      "result": "node_a"
+      "phase": "response",
+      "result": "node_a",
+      "trigger": "connected"
     },
     {
       "stage": "a_first_connect_egress",
-      "phase": "body",
-      "result": "node_a"
+      "phase": "response",
+      "result": "node_a",
+      "trigger": "connected"
+    },
+    {
+      "stage": "kernel_expiry",
+      "phase": "response",
+      "result": "other_address",
+      "trigger": "connected"
+    },
+    {
+      "stage": "restart_a_handshake",
+      "phase": "response",
+      "result": "node_a",
+      "trigger": "connected"
     },
     {
       "stage": "restart_a_egress",
-      "phase": "body",
-      "result": "node_a"
+      "phase": "response",
+      "result": "node_a",
+      "trigger": "connected"
     },
     {
       "stage": "restart_a_egress",
-      "phase": "body",
-      "result": "node_a"
+      "phase": "response",
+      "result": "node_a",
+      "trigger": "connected"
+    },
+    {
+      "stage": "node_failure_cutoff",
+      "phase": "response",
+      "result": "timeout",
+      "trigger": "timeout"
+    },
+    {
+      "stage": "second_recovery",
+      "phase": "response",
+      "result": "other_address",
+      "trigger": "connected"
+    },
+    {
+      "stage": "b_connect_handshake",
+      "phase": "response",
+      "result": "node_b",
+      "trigger": "connected"
     },
     {
       "stage": "b_connect_egress",
-      "phase": "body",
-      "result": "node_b"
+      "phase": "response",
+      "result": "node_b",
+      "trigger": "connected"
     },
     {
       "stage": "b_connect_egress",
-      "phase": "body",
-      "result": "node_b"
+      "phase": "response",
+      "result": "node_b",
+      "trigger": "connected"
+    },
+    {
+      "stage": "return_a_while_b_active",
+      "phase": "response",
+      "result": "node_b",
+      "trigger": "connected"
+    },
+    {
+      "stage": "b_disconnect",
+      "phase": "response",
+      "result": "other_address",
+      "trigger": "connected"
     }
   ],
   "agent_b": {
     "deliveries": 4,
     "acks": 4,
+    "events": [
+      {
+        "kind": "delivery",
+        "peer_ordinal": 1,
+        "operation": "add_peer",
+        "version": 1
+      },
+      {
+        "kind": "ack",
+        "peer_ordinal": 1,
+        "operation": "add_peer",
+        "version": 1,
+        "handler_returned": true,
+        "applied": true
+      },
+      {
+        "kind": "delivery",
+        "peer_ordinal": 1,
+        "operation": "remove_peer",
+        "version": 2
+      },
+      {
+        "kind": "ack",
+        "peer_ordinal": 1,
+        "operation": "remove_peer",
+        "version": 2,
+        "handler_returned": true,
+        "applied": true
+      },
+      {
+        "kind": "delivery",
+        "peer_ordinal": 2,
+        "operation": "add_peer",
+        "version": 1
+      },
+      {
+        "kind": "ack",
+        "peer_ordinal": 2,
+        "operation": "add_peer",
+        "version": 1,
+        "handler_returned": true,
+        "applied": true
+      },
+      {
+        "kind": "delivery",
+        "peer_ordinal": 2,
+        "operation": "remove_peer",
+        "version": 2
+      },
+      {
+        "kind": "ack",
+        "peer_ordinal": 2,
+        "operation": "remove_peer",
+        "version": 2,
+        "handler_returned": true,
+        "applied": true
+      }
+    ],
+    "events_truncated": false,
     "last_delivery": {
       "operation": "remove_peer",
       "version": 2,
       "budget_bytes": 16777216,
-      "remaining_seconds": 46.934,
+      "remaining_seconds": 40.02,
       "inventory_count": 1
     },
     "last_ack": {
@@ -89,5 +228,17 @@
       "applied": true,
       "version": 2
     }
-  }
+  },
+  "api_failures": [
+    {
+      "endpoint": "poll",
+      "status": 503,
+      "error_code": "tunnel_profile_unavailable"
+    },
+    {
+      "endpoint": "poll",
+      "status": 503,
+      "error_code": "agent_unavailable"
+    }
+  ]
 }

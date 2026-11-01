@@ -67,7 +67,7 @@ install -d -m 0755 "$ROOT" /opt/detourvpn-node/current /usr/local/libexec
 for name in window_daemon.py window_gate.py window_peer.py; do
     cp "services/node-agent/$name" "$ROOT/"
 done
-cp infra/staging-v3/{runtime.py,tls_relay.py} "$ROOT/"
+cp infra/staging-v3/{runtime.py,tls_relay.py,dns_observer.py} "$ROOT/"
 install -d -m 0755 "$ROOT/vpn_api/tunnels"
 touch "$ROOT/vpn_api/__init__.py" "$ROOT/vpn_api/tunnels/__init__.py"
 for name in keys.py v3_contracts.py window_journal.py window_runtime.py; do
@@ -100,7 +100,7 @@ chmod 0755 /usr/local/libexec/detourvpn-i028-control
 own_helper=1
 /usr/local/libexec/detourvpn-i028-control prepare
 cat >/etc/sudoers.d/detourvpn-i028 <<'SUDO'
-vpn-deploy ALL=(root) NOPASSWD: /usr/local/libexec/detourvpn-i028-control status, /usr/local/libexec/detourvpn-i028-control manifest, /usr/local/libexec/detourvpn-i028-control configure, /usr/local/libexec/detourvpn-i028-control start-agent, /usr/local/libexec/detourvpn-i028-control stop-agent, /usr/local/libexec/detourvpn-i028-control crash-agent, /usr/local/libexec/detourvpn-i028-control stop
+vpn-deploy ALL=(root) NOPASSWD: /usr/local/libexec/detourvpn-i028-control status, /usr/local/libexec/detourvpn-i028-control manifest, /usr/local/libexec/detourvpn-i028-control configure, /usr/local/libexec/detourvpn-i028-control start-agent, /usr/local/libexec/detourvpn-i028-control stop-agent, /usr/local/libexec/detourvpn-i028-control crash-agent, /usr/local/libexec/detourvpn-i028-control dns-observe, /usr/local/libexec/detourvpn-i028-control stop
 SUDO
 chmod 0440 /etc/sudoers.d/detourvpn-i028
 visudo -cf /etc/sudoers.d/detourvpn-i028 >/dev/null

@@ -53,7 +53,13 @@ def owned(path: Path, *, directory: bool) -> None:
 def archive_closed() -> Path:
     if "45.10.166.106/" not in run(["/usr/sbin/ip", "-4", "address", "show", "dev", "ens3"]):
         raise Refused("archive_wrong_host")
-    for path in SOURCES.values():
+    # /run is volatile tmpfs and a reboot removes its closed-run directory while
+    # the persistent cleanup receipt survives. Treat only a genuinely absent
+    # directory as empty; dangling symlinks and every other source still refuse.
+    missing_run = not SOURCES["run"].exists() and not SOURCES["run"].is_symlink()
+    for label, path in SOURCES.items():
+        if label == "run" and missing_run:
+            continue
         owned(path, directory=True)
     owned(HELPER, directory=False)
     marker = SOURCES["state"] / "i028-cleanup.json"
@@ -113,6 +119,11 @@ def archive_closed() -> Path:
     shutil.copyfile(HELPER, destination / "control-wrapper")
     (destination / "control-wrapper").chmod(0o600)
     for label, source in SOURCES.items():
+        if label == "run" and missing_run:
+            if source.exists() or source.is_symlink():
+                raise Refused("archive_runtime_appeared")
+            (destination / label).mkdir(mode=0o700)
+            continue
         shutil.move(str(source), str(destination / label))
     (destination / "archive.json").write_text(
         json.dumps(
@@ -121,6 +132,7 @@ def archive_closed() -> Path:
                 "private_journal_preserved": True,
                 "timeout_timer_disarmed": True,
                 "sources": list(SOURCES),
+                "missing_sources": ["run"] if missing_run else [],
             }
         )
         + "\n"

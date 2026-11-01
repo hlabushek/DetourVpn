@@ -1,8 +1,5 @@
 // TEST ENTRYPOINT ONLY: actual Android/native/API, fake Telegram delivery.
 // Loopback coordination exists solely in opt-in test_i019_live.py.
-import 'dart:async';
-import 'dart:io';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
@@ -72,68 +69,62 @@ void main() {
       }
 
       Future<String?> egress() async {
-        final client = HttpClient()
-          ..connectionTimeout = const Duration(seconds: 3);
-        var probePhase = 'request';
-        lastProbe = {'phase': probePhase, 'result': 'pending'};
         try {
-          final request = await client
-              .getUrl(Uri.parse('https://api.ipify.org'))
-              .timeout(const Duration(seconds: 4));
-          request.followRedirects = false;
-          probePhase = 'response';
-          final response = await request.close().timeout(
-            const Duration(seconds: 4),
+          final started = await api.call(
+            'POST',
+            '/api/v1/__i019__/egress-probe',
+            {'stage': stage},
           );
-          lastProbe = {'phase': probePhase, 'http_status': response.statusCode};
-          if (response.statusCode != 200) {
-            lastProbe['result'] = 'http_status';
+          final probeId = started['probe_id'];
+          if (probeId is! String) throw StateError('i019_probe_start_failed');
+          // The test API's fixed ADB instrumentation command may take up to
+          // 25 seconds; keep polling long enough to receive its sanitized result.
+          final deadline = DateTime.now().add(const Duration(seconds: 30));
+          Map<String, dynamic>? probe;
+          while (DateTime.now().isBefore(deadline)) {
+            probe = await api.call(
+              'POST',
+              '/api/v1/__i019__/egress-probe-result',
+              {'probe_id': probeId},
+            );
+            if (probe['done'] == true) break;
+            await Future<void>.delayed(const Duration(milliseconds: 300));
+          }
+          if (probe == null || probe['done'] != true) {
+            lastProbe = {'phase': 'response', 'result': 'timeout'};
             return null;
           }
-          probePhase = 'body';
-          final bytes = await response
-              .fold<List<int>>([], (a, b) => a..addAll(b))
-              .timeout(const Duration(seconds: 4));
-          if (bytes.length > 64) {
-            lastProbe = {'phase': probePhase, 'result': 'invalid_body'};
-            return null;
-          }
-          final address = String.fromCharCodes(bytes).trim();
-          if (InternetAddress.tryParse(address) == null) {
-            lastProbe = {'phase': probePhase, 'result': 'invalid_body'};
-            return null;
-          }
-          lastProbe = {
-            'phase': probePhase,
-            'result': address == '45.10.166.106'
-                ? 'node_a'
-                : address == '85.209.132.205'
-                ? 'node_b'
-                : 'other_address',
+          final result = probe['result'];
+          const allowed = {
+            'node_a',
+            'node_b',
+            'other_address',
+            'dns',
+            'timeout',
+            'route',
+            'tls',
+            'connect',
+            'permission',
+            'io',
+            'http_error',
+            'instrumentation_missing',
+            'unexpected_result',
+            'adb_error',
+            'probe_task_error',
+            'unavailable',
           };
-          return address;
-        } on TimeoutException {
-          lastProbe = {'phase': probePhase, 'result': 'timeout'};
-          return null;
-        } on SocketException catch (failure) {
-          lastProbe = {
-            'phase': probePhase,
-            'result': 'socket_error',
-            'os_error': failure.osError?.errorCode,
-          };
-          return null;
-        } on HandshakeException {
-          lastProbe = {'phase': probePhase, 'result': 'tls_error'};
-          return null;
+          final label = result is String && allowed.contains(result)
+              ? result
+              : 'unavailable';
+          lastProbe = {'phase': 'response', 'result': label};
+          return label;
         } catch (_) {
-          lastProbe = {'phase': probePhase, 'result': 'other_error'};
+          lastProbe = {'phase': 'response', 'result': 'unavailable'};
           return null;
-        } finally {
-          client.close(force: true);
         }
       }
 
-      Future<void> connectTo(String id, String host) async {
+      Future<void> connectTo(String id, String expectedEgress) async {
         final attempt = stage;
         await step('${attempt}_catalog');
         await connection.refreshNodes();
@@ -145,29 +136,60 @@ void main() {
           throw StateError('i019_stage_$stage');
         }
         await step('${attempt}_handshake');
+        // WireGuard starts a handshake when traffic is sent. Generate that
+        // traffic from the independent probe UID instead of waiting for
+        // background phone traffic that may not exist in a later reconnect.
+        final trigger = await egress();
+        const transientProbeResults = {
+          'dns',
+          'timeout',
+          'route',
+          'tls',
+          'connect',
+          'permission',
+          'io',
+          'http_error',
+          'instrumentation_missing',
+          'unexpected_result',
+          'adb_error',
+          'probe_task_error',
+          'unavailable',
+        };
+        if (trigger != null &&
+            trigger != expectedEgress &&
+            !transientProbeResults.contains(trigger)) {
+          throw StateError('i019_stage_$stage');
+        }
+        var nextTrigger = DateTime.now().add(const Duration(seconds: 5));
         await until(() async {
           await connection.refresh();
           if (connection.phase == ConnectionPhase.failed) {
             throw StateError('i019_stage_$stage');
+          }
+          if (connection.phase != ConnectionPhase.connected &&
+              DateTime.now().isAfter(nextTrigger)) {
+            final retry = await egress();
+            if (retry != null &&
+                retry != expectedEgress &&
+                !transientProbeResults.contains(retry)) {
+              throw StateError('i019_stage_$stage');
+            }
+            nextTrigger = DateTime.now().add(const Duration(seconds: 5));
           }
           return connection.phase == ConnectionPhase.connected;
         });
         expect((await native.snapshot()).confirmed, true);
         await step('${attempt}_egress');
         var consecutive = 0;
-        // Fresh clients each time; require two actual egress responses, not UP/handshake.
+        // Fresh independent-UID probes; require two actual egress responses, not UP/handshake.
         for (var probe = 0; probe < 3; probe++) {
           final before = await native.snapshot();
           if (!before.confirmed || before.remainingMs < 15000) break;
           final result = await egress();
-          await api.call('POST', '/api/v1/__i019__/probe', {
-            'stage': stage,
-            ...lastProbe,
-          });
-          consecutive = result == host ? consecutive + 1 : 0;
+          consecutive = result == expectedEgress ? consecutive + 1 : 0;
           if (consecutive == 2) return;
           // A response through another network is a failure, never retried as success.
-          if (result != null && result != host) break;
+          if (result != null && result != expectedEgress) break;
           await Future<void>.delayed(const Duration(milliseconds: 500));
         }
         throw StateError('i019_stage_$stage');
@@ -178,9 +200,7 @@ void main() {
         final state = await api.call('POST', '/api/v1/__i019__/normal-network');
         if (state['normal'] != true) return false;
         final address = await egress();
-        return address != null &&
-            address != '45.10.166.106' &&
-            address != '85.209.132.205';
+        return address == 'other_address';
       }
 
       Future<void> disconnectTo() async {
@@ -227,15 +247,11 @@ void main() {
         );
         final ids = await api.call('POST', '/api/v1/__i019__/nodes');
         final baseline = await egress();
-        expect(baseline != null, true);
-        expect(
-          baseline != '45.10.166.106' && baseline != '85.209.132.205',
-          true,
-        );
+        expect(baseline, 'other_address');
         expect(await normalNetwork(), true);
         // Fail early on a foundational B failure before repeating A's expiry windows.
         await step('b_initial_connect');
-        await connectTo(ids['b'] as String, '85.209.132.205');
+        await connectTo(ids['b'] as String, 'node_b');
         await fact('b_initial_handshake_egress');
         await step('b_initial_disconnect');
         await disconnectTo();
@@ -243,7 +259,7 @@ void main() {
         if (ids['diagnostic_b_reuse'] == true) {
           // Explicit diagnostic only: no claim about A failure/expiry in this mode.
           await step('b_connect');
-          await connectTo(ids['b'] as String, '85.209.132.205');
+          await connectTo(ids['b'] as String, 'node_b');
           await fact('b_handshake_egress');
           await step('b_disconnect');
           await disconnectTo();
@@ -254,7 +270,7 @@ void main() {
           return;
         }
         await step('a_first_connect');
-        await connectTo(ids['a'] as String, '45.10.166.106');
+        await connectTo(ids['a'] as String, 'node_a');
         await fact('a_handshake_egress');
         final first = await api.call('POST', '/api/v1/__i019__/active');
         await step('negative_early_recovery');
@@ -312,13 +328,14 @@ void main() {
         await fact('first_recovery');
         await step('restart_a');
         await operation('return-a');
-        await connectTo(ids['a'] as String, '45.10.166.106');
+        await connectTo(ids['a'] as String, 'node_a');
         await fact('a_restart_egress');
         final second = await api.call('POST', '/api/v1/__i019__/active');
         await step('node_failure_cutoff');
         await operation('stop-a');
         expect((await native.snapshot()).up, true);
-        expect(await egress(), null);
+        final cutoffProbe = await egress();
+        expect({'dns', 'timeout', 'route'}.contains(cutoffProbe), true);
         final atCutoff = await native.snapshot();
         expect(atCutoff.up && atCutoff.remainingMs > 0, true);
         expect(
@@ -336,11 +353,11 @@ void main() {
         await recover(second);
         await fact('second_recovery');
         await step('b_connect');
-        await connectTo(ids['b'] as String, '85.209.132.205');
+        await connectTo(ids['b'] as String, 'node_b');
         await fact('b_handshake_egress');
         await step('return_a_while_b_active');
         await operation('return-a');
-        expect(await egress(), '85.209.132.205');
+        expect(await egress(), 'node_b');
         await fact('return_a_does_not_revive_old_peer');
         await step('b_disconnect');
         await disconnectTo();

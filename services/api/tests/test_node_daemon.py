@@ -203,6 +203,76 @@ def test_expiry_removes_and_retains_final_counters(tmp_path: Path) -> None:
     assert ack["rx_bytes"] + ack["tx_bytes"] == 30 and not ack["counters_lost"]
 
 
+@pytest.mark.parametrize("reuse_key", [True, False])
+def test_retired_remove_replay_does_not_cut_off_new_live_lease(
+    tmp_path: Path, reuse_key: bool
+) -> None:
+    native = FakeNative()
+    agent = daemon.Agent(native, tmp_path / "journal")
+    agent.startup()
+    old = lease()
+    assert agent.execute(old)["applied"] is True
+    remove = old | {"operation": "remove_peer", "peer_version": 2, "command_id": str(uuid4())}
+    original_ack = agent.execute(remove)
+    current = lease()
+    if reuse_key:
+        current["public_key"] = old["public_key"]
+    assert agent.execute(current)["applied"] is True
+    closes, budgets = native.closes, native.budgets
+
+    assert agent.execute(remove) == original_ack
+    assert native.current == [current["public_key"]]
+    assert native.closes == closes and native.budgets == budgets
+    with pytest.raises(daemon.AgentFault, match="peer_version_conflict"):
+        agent.execute(remove | {"peer_version": 1})
+    assert native.current == [current["public_key"]] and native.closes == closes
+    wrong_key = base64.b64encode(secrets.token_bytes(32)).decode()
+    with pytest.raises(daemon.AgentFault, match="peer_version_conflict"):
+        agent.execute(remove | {"public_key": wrong_key})
+    assert native.current == [current["public_key"]] and native.closes == closes
+
+
+@pytest.mark.parametrize("invalid", ["expired", "inventory_mismatch"])
+def test_retired_remove_replay_fails_closed_when_new_lease_is_not_verifiable(
+    tmp_path: Path, invalid: str
+) -> None:
+    native = FakeNative()
+    agent = daemon.Agent(native, tmp_path / "journal")
+    agent.startup()
+    old = lease()
+    agent.execute(old)
+    remove = old | {"operation": "remove_peer", "peer_version": 2, "command_id": str(uuid4())}
+    agent.execute(remove)
+    current = lease() | {"public_key": old["public_key"]}
+    agent.execute(current)
+    if invalid == "expired":
+        agent.records[current["peer_id"]]["deadline"] = (
+            datetime.now(UTC) - timedelta(seconds=1)
+        ).isoformat()
+    else:
+        native.current = []
+    closes = native.closes
+    agent.execute(remove)
+    assert native.closes == closes + 1
+
+
+def test_retired_remove_replay_closes_gate_on_corrupt_live_deadline(tmp_path: Path) -> None:
+    native = FakeNative()
+    agent = daemon.Agent(native, tmp_path / "journal")
+    agent.startup()
+    old = lease()
+    agent.execute(old)
+    remove = old | {"operation": "remove_peer", "peer_version": 2}
+    agent.execute(remove)
+    current = lease() | {"public_key": old["public_key"]}
+    agent.execute(current)
+    agent.records[current["peer_id"]]["deadline"] = "invalid"
+    closes = native.closes
+    with pytest.raises(daemon.AgentFault, match="peer_apply_failed"):
+        agent.execute(remove)
+    assert native.closes == closes + 1
+
+
 @pytest.mark.parametrize(
     "change",
     [

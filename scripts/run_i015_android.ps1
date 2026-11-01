@@ -27,7 +27,7 @@ try {
         Copy-Item -LiteralPath $taskBackup -Destination $taskOrdinaryApk -Force
         & $taskAdb install -r $taskBackup
         if ($LASTEXITCODE -ne 0) { throw 'Restore ordinary main.dart APK failed.' }
-        & $taskAdb shell am force-stop org.example.vpnclient
+        & $taskAdb shell am force-stop com.detourvpn.client
         if ($LASTEXITCODE -ne 0) { throw 'Stopping restored app failed.' }
         $taskRestored = $true
     } finally {

@@ -1,15 +1,44 @@
+import java.io.File
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
     id("dev.flutter.flutter-gradle-plugin")
 }
 val i028IsolatedPackage = providers.gradleProperty("i028IsolatedPackage").orNull == "true"
+val clientApplicationId = "com.detourvpn.client"
+val betaSigningEnvironment = linkedMapOf(
+    "DETOURVPN_BETA_KEYSTORE_PATH" to providers.environmentVariable("DETOURVPN_BETA_KEYSTORE_PATH").orNull,
+    "DETOURVPN_BETA_KEYSTORE_PASSWORD" to providers.environmentVariable("DETOURVPN_BETA_KEYSTORE_PASSWORD").orNull,
+    "DETOURVPN_BETA_KEY_ALIAS" to providers.environmentVariable("DETOURVPN_BETA_KEY_ALIAS").orNull,
+    "DETOURVPN_BETA_KEY_PASSWORD" to providers.environmentVariable("DETOURVPN_BETA_KEY_PASSWORD").orNull,
+)
+val betaSigningProvided = betaSigningEnvironment.filterValues { !it.isNullOrBlank() }
+if (betaSigningProvided.isNotEmpty() && betaSigningProvided.size != betaSigningEnvironment.size) {
+    val missing = betaSigningEnvironment.keys - betaSigningProvided.keys
+    throw GradleException("Incomplete beta signing environment; missing variables: ${missing.joinToString()}")
+}
+val betaSigningEnabled = betaSigningProvided.size == betaSigningEnvironment.size
+if (betaSigningEnabled && clientApplicationId == "org.example.vpnclient") {
+    throw GradleException("Choose a stable beta application ID before enabling release signing")
+}
+val betaKeystore = betaSigningEnvironment["DETOURVPN_BETA_KEYSTORE_PATH"]
+    ?.takeIf { betaSigningEnabled }
+    ?.let { File(it) }
+if (betaKeystore != null) {
+    if (!betaKeystore.isAbsolute) {
+        throw GradleException("DETOURVPN_BETA_KEYSTORE_PATH must be an absolute path")
+    }
+    if (!betaKeystore.isFile) {
+        throw GradleException("Configured beta keystore is unavailable")
+    }
+}
 android {
     namespace = "org.example.vpnclient"
     compileSdk = 36
     buildToolsVersion = "36.0.0"
     defaultConfig {
-        applicationId = "org.example.vpnclient"
+        applicationId = clientApplicationId
         minSdk = 24
         targetSdk = 36
         versionCode = 2
@@ -29,6 +58,16 @@ android {
     }
     sourceSets["test"].java.srcDir("../../../android/app/src/test/java")
     packaging { jniLibs.useLegacyPackaging = false }
+    if (betaSigningEnabled) {
+        signingConfigs {
+            create("betaRelease") {
+                storeFile = requireNotNull(betaKeystore)
+                storePassword = requireNotNull(betaSigningEnvironment.getValue("DETOURVPN_BETA_KEYSTORE_PASSWORD"))
+                keyAlias = requireNotNull(betaSigningEnvironment.getValue("DETOURVPN_BETA_KEY_ALIAS"))
+                keyPassword = requireNotNull(betaSigningEnvironment.getValue("DETOURVPN_BETA_KEY_PASSWORD"))
+            }
+        }
+    }
     buildTypes {
         debug {
             manifestPlaceholders["supportsAlwaysOn"] = "true"
@@ -38,6 +77,9 @@ android {
             manifestPlaceholders["supportsAlwaysOn"] = "false"
             isMinifyEnabled = false
             isShrinkResources = false
+            if (betaSigningEnabled) {
+                signingConfig = signingConfigs.getByName("betaRelease")
+            }
         }
     }
 }

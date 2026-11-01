@@ -11,6 +11,13 @@
 <main id="workspace" hidden>
 <nav><button id="refresh">Обновить</button><button id="logout">Выйти</button></nav>
 <section><h2>Пользователи</h2><form id="search-form"><label>UUID или Telegram ID<input name="q"></label><button>Найти</button></form><div id="users"></div></section>
+<section id="beta-invites" hidden><h2>Доступ тестировщика</h2>
+<p>Telegram ID используется только для запроса по HTTPS. Он не показывается в журнале и не должен попадать в причину операции. Выдавайте доступ только после принятия ворот beta.</p>
+<form id="beta-grant-form"><label>Числовой Telegram ID<input name="telegram_subject" type="text" inputmode="numeric" autocomplete="off" autocapitalize="off" spellcheck="false" pattern="[0-9]{1,16}" maxlength="16" required></label>
+<label>Причина без персональных данных<textarea name="reason" minlength="3" maxlength="500" required></textarea></label><button>Выдать приглашение</button></form>
+<form id="beta-revoke-form"><label>Числовой Telegram ID<input name="telegram_subject" type="text" inputmode="numeric" autocomplete="off" autocapitalize="off" spellcheck="false" pattern="[0-9]{1,16}" maxlength="16" required></label>
+<label>Причина без персональных данных<textarea name="reason" minlength="3" maxlength="500" required></textarea></label><button>Отозвать приглашение</button></form>
+<small>Отзыв отключает аккаунт и отзывает его сессии и VPN-туннели. Для нового действия используйте «Начать новую операцию» после проверки журнала.</small></section>
 <section><h2>Выбранный пользователь</h2><p id="selected">Выберите пользователя в списке.</p><div id="quota"></div><div id="devices"></div><div id="subscriptions"></div><div id="history"></div></section>
 <section id="changes"><h2>Изменить трафик или доступ</h2><p>Изменения требуют причины. При сетевой ошибке повтор сохраняет тот же ключ операции.</p>
 <form id="action-form"><label>Действие<select name="operation"><option value="credit">Добавить трафик / компенсация</option><option value="debit">Уменьшить доступный трафик</option><option value="grant_subscription">Выдать / продлить / сменить тариф</option><option value="revoke_subscription">Отменить / отозвать подписку</option><option value="revoke_device">Отозвать устройство и VPN-доступ</option></select></label>

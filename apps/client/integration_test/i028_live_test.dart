@@ -1,4 +1,6 @@
+import 'dart:async';
 import 'dart:io';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
 import 'package:vpn_client/api.dart';
@@ -56,12 +58,33 @@ void main() {
         await api.call('POST', '/api/v1/__i028__/fact', {'name': name});
       }
 
+      Future<void> recordDiagnosticSnapshot(String kind, String point) async {
+        try {
+          final snapshot = await native.snapshot().timeout(
+            const Duration(seconds: 5),
+          );
+          await api
+              .call('POST', '/api/v1/__i028__/native_${kind}_$point', {
+                'up': snapshot.up,
+                'network': snapshot.network,
+                'handshake_age': snapshot.handshakeAge,
+                'remaining_ms': snapshot.remainingMs,
+              })
+              .timeout(const Duration(seconds: 5));
+        } catch (_) {
+          // Diagnostics must not change the acceptance result.
+        }
+      }
+
       Future<Map<String, dynamic>> action(String name) async {
+        if (name == 'egress_dns_observe') stage = 'fixed_dns_queue';
         await api.call('POST', '/api/v1/__i028__/action/$name');
+        if (name == 'egress_dns_observe') stage = 'fixed_dns_wait';
         for (var i = 0; i < 300; i++) {
           await Future<void>.delayed(const Duration(milliseconds: 500));
           final result = await api.call('GET', '/api/v1/__i028__/job');
           if (result['done'] == true) {
+            if (name == 'egress_dns_observe') stage = 'fixed_dns_result';
             check(result['ok'] == true);
             return result;
           }
@@ -133,6 +156,7 @@ void main() {
         }
         check(
           phase == 'run' ||
+              phase == 'egress' ||
               phase == 'lifecycle' ||
               phase == 'network_revoke' ||
               phase == 'natural_sleep',
@@ -153,7 +177,10 @@ void main() {
         final baseline = await action('probe_all');
         check(
           baseline['active_network_is_vpn'] == false &&
-              baseline['egress_is_staging'] == false,
+              baseline['egress_is_staging'] == false &&
+              (phase != 'egress' ||
+                  baseline['ipv6_literal_egress_port_control_connected'] ==
+                      true),
         );
         controller = WindowConnectionController(api, native);
         if (phase == 'natural_sleep') {
@@ -216,9 +243,6 @@ void main() {
             ipv6Contrast['egress_is_staging'] == true &&
                 ipv6Contrast['ipv6_available'] == false,
           );
-          if (baseline['ipv6_available'] == true) {
-            await fact('baseline_ipv6_available_included_ipv6_blocked');
-          }
           await closed();
           for (final mode
               in phase == 'lifecycle'
@@ -309,16 +333,335 @@ void main() {
         await connected();
         await fact('native_reports_fresh_handshake');
         stage = 'included_probe';
-        final included = await action('probe_all');
-        check(
-          included['ipv4_available'] == true &&
-              included['egress_is_staging'] == true &&
-              included['fixed_udp_dns_response'] == true &&
-              included['ipv6_available'] == false,
+        if (phase == 'egress')
+          await recordDiagnosticSnapshot('egress', 'before');
+        final included = await action(
+          phase == 'egress' ? 'egress_probe_all' : 'probe_all',
         );
-        await fact('included_probe_real_staging_ipv4_and_udp_dns');
-        if (baseline['ipv6_available'] == true) {
-          await fact('baseline_ipv6_available_included_ipv6_blocked');
+        if (phase == 'egress')
+          await recordDiagnosticSnapshot('egress', 'after');
+        if (phase == 'egress') {
+          stage = 'fixed_dns_path_observation';
+          final observation = await action('egress_dns_observe');
+          check(observation['diagnostic_collected'] == true);
+          stage = 'included_probe';
+        }
+        final includedProbePassed =
+            included['ipv4_available'] == true &&
+            included['egress_is_staging'] == true &&
+            included['fixed_udp_dns_response'] == true &&
+            included['ipv6_available'] == false &&
+            included['ipv6_literal_connected'] == false &&
+            included['ipv6_literal_connect_attempted'] == true &&
+            (included['ipv6_literal_failure'] == 'route' ||
+                included['ipv6_literal_failure'] == 'io');
+        final deferDnsTimeoutForCapture =
+            phase == 'egress' &&
+            included['probe_complete'] == true &&
+            included['process_uid_matches_target'] == true &&
+            included['active_network_is_vpn'] == true &&
+            included['active_network_validated'] == true &&
+            included['ipv4_available'] == true &&
+            included['egress_is_staging'] == true &&
+            included['fixed_udp_dns_response'] == false &&
+            included['dns_failure'] == 'timeout' &&
+            included['ipv6_available'] == false &&
+            included['ipv6_failure'] == 'dns';
+        // This exact timeout is inconclusive, not a pass. Keep the verified
+        // staging tunnel through the existing bounded packet-capture hold so
+        // an operator capture cannot drift into post-disconnect traffic.
+        // Every other failed probe still stops immediately.
+        if (!includedProbePassed && !deferDnsTimeoutForCapture) check(false);
+        if (includedProbePassed) {
+          await fact('included_probe_real_staging_ipv4_and_udp_dns');
+          if (phase == 'egress') await fact('included_ipv6_literal_blocked');
+        }
+        if (phase == 'egress') {
+          if (controller.trafficRenewalRequested) {
+            await fact('advisory_traffic_renewal_requested');
+          }
+          stage = 'egress_renewal_check';
+          const renewalAckDeadline = Duration(seconds: 30);
+          final renewalAckClock = Stopwatch()..start();
+          Future<T> beforeRenewalAckDeadline<T>(Future<T> operation) {
+            final remaining = renewalAckDeadline - renewalAckClock.elapsed;
+            if (remaining <= Duration.zero) {
+              throw TimeoutException('i028_egress_renewal_ack_timeout');
+            }
+            return operation.timeout(remaining);
+          }
+
+          var renewal = await beforeRenewalAckDeadline(
+            api.call('GET', '/api/v1/__i028__/egress-renewal-status'),
+          );
+          if (controller.trafficRenewalRequested ||
+              renewal['renewal_seen'] == true) {
+            stage = 'egress_initial_renewal_ack_wait';
+            var acknowledged = false;
+            while (renewalAckClock.elapsed < renewalAckDeadline) {
+              await beforeRenewalAckDeadline(controller.refresh());
+              renewal = await beforeRenewalAckDeadline(
+                api.call('GET', '/api/v1/__i028__/egress-renewal-status'),
+              );
+              if (renewal['acknowledged'] == true &&
+                  controller.phase.name == 'connected') {
+                acknowledged = true;
+                break;
+              }
+              final remaining = renewalAckDeadline - renewalAckClock.elapsed;
+              if (remaining > Duration.zero) {
+                final pause = remaining < const Duration(milliseconds: 500)
+                    ? remaining
+                    : const Duration(milliseconds: 500);
+                await Future<void>.delayed(pause);
+              }
+            }
+            if (!acknowledged) {
+              stage = renewal['acknowledged'] == true
+                  ? 'egress_initial_client_not_connected'
+                  : 'egress_initial_server_ack_missing';
+            }
+            check(acknowledged);
+          }
+          // The Linux AP capture starts before this test and waits for the
+          // first outer VPN packet, then observes 90 seconds. Keep this real
+          // tunnel up beyond that bounded window so the capture cannot silently
+          // include post-disconnect phone traffic as if it were included VPN.
+          stage = 'egress_capture_hold';
+          final captureHold = Stopwatch()..start();
+          var holdRefreshProbeAttempted = false;
+          var inboundCounterAvailable = false;
+          var previousReceivedBytes = (await native.snapshot()).receivedBytes;
+          int? lastInboundProgressMs;
+          var holdProbeAttempted = false;
+          var holdProbeSucceeded = false;
+          final holdObservations = <Map<String, Object>>[];
+          while (captureHold.elapsed < const Duration(seconds: 140)) {
+            await Future<void>.delayed(const Duration(seconds: 5));
+            await controller.refresh().timeout(const Duration(seconds: 8));
+            var snapshot = await native.snapshot().timeout(
+              const Duration(seconds: 5),
+            );
+            check(snapshot.up && snapshot.network && snapshot.remainingMs > 0);
+            if (!holdProbeAttempted &&
+                captureHold.elapsed >= const Duration(seconds: 35)) {
+              holdProbeAttempted = true;
+              try {
+                final probe = await action('probe_ipv4');
+                holdProbeSucceeded = probe['egress_is_staging'] == true;
+                if (holdProbeSucceeded) {
+                  await controller.refresh().timeout(
+                    const Duration(seconds: 8),
+                  );
+                  snapshot = await native.snapshot().timeout(
+                    const Duration(seconds: 5),
+                  );
+                }
+              } catch (_) {
+                // This optional fixed probe only supplies inbound test traffic.
+                // The scoped Egress acceptance remains based on its required probe.
+              }
+            }
+            final receivedBytes = snapshot.receivedBytes;
+            final elapsedMs = captureHold.elapsedMilliseconds;
+            if (receivedBytes == null || receivedBytes < 0) {
+              inboundCounterAvailable = false;
+              previousReceivedBytes = null;
+              lastInboundProgressMs = null;
+            } else {
+              inboundCounterAvailable = true;
+              final previous = previousReceivedBytes;
+              if (previous == null || receivedBytes < previous) {
+                lastInboundProgressMs = null;
+              } else if (receivedBytes > previous) {
+                lastInboundProgressMs = elapsedMs;
+              }
+              previousReceivedBytes = receivedBytes;
+            }
+            final progressAtMs = lastInboundProgressMs;
+            final inboundProgressRecent =
+                progressAtMs != null &&
+                elapsedMs >= progressAtMs &&
+                elapsedMs - progressAtMs <=
+                    const Duration(seconds: 60).inMilliseconds;
+            renewal = await api
+                .call('GET', '/api/v1/__i028__/egress-renewal-status')
+                .timeout(const Duration(seconds: 8));
+            if (holdObservations.length < 32) {
+              holdObservations.add({
+                'elapsed_seconds': elapsedMs ~/ 1000,
+                'client_phase': controller.phase.name,
+                'client_has_error': controller.error != null,
+                'native_up': snapshot.up,
+                'native_network': snapshot.network,
+                'handshake_age': snapshot.handshakeAge,
+                'remaining_ms': snapshot.remainingMs,
+                'received_counter_available': inboundCounterAvailable,
+                'inbound_progress_recent': inboundProgressRecent,
+                'renewal_acknowledged': renewal['acknowledged'] == true,
+                'traffic_counter_available':
+                    snapshot.trafficBytes != null &&
+                    snapshot.trafficBytes! >= 0,
+                'traffic_renewal_requested': controller.trafficRenewalRequested,
+                'renewal_pending': controller.renewalPending,
+              });
+            }
+            if (renewal['renewal_seen'] == true &&
+                (renewal['acknowledged'] != true ||
+                    (controller.phase.name != 'connected' &&
+                        !holdRefreshProbeAttempted))) {
+              stage = 'egress_hold_renewal_ack_wait';
+              final holdAckClock = Stopwatch()..start();
+              var holdRenewalAcknowledged = false;
+              while (holdAckClock.elapsed < renewalAckDeadline) {
+                final remaining = renewalAckDeadline - holdAckClock.elapsed;
+                await controller.refresh().timeout(remaining);
+                renewal = await api
+                    .call('GET', '/api/v1/__i028__/egress-renewal-status')
+                    .timeout(remaining);
+                if (renewal['acknowledged'] == true &&
+                    controller.phase.name != 'connected' &&
+                    !holdRefreshProbeAttempted) {
+                  stage = 'egress_hold_refresh_probe';
+                  if (holdObservations.isNotEmpty) {
+                    try {
+                      await api
+                          .call(
+                            'POST',
+                            '/api/v1/__i028__/egress-hold-observation',
+                            {
+                              'fixed_probe_attempted': holdProbeAttempted,
+                              'fixed_probe_succeeded': holdProbeSucceeded,
+                              'observations': holdObservations,
+                            },
+                          )
+                          .timeout(const Duration(seconds: 5));
+                    } catch (_) {
+                      // Save the last bounded state before the tunnel probe.
+                    }
+                  }
+                  final probe = await action('probe_ipv4').timeout(remaining);
+                  if (probe['egress_is_staging'] != true &&
+                      holdObservations.isNotEmpty) {
+                    try {
+                      await api
+                          .call(
+                            'POST',
+                            '/api/v1/__i028__/egress-hold-observation',
+                            {
+                              'fixed_probe_attempted': true,
+                              'fixed_probe_succeeded': false,
+                              'observations': holdObservations,
+                            },
+                          )
+                          .timeout(const Duration(seconds: 5));
+                    } catch (_) {
+                      // Preserve only bounded booleans if the physical probe fails.
+                    }
+                  }
+                  check(probe['egress_is_staging'] == true);
+                  holdRefreshProbeAttempted = true;
+                  try {
+                    await controller.refresh().timeout(remaining);
+                    final refreshed = await native.snapshot().timeout(
+                      const Duration(seconds: 5),
+                    );
+                    await api
+                        .call(
+                          'POST',
+                          '/api/v1/__i028__/egress-hold-observation',
+                          {
+                            'client_phase': controller.phase.name,
+                            'client_has_error': controller.error != null,
+                            'native_up': refreshed.up,
+                            'native_network': refreshed.network,
+                            'handshake_age': refreshed.handshakeAge,
+                            'remaining_ms': refreshed.remainingMs,
+                            'renewal_acknowledged':
+                                renewal['acknowledged'] == true,
+                          },
+                        )
+                        .timeout(const Duration(seconds: 5));
+                  } catch (_) {
+                    // Hold diagnostics must never change physical acceptance.
+                  }
+                  stage = 'egress_hold_renewal_ack_wait';
+                }
+                if (renewal['acknowledged'] == true &&
+                    (controller.phase.name == 'connected' ||
+                        holdRefreshProbeAttempted)) {
+                  holdRenewalAcknowledged = true;
+                  break;
+                }
+                final pause = renewalAckDeadline - holdAckClock.elapsed;
+                if (pause > Duration.zero) {
+                  await Future<void>.delayed(
+                    pause < const Duration(milliseconds: 500)
+                        ? pause
+                        : const Duration(milliseconds: 500),
+                  );
+                }
+              }
+              if (!holdRenewalAcknowledged) {
+                stage = renewal['acknowledged'] == true
+                    ? 'egress_hold_transfer_unconfirmed'
+                    : 'egress_hold_server_ack_missing';
+              }
+              check(holdRenewalAcknowledged);
+              stage = 'egress_capture_hold';
+            }
+          }
+          if (holdObservations.isNotEmpty) {
+            try {
+              await api
+                  .call('POST', '/api/v1/__i028__/egress-hold-observation', {
+                    'fixed_probe_attempted': holdProbeAttempted,
+                    'fixed_probe_succeeded': holdProbeSucceeded,
+                    'observations': holdObservations,
+                  })
+                  .timeout(const Duration(seconds: 5));
+            } catch (_) {
+              // Status fallback evidence is diagnostic and cannot break cleanup.
+            }
+          }
+          stage = 'egress_disconnect';
+          await closed();
+          // Positive control for the synchronized AP audit. The probe UID is
+          // temporarily excluded after closing the tunnel, so its fixed DNS
+          // and direct-IPv6 source ports should be visible on the bridge.
+          // The split rule is restored in finally before the run is released.
+          stage = 'egress_excluded_probe';
+          await PlatformTunnel.channel.invokeMethod<void>('splitWrite', {
+            'packages': ['org.example.vpnpoc'],
+          });
+          await connected();
+          final excluded = await action('probe_all');
+          check(
+            excluded['ipv4_available'] == true &&
+                excluded['egress_is_staging'] == false,
+          );
+          if (included['ipv4_available'] == true) {
+            await fact('same_probe_uid_included_then_excluded_egress');
+          }
+          // Android rejects split-routing preference changes while the VPN
+          // service is up. Disconnect before restoring the default routing.
+          stage = 'egress_excluded_disconnect';
+          await closed();
+          stage = 'egress_split_restore';
+          await PlatformTunnel.channel.invokeMethod<void>('splitWrite', {
+            'packages': <String>[],
+          });
+          stage = 'egress_settlement';
+          await api.call('POST', '/api/v1/__i028__/verify');
+          stage = 'egress_logout';
+          await api.call('POST', '/api/v1/auth/logout');
+          if (!includedProbePassed) {
+            // Retain the failed DNS acceptance result after the full diagnostic
+            // window and normal local settlement/cleanup have completed.
+            stage = 'included_probe';
+            check(false);
+          }
+          return;
         }
         stage = 'sustained_renewal';
         final watch = Stopwatch()..start();
@@ -335,20 +678,40 @@ void main() {
           });
           // Idle handshake freshness and renewable-window validity are separate.
           // Preserve the production UI threshold; require actual transfer here.
+          stage = 'sustained_native_state';
           check(snapshot.up && snapshot.network && snapshot.remainingMs > 0);
           if (watch.elapsed.inSeconds >= nextTransfer) {
+            stage = 'sustained_transfer_probe';
             final transfer = await action('probe_ipv4');
+            if (transfer['egress_is_staging'] != true) {
+              final after = await native.snapshot();
+              await api.call(
+                'POST',
+                '/api/v1/__i028__/native_observation_after_failure',
+                {
+                  'up': after.up,
+                  'network': after.network,
+                  'handshake_age': after.handshakeAge,
+                  'remaining_ms': after.remainingMs,
+                },
+              );
+            }
             check(transfer['egress_is_staging'] == true);
             nextTransfer = watch.elapsed.inSeconds + 20;
           }
         }
+        stage = 'sustained_final_probe';
         final sustained = await action('probe_ipv4');
-        check(
-          sustained['egress_is_staging'] == true &&
-              await native.publicKey() == key,
-        );
+        check(sustained['egress_is_staging'] == true);
+        stage = 'sustained_key_stability';
+        check(await native.publicKey() == key);
+        stage = 'sustained_server_generation';
         await api.call('POST', '/api/v1/__i028__/renewals');
+        stage = 'sustained_fact_checkpoint';
         await fact('sustained_real_renewals_over_three_minutes');
+        if (controller.trafficRenewalRequested) {
+          await fact('advisory_traffic_renewal_requested');
+        }
         stage = 'disconnect';
         await closed();
         await fact('disconnect_native_down_and_server_closed');
@@ -395,7 +758,10 @@ void main() {
         }
         check(!controller.hasLease);
         await connected();
-        check((await action('probe_ipv4'))['egress_is_staging'] == true);
+        await recordDiagnosticSnapshot('recovery', 'before');
+        final recoveryProbe = await action('recovery_probe_ipv4');
+        await recordDiagnosticSnapshot('recovery', 'after');
+        check(recoveryProbe['egress_is_staging'] == true);
         await fact('agent_restart_reconciles_before_new_real_tunnel');
         await closed();
         stage = 'disconnect_renewal_race';

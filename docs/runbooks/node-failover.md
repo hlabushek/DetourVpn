@@ -1,11 +1,79 @@
 # I-019 — выбор узла и bounded recovery
 
-Полный physical drill принят 2026-10-23 в scope ADR-033: два сервера одного
-провайдера, 15/15 facts, ledger и cleanup passed. Текущие receipts:
-`docs/evidence/i-019-staging.json`, `docs/evidence/i-019-session-post-cleanup.json`.
-Оба временных grant удалены; повторять команды для завершения этого этапа
-не требуется. Инструкции ниже предназначены для будущего отдельно разрешённого
-drill. Независимость от провайдера остаётся открытой.
+## Последний результат: independent-provider drill passed 2026-11-01
+
+Attempt `2df6394bc51e41e3b1fb066a1ba7e395` и receipt
+`docs/evidence/i-019-attempt-2df6394bc51e41e3b1fb066a1ba7e395.json` закрывают
+согласованный bounded I-019 scope: A/B/A/B physical egress, cutoff, expiry,
+recovery, ledger и cleanup прошли. Оба host grants удалены и forwarding
+восстановлен. Старые failed attempts ниже приведены как история, а не текущее
+состояние gate.
+
+На телефоне повторное подключение B впервые прошло после удаления дублирующего
+`Context.stopService()` из AWG adapter: pinned `GoBackend.setState(DOWN)` уже
+останавливает сервис активного туннеля. Это правдоподобное объяснение прежней
+гонки, не доказательство единственной причины.
+
+Подтверждена ограниченная provider separation по разным origin ASN
+(AS41745/AS215590). Полная независимость upstream/datacenter, автоматический
+failover, production readiness и device-wide leak freedom этим drill не
+подтверждены.
+
+При завершении попытки runner отменяет следующие шаги фоновой операции A и
+дожидается завершения уже начатой SSH-команды перед диагностикой и cleanup.
+Это предотвращает параллельный повторный запуск узла во время очистки; при
+медленном SSH завершение может занять время до истечения таймаута команды.
+
+ADR-075: cleanup пытается остановить оба сервиса даже при ошибке SIGCONT для
+агента. Последний физический receipt подтвердил stop, restoration и отсутствие
+ресурсов на обоих узлах.
+
+ADR-074 исправляет локально повтор удаления уже закрытой lease: при проверенно
+активной новой lease старый повтор не должен закрывать общий gate или удалять
+переиспользованный ключ. При неоднозначном состоянии остаётся fail-closed.
+Этот safety guard вошёл в успешно проверенную staging версию; связь с прежними
+B-handshake failures не доказана.
+
+Последняя попытка `i-019-attempt-5b914fde876e4c0e866bcce4729835f8.json`
+не получила свежий B handshake: четыре probe вернули `dns`, несмотря на
+DNS-независимый literal trigger; его connect outcome не записан. A cleanup
+подтверждён; оператор остановил B, root recovery вернул `recovery_not_needed`.
+Read-only проверки подтвердили endpoint failed, agent inactive, отсутствие
+timer/namespace/listener и forwarding=0. На момент этой failed попытки
+independent-provider gate оставался открыт; успешный последующий прогон описан
+в начале runbook.
+
+При временной ошибке первого fixed probe тест ограниченно повторяет создание
+трафика, пока ожидает native handshake. Приёмка по-прежнему требует подтверждённый
+handshake и два свежих ответа egress выбранного узла. BuildOnly прошёл; последняя
+физическая проверка завершилась ошибкой, указанной выше.
+
+Предыдущая попытка `i-019-attempt-d16cc96c0cd54f59b940d98e4331bb41.json`
+остановилась на повторном B handshake. Probe сохранился как `other`: среди
+фиксированных результатов sanitizer пропускал только `dns`. Категория
+восстановлена и покрыта тестом; причина DNS/handshake failure пока неизвестна.
+A cleanup прошёл; B остановлен оператором, root recovery вернул
+`recovery_not_needed`, read-only проверки подтвердили forwarding=0 и отсутствие
+активного endpoint, agent, timer, namespace и listener. Приёмка остаётся открытой.
+
+Исторический physical drill от 2026-10-23 был принят в scope ADR-033 для двух
+серверов одного провайдера (15/15 facts, ledger и cleanup). Он не проверяет
+независимость провайдеров. Актуальные independent-provider receipts и состояние
+попыток описаны ниже; путь `docs/evidence/i-019-staging.json` сейчас содержит
+последнюю failed квитанцию и не является исторической квитанцией принятого
+same-provider прогона.
+
+Отдельно разрешённый ADR-073 independent-provider drill использует A
+`45.10.166.106` и Xorek B `150.241.99.227`. Последняя попытка
+`i-019-attempt-5dcc929ff4cd47ae8fe3b58fb794773b.json` прошла A-loss cutoff,
+обе recovery-проверки и свежий B native handshake, но API отклонил B-egress
+record после достижения старого лимита 16. Лимит поднят до 32; regression test
+прошёл. Оператор остановил B и fixed root recovery вернул
+`recovery_not_needed`; read-only checks подтвердили units неактивны, timers и
+namespace/listeners отсутствуют, forwarding восстановлен A=1/B=0. Cleanup
+подтверждён, drill — нет. Исправление лимита нужно проверить новым физическим
+прогоном на свежем bounded окне. Старые same-provider receipts выше не
+подтверждают independent-provider gate.
 
 ## Локальное воспроизведение
 
@@ -107,7 +175,7 @@ intent нельзя создавать на том же устройстве, п
 Недостаток квоты после консервативного списания честно запрещает новый lease.
 Нет обещания бесшовного переноса/сохранения текущих TCP sessions.
 
-## Обязательный live gate — пока не выполнен
+## Исторический план live gate (выполнен в receipt выше)
 
 Для двух конкретных staging hosts отдельно согласовать адреса, права, бюджет,
 временное окно, команды отключения A и cleanup. До действия проверить baseline,
@@ -115,13 +183,19 @@ kernel gates, runtime/key identity, отсутствие чужих peers/кон
 (погрешность node/API не более 1s, gate operation не более 5s),
 SSH transport API. Production root credentials не нужны.
 
-По ADR-033 владелец разрешил этот drill на A 45.10.166.106 и B 85.209.132.205
-у одного провайдера. Независимость от отказа провайдера проверяется позднее
-отдельно; её нельзя включать в успешные результаты этого drill.
-Read-only preflight 2026-10-22: SSH/TUN/NTP доступны; B без pinned release;
-на обоих требуется локальная интерактивная sudo-авторизация, adb не видит
-телефон. Это предварительные сведения, не полный privileged network baseline.
-Старые A-only runners на B не запускать путём подмены inventory/guards.
+По ADR-073 владелец разрешил один bounded drill на A `45.10.166.106` и Xorek
+B `150.241.99.227`; это подтверждает только различие origin ASN, не всю цепочку
+upstream. Старое разрешение ADR-033 для same-provider B
+`85.209.132.205` не покрывает этот критерий. Для принятия нужны A failure,
+deadline/recovery, свежий egress через B, точный ledger settlement, cleanup и
+restoration. Попытка `i-019-attempt-5dcc929ff4cd47ae8fe3b58fb794773b.json`
+доказала A failure/recovery и свежий B native handshake, но не записала B egress
+или финальную ledger-сверку. Settlement составил 51 416 charged bytes. Root
+cause — API receipt cap в 16 probe records: B-egress был следующим и отклонён.
+Лимит повышен до 32, регрессионный тест прошёл. Оператор остановил B и fixed
+root recovery вернул `recovery_not_needed`; read-only проверки подтвердили
+cleanup и forwarding baseline A=1/B=0. Эти старые неудачные попытки
+предшествовали успешному прогону, записанному в начале runbook.
 
 - На физическом Android подтвердить A: handshake и свежий egress probe.
 - В согласованном окне остановить только выделенный A runtime/agent. Проверить
@@ -137,8 +211,9 @@ Read-only preflight 2026-10-22: SSH/TUN/NTP доступны; B без pinned re
   temporary peer/config/forwarding/grants и подтвердить baseline обоих hosts.
 
 В evidence писать только codes/counts/timestamps/хеши, без конфигов, ключей,
-credential, Telegram payload или сетевого содержимого. До такого receipt I-019
-не считается принятой на реальных двух VPN узлах. Коммерческий запуск no-go.
+credential, Telegram payload или сетевого содержимого. Receipt в начале runbook
+подтверждает этот bounded gate. Коммерческий запуск и production readiness им
+не подтверждены.
 
 ## I-019: текущий отдельный runner
 

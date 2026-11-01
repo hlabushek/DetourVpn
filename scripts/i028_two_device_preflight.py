@@ -10,6 +10,9 @@ import sys
 from collections.abc import Callable
 from pathlib import Path
 
+PROBE_PACKAGE = "org.example.vpnpoc.i028"
+PROBE_TEST_PACKAGE = PROBE_PACKAGE + ".test"
+
 
 def _run(adb: str, serial: str, *args: str) -> str:
     result = subprocess.run(  # noqa: S603 - fixed adb executable and argument list.
@@ -65,9 +68,11 @@ def inspect_devices(
 
     devices: list[dict[str, object]] = []
     forbidden_packages = (
-        "org.example.vpnclient.i028",
-        "org.example.vpnclient.i028.test",
+        "com.detourvpn.client.i028",
+        "com.detourvpn.client.i028.test",
         "org.example.vpnpoc.test",
+        PROBE_PACKAGE,
+        PROBE_TEST_PACKAGE,
     )
     for serial in attached:
         model = run(adb, serial, "shell", "getprop", "ro.product.model")
@@ -89,7 +94,7 @@ def inspect_devices(
         )
         if always_on not in {"null", ""} or lockdown not in {"null", "0", "false", ""}:
             raise RuntimeError("preexisting_always_on_policy_preserved")
-        poc_installed = "package:org.example.vpnpoc" in packages.splitlines()
+        poc_installed = f"package:{PROBE_PACKAGE}" in packages.splitlines()
         devices.append(
             {
                 "model": model,

@@ -41,6 +41,54 @@ def test_explicit_approved_staging_address_is_read_only_validated(fake_host):
     assert len(fake_host) == 1
 
 
+def test_i019_xorek_ubuntu_2204_is_allowed_only_for_exact_second_node(fake_host, monkeypatch):
+    monkeypatch.setattr(
+        smoke.platform,
+        "freedesktop_os_release",
+        lambda: {"ID": "ubuntu", "VERSION_ID": "22.04"},
+    )
+    monkeypatch.setattr(
+        smoke,
+        "run",
+        lambda argv: json.dumps([{"addr_info": [{"local": "150.241.99.227"}]}]),
+    )
+    assert (
+        smoke.require_environment("150.241.99.227", i019=True)
+        == "approved_staging_isolated_sandbox"
+    )
+
+
+@pytest.mark.parametrize(
+    ("address", "i019", "version"),
+    [
+        ("45.10.166.106", True, "22.04"),
+        ("150.241.99.228", True, "22.04"),
+        ("150.241.99.227", False, "22.04"),
+        ("150.241.99.227", True, "24.04"),
+    ],
+)
+def test_i019_xorek_os_exception_refuses_other_targets(
+    fake_host, monkeypatch, address, i019, version
+):
+    monkeypatch.setattr(
+        smoke.platform,
+        "freedesktop_os_release",
+        lambda: {"ID": "ubuntu", "VERSION_ID": version},
+    )
+    monkeypatch.setattr(
+        smoke,
+        "run",
+        lambda argv: json.dumps([{"addr_info": [{"local": address}]}]),
+    )
+    expected_error = (
+        "unsupported_staging_platform"
+        if address == "45.10.166.106" or version != "22.04"
+        else "staging_target_not_approved"
+    )
+    with pytest.raises(smoke.SmokeError, match=expected_error):
+        smoke.require_environment(address, i019=i019)
+
+
 @pytest.mark.parametrize("address", [None, "127.0.0.1", "45.10.166.107", ""])
 def test_implicit_or_wrong_target_refused_before_probe(fake_host, address):
     with pytest.raises(smoke.SmokeError):

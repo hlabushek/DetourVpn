@@ -1,0 +1,36 @@
+{
+  "issue": "I-030",
+  "observed_on": "2026-10-29",
+  "scope": "unauthenticated public HTTPS route check against the isolated beta API",
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/mini-app/",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/referrals",
+      "status": 401
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/ready",
+      "status": 404
+    }
+  ],
+  "tls_validation": "default client validation; no bypass configured",
+  "authentication_or_secrets_used": false,
+  "response_bodies_inspected_or_saved": false,
+  "application_or_configuration_state_changed": false,
+  "server_request_logging": "may record these public GET requests; server logs were not inspected",
+  "conclusion": "Mini App HTTPS route is reachable, the unauthenticated referrals API is protected, and the readiness path is not exposed through the public ingress.",
+  "not_verified": [
+    "Current API process or database health",
+    "Current VPN node or node-agent health",
+    "External UDP ingress or current peer handshake",
+    "Android tunnel, DNS/IPv6 privacy, or packet-level acceptance",
+    "Telegram delivery, invitation, or friend onboarding"
+  ],
+  "production_or_B_changed": false
+}

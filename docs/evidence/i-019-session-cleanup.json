@@ -3,9 +3,14 @@
   "cleanup": {
     "45.10.166.106": {
       "cleanup_complete": true,
+      "agent_state_query_failed": false,
+      "agent_resume_failed": false,
+      "agent_stop_command_ok": true,
+      "endpoint_stop_command_ok": true,
+      "receipt_read_failed": false,
       "forwarding_restored": true,
       "cleanup_receipt": {
-        "invocation_id": "6e4ee5822b31415e9e463c31b83bed04",
+        "invocation_id": "d1412cb96ca346bbbbecebfc0971d587",
         "events": [
           {
             "endpoint_ready": true,
@@ -28,11 +33,16 @@
       "owned_resources_absent": true,
       "control_grant_removed": true
     },
-    "85.209.132.205": {
+    "150.241.99.227": {
       "cleanup_complete": true,
+      "agent_state_query_failed": false,
+      "agent_resume_failed": false,
+      "agent_stop_command_ok": true,
+      "endpoint_stop_command_ok": true,
+      "receipt_read_failed": false,
       "forwarding_restored": true,
       "cleanup_receipt": {
-        "invocation_id": "d79d103ed2884683adfeb4a56269c5c2",
+        "invocation_id": "3a2f789aa9274cbb8249c437ba79dd09",
         "events": [
           {
             "endpoint_ready": true,

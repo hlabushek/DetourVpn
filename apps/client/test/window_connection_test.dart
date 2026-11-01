@@ -15,6 +15,8 @@ const runtime = '44444444-4444-4444-8444-444444444444';
 class Native extends FakeNative implements WindowNative {
   int advances = 0;
   int remaining = 59000;
+  int? traffic;
+  int? received;
   bool failPublicKey = false;
   @override
   Future<String> publicKey() async {
@@ -28,6 +30,8 @@ class Native extends FakeNative implements WindowNative {
     network: network,
     handshakeAge: age,
     remainingMs: remaining,
+    trafficBytes: traffic,
+    receivedBytes: received,
     reason: reason,
   );
   @override
@@ -65,6 +69,7 @@ class WindowsApi implements TunnelApi {
   bool deviceBound = false;
   String? invalidResponsePath;
   int creates = 0;
+  int grantBudget = 1048576;
   int deletes = 0;
   final budgets = <int>[];
   final renewKeys = <String>[];
@@ -91,7 +96,7 @@ class WindowsApi implements TunnelApi {
       'public_key': 'test-only-public-key',
       'issued_at': issued.toIso8601String(),
       'not_after': issued.add(const Duration(seconds: 90)).toIso8601String(),
-      'budget_bytes': 16777216,
+      'budget_bytes': grantBudget,
     },
   };
   @override
@@ -180,6 +185,75 @@ void main() {
     expect(WindowConnectionController.budgetBytes, 1048576);
   });
   test(
+    'native traffic can request early renewal without changing byte budget',
+    () async {
+      c.dispose();
+      c = WindowConnectionController(
+        api,
+        native,
+        pollInterval: const Duration(days: 1),
+        renewBeforeMs: 0,
+      )..selectedNode = node;
+      native.traffic = 0;
+      await c.connect();
+      native.traffic = 524287;
+      await c.refresh();
+      expect(api.renewKeys, isEmpty);
+      expect(c.trafficRenewalRequested, false);
+      native.traffic = 524288;
+      await c.refresh();
+      expect(api.renewKeys.length, 1);
+      expect(c.trafficRenewalRequested, true);
+      expect(api.budgets, [1048576, 1048576]);
+      expect(native.advances, 1);
+      await c.refresh();
+      expect(api.renewKeys.length, 1);
+    },
+  );
+  test(
+    'advisory counter reset and absence do not request a guessed renewal',
+    () async {
+      c.dispose();
+      c = WindowConnectionController(
+        api,
+        native,
+        pollInterval: const Duration(days: 1),
+        renewBeforeMs: 0,
+      )..selectedNode = node;
+      native.traffic = 0;
+      await c.connect();
+      native.traffic = 400000;
+      await c.refresh();
+      native.traffic = null;
+      await c.refresh();
+      native.traffic = 2;
+      await c.refresh();
+      expect(api.renewKeys, isEmpty);
+    },
+  );
+  test(
+    'early traffic renewal reuses its idempotency key after response loss',
+    () async {
+      c.dispose();
+      c = WindowConnectionController(
+        api,
+        native,
+        pollInterval: const Duration(days: 1),
+        renewBeforeMs: 0,
+      )..selectedNode = node;
+      native.traffic = 0;
+      await c.connect();
+      api.lostRenew = true;
+      native.traffic = 524288;
+      await c.refresh();
+      native.traffic = 700000;
+      await c.refresh();
+      expect(api.renewKeys.length, 2);
+      expect(api.renewKeys.toSet().length, 1);
+      expect(native.advances, 1);
+    },
+  );
+  test(
     'invalid registration response identifies its bounded diagnostic stage',
     () async {
       api.invalidResponsePath = '/api/v1/devices';
@@ -214,6 +288,80 @@ void main() {
     ]);
     expect(native.advances, 1);
     expect(c.phase, ConnectionPhase.connected);
+    expect(c.trafficRenewalRequested, false);
+  });
+  test(
+    'recent inbound tunnel progress confirms an established session',
+    () async {
+      await c.connect();
+      await c.refresh(); // Establish the fresh-handshake barrier first.
+      expect(c.phase, ConnectionPhase.connected);
+      native.age = 181;
+      native.received = 100;
+      await c.refresh();
+      expect(c.phase, ConnectionPhase.reconnecting);
+      native.received = 101;
+      await c.refresh();
+      expect(c.phase, ConnectionPhase.connected);
+      expect(c.detail, 'Входящий трафик через VPN подтверждён');
+    },
+  );
+  test('outbound-only traffic does not confirm a stale handshake', () async {
+    await c.connect();
+    await c.refresh(); // Establish the fresh-handshake barrier first.
+    native.age = 181;
+    native.traffic = 100;
+    await c.refresh();
+    native.traffic = 200;
+    await c.refresh();
+    expect(c.phase, ConnectionPhase.reconnecting);
+  });
+  test(
+    'pending renewal retains connected status on recent inbound progress',
+    () async {
+      await c.connect();
+      await c.refresh();
+      expect(c.phase, ConnectionPhase.connected);
+      final advancesBeforePending = native.advances;
+      api.pending = true;
+      native.age = 181;
+      native.received = 100;
+      await c.refresh();
+      expect(c.phase, ConnectionPhase.reconnecting);
+      native.received = 101;
+      await c.refresh();
+      expect(c.phase, ConnectionPhase.connected);
+      expect(c.detail, 'Входящий трафик через VPN подтверждён');
+      expect(
+        native.advances,
+        advancesBeforePending,
+      ); // Pending never extends the native lease.
+    },
+  );
+  test('pending renewal cannot establish before a fresh handshake', () async {
+    await c.connect();
+    native.age = 181;
+    native.received = 100;
+    native.traffic = 0;
+    await c.refresh();
+    expect(c.phase, ConnectionPhase.reconnecting);
+    final advancesBeforePending = native.advances;
+    api.pending = true;
+    native.received = 101;
+    native.traffic = 600000;
+    await c.refresh();
+    expect(c.renewalPending, true);
+    expect(c.phase, ConnectionPhase.reconnecting);
+    expect(native.advances, advancesBeforePending);
+  });
+  test('inbound activity expires and a counter reset clears confirmation', () {
+    final activity = InboundTrafficFreshness();
+    expect(activity.observe(100, 1000), false);
+    expect(activity.observe(101, 2000), true);
+    expect(activity.observe(101, 62000), true);
+    expect(activity.observe(101, 62001), false);
+    expect(activity.observe(0, 63000), false);
+    expect(activity.observe(1, 64000), true);
   });
   test(
     'fresh OTP session binds phone key before reconciling connections',

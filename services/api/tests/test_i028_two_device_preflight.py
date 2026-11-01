@@ -74,7 +74,12 @@ def test_two_device_preflight_refuses_wrong_device_count(
 @pytest.mark.parametrize(
     ("packages", "always_on", "lockdown", "error"),
     [
-        ("package:org.example.vpnpoc.test", "null", "0", "preexisting_i028_test_package_preserved"),
+        (
+            "package:org.example.vpnpoc.i028.test",
+            "null",
+            "0",
+            "preexisting_i028_test_package_preserved",
+        ),
         ("", "com.example.other", "0", "preexisting_always_on_policy_preserved"),
         ("", "null", "1", "preexisting_always_on_policy_preserved"),
     ],
@@ -114,3 +119,26 @@ def test_two_device_preflight_refuses_changed_apk(
     Path(str(ready["probe_apk"])).write_bytes(b"changed")
     with pytest.raises(RuntimeError, match="source_bound_probe_apk_hash_mismatch"):
         inspect_devices("adb", ready, lambda *_args: "unused")
+
+
+def test_two_device_preflight_ignores_and_preserves_legacy_probe_package(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _adb_list(monkeypatch)
+
+    def run(_adb: str, _serial: str, *args: str) -> str:
+        if args[-1] == "ro.product.model":
+            return "Android test device"
+        if args[-1] == "ro.build.version.release":
+            return "15"
+        if args[2:4] == ("list", "packages"):
+            return "package:org.example.vpnpoc"
+        if args[-1] == "always_on_vpn_app":
+            return "null"
+        if args[-1] == "always_on_vpn_lockdown":
+            return "0"
+        raise AssertionError(args)
+
+    result = inspect_devices("adb", _inputs(tmp_path), run)
+    assert result["passed"] is True
+    assert all(device["probe_base_install_needed"] for device in result["devices"])

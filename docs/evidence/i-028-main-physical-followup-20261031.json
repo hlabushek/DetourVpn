@@ -1,0 +1,38 @@
+{
+  "issue": "I-028",
+  "measured_at_utc": "2026-10-31T12:15:12Z",
+  "scope": "source-bound physical Main suite after ADR-070 client-status correction",
+  "receipt": "i-028-android-staging-20261031T122302Z-4de68407.json",
+  "suite": "Main",
+  "passed": true,
+  "duration_seconds": 476.07,
+  "required_fact_count": 11,
+  "all_required_facts_true": true,
+  "receipt_source_hashes_match_checkout": true,
+  "matched_source_hash_count": 11,
+  "accounting": {
+    "ledger_consistent": true,
+    "measured_bytes": "38768559",
+    "receipt_count": 45,
+    "reserved_bytes": "0",
+    "unknown_receipts": 0,
+    "open_connections": 0,
+    "violations": 0
+  },
+  "cleanup": {
+    "complete": true,
+    "agent_revoked_and_stopped": true,
+    "temporary_grant_removed": true,
+    "timeout_timer_disarmed": true,
+    "journal_preserved": true,
+    "phone_restored": true,
+    "phone_session_absent": true,
+    "independent_postcheck": true
+  },
+  "vpn_dataplane_acceptance": false,
+  "remaining_gates": [
+    "comprehensive UID-attributed DNS/IPv6 leak acceptance",
+    "independent-provider failure",
+    "physical verification of ADR-070 inbound-counter fallback after handshake age exceeds 60 seconds"
+  ]
+}

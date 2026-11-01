@@ -16,9 +16,19 @@ from test_migrations import migration_config
 from test_mini_app_validation import signed
 from test_rewards import rule
 
+from vpn_api.admin import password_hash
 from vpn_api.auth.contracts import TokenResponse
+from vpn_api.auth.security import beta_invite_digest
 from vpn_api.db.connection import transaction
-from vpn_api.db.models import CodeIssue, LoginAttempt, MiniAppExchange, SessionFamily, User
+from vpn_api.db.models import (
+    AdminIdentity,
+    BetaInvite,
+    CodeIssue,
+    LoginAttempt,
+    MiniAppExchange,
+    SessionFamily,
+    User,
+)
 
 __all__ = ["harness"]
 pytestmark = pytest.mark.postgres
@@ -177,6 +187,54 @@ def test_beta_invites_block_webhook_mini_app_otp_and_direct_session(harness: Har
         assert attempt is not None and attempt.subject is None and attempt.generation == 0
         assert session.scalar(select(func.count()).select_from(CodeIssue)) == 0
         assert session.scalar(select(func.count()).select_from(User)) == 0
+
+
+def test_invited_tester_can_request_mini_app_otp_and_verify_android_session(
+    harness: Harness,
+) -> None:
+    """Synthetic Telegram initData and fake sender; exercises the invited path only."""
+    h = harness
+    subject = 7654321
+    pepper = h.auth.settings.auth_pepper
+    assert pepper is not None
+    h.auth.settings.beta_invites_only = True
+    now = datetime.now(UTC)
+    with transaction(h.engine) as session:
+        admin = AdminIdentity(
+            username="test-beta-owner",
+            password_hash=password_hash("TEST ONLY synthetic admin password"),
+            totp_ciphertext="TEST ONLY",
+            role="admin",
+            created_at=now,
+        )
+        session.add(admin)
+        session.flush()
+        session.add(
+            BetaInvite(
+                subject_digest=beta_invite_digest(pepper.get_secret_value(), subject),
+                admin_id=admin.id,
+                reason="TEST ONLY invited Mini App OTP path",
+                created_at=now,
+            )
+        )
+
+    start = begin(h)
+    raw_init_data = payload(h, subject)
+    requested = request_code(h, raw_init_data, start.request_id.hex)
+    assert requested.status_code == 200
+    assert requested.json() == {"status": "processed"}
+    assert len(h.sender.messages) == 1
+    recipient, message = h.sender.messages[0]
+    assert recipient == subject
+    match = re.search(r"Код входа: ([0-9]{8})", message)
+    assert match is not None
+    assert raw_init_data not in message
+
+    tokens = h.auth.verify(start.request_id, start.verifier, match[1], "test-android")
+    profile = h.client.get("/api/v1/me", headers=headers(tokens))
+    assert profile.status_code == 200
+    assert profile.json()["telegram_subject"] == subject
+    assert raw_init_data not in profile.text
 
 
 def test_mini_app_rejected_or_rate_limited_code_request_does_not_message_user(

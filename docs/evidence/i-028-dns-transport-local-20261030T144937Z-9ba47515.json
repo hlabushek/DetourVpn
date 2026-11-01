@@ -1,0 +1,34 @@
+{
+  "fixed_operator_and_capture_fast_result": {
+    "complete": true,
+    "counts": {
+      "tunnel": {
+        "inbound": 1,
+        "outbound": 1
+      },
+      "uplink": {
+        "inbound": 1,
+        "outbound": 1
+      }
+    },
+    "packet_loss": false,
+    "probe_response": true
+  },
+  "passed": true,
+  "ready_timeout_seconds": 30,
+  "real_vps_or_android_test": false,
+  "scope": "synthetic loopback SSH/sudo and private WSL namespaces; fake Android and status",
+  "slow_probe_fails_closed": {
+    "complete": false,
+    "reason": "observer_ended_before_probe",
+    "stage": "probe"
+  },
+  "source_sha256": {
+    "infra/staging-v3/dns_observer.py": "3aad92b8edd50e0fc812dc6135187a8674ed8af9883e837c1579f9800e37495a",
+    "infra/staging-v3/runtime.py": "c6072baaf147e22af538a8108f64c2dc602b7c92544849c68c5ace57b45e9d2e",
+    "scripts/check_i028_dns_observer.py": "fe785e3040596ffb4f4dfd40fc750104456ae1aef454f707b644c72b128b33bb",
+    "scripts/check_i028_dns_transport.py": "3ea26a7bc692f1e98fa7ab5e56fb2365e5c39b7a23fa8b70354c5da24a8acdb3",
+    "scripts/check_i028_dns_transport_host.py": "b8788c1d2e5c733e9c2683ddcce5ebedfc7caed4ae939f9ac1091add0d9017df",
+    "services/api/tests/test_i028_live.py": "8bee624ab38e32774ac2e98c5fc6fa8c699db12d372643585c05b26a8c2bbf72"
+  }
+}

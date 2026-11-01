@@ -1,0 +1,42 @@
+{
+  "issue": "I-027",
+  "measured_on": "2026-11-01",
+  "scope": "scheduled beta backup retry and local key visibility diagnosis",
+  "secret_values_recorded": false,
+  "scheduled_task": {
+    "name": "DetourVpn Beta Backup Daily",
+    "last_run_local": "2026-11-01 20:41:47 +03:00",
+    "last_task_result": 1,
+    "result_is_success": false,
+    "failure_stage": "local_key_preflight",
+    "failure_class": "DirectoryNotFoundException",
+    "task_profile_matches_current_user_profile": true,
+    "key_directory_visible_to_task": false,
+    "current_action_restored_after_diagnostics": true,
+    "logon_type": "Interactive",
+    "run_level": "Limited"
+  },
+  "manual_shell_pull": {
+    "windows_powershell_5_1": "passed",
+    "encrypted_import_verification": "passed",
+    "encrypted_archive_imported": true,
+    "owner_windows_host_visibility": "not_verified",
+    "counts_as_scheduled_acceptance": false
+  },
+  "checks": {
+    "powershell_parse": "passed",
+    "task_configuration_restored": "passed",
+    "scheduled_backup_acceptance": "failed"
+  },
+  "limitations": [
+    "A manual pull from the Codex shell succeeded, but the Task Scheduler process could not see the local beta backup key directory.",
+    "The successful shell import is not evidence of a successful scheduled run or a verified archive in the owner's Windows profile.",
+    "I-027 remains open until the scheduled task succeeds and the resulting archive is verified in the owner's Windows environment."
+  ],
+  "explicitly_untouched": [
+    "beta database contents",
+    "production",
+    "node B",
+    "DNS and payments"
+  ]
+}

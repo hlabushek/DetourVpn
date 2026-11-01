@@ -1,0 +1,33 @@
+{
+  "cleanup_steps": {
+    "cleanup_failure_code": "retry_budget_exhausted",
+    "cleanup_failure_stage": "staging_stop",
+    "device_0_restored": false,
+    "device_1_restored": false,
+    "local_api_stopped": true,
+    "local_reverse_tunnel_closed": true,
+    "staging_a_closed": false
+  },
+  "devices": [],
+  "facts": {},
+  "failed_at": "i028_two_device_fixed_command_failed",
+  "measured_at": "2026-10-29T09:41:11.530570+00:00",
+  "open_cases": [
+    "independent provider failure",
+    "comprehensive DNS/IPv6 packet capture"
+  ],
+  "passed": false,
+  "quota_funding": "TEST FREE GRANT ONLY",
+  "scope": "two physical Android devices, disposable local API/PostgreSQL, bounded staging A",
+  "source_sha256": {
+    "apps/client/integration_test/i028_two_device_test.dart": "94c66a21248d3be9a99a3ce3723818575c5e1269fe21a78102d8ec21c5ccab06",
+    "infra/staging-v3/runtime.py": "dea3321d3c9181d27c01840b7a12f6c97bd46f3d5bdfac8aa53449ea0cb87b89",
+    "scripts/i028_two_device_driver.py": "887d25b27fed0dfc198419dad3f7e96f56c163a813e12c5993eccf16e5354d38",
+    "scripts/i028_two_device_preflight.py": "c2762c44c9d0cc3362a6a35106751f8588e71e4b97d550534b0d93b963e90476",
+    "scripts/run_i028_staging.ps1": "1f83587e13f99b9cae4daab21e5f6a922d297d91f8b6343cc3ed36a9767ba1d3",
+    "services/api/tests/test_i028_two_device_driver.py": "d5767998dfcfafcca50459f4f1f10107d95061f7ff047356b9021b6e2fc014ca",
+    "services/api/tests/test_i028_two_devices.py": "5beba12f6c796ab1bb051d3eed649acbdfa86c5dc1965bb8f7c409ea208f180c"
+  },
+  "telegram": "TEST FAKE ONLY",
+  "vpn_dataplane_acceptance": false
+}

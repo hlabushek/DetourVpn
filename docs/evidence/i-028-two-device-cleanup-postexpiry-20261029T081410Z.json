@@ -1,0 +1,18 @@
+{
+  "measured_at": "2026-10-29T08:14:10Z",
+  "scope": "read-only post-expiry staging A and local two-device cleanup verification",
+  "source": "unprivileged independent host post-check and local physical-device preflight",
+  "related_physical_receipt": "i-028-two-device-staging-20261028T224249Z-676f9ea2.json",
+  "related_physical_receipt_passed": false,
+  "timeout_timer_state": "inactive",
+  "i028_agent_service_state": "inactive",
+  "i028_namespaces_absent": true,
+  "i028_interfaces_absent": true,
+  "i028_tcp_udp_listener_markers_absent": true,
+  "local_api_stopped": true,
+  "devices_restored_and_test_packages_absent": true,
+  "always_on_vpn_unconfigured": true,
+  "control_helper_status_confirmed": false,
+  "control_helper_status_limitation": "sudo password required; not entered remotely",
+  "vpn_dataplane_acceptance": false
+}

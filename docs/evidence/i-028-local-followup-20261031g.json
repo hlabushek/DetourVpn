@@ -1,0 +1,66 @@
+{
+  "issue": "I-028",
+  "measured_at_utc": "2026-10-31T12:39:57Z",
+  "scope": "local source-bound Egress diagnostics preparation; no physical run",
+  "passed": true,
+  "source_bound_build": {
+    "suite": "Egress",
+    "input_count": 95,
+    "input_hash_mismatches": 0,
+    "flutter_analyze": "passed",
+    "flutter_unit_tests": "passed",
+    "physical_entrypoint_compilation": "passed",
+    "independent_uid_probe_apks": "built",
+    "android_gradle_build": "BUILD SUCCESSFUL",
+    "client_apk_sha256": "ed507d29341fa7105ed4d9ef0a4505de88e5b6857703f37c59c89c25fad3bfaf",
+    "probe_test_apk_sha256": "c27c0612bf03ccda51cfbd880c6f4f0a9b1f7d4697d551bcf531ac7266c3eecb",
+    "probe_base_apk_sha256": "61006df375b245a808b779bdb5cbb02e1bfa44460737d0b61fe982f99a93481c"
+  },
+  "adr_070_diagnostic": {
+    "hold_seconds": 140,
+    "sample_interval_seconds": 5,
+    "fixed_same_uid_ipv4_probe_after_seconds": 35,
+    "max_samples": 32,
+    "retained_fields": [
+      "elapsed_seconds",
+      "client_phase",
+      "client_has_error",
+      "native_up",
+      "native_network",
+      "handshake_age",
+      "remaining_ms",
+      "received_counter_available",
+      "inbound_progress_recent",
+      "renewal_acknowledged"
+    ],
+    "raw_received_bytes_retained": false,
+    "suite_pass_fail_changed": false,
+    "physical_fallback_verified": false
+  },
+  "checks": {
+    "ruff": "passed",
+    "test_i028_diagnostics_pytest": "36 passed",
+    "git_diff_check": "passed"
+  },
+  "fresh_phone_only_probe": {
+    "receipt": "i-028-probe-after-startup-fix-20261031T123945453Z.json",
+    "measured_at_utc": "2026-10-31T12:39:34.7736227Z",
+    "passed": true,
+    "direct_network_ready": true,
+    "direct_ipv6_ready": true,
+    "ipv4_available": true,
+    "fixed_udp_dns_response": true,
+    "active_network_is_vpn": false,
+    "active_network_validated": true,
+    "active_transport_wifi": true,
+    "temporary_test_apk_removed": true,
+    "probe_base_removed": true,
+    "android_dns_settings_changed": false
+  },
+  "vpn_dataplane_acceptance": false,
+  "remaining": [
+    "physical Egress run with triggered pre-NAT capture",
+    "physical ADR-070 observation with handshake age over 60 seconds and recent inbound progress",
+    "phase-separated DNS/IPv6 baseline, excluded control, transition and outage capture"
+  ]
+}

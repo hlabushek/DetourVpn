@@ -9,11 +9,13 @@ import hashlib
 import importlib.util
 import json
 import os
+import queue
 import re
 import subprocess
 import tempfile
 import threading
 import time
+from collections.abc import Callable
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -96,6 +98,26 @@ NATURAL_SLEEP_FACTS = {
     "natural_sleep_new_staging_egress_after_recovery",
     "natural_sleep_window_cutoff_and_real_recovery",
 }
+EGRESS_DIAGNOSTIC_FACTS = {
+    "real_account_refresh_after_android_process_restart",
+    "included_probe_real_staging_ipv4_and_udp_dns",
+    "included_ipv6_literal_blocked",
+}
+
+
+def i028_suite_config(suite: str) -> tuple[bool, str, set[str]]:
+    configs = {
+        "Main": (False, "run", FACTS),
+        "Egress": (False, "egress", EGRESS_DIAGNOSTIC_FACTS),
+        "Lifecycle": (True, "lifecycle", LIFECYCLE_FACTS),
+        "NetworkRevoke": (True, "network_revoke", NETWORK_REVOKE_FACTS),
+        "NaturalSleep": (True, "natural_sleep", NATURAL_SLEEP_FACTS),
+    }
+    if suite not in configs:
+        raise ValueError("i028_suite_invalid")
+    return configs[suite]
+
+
 PROBE_FLAGS = {
     "active_transport_cellular",
     "active_transport_wifi",
@@ -105,6 +127,9 @@ PROBE_FLAGS = {
     "ipv4_available",
     "ipv4_used_fallback",
     "ipv6_available",
+    "ipv6_literal_connected",
+    "ipv6_literal_connect_attempted",
+    "ipv6_literal_egress_port_control_connected",
     "egress_is_staging",
     "fixed_udp_dns_response",
     "active_network_is_vpn",
@@ -136,7 +161,7 @@ def command(parts: list[str], *, data: bytes | None = None, timeout: int = 60) -
     return result.stdout
 
 
-def helper(verb: str, value: dict[str, Any] | None = None) -> dict[str, Any]:
+def helper(verb: str, value: dict[str, Any] | None = None, *, timeout: int = 60) -> dict[str, Any]:
     assert verb in {
         "status",
         "manifest",
@@ -147,7 +172,9 @@ def helper(verb: str, value: dict[str, Any] | None = None) -> dict[str, Any]:
         "stop",
     }
     raw = command(
-        [*SSH, HOST, HELPER + verb], data=json.dumps(value).encode() if value is not None else None
+        [*SSH, HOST, HELPER + verb],
+        data=json.dumps(value).encode() if value is not None else None,
+        timeout=timeout,
     )
     result = json.loads(raw)
     assert isinstance(result, dict)
@@ -167,29 +194,611 @@ def parse_probe(output: str) -> dict[str, Any]:
             "ipv4_failure",
             "ipv4_primary_failure",
             "ipv6_failure",
+            "ipv6_literal_failure",
+            "ipv6_literal_egress_port_control_failure",
             "dns_failure",
         } and re.fullmatch(
             r"none|dns|tls|timeout|connect|permission|io|route|http_[1-5][0-9]{2}", value
         ):
+            result[name] = value
+        elif name in {
+            "fixed_resolver_result",
+            "fixed_tcp_result",
+            "fixed_tls_result",
+        } and value in {
+            "ok",
+            "timeout",
+            "dns",
+            "tls",
+            "connect",
+            "permission",
+            "io",
+            "route",
+            "not_attempted",
+            "interrupted",
+        }:
             result[name] = value
     if result.get("probe_complete") is not True:
         raise RuntimeError("i028_probe_incomplete")
     return result
 
 
+def sanitize_recovery_node_status(value: object) -> dict[str, Any]:
+    """Retain only bounded aggregate staging-slot observations, never peer identities."""
+    if not isinstance(value, dict):
+        return {"available": False}
+    peers = value.get("peer_counts")
+    live = value.get("live_slots")
+    transfer = value.get("native_transfer_bytes")
+    if (
+        value.get("prepared") is not True
+        or type(value.get("agent_active")) is not bool
+        or not isinstance(peers, list)
+        or len(peers) != 2
+        or any(type(x) is not int or not 0 <= x <= 2 for x in peers)
+        or not isinstance(live, list)
+        or len(live) != len(set(x for x in live if type(x) is int and x in (1, 2)))
+        or not isinstance(transfer, list)
+        or len(transfer) != 2
+    ):
+        return {"available": False}
+    counters = []
+    for slot, row in enumerate(transfer, 1):
+        if not isinstance(row, dict) or type(row.get("slot")) is not int or row["slot"] != slot:
+            return {"available": False}
+        received, sent = row.get("received"), row.get("sent")
+        if not all(
+            isinstance(x, str) and re.fullmatch(r"[0-9]{1,20}", x) for x in (received, sent)
+        ):
+            return {"available": False}
+        counters.append({"slot": slot, "received": received, "sent": sent})
+    result = {
+        "available": True,
+        "agent_active": value["agent_active"],
+        "live_slots": live,
+        "peer_counts": peers,
+        "native_transfer_bytes": counters,
+    }
+    quota = value.get("byte_quota_exhausted")
+    if (
+        isinstance(quota, list)
+        and len(quota) == len(live)
+        and all(
+            isinstance(row, dict)
+            and type(row.get("slot")) is int
+            and row["slot"] in live
+            and (row.get("exhausted") is None or type(row.get("exhausted")) is bool)
+            and "exhausted" in row
+            for row in quota
+        )
+        and len({row["slot"] for row in quota}) == len(live)
+    ):
+        result["byte_quota_exhausted"] = []
+        for row in quota:
+            clean_row = {"slot": row["slot"], "exhausted": row["exhausted"]}
+            remaining = row.get("remaining_bytes")
+            if type(remaining) is int and 0 <= remaining <= 67108864:
+                clean_row["remaining_bytes"] = remaining
+            result["byte_quota_exhausted"].append(clean_row)
+    return result
+
+
+def sanitize_recovery_connection_status(value: object) -> dict[str, Any]:
+    """Keep bounded grant state only; never retain row identifiers."""
+    if not isinstance(value, dict) or value.get("available") is not True:
+        return {"available": False}
+    state = value.get("state")
+    generation = value.get("generation")
+    budget = value.get("budget_bytes")
+    remaining = value.get("lease_remaining_seconds")
+    if (
+        not isinstance(state, str)
+        or state not in {"active", "pending", "revoke_pending", "closed", "absent"}
+        or type(generation) is not int
+        or not 0 <= generation <= 1000000
+        or type(budget) is not int
+        or not 0 <= budget <= 67108864
+        or type(remaining) is not int
+        or not 0 <= remaining <= 90
+    ):
+        return {"available": False}
+    return {
+        "available": True,
+        "state": state,
+        "generation": generation,
+        "budget_bytes": budget,
+        "lease_remaining_seconds": remaining,
+    }
+
+
+def sanitize_egress_renewal_status(value: object) -> dict[str, Any]:
+    """Expose only bounded generation/state needed to await an Egress ACK."""
+    if not isinstance(value, dict) or value.get("available") is not True:
+        return {"available": False}
+    state = value.get("state")
+    generation = value.get("generation")
+    if (
+        not isinstance(state, str)
+        or state not in {"active", "pending", "revoke_pending", "closed", "absent"}
+        or type(generation) is not int
+        or not 0 <= generation <= 1000000
+    ):
+        return {"available": False}
+    renewal_seen = generation >= 2
+    return {
+        "available": True,
+        "renewal_seen": renewal_seen,
+        "acknowledged": renewal_seen and state == "active",
+        "generation": generation,
+        "state": state,
+    }
+
+
+def sanitize_egress_hold_observations(value: object) -> dict[str, Any]:
+    """Retain bounded phase, handshake-age, lease, and RX-progress aggregates."""
+    if not isinstance(value, dict) or set(value) != {
+        "observations",
+        "fixed_probe_attempted",
+        "fixed_probe_succeeded",
+    }:
+        raise ValueError("egress_hold_observation_invalid")
+    if (
+        type(value["fixed_probe_attempted"]) is not bool
+        or type(value["fixed_probe_succeeded"]) is not bool
+        or (value["fixed_probe_succeeded"] and not value["fixed_probe_attempted"])
+    ):
+        raise ValueError("egress_hold_observation_invalid")
+    observations = value["observations"]
+    if not isinstance(observations, list) or not 1 <= len(observations) <= 32:
+        raise ValueError("egress_hold_observation_invalid")
+
+    allowed_phases = {"connected", "reconnecting", "failed", "connecting", "disconnected"}
+    clean: list[dict[str, Any]] = []
+    previous_elapsed = -1
+    for item in observations:
+        fields = {
+            "elapsed_seconds",
+            "client_phase",
+            "client_has_error",
+            "native_up",
+            "native_network",
+            "handshake_age",
+            "remaining_ms",
+            "received_counter_available",
+            "inbound_progress_recent",
+            "renewal_acknowledged",
+            "traffic_counter_available",
+            "traffic_renewal_requested",
+            "renewal_pending",
+        }
+        if not isinstance(item, dict) or set(item) != fields:
+            raise ValueError("egress_hold_observation_invalid")
+        elapsed = item["elapsed_seconds"]
+        phase = item["client_phase"]
+        handshake_age = item["handshake_age"]
+        remaining = item["remaining_ms"]
+        counter_available = item["received_counter_available"]
+        inbound_recent = item["inbound_progress_recent"]
+        if (
+            type(elapsed) is not int
+            or not 0 <= elapsed <= 300
+            or elapsed <= previous_elapsed
+            or not isinstance(phase, str)
+            or phase not in allowed_phases
+            or type(handshake_age) is not int
+            or not -1 <= handshake_age <= 86400
+            or type(remaining) is not int
+            or not 0 <= remaining <= 90000
+            or type(counter_available) is not bool
+            or type(inbound_recent) is not bool
+            or (inbound_recent and not counter_available)
+            or any(
+                type(item[field]) is not bool
+                for field in (
+                    "client_has_error",
+                    "native_up",
+                    "native_network",
+                    "renewal_acknowledged",
+                    "traffic_counter_available",
+                    "traffic_renewal_requested",
+                    "renewal_pending",
+                )
+            )
+        ):
+            raise ValueError("egress_hold_observation_invalid")
+        previous_elapsed = elapsed
+        clean.append(
+            {
+                "elapsed_seconds": elapsed,
+                "client_phase": phase,
+                "client_has_error": item["client_has_error"],
+                "native_up": item["native_up"],
+                "native_network": item["native_network"],
+                "handshake_age": handshake_age,
+                "remaining_ms": remaining,
+                "received_counter_available": counter_available,
+                "inbound_progress_recent": inbound_recent,
+                "renewal_acknowledged": item["renewal_acknowledged"],
+                "traffic_counter_available": item["traffic_counter_available"],
+                "traffic_renewal_requested": item["traffic_renewal_requested"],
+                "renewal_pending": item["renewal_pending"],
+            }
+        )
+
+    fallback_observed = any(
+        item["handshake_age"] > 60
+        and item["inbound_progress_recent"]
+        and item["client_phase"] == "connected"
+        and not item["client_has_error"]
+        and item["native_up"]
+        and item["native_network"]
+        and item["remaining_ms"] > 0
+        for item in clean
+    )
+    return {
+        "fixed_probe_attempted": value["fixed_probe_attempted"],
+        "fixed_probe_succeeded": value["fixed_probe_succeeded"],
+        "sample_count": len(clean),
+        "stale_handshake_threshold_seconds": 60,
+        "inbound_freshness_window_seconds": 60,
+        "stale_handshake_connected_with_recent_inbound": fallback_observed,
+        "observations": clean,
+    }
+
+
+def recovery_connection_snapshot(session: Session, user_id: Any) -> dict[str, Any]:
+    """Return sanitized current grant metadata for test diagnostics."""
+    try:
+        connection = session.scalar(
+            select(PeerConnection)
+            .where(PeerConnection.user_id == user_id)
+            .order_by(PeerConnection.created_at.desc())
+            .limit(1)
+        )
+        if connection is None:
+            return sanitize_recovery_connection_status(
+                {
+                    "available": True,
+                    "state": "absent",
+                    "generation": 0,
+                    "budget_bytes": 0,
+                    "lease_remaining_seconds": 0,
+                }
+            )
+        hold = session.get(PeerWindowHold, connection.window_id)
+        if hold is None:
+            return {"available": False}
+        remaining = max(
+            0,
+            min(90, int((hold.not_after - datetime.now(UTC)).total_seconds())),
+        )
+        return sanitize_recovery_connection_status(
+            {
+                "available": True,
+                "state": connection.state,
+                "generation": connection.generation,
+                "budget_bytes": hold.amount_bytes,
+                "lease_remaining_seconds": remaining,
+            }
+        )
+    except Exception:
+        # Diagnostic collection must never alter the physical acceptance result.
+        return {"available": False}
+
+
+def append_sustained_window_observation(
+    report: dict[str, Any], native: object, connection: object
+) -> None:
+    """Retain at most 48 sanitized native and grant snapshots for Main diagnostics."""
+    if not isinstance(native, dict):
+        return
+    up, network, remaining = (native.get("up"), native.get("network"), native.get("remaining_ms"))
+    if (
+        type(up) is not bool
+        or type(network) is not bool
+        or type(remaining) is not int
+        or not 0 <= remaining <= 90000
+    ):
+        return
+    observations = report.setdefault("sustained_window_observations", [])
+    if not isinstance(observations, list) or len(observations) >= 48:
+        return
+    observations.append(
+        {
+            "native": {"up": up, "network": network, "remaining_ms": remaining},
+            "connection": sanitize_recovery_connection_status(connection),
+        }
+    )
+
+
+def sanitize_dns_observation(value: object) -> dict[str, Any]:
+    if not isinstance(value, dict) or value.get("complete") is not True:
+        raise ValueError("dns_observation_invalid")
+    if value.get("packet_loss") is not False or not isinstance(value.get("counts"), dict):
+        raise ValueError("dns_observation_invalid")
+    counts = value["counts"]
+    if set(counts) != {"tunnel", "uplink"}:
+        raise ValueError("dns_observation_invalid")
+    clean = {}
+    for point in ("tunnel", "uplink"):
+        item = counts[point]
+        if not isinstance(item, dict) or set(item) != {"inbound", "outbound"}:
+            raise ValueError("dns_observation_invalid")
+        if any(type(item[x]) is not int or not 0 <= item[x] < 64 for x in item):
+            raise ValueError("dns_observation_invalid")
+        clean[point] = {"inbound": item["inbound"], "outbound": item["outbound"]}
+    return {"complete": True, "packet_loss": False, "counts": clean}
+
+
+DNS_OBSERVER_REMOTE_CATEGORIES = frozenset(
+    {
+        "single_live_slot_required",
+        "insufficient_observation_window",
+        "capture_not_ready",
+        "capture_ended_early",
+        "capture_stream_closed",
+        "capture_stream_unavailable",
+        "capture_linktype_unsupported",
+        "capture_linktype_unavailable",
+        "capture_sync_timeout",
+        "capture_sync_invalid",
+        "capture_packet_limit",
+        "capture_output_limit",
+        "packet_header_invalid",
+        "packet_filter_mismatch",
+        "capture_completion_unknown",
+        "capture_incomplete",
+        "capture_unavailable",
+        "capture_tool_missing",
+        "staging_deadline_expired",
+        "observer_busy",
+        "other",
+    }
+)
+
+
+def dns_observer_remote_category(value: object) -> str:
+    if not isinstance(value, dict) or value.get("error") != "dns_observe_failed":
+        return "invalid_remote_result"
+    category = value.get("category")
+    if not isinstance(category, str) or category not in DNS_OBSERVER_REMOTE_CATEGORIES:
+        return "invalid_remote_result"
+    return category
+
+
+def collect_dns_path_observation(
+    command: list[str],
+    run_probe: Callable[[], dict[str, Any]],
+    *,
+    ready_timeout: float = 30,
+    finish_timeout: float = 20,
+) -> dict[str, Any]:
+    """Test-only fixed observer protocol; retain only allowlisted failures and counters."""
+    stage = "launch"
+    process: subprocess.Popen[bytes] | None = None
+    reader: threading.Thread | None = None
+    output_reader: threading.Thread | None = None
+    failure = "launch_failed"
+    phase_started = time.monotonic()
+    timings: dict[str, int] = {}
+
+    def elapsed() -> int:
+        # Rounded, bounded duration only; no timestamps or user activity.
+        return min(120000, max(0, int((time.monotonic() - phase_started) * 10) * 100))
+
+    try:
+        process = subprocess.Popen(  # noqa: S603 - caller passes the fixed test operator only
+            command,
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
+        )
+        failure = "unexpected"
+        if process.stdout is None or process.stdin is None:
+            failure = "stream_unavailable"
+            raise RuntimeError
+        stdout = process.stdout
+        lines: queue.Queue[bytes] = queue.Queue(maxsize=1)
+        reader = threading.Thread(target=lambda: lines.put(stdout.readline(256)), daemon=True)
+        reader.start()
+        stage = "ready"
+        try:
+            line = lines.get(timeout=ready_timeout)
+        except queue.Empty:
+            failure = "ready_timeout"
+            raise RuntimeError from None
+        if line not in (b'{"ready":true}\n', b'{"ready":true}\r\n'):
+            try:
+                remote = json.loads(line)
+            except (ValueError, UnicodeDecodeError):
+                failure = "invalid_ready"
+            else:
+                failure = dns_observer_remote_category(remote)
+            raise RuntimeError
+        timings["ready_ms"] = elapsed()
+        stage = "probe"
+        phase_started = time.monotonic()
+        try:
+            measured = run_probe()
+        except Exception:
+            failure = "probe_failed"
+            raise RuntimeError from None
+        if (
+            not isinstance(measured, dict)
+            or type(measured.get("fixed_udp_dns_response")) is not bool
+        ):
+            failure = "probe_result_invalid"
+            raise RuntimeError
+        timings["probe_ms"] = elapsed()
+        if process.poll() is not None:
+            failure = "observer_ended_before_probe"
+            raise RuntimeError
+        stage = "finish"
+        phase_started = time.monotonic()
+        failure = "completion_signal_failed"
+        process.stdin.write(b"done\n")
+        process.stdin.flush()
+        process.stdin.close()
+        output_lines: queue.Queue[bytes] = queue.Queue(maxsize=1)
+        output_reader = threading.Thread(
+            target=lambda: output_lines.put(stdout.read(4097)), daemon=True
+        )
+        output_reader.start()
+        deadline = time.monotonic() + finish_timeout
+        try:
+            output = output_lines.get(timeout=finish_timeout)
+        except queue.Empty:
+            failure = "finish_timeout"
+            raise RuntimeError from None
+        if len(output) > 4096:
+            failure = "output_limit"
+            raise RuntimeError
+        try:
+            process.wait(timeout=max(0.01, deadline - time.monotonic()))
+        except subprocess.TimeoutExpired:
+            failure = "finish_timeout"
+            raise RuntimeError from None
+        try:
+            payload = json.loads(output)
+        except (ValueError, UnicodeDecodeError):
+            failure = "invalid_result"
+            raise RuntimeError from None
+        if process.returncode != 0:
+            failure = dns_observer_remote_category(payload)
+            raise RuntimeError
+        try:
+            observation = sanitize_dns_observation(payload)
+        except ValueError:
+            failure = "invalid_result"
+            raise RuntimeError from None
+        observation["probe_response"] = measured["fixed_udp_dns_response"]
+        timings["finish_ms"] = elapsed()
+        observation["timing_ms"] = timings
+        return observation
+    except (OSError, RuntimeError, subprocess.SubprocessError):
+        timings.setdefault(f"{stage}_ms", elapsed())
+        return {"complete": False, "stage": stage, "reason": failure, "timing_ms": timings}
+    finally:
+        if process is not None and process.poll() is None:
+            try:
+                process.kill()
+                process.wait(timeout=5)
+            except (OSError, subprocess.SubprocessError):
+                pass
+        for thread in (reader, output_reader):
+            if thread is not None:
+                thread.join(timeout=1)
+        if process is not None:
+            for stream in (process.stdin, process.stdout):
+                if (
+                    stream is not None
+                    and not stream.closed
+                    and not any(
+                        thread is not None and thread.is_alive()
+                        for thread in (reader, output_reader)
+                    )
+                ):
+                    try:
+                        stream.close()
+                    except OSError:
+                        pass
+
+
+def record_dns_path_observation(
+    report: dict[str, Any], collector: Callable[[], dict[str, Any]]
+) -> dict[str, bool]:
+    """Persist a fixed outcome even when the diagnostic itself fails unexpectedly."""
+    report["dns_path_action_state"] = "started"
+    try:
+        observation = collector()
+        if not isinstance(observation, dict) or type(observation.get("complete")) is not bool:
+            raise ValueError("invalid_diagnostic_result")
+    except Exception:
+        observation = {"complete": False, "stage": "internal", "reason": "unexpected"}
+    report["dns_path_observation"] = observation
+    report["dns_path_action_state"] = "completed"
+    return {"diagnostic_collected": observation["complete"]}
+
+
+def summarize_probe_runner(
+    output: str, exit_code: int | None, *, timed_out: bool = False
+) -> dict[str, Any]:
+    """Keep only fixed instrumentation health fields; never persist raw output."""
+    lines = output.splitlines()
+    completion_seen = any(line == "INSTRUMENTATION_RESULT: probe_complete=true" for line in lines)
+    aborted_seen = any(
+        line in {"INSTRUMENTATION_ABORTED", "INSTRUMENTATION_FAILED"} for line in lines
+    )
+    stages = [
+        match.group(1)
+        for line in lines
+        if (match := re.fullmatch(r"INSTRUMENTATION_STATUS: i028_stage=([a-z0-9_]{1,40})", line))
+        and match.group(1) in PROBE_STAGE_MARKERS
+    ]
+    if timed_out:
+        category = "adb_timeout"
+    elif exit_code is None:
+        category = "adb_exit_unknown"
+    elif exit_code != 0:
+        category = "adb_nonzero"
+    elif aborted_seen:
+        category = "instrumentation_aborted"
+    elif completion_seen:
+        category = "completed"
+    else:
+        category = "completion_marker_missing"
+    return {
+        "adb_exit_code": (
+            exit_code if exit_code is not None and -255 <= exit_code <= 255 else None
+        ),
+        "instrumentation_result_line_count": min(
+            sum(line.startswith("INSTRUMENTATION_RESULT: ") for line in lines), 100
+        ),
+        "completion_marker_seen": completion_seen,
+        "aborted_marker_seen": aborted_seen,
+        "last_stage": stages[-1] if stages else None,
+        "category": category,
+    }
+
+
+PROBE_STAGE_MARKERS = frozenset(
+    {
+        "started",
+        "idle",
+        "ipv4_primary_started",
+        "ipv4_primary_done",
+        "ipv4_fallback_started",
+        "ipv4_fallback_done",
+        "ipv4_done",
+        "ipv6_started",
+        "ipv6_done",
+        "udp_dns_started",
+        "udp_dns_done",
+        "metadata_started",
+        "metadata_done",
+        "fixed_path_diagnostic_started",
+        "fixed_path_diagnostic_done",
+        "completed",
+    }
+)
+MAX_PROBE_PARTIAL_OUTPUT_BYTES = 65536
+
+
+def bounded_probe_partial_output(error: subprocess.TimeoutExpired) -> str:
+    """Decode only a bounded timeout tail so fixed markers survive; never persist raw text."""
+    parts: list[str] = []
+    for value in (error.stdout, error.stderr):
+        if isinstance(value, bytes):
+            parts.append(value.decode("utf-8", errors="replace"))
+        elif isinstance(value, str):
+            parts.append(value)
+    return "\n".join(parts)[-MAX_PROBE_PARTIAL_OUTPUT_BYTES:]
+
+
 def test_i028_real_android(harness: Harness) -> None:
     h = harness
     suite = os.environ.get("VPN_I028_SUITE", "Main")
-    lifecycle = suite != "Main"
-    required_facts = (
-        NATURAL_SLEEP_FACTS
-        if suite == "NaturalSleep"
-        else NETWORK_REVOKE_FACTS
-        if suite == "NetworkRevoke"
-        else LIFECYCLE_FACTS
-        if lifecycle
-        else FACTS
-    )
+    lifecycle, phase_name, required_facts = i028_suite_config(suite)
     adb_exe = Path(os.environ["LOCALAPPDATA"]) / "Android/Sdk/platform-tools/adb.exe"
     serial = os.environ["VPN_I028_SERIAL"]
     client = Path(os.environ["VPN_I028_CLIENT_DIR"])
@@ -201,6 +810,11 @@ def test_i028_real_android(harness: Harness) -> None:
         )
 
     def saved_session() -> bool:
+        # This preflight runs before the isolated package is installed. Its
+        # earlier inventory assertion rejects an existing package, so there
+        # cannot be app-private session data to inspect when it is absent.
+        if f"package:{PACKAGE}" not in adb("shell", "pm", "list", "packages", PACKAGE).splitlines():
+            return False
         if "no_backup" not in adb("shell", "run-as", PACKAGE, "ls", "-a").splitlines():
             return False
         return "session.vault" in adb("shell", "run-as", PACKAGE, "ls", "no_backup").splitlines()
@@ -240,9 +854,14 @@ def test_i028_real_android(harness: Harness) -> None:
     # dumpsys retains old NetworkCapabilities even after disconnect; the independent
     # probe below checks the actual active network instead of that stale structure.
     assert not saved_session()
-    previous_appop = adb("shell", "appops", "get", PACKAGE, "ACTIVATE_VPN")
-    mode_match = re.search(r"ACTIVATE_VPN: (allow|deny|ignore|default)", previous_appop)
-    previous_mode = mode_match[1] if mode_match else "default"
+    installed_before = (
+        f"package:{PACKAGE}" in adb("shell", "pm", "list", "packages", PACKAGE).splitlines()
+    )
+    previous_mode = "default"
+    if installed_before:
+        previous_appop = adb("shell", "appops", "get", PACKAGE, "ACTIVATE_VPN")
+        mode_match = re.search(r"ACTIVATE_VPN: (allow|deny|ignore|default)", previous_appop)
+        previous_mode = mode_match[1] if mode_match else "default"
     status = helper("status")
     assert status.get("prepared") and status.get("remaining_seconds", 0) >= 1100
     assert status.get("live_slots") == [] and status.get("peer_counts") == [0, 0]
@@ -251,6 +870,8 @@ def test_i028_real_android(harness: Harness) -> None:
         "passed": False,
         "scope": "bounded staging A, one physical Android, local disposable API/PostgreSQL",
         "suite": suite,
+        "diagnostic_only": suite == "Egress",
+        "vpn_dataplane_acceptance": False,
         "source_sha256": {
             name: hashlib.sha256((ROOT / name).read_bytes()).hexdigest()
             for name in (
@@ -264,6 +885,7 @@ def test_i028_real_android(harness: Harness) -> None:
                 "apps/client/android/app/src/main/java/org/example/vpnpoc/ClientActivity.java",
                 "apps/android/app/src/androidTest/java/org/example/vpnpoc/I028Probe.java",
                 "infra/staging-v3/runtime.py",
+                "infra/staging-v3/dns_observer.py",
             )
         },
         "telegram": "TEST FAKE ONLY",
@@ -448,18 +1070,44 @@ def test_i028_real_android(harness: Harness) -> None:
                 return {"accepted": True}
 
             def probe(mode: str) -> dict[str, Any]:
-                output = adb(
-                    "shell",
-                    "am",
-                    "instrument",
-                    "-w",
-                    "-r",
-                    "-e",
-                    "mode",
-                    mode,
-                    "org.example.vpnpoc.test/org.example.vpnpoc.I028Probe",
-                    timeout=45,
-                )
+                try:
+                    result = subprocess.run(  # noqa: S603 - fixed test-only instrumentation command.
+                        [
+                            str(adb_exe),
+                            "-s",
+                            serial,
+                            "shell",
+                            "am",
+                            "instrument",
+                            "-w",
+                            "-r",
+                            "-e",
+                            "mode",
+                            mode,
+                            "org.example.vpnpoc.test/org.example.vpnpoc.I028Probe",
+                        ],
+                        capture_output=True,
+                        timeout=60 if mode == "egress" else 45,
+                        check=False,
+                    )
+                except subprocess.TimeoutExpired as exc:
+                    report["last_probe_runner"] = summarize_probe_runner(
+                        bounded_probe_partial_output(exc), None, timed_out=True
+                    )
+                    raise RuntimeError("i028_probe_command_timeout") from None
+                except OSError:
+                    report["last_probe_runner"] = {
+                        "adb_exit_code": None,
+                        "instrumentation_result_line_count": 0,
+                        "completion_marker_seen": False,
+                        "aborted_marker_seen": False,
+                        "category": "adb_unavailable",
+                    }
+                    raise RuntimeError("i028_probe_command_failed") from None
+                output = (result.stdout + result.stderr).decode("utf-8", errors="replace")
+                report["last_probe_runner"] = summarize_probe_runner(output, result.returncode)
+                if result.returncode != 0:
+                    raise RuntimeError("i028_probe_command_failed")
                 parsed_result = parse_probe(output)
                 report.setdefault("independent_probes", []).append(parsed_result)
                 return parsed_result
@@ -604,6 +1252,60 @@ def test_i028_real_android(harness: Harness) -> None:
                         )
                         report["system_revoke_test_app_foregrounded"] = True
                     return {"permission_revoked": revoked}
+                if name in {"recovery_probe_ipv4", "egress_probe_all", "probe_ipv4"}:
+                    kind = {
+                        "egress_probe_all": "egress",
+                        "probe_ipv4": "sustained",
+                        "recovery_probe_ipv4": "recovery",
+                    }[name]
+
+                    def record_node(phase: str) -> None:
+                        try:
+                            report[f"{kind}_node_{phase}_probe"] = sanitize_recovery_node_status(
+                                helper("status", timeout=10)
+                            )
+                        except Exception:
+                            # Diagnostic failure must not alter the physical acceptance result.
+                            report[f"{kind}_node_{phase}_probe"] = {"available": False}
+
+                    def record_connection(phase: str) -> None:
+                        try:
+                            with Session(h.engine) as session:
+                                snapshot = recovery_connection_snapshot(session, state["user"])
+                            report[f"{kind}_connection_{phase}_probe"] = snapshot
+                        except Exception:
+                            # Diagnostic failure must never change the probe outcome.
+                            report[f"{kind}_connection_{phase}_probe"] = {"available": False}
+
+                    record_node("before")
+                    record_connection("before")
+                    try:
+                        return probe("egress" if kind == "egress" else "ipv4")
+                    finally:
+                        record_node("after")
+                        record_connection("after")
+                if name == "egress_dns_observe":
+                    if suite != "Egress":
+                        raise RuntimeError("i028_dns_observe_wrong_suite")
+
+                    def record_dns_node(point: str) -> None:
+                        try:
+                            report[f"dns_observer_node_{point}"] = sanitize_recovery_node_status(
+                                helper("status", timeout=10)
+                            )
+                        except Exception:
+                            report[f"dns_observer_node_{point}"] = {"available": False}
+
+                    record_dns_node("before")
+                    try:
+                        return record_dns_path_observation(
+                            report,
+                            lambda: collect_dns_path_observation(
+                                [*SSH, HOST, HELPER + "dns-observe"], lambda: probe("dns")
+                            ),
+                        )
+                    finally:
+                        record_dns_node("after")
                 if name.startswith("probe_"):
                     return probe("all" if name == "probe_all" else "ipv4")
                 if name == "outage":
@@ -628,6 +1330,39 @@ def test_i028_real_android(harness: Harness) -> None:
                     time.sleep(0.5)
                 raise RuntimeError("i028_recovery_unconfirmed")
 
+            @app.get("/api/v1/__i028__/egress-renewal-status", include_in_schema=False)
+            def egress_renewal_status(request: Request) -> dict[str, Any]:
+                p = principal(request)
+                assert suite == "Egress"
+                with Session(h.engine) as session:
+                    connection = session.scalar(
+                        select(PeerConnection)
+                        .where(PeerConnection.user_id == p.user_id)
+                        .order_by(PeerConnection.created_at.desc())
+                    )
+                    generation = (
+                        connection.generation
+                        if connection is not None
+                        and type(connection.generation) is int
+                        and 0 <= connection.generation <= 2**63 - 1
+                        else None
+                    )
+                    state_name = (
+                        connection.state
+                        if connection is not None
+                        and connection.state in {"active", "pending", "closed", "revoke_pending"}
+                        else "other"
+                    )
+                status = sanitize_egress_renewal_status(
+                    {
+                        "available": True,
+                        "generation": generation,
+                        "state": state_name,
+                    }
+                )
+                report["egress_renewal_status"] = status
+                return status
+
             @app.post("/api/v1/__i028__/action/{name}", include_in_schema=False)
             def action(request: Request, name: str) -> dict[str, bool]:
                 nonlocal job
@@ -635,6 +1370,9 @@ def test_i028_real_android(harness: Harness) -> None:
                 assert name in {
                     "probe_all",
                     "probe_ipv4",
+                    "recovery_probe_ipv4",
+                    "egress_probe_all",
+                    "egress_dns_observe",
                     "outage",
                     "expired",
                     "recover",
@@ -649,6 +1387,8 @@ def test_i028_real_android(harness: Harness) -> None:
                     "permission_revoked",
                 }
                 assert job is None or job.done()
+                if name == "egress_dns_observe":
+                    report["dns_path_action_state"] = "queued"
                 job = executor.submit(action_work, name)
                 return {"queued": True}
 
@@ -666,14 +1406,19 @@ def test_i028_real_android(harness: Harness) -> None:
             @app.post("/api/v1/__i028__/fact", include_in_schema=False)
             def fact(request: Request, value: dict[str, str]) -> dict[str, bool]:
                 principal(request)
-                assert value[
-                    "name"
-                ] in FACTS | LIFECYCLE_FACTS | NETWORK_REVOKE_FACTS | NATURAL_SLEEP_FACTS | {
-                    "baseline_ipv6_available_included_ipv6_blocked",
-                    "direct_ipv4_comparison_unavailable",
-                    "native_reports_fresh_handshake",
-                    "mobile_direct_ipv6_baseline_available",
-                }
+                assert value["name"] in (
+                    FACTS
+                    | EGRESS_DIAGNOSTIC_FACTS
+                    | LIFECYCLE_FACTS
+                    | NETWORK_REVOKE_FACTS
+                    | NATURAL_SLEEP_FACTS
+                    | {
+                        "direct_ipv4_comparison_unavailable",
+                        "native_reports_fresh_handshake",
+                        "advisory_traffic_renewal_requested",
+                        "mobile_direct_ipv6_baseline_available",
+                    }
+                )
                 report["facts"][value["name"]] = True
                 return {"accepted": True}
 
@@ -684,6 +1429,24 @@ def test_i028_real_android(harness: Harness) -> None:
                     connection = session.scalar(
                         select(PeerConnection).order_by(PeerConnection.created_at.desc())
                     )
+                    generation = (
+                        connection.generation
+                        if connection is not None
+                        and type(connection.generation) is int
+                        and 0 <= connection.generation <= 2**63 - 1
+                        else None
+                    )
+                    state_name = (
+                        connection.state
+                        if connection is not None
+                        and connection.state in {"active", "pending", "closed", "revoke_pending"}
+                        else "other"
+                    )
+                    report["sustained_renewal_server_check"] = {
+                        "connection_present": connection is not None,
+                        "generation": generation,
+                        "state": state_name,
+                    }
                     assert (
                         connection is not None
                         and connection.generation >= 4
@@ -692,6 +1455,11 @@ def test_i028_real_android(harness: Harness) -> None:
                     report["sustained_acknowledged_generation"] = connection.generation
                 return {"accepted": True}
 
+            @app.post("/api/v1/__i028__/native_observation_after_failure", include_in_schema=False)
+            @app.post("/api/v1/__i028__/native_recovery_before", include_in_schema=False)
+            @app.post("/api/v1/__i028__/native_recovery_after", include_in_schema=False)
+            @app.post("/api/v1/__i028__/native_egress_before", include_in_schema=False)
+            @app.post("/api/v1/__i028__/native_egress_after", include_in_schema=False)
             @app.post("/api/v1/__i028__/native_observation", include_in_schema=False)
             def native_observation(request: Request, value: dict[str, Any]) -> dict[str, bool]:
                 principal(request)
@@ -699,7 +1467,29 @@ def test_i028_real_android(harness: Harness) -> None:
                 assert type(value["up"]) is bool and type(value["network"]) is bool
                 assert type(value["handshake_age"]) is int and -1 <= value["handshake_age"] <= 86400
                 assert type(value["remaining_ms"]) is int and 0 <= value["remaining_ms"] <= 90000
-                report["last_sustained_native_observation"] = value
+                key = {
+                    "native_observation_after_failure": "native_observation_after_failed_transfer",
+                    "native_recovery_before": "native_recovery_before_probe",
+                    "native_recovery_after": "native_recovery_after_probe",
+                    "native_egress_before": "native_egress_before_probe",
+                    "native_egress_after": "native_egress_after_probe",
+                    "native_observation": "last_sustained_native_observation",
+                }[request.url.path.rsplit("/", 1)[-1]]
+                report[key] = value
+                if key == "last_sustained_native_observation" and suite == "Main":
+                    try:
+                        with Session(h.engine) as session:
+                            connection = recovery_connection_snapshot(session, state["user"])
+                    except Exception:
+                        connection = {"available": False}
+                    append_sustained_window_observation(report, value, connection)
+                return {"accepted": True}
+
+            @app.post("/api/v1/__i028__/egress-hold-observation", include_in_schema=False)
+            def egress_hold_observation(request: Request, value: dict[str, Any]) -> dict[str, bool]:
+                principal(request)
+                observation = sanitize_egress_hold_observations(value)
+                report["egress_hold_observation"] = observation
                 return {"accepted": True}
 
             @app.post("/api/v1/__i028__/revoke", include_in_schema=False)
@@ -811,7 +1601,6 @@ def test_i028_real_android(harness: Harness) -> None:
                     "-r",
                     os.environ["VPN_I028_PROBE_APK"],
                 )
-            adb("shell", "appops", "set", PACKAGE, "ACTIVATE_VPN", "allow")
             if lifecycle:
                 device_spec = importlib.util.spec_from_file_location(
                     "i028_device", ROOT / "scripts/i028_device_scenarios.py"
@@ -824,15 +1613,6 @@ def test_i028_real_android(harness: Harness) -> None:
                 os.environ,
                 JAVA_HOME=r"C:\Program Files\Android\Android Studio\jbr",
                 PUB_CACHE=str(flutter.parents[2] / "pub-cache"),
-            )
-            phase_name = (
-                "natural_sleep"
-                if suite == "NaturalSleep"
-                else "network_revoke"
-                if suite == "NetworkRevoke"
-                else "lifecycle"
-                if lifecycle
-                else "run"
             )
             for phase in ("seed", phase_name):
                 stage = "flutter_" + phase
@@ -965,9 +1745,6 @@ def test_i028_real_android(harness: Harness) -> None:
                         "--no-uninstall",
                         "--dart-define=VPN_WINDOW_TUNNELS=true",
                         "--dart-define=VPN_I028_PHASE=" + phase,
-                        "--android-project-arg=i028IsolatedPackage=true",
-                        "--android-project-arg=awgPreparedDir="
-                        + os.environ["VPN_I028_PREPARED_AWG"],
                     ],
                     cwd=client,
                     env=env,
@@ -978,6 +1755,8 @@ def test_i028_real_android(harness: Harness) -> None:
                 failure = re.search(rb"i028_stage_([a-z_]{1,48})", result.stdout + result.stderr)
                 if failure:
                     report["phone_failure_stage"] = failure[1].decode("ascii")
+                report["flutter_exit_code"] = result.returncode
+                report["flutter_stage_marker_seen"] = failure is not None
                 success = result.returncode == 0
                 del result
                 # Pytest assertion rewriting must never render CompletedProcess,
@@ -985,11 +1764,22 @@ def test_i028_real_android(harness: Harness) -> None:
                 if not success:
                     raise RuntimeError("i028_flutter_failed_see_sanitized_receipt")
                 if phase == "seed":
-                    assert (
-                        "session.vault"
-                        in adb("shell", "run-as", PACKAGE, "ls", "no_backup").splitlines()
-                    )
+                    report["seed_postflight_checkpoint"] = "package_inventory"
+                    installed_packages = adb(
+                        "shell", "pm", "list", "packages", PACKAGE
+                    ).splitlines()
+                    report["seed_package_installed"] = f"package:{PACKAGE}" in installed_packages
+                    assert report["seed_package_installed"]
+                    report["seed_postflight_checkpoint"] = "session_vault"
+                    vault_entries = adb("shell", "run-as", PACKAGE, "ls", "no_backup").splitlines()
+                    report["seed_session_vault_present"] = "session.vault" in vault_entries
+                    assert report["seed_session_vault_present"]
+                    report["seed_postflight_checkpoint"] = "force_stop"
                     adb("shell", "am", "force-stop", PACKAGE)
+                    report["seed_postflight_checkpoint"] = "vpn_appop"
+                    adb("shell", "appops", "set", PACKAGE, "ACTIVATE_VPN", "allow")
+                    report["seed_vpn_appop_set"] = True
+                    report["seed_postflight_checkpoint"] = "complete"
             report["passed"] = all(report["facts"].get(name) is True for name in required_facts)
             report["passed"] &= report.get("ledger_consistent") is True
         finally:
@@ -1128,9 +1918,6 @@ def test_i028_real_android(harness: Harness) -> None:
                                 "--no-uninstall",
                                 "--dart-define=VPN_WINDOW_TUNNELS=true",
                                 "--dart-define=VPN_I028_PHASE=cleanup",
-                                "--android-project-arg=i028IsolatedPackage=true",
-                                "--android-project-arg=awgPreparedDir="
-                                + os.environ["VPN_I028_PREPARED_AWG"],
                             ],
                             cwd=client,
                             env=env,
@@ -1219,7 +2006,9 @@ def test_i028_real_android(harness: Harness) -> None:
             if not report["passed"]:
                 report["failed_at"] = stage
             receipt_name = (
-                "i-028-natural-sleep-staging.json"
+                "i-028-egress-diagnostic.json"
+                if suite == "Egress"
+                else "i-028-natural-sleep-staging.json"
                 if suite == "NaturalSleep"
                 else "i-028-network-revoke-staging.json"
                 if suite == "NetworkRevoke"

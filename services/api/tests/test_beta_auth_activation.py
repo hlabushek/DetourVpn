@@ -33,7 +33,7 @@ def closed_environment() -> str:
             "VPN_ENABLE_AUTH=false",
             "VPN_ENABLE_MINI_APP=false",
             "VPN_BETA_INVITES_ONLY=false",
-            "VPN_TELEGRAM_BOT_TOKEN=123456:abcdefghijklmnopqrstuvwxyz123456789",
+            "VPN_TELEGRAM_BOT_TOKEN=123456:TEST_ONLY_NOT_A_REAL_TELEGRAM_BOT_TOKEN_000000",
             "VPN_TELEGRAM_BOT_ID=123456",
             "VPN_TELEGRAM_BOT_USERNAME=uysdgyfudf_bot",
             "",

@@ -1,6 +1,14 @@
+import java.util.Properties
+
 plugins { id("com.android.library") }
+val localAndroidProperties = Properties()
+val localAndroidPropertiesFile = rootProject.file("local.properties")
+if (localAndroidPropertiesFile.isFile) {
+    localAndroidPropertiesFile.reader(Charsets.UTF_8).use { localAndroidProperties.load(it) }
+}
 val preparedPath = providers.gradleProperty("awgPreparedDir").orNull
     ?.takeIf { it.isNotBlank() }
+    ?: localAndroidProperties.getProperty("awg.prepared.dir")?.takeIf { it.isNotBlank() }
     ?: "../../../.cache/i-011/sdk-go-only"
 val prepared = project.file(preparedPath)
 check(prepared.resolve("PREPARED.json").isFile) { "Run scripts/prepare_android_poc.py first" }

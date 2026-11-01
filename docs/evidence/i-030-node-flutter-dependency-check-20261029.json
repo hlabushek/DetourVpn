@@ -1,0 +1,49 @@
+{
+  "observed_on": "2026-10-29",
+  "scope": "Node lockfile advisory audit and Flutter locked dependency resolution",
+  "npm": {
+    "version": "11.12.1",
+    "command": "npm audit --package-lock-only --json",
+    "mini_app": {
+      "lockfile_sha256": "2aa1d51faa551485055101b1ab1141eccc993a4af55fb2f3317016dd59973037",
+      "dependency_counts_reported": {
+        "prod": 4,
+        "dev": 64,
+        "optional": 47,
+        "total": 67
+      },
+      "known_vulnerability_count": 0
+    },
+    "telegram_bot": {
+      "lockfile_sha256": "a96b270634ba0e98cc05ec8dbf5e3961421f6f155afcfcb958bfec214b306a5c",
+      "dependency_counts_reported": {
+        "prod": 1,
+        "dev": 22,
+        "optional": 0,
+        "total": 22
+      },
+      "known_vulnerability_count": 0
+    },
+    "lockfiles_modified": false
+  },
+  "flutter": {
+    "sdk_version": "3.47.7",
+    "command": "flutter pub get --enforce-lockfile",
+    "result": "passed; no security advisory messages reported",
+    "pubspec_lock_sha256": "c994a810e14314cf7cae00fc8da3819b0a2c6ddd39580c997eabbf78593b3465",
+    "lockfile_unchanged": true
+  },
+  "not_covered": [
+    "Android and Gradle dependencies",
+    "Android SDK, NDK, and base images",
+    "OS packages and container images",
+    "license review or SBOM completeness",
+    "independent security review"
+  ],
+  "side_effects": {
+    "application_sources_changed": false,
+    "dependency_lockfiles_changed": false,
+    "beta_host_changed": false,
+    "production_or_staging_accessed": false
+  }
+}

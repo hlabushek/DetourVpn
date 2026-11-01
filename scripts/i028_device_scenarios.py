@@ -219,7 +219,7 @@ class DeviceScenarios:
                             "am",
                             "start",
                             "-n",
-                            "org.example.vpnclient/org.example.vpnpoc.ClientActivity",
+                            "com.detourvpn.client/org.example.vpnpoc.ClientActivity",
                         ),
                     ),
                 ]

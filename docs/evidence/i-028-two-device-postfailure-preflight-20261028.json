@@ -1,0 +1,27 @@
+{
+  "measured_at": "2026-10-28T09:34:56.9634842Z",
+  "scope": "read-only ADB post-failure verification; no installation or staging changes",
+  "passed": true,
+  "devices": [
+    {
+      "model": "Pixel 8 Pro",
+      "android_release": "17",
+      "isolated_i028_package_absent": true,
+      "probe_test_package_absent": true,
+      "always_on_vpn_unconfigured": true,
+      "probe_base_present": false
+    },
+    {
+      "model": "25040RP0AG",
+      "android_release": "15",
+      "isolated_i028_package_absent": true,
+      "probe_test_package_absent": true,
+      "always_on_vpn_unconfigured": true,
+      "probe_base_present": false
+    }
+  ],
+  "probe_artifacts_hash_verified": true,
+  "probe_base_sha256": "d498d25c70afd2669c4f45df36822d7a8379a7c8749301aff3f64764936a598f",
+  "probe_test_sha256": "62e9916042b03a6e778afe89f94109e870488dc9bf2f91b640ab0738960d5b1d",
+  "vpn_dataplane_acceptance": false
+}

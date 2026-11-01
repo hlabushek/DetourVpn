@@ -1,0 +1,55 @@
+{
+  "issue": "I-028",
+  "measured_at_utc": "2026-10-31T14:18:36Z/2026-10-31T14:20:36Z",
+  "scope": "operator-provided 120-second direct-baseline positive control; AP-station capture correlated with phone-only Egress Probe",
+  "source": "sanitized console output supplied by operator",
+  "phase": "baseline",
+  "phase_scope": "operator_labeled_window",
+  "client_filter_mode": "ap_station",
+  "duration_seconds": 120,
+  "packet_count": 493,
+  "packet_limit": 20000,
+  "packet_limit_reached": false,
+  "bounded_window_ended": true,
+  "capture_started_at_utc": "2026-10-31T14:18:36.379571+00:00",
+  "capture_completed_at_utc": "2026-10-31T14:20:36.430784+00:00",
+  "probe_capture_counters": {
+    "probe_baseline_ipv6_https_source_port_packets": 28,
+    "probe_dns_source_port_packets": 2,
+    "probe_included_ipv6_https_source_port_packets": 0
+  },
+  "aggregate_context": {
+    "direct_dns_v4_packets": 2,
+    "global_ipv6_egress_packets": 491,
+    "vpn_outer_endpoint_packets": 0
+  },
+  "correlated_phone_probe": {
+    "evidence_file": "i-028-probe-after-startup-fix-20261031T141909906Z.json",
+    "measured_at_utc": "2026-10-31T14:19:04.2528063Z",
+    "passed": true,
+    "direct_network_ready": true,
+    "direct_ipv6_ready": true,
+    "ipv4_available": true,
+    "ipv6_available": true,
+    "fixed_udp_dns_response": true,
+    "active_transport_wifi": true,
+    "active_network_is_vpn": false,
+    "egress_is_staging": false,
+    "test_apk_removed": true,
+    "probe_base_removed": true
+  },
+  "result": "positive_control_passed_for_fixed_probe_source_ports",
+  "vpn_dataplane_acceptance": false,
+  "limitations": [
+    "AP-station filter is not Android UID-wide attribution",
+    "baseline capture proves the auditor sees fixed direct probe flows; it does not establish included or excluded behavior",
+    "global IPv6 aggregates include unrelated station traffic and are not attributed to the probe"
+  ],
+  "privacy": {
+    "raw_packet_capture_saved": false,
+    "packet_headers_or_addresses_in_receipt": false,
+    "station_mac_saved": false,
+    "source_port_counts_only": true
+  },
+  "auditor_sha256": "3d98882ab8d00fd324e440ee85d470da8c104f95295707ab3b82e3484fbb83cd"
+}

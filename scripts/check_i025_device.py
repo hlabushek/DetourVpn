@@ -7,7 +7,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-PACKAGE = "org.example.vpnclient"
+PACKAGE = "com.detourvpn.client"
 TEST_PACKAGE = PACKAGE + ".test"
 PHASES = (
     "seed",

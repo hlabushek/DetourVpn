@@ -78,13 +78,14 @@ def require_environment(staging_address: str | None, *, i019: bool = False) -> s
         if not wsl:
             raise SmokeError("explicit_staging_address_required")
         return "local_wsl_only"
-    allowed = ("45.10.166.106", "85.209.132.205") if i019 else ("45.10.166.106",)
+    allowed = ("45.10.166.106", "150.241.99.227") if i019 else ("45.10.166.106",)
     if staging_address not in allowed or wsl:
         raise SmokeError("staging_target_not_approved")
     release = platform.freedesktop_os_release()
     if (
         release.get("ID") != "ubuntu"
-        or release.get("VERSION_ID") != "24.04"
+        or release.get("VERSION_ID")
+        != ("22.04" if i019 and staging_address == "150.241.99.227" else "24.04")
         or platform.machine() != "x86_64"
     ):
         raise SmokeError("unsupported_staging_platform")

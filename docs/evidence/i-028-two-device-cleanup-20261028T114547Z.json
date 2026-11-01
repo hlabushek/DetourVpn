@@ -1,0 +1,32 @@
+{
+  "measured_at": "2026-10-28T11:45:47.4247692Z",
+  "scope": "post-failure cleanup confirmation for I-028 physical two-device staging A run",
+  "failed_run_receipt": "i-028-two-device-staging-20261028T114212Z-ab4df5d2.json",
+  "failed_at": "i028_two_device_flutter_run_exited_before_a_disconnect",
+  "manual_stop": {
+    "cleanup_complete": true,
+    "journal_preserved": true,
+    "temporary_grant_removed": true
+  },
+  "read_only_status": {
+    "prepared": false,
+    "cleanup_complete": true
+  },
+  "independent_remote_postcheck": {
+    "i028_network_namespaces_absent": true,
+    "i028_listeners_absent": true,
+    "method": "unprivileged SSH: ip netns list, ip -o link show, ss UDP/TCP listeners"
+  },
+  "devices": {
+    "both_connected": true,
+    "i028_app_and_probe_packages_absent": true,
+    "always_on_vpn_configured": false
+  },
+  "passed": false,
+  "vpn_dataplane_acceptance": false,
+  "notes": [
+    "Both devices previously passed initial real staging-egress probes in the failed run.",
+    "Cleanup confirmation is separate evidence and does not change the failed physical-run result.",
+    "Existing unrelated network interfaces/services were left unchanged."
+  ]
+}

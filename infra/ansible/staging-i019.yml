@@ -23,7 +23,7 @@
           - ansible_user == 'vpn-deploy'
           - ansible_connection == 'ssh'
           - hostvars['i019-node-a'].ansible_host == '45.10.166.106'
-          - hostvars['i019-node-b'].ansible_host == '85.209.132.205'
+          - hostvars['i019-node-b'].ansible_host == '150.241.99.227'
     - name: Verify actual assigned staging IPv4
       ansible.builtin.command:
         argv: [/usr/sbin/ip, -j, -4, address, show]

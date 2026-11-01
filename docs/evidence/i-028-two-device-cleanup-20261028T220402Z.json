@@ -1,0 +1,8 @@
+{
+  "measured_at": "2026-10-28T22:04:02Z",
+  "scope": "staging A post-expiry status",
+  "source": "owner-supplied scoped status runner output",
+  "prepared": false,
+  "cleanup_complete": true,
+  "vpn_dataplane_acceptance": false
+}

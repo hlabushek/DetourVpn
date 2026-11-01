@@ -1,0 +1,22 @@
+{
+  "issue": "I-028",
+  "measured_on": "2026-10-29",
+  "scope": "local synthetic regression suite for the bounded packet-audit utility",
+  "command": "python -m pytest infra/ansible/tests/test_i028_packet_audit.py -q",
+  "result": {
+    "status": "passed",
+    "tests_passed": 10,
+    "tests_failed": 0
+  },
+  "coverage": [
+    "synthetic packet-header aggregation",
+    "malformed header rejection",
+    "filter construction",
+    "mocked bounded tcpdump invocation without a pcap output path",
+    "input and packet-limit validation"
+  ],
+  "physical_capture": false,
+  "device_interaction": false,
+  "network_configuration_changed": false,
+  "limitation": "This receipt verifies local tooling behavior only; it does not satisfy pre-NAT DNS/IPv6 acceptance or prove VPN privacy."
+}

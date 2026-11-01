@@ -36,12 +36,12 @@
           - vpn_staging_approved | default(false) | bool
           - (vpn_environment | default('')) == 'staging'
           - (vpn_approved_inventory_name | default('')) == inventory_hostname
-          # B is artifact-only I-019 staging, enabled solely by explicit opt-in.
+          # B is artifact-only I-019 staging on the owner-approved independent host.
           # Existing I-010/I-011/I-012 runtime gates remain A-only.
           - >-
             (vpn_approved_host_address | default('')) == '45.10.166.106'
             or (
-              (vpn_approved_host_address | default('')) == '85.209.132.205'
+              (vpn_approved_host_address | default('')) == '150.241.99.227'
               and vpn_i019_second_node_approved | default(false) | bool
               and inventory_hostname == 'i019-node-b'
               and (ansible_user | default('')) == 'vpn-deploy'
@@ -88,7 +88,13 @@
       ansible.builtin.assert:
         that:
           - ansible_facts['distribution'] == 'Ubuntu'
-          - ansible_facts['distribution_version'] == '24.04'
+          - >-
+            ansible_facts['distribution_version'] == '24.04'
+            or (
+              ansible_facts['distribution_version'] == '22.04'
+              and vpn_approved_host_address == '150.241.99.227'
+              and vpn_i019_second_node_approved | default(false) | bool
+            )
           - ansible_facts['architecture'] == 'x86_64'
           - ansible_service_mgr == 'systemd'
         fail_msg: "This release procedure supports only Ubuntu 24.04 amd64 with systemd."

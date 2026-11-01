@@ -1,0 +1,39 @@
+{
+  "issue": "I-028",
+  "measured_on": "2026-10-31",
+  "scope": "local-only Egress renewal failure-stage refinement and source-bound build",
+  "changes": [
+    "The Egress runner now reports separate fixed failure stages for initial renewal acknowledgement and renewal acknowledgement during the capture hold, distinguishing a missing server acknowledgement from a client phase that did not return to connected",
+    "Saved the 2026-10-31 included AP-station packet aggregate; it remains diagnostic because packets are not attributed to the probe UID"
+  ],
+  "checks": {
+    "flutter_analyze": true,
+    "flutter_tests_passed": 99,
+    "android_client_apk_build": true,
+    "android_instrumentation_apk_build": true,
+    "source_bound_suite": "Egress",
+    "source_input_count": 95,
+    "source_input_mismatch_count": 0,
+    "client_apk_sha256_verified": true,
+    "probe_test_apk_sha256_verified": true,
+    "git_diff_check": true,
+    "packet_capture_json_valid": true
+  },
+  "source_sha256": {
+    "apps/client/integration_test/i028_live_test.dart": "27037e2a80732c85d41c4e2bababd147e5b5f56e30974fa52085194024f25c3d"
+  },
+  "artifact_sha256": {
+    "client_apk": "2f26a71f0fed5bd2375937982e6daf1ea492eaa8c10be65a862d412c816ea582",
+    "probe_test_apk": "c27c0612bf03ccda51cfbd880c6f4f0a9b1f7d4697d551bcf531ac7266c3eecb",
+    "native_bundle": "7c287ac773c45ec6b12b1a53fd9cd43beb404b430362872f338dad490826fed2"
+  },
+  "python_diagnostics_test": "not validated: uv failed to canonicalize the script path; direct system-Python collection lacked cryptography.hazmat.primitives.kdf.argon2",
+  "physical_install_or_test_run": false,
+  "vpn_dataplane_acceptance": false,
+  "remaining": [
+    "Stage this exact Egress build before the next physical test",
+    "Run one synchronized Egress test and 90-second AP capture; inspect the refined renewal failure stage and verify cleanup",
+    "The current AP capture is station-level, not probe-UID-attributed",
+    "Natural sleep/Doze, Wi-Fi/mobile transition, system VPN permission revoke, disconnect during renewal, two-device acceptance, independent-provider failure, and comprehensive DNS leak capture remain open"
+  ]
+}

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'connection.dart';
+import 'diagnostic_report.dart';
 import 'native_tunnel.dart';
 import 'window_connection.dart';
 import 'split_apps.dart';
@@ -304,6 +305,10 @@ class ConnectionScreen extends StatelessWidget {
                           )
                           case final details?)
                         Text(details),
+                      DiagnosticReportButton(
+                        error: c.error!,
+                        stage: c.diagnosticStage,
+                      ),
                     ],
                   ),
                 ),

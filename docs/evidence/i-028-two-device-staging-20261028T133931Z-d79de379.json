@@ -1,0 +1,50 @@
+{
+  "cleanup_steps": {
+    "device_0_restored": true,
+    "device_1_restored": true,
+    "independent_remote_postcheck": false,
+    "local_api_stopped": true,
+    "staging_a_closed": false
+  },
+  "devices": [],
+  "diagnostics": {
+    "phase": "probe_base_install",
+    "safe_categories": [
+      "install_timeout"
+    ]
+  },
+  "facts": {},
+  "failed_at": "i028_two_device_probe_base_install_failed",
+  "measured_at": "2026-10-28T13:37:42.869256+00:00",
+  "open_cases": [
+    "independent provider failure",
+    "comprehensive DNS/IPv6 packet capture"
+  ],
+  "passed": false,
+  "quota_funding": "TEST FREE GRANT ONLY",
+  "scope": "two physical Android devices, disposable local API/PostgreSQL, bounded staging A",
+  "source_sha256": {
+    "apps/client/integration_test/i028_two_device_test.dart": "b571627b827d941dcb9157badbe0917b046dd8ea4b9ddb7d2732bdee13b1a808",
+    "infra/staging-v3/runtime.py": "1898bb981c09b64f546a7b35635493d113e19f75c6f552fa10e0254552e24094",
+    "scripts/i028_two_device_driver.py": "dd825fdcc559f3272d366e78942e007163aeba3a2f423297c806726672ce1c05",
+    "scripts/i028_two_device_preflight.py": "c2762c44c9d0cc3362a6a35106751f8588e71e4b97d550534b0d93b963e90476",
+    "scripts/run_i028_staging.ps1": "d128d14944bc99e3c1118d8f1a1b28498e7b96bf315cd1f6739ab3ef26b09890",
+    "services/api/tests/test_i028_two_device_driver.py": "9efc615a1269ae2f5361dd6f84dfc3583e052ee60b19805e39b7f414e0236952",
+    "services/api/tests/test_i028_two_devices.py": "36c739dea98372dd3fde6919e87bda3aab7ac99fb659ea4eb5c42c794dfee3a4"
+  },
+  "staging_baseline": {
+    "agent_active": true,
+    "cleanup_complete": false,
+    "live_slots": [],
+    "peer_counts": [
+      0,
+      0
+    ],
+    "prepared": true,
+    "remaining_seconds": 1713,
+    "slot_count": 2
+  },
+  "staging_remaining_seconds_at_start": 1713,
+  "telegram": "TEST FAKE ONLY",
+  "vpn_dataplane_acceptance": false
+}

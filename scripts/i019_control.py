@@ -54,7 +54,7 @@ def host() -> str:
     if HOST_FILE.stat().st_size > 128:
         raise ValueError("invalid_host")
     value = json.loads(HOST_FILE.read_text())
-    if set(value) != {"host"} or value["host"] not in {"45.10.166.106", "85.209.132.205"}:
+    if set(value) != {"host"} or value["host"] not in {"45.10.166.106", "150.241.99.227"}:
         raise ValueError("invalid_host")
     return str(value["host"])
 
@@ -148,24 +148,46 @@ def profile(old: Any, selected: str) -> dict[str, Any]:
 
 
 def stop(old: Any) -> dict[str, Any]:
-    agent_state = old.command(
-        ["/usr/bin/systemctl", "show", AGENT_UNIT, "--property=ActiveState", "--value"]
-    ).strip()
-    if agent_state == "active":
-        old.command(
-            ["/usr/bin/systemctl", "kill", "--kill-whom=main", "--signal=SIGCONT", AGENT_UNIT]
-        )
-    stopped = True
-    for unit in (AGENT_UNIT, UNIT):
+    resume_failed = False
+    state_query_failed = False
+    try:
+        agent_state = old.command(
+            ["/usr/bin/systemctl", "show", AGENT_UNIT, "--property=ActiveState", "--value"]
+        ).strip()
+    except Exception:
+        agent_state = "unknown"
+        state_query_failed = True
+    if agent_state in {"active", "unknown"}:
         try:
-            old.command(["/usr/bin/systemctl", "stop", unit], timeout=220)
+            old.command(
+                ["/usr/bin/systemctl", "kill", "--kill-whom=main", "--signal=SIGCONT", AGENT_UNIT]
+            )
         except Exception:
-            stopped = False  # Still attempt the other stop and forwarding restoration.
-    restored = forwarding(old, False)
-    invocation = old.command(
-        ["/usr/bin/systemctl", "show", UNIT, "--property=InvocationID", "--value"]
-    ).strip()
-    receipt = old.receipt() if re.fullmatch(r"[0-9a-f]{32}", invocation) else {"events": []}
+            # A failed resume must never prevent both units from being stopped.
+            resume_failed = True
+    stop_checks: dict[str, bool] = {}
+    for name, unit, timeout in (
+        ("agent_stop_command_ok", AGENT_UNIT, 30),
+        ("endpoint_stop_command_ok", UNIT, 200),
+    ):
+        try:
+            old.command(["/usr/bin/systemctl", "stop", unit], timeout=timeout)
+            stop_checks[name] = True
+        except Exception:
+            stop_checks[name] = False  # Still attempt the other stop and forwarding restoration.
+    try:
+        restored = forwarding(old, False)
+    except Exception:
+        restored = False
+    receipt_read_failed = False
+    try:
+        invocation = old.command(
+            ["/usr/bin/systemctl", "show", UNIT, "--property=InvocationID", "--value"]
+        ).strip()
+        receipt = old.receipt() if re.fullmatch(r"[0-9a-f]{32}", invocation) else {"events": []}
+    except Exception:
+        invocation, receipt = "", {"events": []}
+        receipt_read_failed = True
     events = receipt["events"]
     complete = any(
         row.get("cleanup_complete") is True
@@ -182,15 +204,85 @@ def stop(old: Any) -> dict[str, Any]:
             Path("/run/amneziawg/v19awg.sock"),
         )
     )
-    no_mutation = not invocation or any(
-        row.get("cleanup_no_mutation_marker") is True for row in events
+    no_mutation = not receipt_read_failed and (
+        not invocation or any(row.get("cleanup_no_mutation_marker") is True for row in events)
     )
     return {
-        "cleanup_complete": stopped and restored and owned_absent and (complete or no_mutation),
+        "cleanup_complete": all(stop_checks.values())
+        and restored
+        and owned_absent
+        and (complete or no_mutation),
+        "agent_state_query_failed": state_query_failed,
+        "agent_resume_failed": resume_failed,
+        **stop_checks,
+        "receipt_read_failed": receipt_read_failed,
         "forwarding_restored": restored,
         "cleanup_receipt": receipt,
         "owned_resources_absent": owned_absent,
     }
+
+
+def agent_request_diagnostics(old: Any) -> list[dict[str, str]]:
+    """Return distinct safe fixed-stage/status events for this agent invocation."""
+    invocation = old.command(
+        ["/usr/bin/systemctl", "show", AGENT_UNIT, "--property=InvocationID", "--value"]
+    ).strip()
+    if not re.fullmatch(r"[0-9a-f]{32}", invocation):
+        return []
+    output = old.command(
+        [
+            "/usr/bin/journalctl",
+            f"_SYSTEMD_INVOCATION_ID={invocation}",
+            "-n",
+            "32",
+            "--output=cat",
+            "--no-pager",
+        ]
+    )
+    valid_stages = {"poll", "command", "ack"}
+    valid_reasons = {
+        "control_plane_request_failed",
+        "control_plane_transport_error",
+        "agent_command_failed",
+        "agent_fault_other",
+        "command_value_error",
+        "command_os_error",
+        "command_http_error",
+        "invalid_command",
+        "invalid_public_key",
+        "peer_version_conflict",
+        "peer_apply_failed",
+        "native_operation_failed",
+        "peer_not_applied",
+        "peer_not_removed",
+        "native_counters_missing",
+        "invalid_native_counters",
+    }
+    diagnostics: list[dict[str, str]] = []
+    for line in output.splitlines():
+        try:
+            record = json.loads(line)
+        except ValueError:
+            continue
+        if not isinstance(record, dict) or record.get("error") != "control_plane_request_failed":
+            continue
+        stage, reason = record.get("stage"), record.get("reason")
+        if stage not in valid_stages:
+            continue
+        if reason not in valid_reasons and not (
+            isinstance(reason, str) and re.fullmatch(r"control_plane_http_[1-5][0-9]{2}", reason)
+        ):
+            continue
+        event = {"stage": stage, "reason": reason}
+        if event not in diagnostics:
+            diagnostics.append(event)
+    return diagnostics[-6:]
+
+
+def agent_request_diagnostic(old: Any) -> dict[str, str] | None:
+    """Compatibility helper returning only the latest safe diagnostic event."""
+    diagnostics = agent_request_diagnostics(old)
+    return diagnostics[-1] if diagnostics else None
 
 
 def run_agent() -> int:
@@ -254,11 +346,16 @@ def main() -> int:
             receipt = old.receipt()
         except Exception:
             receipt = {"events": []}
+        request_diagnostics = agent_request_diagnostics(old)
         print(
             json.dumps(
                 {
                     "endpoint_state": old.service_state(),
                     "agent_failure_stage": lifecycle().agent_failure(old),
+                    "agent_request_diagnostic": (
+                        request_diagnostics[-1] if request_diagnostics else None
+                    ),
+                    "agent_request_diagnostics": request_diagnostics,
                     "receipt": receipt,
                 }
             )

@@ -1,0 +1,63 @@
+{
+  "delayed_ready_nine_seconds": {
+    "complete": true,
+    "counts": {
+      "tunnel": {
+        "inbound": 1,
+        "outbound": 1
+      },
+      "uplink": {
+        "inbound": 1,
+        "outbound": 1
+      }
+    },
+    "packet_loss": false,
+    "probe_response": true,
+    "timing_ms": {
+      "finish_ms": 700,
+      "probe_ms": 1000,
+      "ready_ms": 9700
+    }
+  },
+  "fixed_operator_and_capture_fast_result": {
+    "complete": true,
+    "counts": {
+      "tunnel": {
+        "inbound": 1,
+        "outbound": 1
+      },
+      "uplink": {
+        "inbound": 1,
+        "outbound": 1
+      }
+    },
+    "packet_loss": false,
+    "probe_response": true,
+    "timing_ms": {
+      "finish_ms": 600,
+      "probe_ms": 1000,
+      "ready_ms": 2800
+    }
+  },
+  "passed": true,
+  "ready_timeout_seconds": 30,
+  "real_vps_or_android_test": false,
+  "scope": "synthetic loopback SSH/sudo and private WSL namespaces; fake Android and status",
+  "slow_probe_fails_closed": {
+    "complete": false,
+    "reason": "observer_ended_before_probe",
+    "stage": "probe",
+    "timing_ms": {
+      "probe_ms": 14000,
+      "ready_ms": 1000
+    }
+  },
+  "source_sha256": {
+    "infra/staging-v3/dns_observer.py": "3aad92b8edd50e0fc812dc6135187a8674ed8af9883e837c1579f9800e37495a",
+    "infra/staging-v3/runtime.py": "dffcac2744656469be491de7b453d738cd67ceb15f328ceb5649730847adf6f4",
+    "scripts/check_i028_dns_observer.py": "e6dac00b81ae3777c098ebedf95ff09fccab6ff66a533d93f960c34eff6bb475",
+    "scripts/check_i028_dns_transport.py": "61e87d3e02f0f2164b30bc29fa26ddf555cafd15570f250f916e2ee09ef25826",
+    "scripts/check_i028_dns_transport_host.py": "9bd793cb8d3ef05c4f836662be10485bc937c5fe4b27b6f4f4979ef007b83115",
+    "services/api/tests/test_i028_live.py": "a4c0957fea3cf02fa1e4e4d937ceebb3d2154cb0abdceace8eff89217e1b5437"
+  }
+}

@@ -17,7 +17,7 @@ import signal
 import stat
 import subprocess
 import time
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 from uuid import UUID, uuid4
@@ -37,6 +37,21 @@ PORT = 51892
 TABLE = "vpn_i012"
 ENV = {"PATH": "/usr/sbin:/usr/bin:/sbin:/bin", "LOG_LEVEL": "silent"}
 AGENT_STAGE = "initialize"
+UTC = timezone.utc  # noqa: UP017 - datetime.UTC is unavailable on Python 3.10.
+COMMAND_FAILURE_CODES = frozenset(
+    {
+        "invalid_command",
+        "invalid_public_key",
+        "peer_version_conflict",
+        "peer_apply_failed",
+        "native_operation_failed",
+        "peer_not_applied",
+        "peer_not_removed",
+        "native_counters_missing",
+        "invalid_native_counters",
+        "invalid_lease",
+    }
+)
 
 
 class AgentFault(Exception):
@@ -107,6 +122,20 @@ def key(value: object) -> str:
     if len(raw) != 32 or raw == bytes(32) or base64.b64encode(raw).decode() != value:
         raise AgentFault("invalid_public_key")
     return value
+
+
+def parse_utc_datetime(value: object) -> datetime:
+    """Parse API timestamps on Python 3.10, whose fromisoformat rejects UTC 'Z'."""
+    if not isinstance(value, str):
+        raise AgentFault("invalid_command")
+    normalized = value[:-1] + "+00:00" if value.endswith("Z") else value
+    try:
+        parsed = datetime.fromisoformat(normalized)
+    except ValueError:
+        raise AgentFault("invalid_command") from None
+    if parsed.tzinfo is None or parsed.utcoffset() is None:
+        raise AgentFault("invalid_command")
+    return parsed
 
 
 class Native:
@@ -265,7 +294,7 @@ class Agent:
         version, budget = body["peer_version"], body["budget_bytes"]
         if type(version) is not int or not 1 <= version <= 2**63 - 1 or type(budget) is not int:
             raise AgentFault("invalid_command")
-        deadline = datetime.fromisoformat(body["lease_deadline"])
+        deadline = parse_utc_datetime(body["lease_deadline"])
         if deadline.tzinfo is None:
             raise AgentFault("invalid_command")
         remaining = math.floor((deadline - datetime.now(UTC)).total_seconds())
@@ -320,6 +349,33 @@ class Agent:
             self.save()
             ack["applied"] = True
         elif body["operation"] == "remove_peer":
+            # A replay for a retired lease must not close a newer lease's
+            # single shared gate or remove its reused device public key.
+            if record is not None and record["status"] == "removed":
+                if record["public_key"] != public_key or version < record["version"]:
+                    raise AgentFault("peer_version_conflict")
+                try:
+                    other_active = [
+                        row
+                        for other_id, row in self.records.items()
+                        if other_id != peer_id and row["status"] == "active"
+                    ]
+                    verified = (
+                        len(other_active) == 1
+                        and parse_utc_datetime(other_active[0]["deadline"]) > datetime.now(UTC)
+                        and self.native.peers() == [other_active[0]["public_key"]]
+                    )
+                except Exception:
+                    self.native.close_gate()
+                    raise AgentFault("peer_apply_failed") from None
+                if verified:
+                    if version != record["version"]:
+                        record["version"] = version
+                        self.save()
+                    ack.update(
+                        rx_bytes=record["rx"], tx_bytes=record["tx"], counters_lost=record["lost"]
+                    )
+                    return ack
             self.native.close_gate()
             if record is None:
                 record = {
@@ -350,7 +406,7 @@ class Agent:
 
     def expire(self) -> None:
         for record in self.records.values():
-            if record["status"] == "active" and datetime.fromisoformat(
+            if record["status"] == "active" and parse_utc_datetime(
                 record["deadline"]
             ) <= datetime.now(UTC):
                 self.native.close_gate()
@@ -382,7 +438,9 @@ def request(config: dict[str, Any], suffix: str, payload: dict[str, Any]) -> dic
         response = connection.getresponse()
         raw = response.read(16385)
         if response.status != 200 or len(raw) > 16384:
-            raise AgentFault("control_plane_unavailable")
+            # Keep only the HTTP status. Never log the response body, which could
+            # contain request-specific data from a staging or production API.
+            raise AgentFault(f"control_plane_http_{response.status}")
         result: dict[str, Any] = json.loads(raw)
         return result
     finally:
@@ -416,9 +474,11 @@ def main() -> int:
 
     signal.signal(signal.SIGTERM, stop)
     signal.signal(signal.SIGINT, stop)
+    last_reported_failure: tuple[str, str] | None = None
     try:
         while running:
             agent.expire()
+            request_stage = "poll"
             try:
                 response = request(
                     config,
@@ -432,10 +492,52 @@ def main() -> int:
                     },
                 )
                 for item in response["commands"]:
-                    request(config, "ack", agent.execute(item))
-            except (OSError, ValueError, http.client.HTTPException, AgentFault):
+                    request_stage = "command"
+                    acknowledgement = agent.execute(item)
+                    request_stage = "ack"
+                    request(config, "ack", acknowledgement)
+                last_reported_failure = None
+            except (OSError, ValueError, http.client.HTTPException, AgentFault) as failure:
                 # Kernel gate remains the deadline/budget authority, even on network failure.
-                pass
+                if request_stage == "command":
+                    if isinstance(failure, AgentFault) and failure.args:
+                        candidate = str(failure.args[0])
+                        reason = (
+                            candidate if candidate in COMMAND_FAILURE_CODES else "agent_fault_other"
+                        )
+                    elif isinstance(failure, ValueError):
+                        reason = "command_value_error"
+                    elif isinstance(failure, OSError):
+                        reason = "command_os_error"
+                    elif isinstance(failure, http.client.HTTPException):
+                        reason = "command_http_error"
+                    else:
+                        reason = "agent_command_failed"
+                elif isinstance(failure, AgentFault) and failure.args:
+                    candidate = str(failure.args[0])
+                    reason = (
+                        candidate
+                        if candidate.startswith("control_plane_http_")
+                        and candidate.removeprefix("control_plane_http_").isdigit()
+                        else "control_plane_request_failed"
+                    )
+                else:
+                    reason = "control_plane_transport_error"
+                diagnostic = (request_stage, reason)
+                if diagnostic != last_reported_failure:
+                    # Fixed stage and status only; no exception, payload, credential,
+                    # key, endpoint or response text is emitted.
+                    print(
+                        json.dumps(
+                            {
+                                "error": "control_plane_request_failed",
+                                "stage": request_stage,
+                                "reason": reason,
+                            }
+                        ),
+                        flush=True,
+                    )
+                    last_reported_failure = diagnostic
             time.sleep(0.5)
     finally:
         agent.native.close_gate()

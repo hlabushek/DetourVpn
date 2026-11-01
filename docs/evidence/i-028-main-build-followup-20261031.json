@@ -1,0 +1,26 @@
+{
+  "issue": "I-028",
+  "measured_at_utc": "2026-10-31",
+  "scope": "source-bound local Main runner build after physical Egress follow-up",
+  "suite": "Main",
+  "passed": true,
+  "checks": {
+    "flutter_analyze": "passed: No issues found",
+    "flutter_tests": "passed: 102 tests",
+    "native_backend_verification": "passed: arm64-v8a and x86_64 libraries verified",
+    "android_debug_and_instrumentation_apks": "passed: Gradle BUILD SUCCESSFUL, 84 tasks up-to-date"
+  },
+  "source_bound_ready_record": {
+    "declared_input_count": 95,
+    "input_hash_mismatches": 0,
+    "client_apk_sha256": "1394eaaa0927f9fa7ee19e92326faa0e9ffdd3e77c680feb6986809d57e705e9",
+    "probe_test_sha256": "c27c0612bf03ccda51cfbd880c6f4f0a9b1f7d4697d551bcf531ac7266c3eecb",
+    "prepared_awg_patch_sha256": "523e726eb306af84addfa7c2ef6f4e0b6f89c8e4e9db7d015147752f843c2000"
+  },
+  "physical_main_install_test_pending": true,
+  "vpn_dataplane_acceptance": false,
+  "limitations": [
+    "This is build and local test evidence only; the Main suite has not been installed or run on the physical phone.",
+    "Gradle, Android Gradle Plugin and Kotlin deprecation notices and the existing NDK version mismatch were warnings; the build completed successfully."
+  ]
+}

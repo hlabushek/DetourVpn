@@ -1,0 +1,42 @@
+{
+  "issue": "I-027",
+  "measured_on": "2026-10-29",
+  "scope": "owner-PC encrypted beta backup pull and scheduled task diagnosis",
+  "vpn_dataplane_acceptance": false,
+  "manual_pull": {
+    "windows_powershell_7": "passed",
+    "windows_powershell_5_1": "passed",
+    "encrypted_import_verification": "passed",
+    "new_archives_created": 2,
+    "remote_archive_size_bytes": "26965432",
+    "second_local_archive_size_bytes": "26976716"
+  },
+  "restore_verification": {
+    "result": "passed",
+    "source": "first new encrypted archive pulled on 2026-10-29",
+    "target": "disposable local PostgreSQL cluster",
+    "test_result": "1 passed",
+    "temporary_cluster_removed": true,
+    "row_data_logged": false
+  },
+  "scheduled_task": {
+    "name": "DetourVpn Beta Backup Daily",
+    "enabled": true,
+    "latest_run_local": "2026-10-29 19:49:44",
+    "latest_task_result": 1,
+    "next_run_local": "2026-10-30 07:00:00",
+    "observed_failure_stage": "local_key_preflight",
+    "observed_failure_code": "Local beta backup key is missing",
+    "task_scheduler_operational_log_enabled": false
+  },
+  "limitations": [
+    "The scheduled task has not passed; the successful manual pulls do not convert its failed result.",
+    "No task configuration change or further scheduled retry was performed."
+  ],
+  "explicitly_untouched": [
+    "production",
+    "node B",
+    "beta database schema and contents",
+    "DNS, payments, and public release settings"
+  ]
+}

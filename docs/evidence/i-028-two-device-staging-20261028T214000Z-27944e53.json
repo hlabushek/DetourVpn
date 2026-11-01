@@ -1,0 +1,54 @@
+{
+  "cleanup_steps": {
+    "device_0_restored": true,
+    "device_1_restored": true,
+    "local_api_stopped": true,
+    "staging_a_closed": false
+  },
+  "devices": [
+    {
+      "android_release": "17",
+      "model": "Pixel 8 Pro"
+    }
+  ],
+  "diagnostics": {
+    "phase": "probe_test_install",
+    "safe_categories": [
+      "user_restricted"
+    ]
+  },
+  "facts": {},
+  "failed_at": "i028_two_device_probe_test_install_failed",
+  "measured_at": "2026-10-28T21:34:28.682316+00:00",
+  "open_cases": [
+    "independent provider failure",
+    "comprehensive DNS/IPv6 packet capture"
+  ],
+  "passed": false,
+  "quota_funding": "TEST FREE GRANT ONLY",
+  "scope": "two physical Android devices, disposable local API/PostgreSQL, bounded staging A",
+  "source_sha256": {
+    "apps/client/integration_test/i028_two_device_test.dart": "b571627b827d941dcb9157badbe0917b046dd8ea4b9ddb7d2732bdee13b1a808",
+    "infra/staging-v3/runtime.py": "1898bb981c09b64f546a7b35635493d113e19f75c6f552fa10e0254552e24094",
+    "scripts/i028_two_device_driver.py": "9750ce7a8998da8aa3006df245e158b71864f9a31aaa4e0508d70f28946386f4",
+    "scripts/i028_two_device_preflight.py": "c2762c44c9d0cc3362a6a35106751f8588e71e4b97d550534b0d93b963e90476",
+    "scripts/run_i028_staging.ps1": "d128d14944bc99e3c1118d8f1a1b28498e7b96bf315cd1f6739ab3ef26b09890",
+    "services/api/tests/test_i028_two_device_driver.py": "aa89e777b8e05754492bc2eef3a5d91a5bdd6e181b68fdd3920ac2d16b22ccf9",
+    "services/api/tests/test_i028_two_devices.py": "fddbbf3f9912b17dd277aed587d53962a87e4680a5e7a13012ec94184f024df8"
+  },
+  "staging_baseline": {
+    "agent_active": true,
+    "cleanup_complete": false,
+    "live_slots": [],
+    "peer_counts": [
+      0,
+      0
+    ],
+    "prepared": true,
+    "remaining_seconds": 1652,
+    "slot_count": 2
+  },
+  "staging_remaining_seconds_at_start": 1652,
+  "telegram": "TEST FAKE ONLY",
+  "vpn_dataplane_acceptance": false
+}

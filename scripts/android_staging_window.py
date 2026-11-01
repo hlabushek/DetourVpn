@@ -49,7 +49,7 @@ def configure_i019(host: str) -> None:
     """Explicit, fixed staging opt-in. Default I-011 paths/host remain unchanged."""
     global HOST, NS, VETH, VETH_NS, TUN, PORT, STATE, INPUT, SOCKET, UNIT
     global I019, LABEL, CONTAINERS, BLOCKED
-    if host not in {"45.10.166.106", "85.209.132.205"}:
+    if host not in {"45.10.166.106", "150.241.99.227"}:
         raise SmokeError("staging_target_not_approved")
     HOST, NS, VETH, VETH_NS, TUN = host, "vpn-i019", "v19host", "v19ns", "v19awg"
     PORT = "51893"
@@ -58,13 +58,13 @@ def configure_i019(host: str) -> None:
     SOCKET = Path(f"/run/amneziawg/{TUN}.sock")
     UNIT = "project-vpn-i019.service"
     LABEL, I019 = "project-vpn-i019", True
-    CONTAINERS = () if host == "85.209.132.205" else ("amnezia-awg2", "amnezia-wireguard")
-    BLOCKED = tuple(dict.fromkeys((*BLOCKED, "45.10.166.106/32", "85.209.132.205/32")))
+    CONTAINERS = () if host == "150.241.99.227" else ("amnezia-awg2", "amnezia-wireguard")
+    BLOCKED = tuple(dict.fromkeys((*BLOCKED, "45.10.166.106/32", "150.241.99.227/32")))
 
 
 def no_docker_baseline() -> str:
     """B-only: verify actual absence, never substitute fake container metadata."""
-    if not I019 or HOST != "85.209.132.205":
+    if not I019 or HOST != "150.241.99.227":
         raise SmokeError("empty_container_baseline_not_approved")
     for path in ("/usr/bin/docker", "/run/docker.sock", "/run/containerd/containerd.sock"):
         if Path(path).exists():
@@ -91,7 +91,7 @@ def cleanup_i019_tables(original: list[list[str]]) -> None:
     Never flush an existing table or delete any table containing foreign objects.
     A pristine B may have no filter/nat table before our first iptables rule.
     """
-    if not I019 or HOST != "85.209.132.205":
+    if not I019 or HOST != "150.241.99.227":
         raise SmokeError("empty_table_cleanup_not_approved")
     expected = {
         "filter": {
@@ -531,7 +531,7 @@ def serve() -> None:
     # Marker precedes the first mutation so ExecStopPost also handles partial setup.
     checkpoint("namespace_setup")
     metadata: dict[str, Any] = {"schema_version": 2, "hashes": baseline}
-    if I019 and HOST == "85.209.132.205":
+    if I019 and HOST == "150.241.99.227":
         metadata["original_nft_tables"] = i019_tables()
     private_file("baseline.json", json.dumps(metadata))
     run([IP, "netns", "add", NS])
@@ -693,7 +693,7 @@ def cleanup() -> bool:
             path.unlink(missing_ok=True)
         except OSError:
             ok = False
-    if I019 and HOST == "85.209.132.205":
+    if I019 and HOST == "150.241.99.227":
         cleanup_i019_tables(saved["original_nft_tables"])
     current = snapshot(legacy=True) if legacy else snapshot()
     restored = {name: value == current.get(name) for name, value in baseline.items()}
@@ -790,7 +790,7 @@ def revoke() -> None:
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("action", choices=("preflight", "serve", "cleanup", "recover", "revoke"))
-    parser.add_argument("--i019-host", choices=("45.10.166.106", "85.209.132.205"))
+    parser.add_argument("--i019-host", choices=("45.10.166.106", "150.241.99.227"))
     args = parser.parse_args()
     try:
         if args.i019_host:

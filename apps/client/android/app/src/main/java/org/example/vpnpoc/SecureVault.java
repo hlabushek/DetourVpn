@@ -34,7 +34,7 @@ final class SecureVault {
         return (SecretKey) store.getKey("detourvpn.v1", null);
     }
     private AtomicFile file(String name) {
-        if (!java.util.Set.of("device", "session").contains(name)) throw new IllegalArgumentException();
+        if (!java.util.Set.of("device", "session", "login").contains(name)) throw new IllegalArgumentException();
         return new AtomicFile(new File(context.getNoBackupFilesDir(), name + ".vault"));
     }
     String read(String name) throws Exception {

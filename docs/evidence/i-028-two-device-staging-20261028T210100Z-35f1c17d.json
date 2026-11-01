@@ -1,0 +1,132 @@
+{
+  "cleanup_steps": {
+    "device_0_restored": true,
+    "device_1_restored": true,
+    "local_api_stopped": true,
+    "staging_a_closed": false
+  },
+  "devices": [
+    {
+      "android_release": "17",
+      "model": "Pixel 8 Pro"
+    },
+    {
+      "android_release": "15",
+      "model": "25040RP0AG"
+    }
+  ],
+  "facts": {},
+  "failed_at": "i028_two_device_prebarrier_probe_not_staging",
+  "handshake_kick_probes": [
+    {
+      "devices": [
+        {
+          "active_network_available": true,
+          "active_network_is_vpn": true,
+          "active_network_validated": true,
+          "active_transport_cellular": true,
+          "active_transport_wifi": false,
+          "application_initialized": true,
+          "egress_is_staging": false,
+          "ipv4_available": false,
+          "ipv4_failure": "dns",
+          "ipv4_primary_failure": "dns",
+          "ipv4_used_fallback": true,
+          "probe_complete": true,
+          "process_uid_matches_target": true,
+          "test_internet_permission_declared": true,
+          "vpn_dns_configured": true
+        },
+        {
+          "active_network_available": true,
+          "active_network_is_vpn": true,
+          "active_network_validated": true,
+          "active_transport_cellular": false,
+          "active_transport_wifi": true,
+          "application_initialized": true,
+          "egress_is_staging": false,
+          "ipv4_available": false,
+          "ipv4_failure": "dns",
+          "ipv4_primary_failure": "dns",
+          "ipv4_used_fallback": true,
+          "probe_complete": true,
+          "process_uid_matches_target": true,
+          "test_internet_permission_declared": true,
+          "vpn_dns_configured": true
+        }
+      ],
+      "round": 1
+    },
+    {
+      "devices": [
+        {
+          "active_network_available": true,
+          "active_network_is_vpn": true,
+          "active_network_validated": true,
+          "active_transport_cellular": true,
+          "active_transport_wifi": false,
+          "application_initialized": true,
+          "egress_is_staging": false,
+          "ipv4_available": false,
+          "ipv4_failure": "dns",
+          "ipv4_primary_failure": "dns",
+          "ipv4_used_fallback": true,
+          "probe_complete": true,
+          "process_uid_matches_target": true,
+          "test_internet_permission_declared": true,
+          "vpn_dns_configured": true
+        },
+        {
+          "active_network_available": true,
+          "active_network_is_vpn": true,
+          "active_network_validated": true,
+          "active_transport_cellular": false,
+          "active_transport_wifi": true,
+          "application_initialized": true,
+          "egress_is_staging": false,
+          "ipv4_available": false,
+          "ipv4_failure": "dns",
+          "ipv4_primary_failure": "dns",
+          "ipv4_used_fallback": true,
+          "probe_complete": true,
+          "process_uid_matches_target": true,
+          "test_internet_permission_declared": true,
+          "vpn_dns_configured": true
+        }
+      ],
+      "round": 2
+    }
+  ],
+  "measured_at": "2026-10-28T20:56:33.936538+00:00",
+  "open_cases": [
+    "independent provider failure",
+    "comprehensive DNS/IPv6 packet capture"
+  ],
+  "passed": false,
+  "quota_funding": "TEST FREE GRANT ONLY",
+  "scope": "two physical Android devices, disposable local API/PostgreSQL, bounded staging A",
+  "source_sha256": {
+    "apps/client/integration_test/i028_two_device_test.dart": "b571627b827d941dcb9157badbe0917b046dd8ea4b9ddb7d2732bdee13b1a808",
+    "infra/staging-v3/runtime.py": "1898bb981c09b64f546a7b35635493d113e19f75c6f552fa10e0254552e24094",
+    "scripts/i028_two_device_driver.py": "7f7c5f2af5e92a72861e1b5177171c959b1c125bff75b361f1ea10e5424e4b13",
+    "scripts/i028_two_device_preflight.py": "c2762c44c9d0cc3362a6a35106751f8588e71e4b97d550534b0d93b963e90476",
+    "scripts/run_i028_staging.ps1": "d128d14944bc99e3c1118d8f1a1b28498e7b96bf315cd1f6739ab3ef26b09890",
+    "services/api/tests/test_i028_two_device_driver.py": "a6e4c5e4b52707f8ca04c85dd37bf177bf56eeef67b4f62ec0e060d7371badfd",
+    "services/api/tests/test_i028_two_devices.py": "7f0b51eb7189f0dd6295b21c6e66be7e8b8a635be3de3bec36a8248bae1a2676"
+  },
+  "staging_baseline": {
+    "agent_active": true,
+    "cleanup_complete": false,
+    "live_slots": [],
+    "peer_counts": [
+      0,
+      0
+    ],
+    "prepared": true,
+    "remaining_seconds": 1669,
+    "slot_count": 2
+  },
+  "staging_remaining_seconds_at_start": 1669,
+  "telegram": "TEST FAKE ONLY",
+  "vpn_dataplane_acceptance": false
+}

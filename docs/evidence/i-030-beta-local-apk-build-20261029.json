@@ -1,0 +1,29 @@
+{
+  "date": "2026-10-29",
+  "scope": "local Flutter client build only",
+  "command": "scripts/build_flutter_client.ps1",
+  "result": "passed",
+  "checks": {
+    "dart_format": "passed; 36 files checked, 0 changed",
+    "flutter_analyze": "passed; no issues found",
+    "flutter_tests": {
+      "passed": 92,
+      "failed": 0
+    },
+    "android_debug_unit_tests": {
+      "passed": 25,
+      "failed": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "android_lint_debug": "passed",
+    "debug_apk_build": "passed",
+    "release_apk_build": "passed; unsigned"
+  },
+  "release_apk_sha256": "462fdb65c3a640a0870ecace9d8b9a1cee5a9c2e29d22dc81dd533e89318ae7f",
+  "signing_configured": false,
+  "installed_on_device": false,
+  "distributed": false,
+  "staging_or_network_actions": false,
+  "acceptance_boundary": "This proves local compilation and checks only. It does not establish APK signing, tester distribution, physical VPN behavior, privacy acceptance, or beta readiness."
+}

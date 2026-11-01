@@ -421,6 +421,34 @@ def prepare() -> dict[str, object]:
         raise
 
 
+def quota_snapshot(current: Any) -> dict[str, bool | int] | None:
+    """Best-effort aggregate quota snapshot; never a final accounting receipt."""
+    try:
+        value = json.loads(current.nft(
+            ["-j", "list", "quota", "inet", "detour_window_v3", "budget"]
+        ))
+        rows = [row["quota"] for row in value["nftables"] if "quota" in row]
+        if len(rows) != 1:
+            return None
+        limit, used = rows[0].get("bytes"), rows[0].get("used")
+        if (
+            type(limit) is not int
+            or type(used) is not int
+            or not 65536 <= limit <= 67108864
+            or used < 0
+        ):
+            return None
+        return {"exhausted": used >= limit, "remaining_bytes": max(0, limit - used)}
+    except Exception:
+        return None
+
+
+def quota_exhausted(current: Any) -> bool | None:
+    """Compatibility accessor for callers that need only the bounded boolean."""
+    snapshot = quota_snapshot(current)
+    return None if snapshot is None else bool(snapshot["exhausted"])
+
+
 def status() -> dict[str, object]:
     if (STATE_DIR / "i028-cleanup.json").is_file():
         return {"prepared": False, "cleanup_complete": True}
@@ -430,12 +458,21 @@ def status() -> dict[str, object]:
     live_slots = []
     peer_counts = []
     native_transfer_bytes = []
+    byte_quota_exhausted = []
     for slot in SLOTS:
         if Path(f"/run/netns/dv3slot{slot}").exists():
             current = gate(slot)
             try:
                 if current.is_live():
                     live_slots.append(slot)
+                    quota = quota_snapshot(current)
+                    byte_quota_exhausted.append(
+                        {
+                            "slot": slot,
+                            "exhausted": quota["exhausted"] if quota else None,
+                            "remaining_bytes": quota["remaining_bytes"] if quota else None,
+                        }
+                    )
             finally:
                 current.dispose()
             peer_counts.append(len(call([str(AWG), "show", f"dv3s{slot}", "peers"]).splitlines()))
@@ -455,6 +492,7 @@ def status() -> dict[str, object]:
         "live_slots": live_slots,
         "peer_counts": peer_counts,
         "native_transfer_bytes": native_transfer_bytes,
+        "byte_quota_exhausted": byte_quota_exhausted,
         "agent_active": call(
             ["/usr/bin/systemctl", "is-active", "detourvpn-i028-agent.service"], required=False
         )
@@ -497,11 +535,24 @@ def disarm_timeout() -> bool:
 
 def cleanup() -> dict[str, object]:
     gate_close_errors = 0
-    if (STATE_DIR / "i028-cleanup.json").is_file():
+    cleanup_journal = STATE_DIR / "i028-cleanup.json"
+    if cleanup_journal.is_file():
+        try:
+            journal = json.loads(cleanup_journal.read_text())
+        except (OSError, json.JSONDecodeError):
+            raise Failure("cleanup_journal_unreadable") from None
+        recorded_gate_errors = (
+            journal.get("gate_close_errors_before_core_stop") if isinstance(journal, dict) else None
+        )
+        if type(recorded_gate_errors) is not int or recorded_gate_errors < 0:
+            raise Failure("cleanup_journal_incomplete")
+        disarmed = disarm_timeout()
         return {
-            "cleanup_complete": disarm_timeout(),
+            "cleanup_complete": disarmed,
+            "timeout_timer_disarmed": disarmed,
             "journal_preserved": True,
             "temporary_grant_removed": True,
+            "gate_close_errors_before_core_stop": recorded_gate_errors,
         }
     if not (RUN / "baseline.json").is_file():
         return {"cleanup_complete": not RUN.exists()}
@@ -555,7 +606,14 @@ def cleanup() -> dict[str, object]:
     destination = STATE_DIR / "i028-cleanup.json"
     destination.parent.mkdir(mode=0o700, exist_ok=True)
     write_private(
-        destination, json.dumps({"cleanup_complete": True, "measured_at": int(time.time())})
+        destination,
+        json.dumps(
+            {
+                "cleanup_complete": True,
+                "measured_at": int(time.time()),
+                "gate_close_errors_before_core_stop": gate_close_errors,
+            }
+        ),
     )
     for secret in ("localhost.key", "localhost.crt", "slots.json"):
         (RUN / secret).unlink(missing_ok=True)
@@ -570,6 +628,7 @@ def cleanup() -> dict[str, object]:
 
 
 def main() -> int:
+    operation = None
     try:
         if os.geteuid() != 0 or len(sys.argv) != 2:
             raise Failure("fixed_root_action_required")
@@ -587,6 +646,36 @@ def main() -> int:
                 raise Failure("staging_deadline_expired")
             if operation == "manifest":
                 result = {"slots": json.loads((RUN / "slots.json").read_text())}
+            elif operation == "dns-observe":
+                import fcntl
+
+                slots = info.get("live_slots")
+                if (
+                    not isinstance(slots, list) or len(slots) != 1
+                    or type(slots[0]) is not int or slots[0] not in SLOTS
+                ):
+                    raise Failure("single_live_slot_required")
+                if remaining < 40:
+                    raise Failure("insufficient_observation_window")
+                if any(
+                    not os.path.isfile(path) or not os.access(path, os.X_OK)
+                    for path in ("/usr/bin/tcpdump", "/usr/bin/timeout")
+                ):
+                    raise Failure("capture_tool_missing")
+                fd = os.open(
+                    RUN / "dns-observer.lock", os.O_CREAT | os.O_RDWR | os.O_NOFOLLOW, 0o600
+                )
+                try:
+                    try:
+                        fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                    except BlockingIOError:
+                        raise Failure("observer_busy") from None
+                    observer = module("dns_observer")
+                    result = observer.observe(
+                        slots[0], lambda: print('{"ready":true}', flush=True), sys.stdin.buffer
+                    )
+                finally:
+                    os.close(fd)
             elif operation == "configure":
                 configure(sys.stdin.buffer.read(513))
                 result = {"configured": True}
@@ -615,7 +704,28 @@ def main() -> int:
                 raise Failure("action_forbidden")
         print(json.dumps(result), flush=True)
         return 0
-    except Exception:
+    except Exception as exc:
+        if operation == "dns-observe":
+            # Only fixed categories may cross SSH; exception text is never echoed.
+            allowed = {
+                "single_live_slot_required", "insufficient_observation_window",
+                "capture_not_ready", "capture_ended_early", "capture_stream_closed",
+                "capture_stream_unavailable", "capture_linktype_unsupported",
+                "capture_linktype_unavailable", "capture_sync_timeout", "capture_sync_invalid",
+                "capture_packet_limit", "capture_output_limit", "packet_header_invalid",
+                "packet_filter_mismatch", "capture_completion_unknown", "capture_incomplete",
+                "capture_unavailable", "capture_tool_missing", "staging_deadline_expired",
+                "observer_busy",
+            }
+            # Only local fixed exception types can supply a category. Avoid
+            # exposing arbitrary messages from OS, dependencies or subprocesses.
+            category = (
+                str(exc) if type(exc).__name__ in {"Failure", "ObservationError"} else "other"
+            )
+            if category not in allowed:
+                category = "other"
+            print(json.dumps({"error": "dns_observe_failed", "category": category}), flush=True)
+            return 1
         print('{"error":"i028_operator_action_failed"}', flush=True)
         return 1
 

@@ -1,0 +1,48 @@
+{
+  "issue": "I-028",
+  "measured_at_utc": "2026-10-31",
+  "scope": "local client-status correction after physical Egress receipt 20261031T111729Z-a655b866",
+  "physical_receipt": "i-028-egress-diagnostic-20261031T111729Z-a655b866.json",
+  "diagnosis": {
+    "client_phase": "reconnecting",
+    "native_up": true,
+    "native_network": true,
+    "lease_remaining_ms": 80550,
+    "handshake_age_seconds": 73,
+    "renewal_acknowledged": true,
+    "same_uid_staging_ipv4_probe": true,
+    "issue": "Established data path remained usable while UI phase relied only on the <=60-second handshake age."
+  },
+  "local_change": {
+    "files": [
+      "apps/client/lib/native_tunnel.dart",
+      "apps/client/lib/window_connection.dart",
+      "apps/android/app/src/main/java/org/example/vpnpoc/TunnelProviderV1.java",
+      "apps/android/app/src/main/java/org/example/vpnpoc/AwgProviderV1.java",
+      "apps/client/android/app/src/main/java/org/example/vpnpoc/ClientApplication.java",
+      "apps/client/test/window_connection_test.dart",
+      "docs/adr/070-established-window-connected-status.md"
+    ],
+    "acceptance": "Initial connection retains the fresh-handshake condition. Established status may also use inbound-only counter progress within 60 seconds, conditional on native up, validated network, and valid lease.",
+    "limitations": "Counter is advisory and never used for quota, settlement, authorization, lease extension, or routing. TX-only and unavailable stats do not create new confirmation."
+  },
+  "checks": {
+    "dart_format": "passed",
+    "flutter_tests": "passed: test/window_connection_test.dart and test/connection_test.dart",
+    "android_debug_apk_build": "passed",
+    "android_unit_tests": "passed: :app:testDebugUnitTest",
+    "android_lint": "passed: :app:lintDebug; 4 warnings",
+    "flutter_analyze": "blocked: analysis_server exited after FormatException: Unexpected end of input in truncated JSON"
+  },
+  "local_debug_apk": {
+    "path": "apps/client/build/app/outputs/flutter-apk/app-debug.apk",
+    "sha256": "aab85a8bb90452537157458efbcb3c838bae34e7b2506552ebc4f9ac26b6330d",
+    "source_bound_runner_receipt": false
+  },
+  "vpn_dataplane_acceptance": false,
+  "physical_followup_pending": true,
+  "limitations": [
+    "No new physical Android run has verified the revised status behavior.",
+    "The preceding AP-station capture is not UID-attributed and does not establish comprehensive DNS or IPv6 leak freedom."
+  ]
+}

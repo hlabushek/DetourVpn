@@ -1,0 +1,8 @@
+{
+  "measured_at": "2026-10-29T15:24:24.3183343+00:00",
+  "passed": false,
+  "facts": {},
+  "vpn_dataplane_acceptance": false,
+  "test_apk_removed": false,
+  "scope": "physical phone-only independent UID diagnostics; no server setup"
+}

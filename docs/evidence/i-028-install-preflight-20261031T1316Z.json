@@ -1,0 +1,24 @@
+{
+  "issue": "I-028",
+  "recorded_at_utc": "2026-10-31T13:16:28Z",
+  "scope": "owner-run staging Install preflight; Test was not started",
+  "outcome": "blocked_before_staging_setup",
+  "installer": {
+    "staged_source_matches_current": true,
+    "install_script_sha256": "3ac35a6fbbe721f98284f043f5b545aed8eda321bbe94068962f737d003aa6c7",
+    "failed_line": 52,
+    "guard": "available_kib must be greater than 1500000",
+    "exact_available_kib": null
+  },
+  "closed_run_archive": {
+    "closed_run_archived": true,
+    "private_journal_preserved": true,
+    "archive_helper_verified_resources_closed": true,
+    "archive_helper_verified_timeout_timer_disarmed": true
+  },
+  "new_staging_runtime_created": false,
+  "new_cleanup_timer_started": false,
+  "test_started": false,
+  "interpretation": "Preflight disk-space refusal after safe archival; this is not an Android, DNS, IPv6, or VPN result.",
+  "vpn_dataplane_acceptance": false
+}

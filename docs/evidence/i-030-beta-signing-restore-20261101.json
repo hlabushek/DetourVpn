@@ -1,0 +1,20 @@
+{
+  "observed_at": "2026-11-01T20:38:44Z",
+  "issue": "I-030",
+  "scope": "beta signing JKS recovery-copy verification",
+  "restore_source": "GERFFINSUSB:E:/DetourVpn-Beta-Backup/detourvpn-beta-signing.jks",
+  "usb_source_sha256_matches_restore_copy": true,
+  "restore_copy_matches_original_local_jks": true,
+  "restore_copy_filename": "detourvpn-beta-restore-20261101-233554.jks",
+  "signed_build_receipt": "i-030-beta-apk-20261101T203843691Z-c0d3a24a.json",
+  "apk_signature_verification": "passed",
+  "signer_matches_previous_beta": true,
+  "jks_store_and_key_passwords": "accepted_by_signed_build",
+  "bitlocker_recovery_key_storage_owner_report": "saved_as_file_on_pc",
+  "bitlocker_recovery_key_file_content_inspected": false,
+  "temporary_restore_copy_removed": true,
+  "owner_cleanup_pending": false,
+  "removal_confirmed_by_execution_shell": true,
+  "secret_values_recorded": false,
+  "distribution": "not_accepted"
+}

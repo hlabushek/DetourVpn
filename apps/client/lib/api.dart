@@ -65,6 +65,23 @@ class Api implements TunnelApi {
   final HttpClient _client;
   final SessionStore? store;
   Future<void> _storage = Future.value();
+  Future<Map<String, dynamic>?> readPendingLogin() async {
+    final pendingStore = store;
+    if (pendingStore is PendingLoginStore) {
+      return (pendingStore as PendingLoginStore).readPendingLogin();
+    }
+    return null;
+  }
+
+  Future<void> writePendingLogin(Map<String, dynamic>? value) async {
+    final pendingStore = store;
+    if (pendingStore is! PendingLoginStore) {
+      if (value != null) throw const ClientError('login_storage_unavailable');
+      return;
+    }
+    await (pendingStore as PendingLoginStore).writePendingLogin(value);
+  }
+
   Future<void> _persist(Map<String, dynamic>? value) {
     final work = _storage.then((_) => store?.write(value));
     _storage = work.catchError((Object _) {});

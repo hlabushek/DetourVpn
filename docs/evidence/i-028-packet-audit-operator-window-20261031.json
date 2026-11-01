@@ -1,0 +1,46 @@
+{
+  "acceptance_eligible": false,
+  "capture_timestamp": null,
+  "classification": "phase_unverified_no_vpn_outer_trigger",
+  "classification_reasons": [
+    "operator-labeled included capture had no timestamp or synchronization marker",
+    "no outgoing UDP packet to the fixed I-028 endpoint ports 51901/51902 was observed",
+    "capture duration was 120 seconds while the associated Egress Test took 146.12 seconds; temporal overlap is unknown"
+  ],
+  "receipt_kind": "operator_pasted_sanitized_aggregate",
+  "reported": {
+    "bounded_window_ended": true,
+    "client_filter_mode": "ap_station",
+    "direct_dns_v4_packets": 23,
+    "direct_dns_v4_tcp_egress_packets": 4,
+    "direct_dns_v4_udp_egress_packets": 19,
+    "direct_dns_v6_packets": 0,
+    "direct_dns_v6_tcp_egress_packets": 0,
+    "direct_dns_v6_udp_egress_packets": 0,
+    "direction": "egress",
+    "duration_seconds": 120,
+    "global_ipv6_egress_packets": 303,
+    "global_ipv6_egress_port_443_packets": 258,
+    "global_ipv6_egress_port_53_packets": 0,
+    "global_ipv6_egress_other_port_packets": 45,
+    "global_ipv6_egress_tcp_packets": 266,
+    "global_ipv6_egress_udp_packets": 37,
+    "packet_count": 326,
+    "packet_limit": 2000,
+    "packet_limit_reached": false,
+    "phase": "included",
+    "phase_scope": "operator_labeled_window",
+    "test_only": true,
+    "vpn_outer_endpoint_packets": 0,
+    "vpn_outer_endpoint_ports": [51901, 51902],
+    "vpn_outer_endpoint_udp_egress_packets": 0
+  },
+  "related_egress_receipt": "i-028-egress-diagnostic-20261030T224336Z-f7796385.json",
+  "related_egress_test_seconds": 146.12,
+  "reported_post_test_symptom": {
+    "classification": "operator_report_unverified",
+    "description": "Global IPv6 connectivity becomes unavailable after these tests and returns after Wi-Fi reconnect; no immediate post-test probe was recorded.",
+    "measured_at": null
+  },
+  "vpn_dataplane_acceptance": false
+}

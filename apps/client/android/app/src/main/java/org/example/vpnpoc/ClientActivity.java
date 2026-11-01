@@ -65,6 +65,13 @@ public final class ClientActivity extends FlutterActivity {
             .setMethodCallHandler(this::handle);
     }
     private void handle(MethodCall call, MethodChannel.Result result) {
+        if (call.method.equals("i028PackageName")) {
+            if ((getApplicationInfo().flags & ApplicationInfo.FLAG_DEBUGGABLE) == 0) {
+                result.notImplemented(); return;
+            }
+            result.success(getPackageName());
+            return;
+        }
         if (call.method.equals("i028StageWrite")) {
             if ((getApplicationInfo().flags & ApplicationInfo.FLAG_DEBUGGABLE) == 0) {
                 result.notImplemented(); return;
@@ -136,8 +143,30 @@ public final class ClientActivity extends FlutterActivity {
             }
             return;
         }
+        if (call.method.equals("shareDiagnosticReport")) {
+            String code = call.argument("code");
+            String stage = call.argument("stage");
+            final String reportText;
+            try {
+                reportText = DiagnosticReportText.format(code, stage);
+            } catch (IllegalArgumentException invalidReport) {
+                result.error("diagnostic_report_invalid", "Отчёт диагностики недоступен", null);
+                return;
+            }
+            try {
+                Intent report = new Intent(Intent.ACTION_SEND);
+                report.setType("text/plain");
+                report.putExtra(Intent.EXTRA_TEXT, reportText);
+                startActivity(Intent.createChooser(report, "Поделиться диагностикой"));
+                result.success(null);
+            } catch (RuntimeException unavailable) {
+                result.error("diagnostic_share_unavailable", "Не удалось открыть отправку отчёта", null);
+            }
+            return;
+        }
         if (!java.util.Set.of("publicKey", "prove", "connect", "connectWindow", "advanceWindow",
-                "disconnect", "snapshot", "sessionRead", "sessionWrite", "splitRead", "splitModeRead",
+                "disconnect", "snapshot", "sessionRead", "sessionWrite", "pendingLoginRead",
+                "pendingLoginWrite", "splitRead", "splitModeRead",
                 "splitWrite", "apps", "nodeRead", "nodeWrite").contains(call.method)) {
             result.notImplemented(); return;
         }
@@ -151,7 +180,8 @@ public final class ClientActivity extends FlutterActivity {
         app.worker.execute(() -> {
             try {
                 // Session erasure must remain available even when native SDK init fails.
-                boolean storage = call.method.equals("sessionRead") || call.method.equals("sessionWrite");
+                boolean storage = call.method.equals("sessionRead") || call.method.equals("sessionWrite")
+                        || call.method.equals("pendingLoginRead") || call.method.equals("pendingLoginWrite");
                 boolean preference = call.method.equals("nodeRead") || call.method.equals("nodeWrite");
                 if (storage && app.vault == null) throw new IllegalStateException();
                 if (!storage && !preference && app.provider == null) throw new IllegalStateException();
@@ -159,11 +189,22 @@ public final class ClientActivity extends FlutterActivity {
                 switch (call.method) {
                     case "sessionRead":
                         String saved = app.vault.read("session");
-                        value = saved == null ? null : jsonMap(new org.json.JSONObject(saved));
+                        value = saved == null ? null : jsonMap(
+                                new org.json.JSONObject(saved), "origin", "refresh_token");
                         break;
                     case "sessionWrite":
                         java.util.Map<String, Object> record = call.argument("value");
                         app.vault.write("session", record == null ? null : new org.json.JSONObject(record).toString());
+                        break;
+                    case "pendingLoginRead":
+                        String pendingLogin = app.vault.read("login");
+                        value = pendingLogin == null ? null : jsonMap(
+                                new org.json.JSONObject(pendingLogin),
+                                "request_id", "verifier", "bot_url", "expires_at");
+                        break;
+                    case "pendingLoginWrite":
+                        java.util.Map<String, Object> loginRecord = call.argument("value");
+                        app.vault.write("login", loginRecord == null ? null : new org.json.JSONObject(loginRecord).toString());
                         break;
                     case "nodeRead":
                         value = getSharedPreferences("connection", MODE_PRIVATE).getString("selected_node", null);
@@ -301,9 +342,10 @@ public final class ClientActivity extends FlutterActivity {
             default -> throw new IllegalArgumentException();
         };
     }
-    private static java.util.Map<String, Object> jsonMap(org.json.JSONObject record) throws Exception {
+    private static java.util.Map<String, Object> jsonMap(
+            org.json.JSONObject record, String... fields) throws Exception {
         var value = new java.util.HashMap<String, Object>();
-        for (String key : java.util.List.of("origin", "refresh_token")) value.put(key, record.getString(key));
+        for (String key : fields) value.put(key, record.getString(key));
         return value;
     }
     @Override protected void onActivityResult(int request, int response, Intent data) {

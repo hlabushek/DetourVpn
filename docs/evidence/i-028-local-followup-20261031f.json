@@ -1,0 +1,34 @@
+{
+  "issue": "I-028",
+  "measured_at_utc": "2026-10-31",
+  "scope": "clean source-snapshot validation and source-bound Egress runner build for ADR-070 client-status correction",
+  "source_snapshot": "C:/Users/JetGame/AppData/Local/ProjectVpn/i013-builds/005a985882024eae914cacb31cd72100",
+  "checks": {
+    "flutter_analyze": "passed: No issues found",
+    "flutter_tests": "passed: full project suite through build_flutter_client.ps1 -WindowTunnels",
+    "runner_build": "passed: run_i028_staging.ps1 -Action Build -Suite Egress using the complete declared source-input snapshot",
+    "runner_android_debug_and_instrumentation_apks": "passed: Gradle BUILD SUCCESSFUL, 84 tasks",
+    "targeted_flutter_tests": "passed: test/window_connection_test.dart and test/connection_test.dart",
+    "android_unit_tests": "passed: :app:testDebugUnitTest",
+    "android_lint": "passed: :app:lintDebug; 4 existing toolchain warnings"
+  },
+  "source_bound_runner": {
+    "suite": "Egress",
+    "client_package": "org.example.vpnclient.i028",
+    "client_apk_sha256": "1394eaaa0927f9fa7ee19e92326faa0e9ffdd3e77c680feb6986809d57e705e9",
+    "probe_package": "org.example.vpnpoc.test",
+    "probe_test_sha256": "c27c0612bf03ccda51cfbd880c6f4f0a9b1f7d4697d551bcf531ac7266c3eecb",
+    "probe_base_sha256": "61006df375b245a808b779bdb5cbb02e1bfa44460737d0b61fe982f99a93481c",
+    "probe_native_sha256": {
+      "arm64-v8a": "df0a0e3365d5f9b2a857165c4b09a3b7eb1c683c3337821c8107721a77a5893d",
+      "x86_64": "e321d2962e9f7b59c37974a10d21633a247acc01c53f6a6f5797c2c16826660c"
+    },
+    "declared_source_inputs_hash_bound": true
+  },
+  "physical_followup_pending": true,
+  "vpn_dataplane_acceptance": false,
+  "limitations": [
+    "The new source-bound runner has not yet been installed and exercised on the physical phone.",
+    "This local build does not close independent-provider, lifecycle, two-device, or comprehensive UID-attributed DNS/IPv6 capture criteria."
+  ]
+}

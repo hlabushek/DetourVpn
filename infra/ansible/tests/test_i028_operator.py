@@ -6,6 +6,7 @@ import os
 import secrets
 import subprocess
 import sys
+import types
 from pathlib import Path
 from typing import Any
 from uuid import uuid4
@@ -33,6 +34,37 @@ def test_only_fixed_slot_numbers(operator: Any) -> None:
     for invalid in (-1, 0, 3, True, "1", "1;id"):
         with pytest.raises(operator.Failure):
             operator.addresses(invalid)
+
+
+@pytest.mark.parametrize(
+    ("payload", "expected"),
+    [
+        ({"nftables": [{"quota": {"bytes": 1048576, "used": 1048575}}]}, False),
+        ({"nftables": [{"quota": {"bytes": 1048576, "used": 1048576}}]}, True),
+        ({"nftables": [{"quota": {"bytes": 1048576, "used": 1048600}}]}, True),
+        ({"nftables": [{"quota": {"bytes": 1048576, "used": True}}]}, None),
+        ({"nftables": []}, None),
+        ({"nftables": [{"quota": {"bytes": 1, "used": 1}}]}, None),
+    ],
+)
+def test_quota_diagnostic_is_bounded_and_never_final_accounting(
+    operator: Any, payload: dict[str, object], expected: bool | None
+) -> None:
+    current = types.SimpleNamespace(nft=lambda args: json.dumps(payload))
+    assert operator.quota_exhausted(current) is expected
+    snapshot = operator.quota_snapshot(current)
+    if expected is None:
+        assert snapshot is None
+    else:
+        used = payload["nftables"][0]["quota"]["used"]
+        assert snapshot == {
+            "exhausted": expected,
+            "remaining_bytes": max(0, 1048576 - used),
+        }
+    def broken(args: list[str]) -> str:
+        raise RuntimeError("synthetic private error")
+    assert operator.quota_exhausted(types.SimpleNamespace(nft=broken)) is None
+    assert operator.quota_snapshot(types.SimpleNamespace(nft=broken)) is None
 
 
 @pytest.mark.parametrize(
@@ -98,6 +130,51 @@ def test_expired_budget_and_unknown_cli_cannot_launch_processes(
     for argv in (["helper", "start-agent"], ["helper", "shell"], ["helper", "status", "extra"]):
         monkeypatch.setattr(sys, "argv", argv)
         assert operator.main() == 1
+
+
+def test_dns_observer_reports_only_allowlisted_failure_categories(
+    operator: Any, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    monkeypatch.setattr(sys, "argv", ["helper", "dns-observe"])
+    assert operator.main() == 1
+    assert json.loads(capsys.readouterr().out) == {
+        "error": "dns_observe_failed", "category": "staging_deadline_expired"
+    }
+
+    def fail_with_private_message() -> dict[str, Any]:
+        raise RuntimeError("SYNTHETIC PRIVATE ERROR")
+
+    operator.status = fail_with_private_message
+    assert operator.main() == 1
+    output = capsys.readouterr().out
+    assert json.loads(output) == {"error": "dns_observe_failed", "category": "other"}
+    assert "SYNTHETIC PRIVATE" not in output
+
+
+def test_dns_observer_missing_tool_is_bounded_without_creating_capture(
+    operator: Any, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    monkeypatch.setattr(sys, "argv", ["helper", "dns-observe"])
+    monkeypatch.setitem(sys.modules, "fcntl", types.SimpleNamespace())
+    monkeypatch.setattr(os.path, "isfile", lambda _: False)
+    operator.status = lambda: {"prepared": True, "remaining_seconds": 100, "live_slots": [1]}
+    assert operator.main() == 1
+    assert json.loads(capsys.readouterr().out) == {
+        "error": "dns_observe_failed", "category": "capture_tool_missing"
+    }
+
+
+@pytest.mark.parametrize("slots", [[], [1, 2], [True], [3]])
+def test_dns_observer_requires_exactly_one_real_fixed_slot(
+    operator: Any, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], slots: list
+) -> None:
+    monkeypatch.setattr(sys, "argv", ["helper", "dns-observe"])
+    monkeypatch.setitem(sys.modules, "fcntl", types.SimpleNamespace())
+    operator.status = lambda: {"prepared": True, "remaining_seconds": 100, "live_slots": slots}
+    assert operator.main() == 1
+    assert json.loads(capsys.readouterr().out) == {
+        "error": "dns_observe_failed", "category": "single_live_slot_required"
+    }
 
 
 @pytest.mark.skipif(

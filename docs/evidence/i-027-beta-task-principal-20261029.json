@@ -1,0 +1,31 @@
+{
+  "issue": "I-027",
+  "measured_on": "2026-10-29",
+  "scope": "local scheduled-task principal repair and read-only verification",
+  "secret_values_recorded": false,
+  "task": {
+    "name": "DetourVpn Beta Backup Daily",
+    "action_matches_expected_pull_script": true,
+    "principal_matches_current_user_by_sid": true,
+    "logon_type": "Interactive",
+    "run_level": "Limited",
+    "repeat_registration": "idempotent"
+  },
+  "post_repair_execution": {
+    "task_started": false,
+    "remote_contact": false,
+    "scheduled_run_success": false,
+    "last_task_result": 1,
+    "last_task_result_is_historical": true
+  },
+  "checks": {
+    "powershell_parse": "passed",
+    "registration_repeat": "passed",
+    "read_only_task_configuration_check": "passed"
+  },
+  "limitations": [
+    "The previous scheduled run failed before transfer because the task principal could not access the current user's local backup key.",
+    "The task was not run after repair; scheduled backup success remains unverified.",
+    "No VPS, staging, production, or beta database was contacted during this repair."
+  ]
+}

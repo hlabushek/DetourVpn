@@ -1,0 +1,789 @@
+{
+  "accounting_after_revoke": {
+    "ledger_consistent": true,
+    "measured_receipt_bytes": "32772659",
+    "open_connections": 0,
+    "receipt_count": 32,
+    "reserved_bytes": "0",
+    "unknown_receipts": 0,
+    "used_bytes": "32772659",
+    "violations": 0
+  },
+  "cleanup_steps": {
+    "agent_revoke_and_stop": true,
+    "isolated_i028_app_absent": true,
+    "local_api_stopped": true,
+    "owner_app_untouched": true,
+    "phone_restored": true,
+    "phone_session_absent": true,
+    "root_stop": {
+      "cleanup_complete": true,
+      "gate_close_errors_before_core_stop": 0,
+      "journal_preserved": true,
+      "temporary_grant_removed": true,
+      "timeout_timer_disarmed": true
+    },
+    "ssh_transport": true
+  },
+  "control_plane_settlement_complete": true,
+  "diagnostic_only": true,
+  "different_android_process_same_real_account_family_and_device": true,
+  "dns_observer_node_after": {
+    "agent_active": true,
+    "available": true,
+    "byte_quota_exhausted": [
+      {
+        "exhausted": true,
+        "remaining_bytes": 0,
+        "slot": 1
+      }
+    ],
+    "live_slots": [
+      1
+    ],
+    "native_transfer_bytes": [
+      {
+        "received": "335828",
+        "sent": "3545164",
+        "slot": 1
+      },
+      {
+        "received": "0",
+        "sent": "0",
+        "slot": 2
+      }
+    ],
+    "peer_counts": [
+      1,
+      0
+    ]
+  },
+  "dns_observer_node_before": {
+    "agent_active": true,
+    "available": true,
+    "byte_quota_exhausted": [
+      {
+        "exhausted": true,
+        "remaining_bytes": 0,
+        "slot": 1
+      }
+    ],
+    "live_slots": [
+      1
+    ],
+    "native_transfer_bytes": [
+      {
+        "received": "294324",
+        "sent": "2572132",
+        "slot": 1
+      },
+      {
+        "received": "0",
+        "sent": "0",
+        "slot": 2
+      }
+    ],
+    "peer_counts": [
+      1,
+      0
+    ]
+  },
+  "dns_path_action_state": "completed",
+  "dns_path_observation": {
+    "complete": true,
+    "counts": {
+      "tunnel": {
+        "inbound": 1,
+        "outbound": 1
+      },
+      "uplink": {
+        "inbound": 1,
+        "outbound": 1
+      }
+    },
+    "packet_loss": false,
+    "probe_response": true,
+    "timing_ms": {
+      "finish_ms": 600,
+      "probe_ms": 1000,
+      "ready_ms": 1000
+    }
+  },
+  "egress_connection_after_probe": {
+    "available": true,
+    "budget_bytes": 1048576,
+    "generation": 3,
+    "lease_remaining_seconds": 87,
+    "state": "active"
+  },
+  "egress_connection_before_probe": {
+    "available": true,
+    "budget_bytes": 1048576,
+    "generation": 2,
+    "lease_remaining_seconds": 89,
+    "state": "pending"
+  },
+  "egress_hold_observation": {
+    "fixed_probe_attempted": true,
+    "fixed_probe_succeeded": true,
+    "inbound_freshness_window_seconds": 60,
+    "observations": [
+      {
+        "client_has_error": false,
+        "client_phase": "connected",
+        "elapsed_seconds": 5,
+        "handshake_age": 21,
+        "inbound_progress_recent": true,
+        "native_network": true,
+        "native_up": true,
+        "received_counter_available": true,
+        "remaining_ms": 78327,
+        "renewal_acknowledged": true,
+        "renewal_pending": false,
+        "traffic_counter_available": true,
+        "traffic_renewal_requested": true
+      },
+      {
+        "client_has_error": false,
+        "client_phase": "connected",
+        "elapsed_seconds": 10,
+        "handshake_age": 26,
+        "inbound_progress_recent": true,
+        "native_network": true,
+        "native_up": true,
+        "received_counter_available": true,
+        "remaining_ms": 77230,
+        "renewal_acknowledged": true,
+        "renewal_pending": true,
+        "traffic_counter_available": true,
+        "traffic_renewal_requested": true
+      },
+      {
+        "client_has_error": false,
+        "client_phase": "connected",
+        "elapsed_seconds": 15,
+        "handshake_age": 31,
+        "inbound_progress_recent": true,
+        "native_network": true,
+        "native_up": true,
+        "received_counter_available": true,
+        "remaining_ms": 76027,
+        "renewal_acknowledged": false,
+        "renewal_pending": true,
+        "traffic_counter_available": true,
+        "traffic_renewal_requested": true
+      },
+      {
+        "client_has_error": false,
+        "client_phase": "connected",
+        "elapsed_seconds": 21,
+        "handshake_age": 37,
+        "inbound_progress_recent": true,
+        "native_network": true,
+        "native_up": true,
+        "received_counter_available": true,
+        "remaining_ms": 78027,
+        "renewal_acknowledged": false,
+        "renewal_pending": true,
+        "traffic_counter_available": true,
+        "traffic_renewal_requested": true
+      },
+      {
+        "client_has_error": false,
+        "client_phase": "connected",
+        "elapsed_seconds": 48,
+        "handshake_age": 64,
+        "inbound_progress_recent": true,
+        "native_network": true,
+        "native_up": true,
+        "received_counter_available": true,
+        "remaining_ms": 76153,
+        "renewal_acknowledged": false,
+        "renewal_pending": true,
+        "traffic_counter_available": true,
+        "traffic_renewal_requested": true
+      },
+      {
+        "client_has_error": false,
+        "client_phase": "connected",
+        "elapsed_seconds": 55,
+        "handshake_age": 71,
+        "inbound_progress_recent": true,
+        "native_network": true,
+        "native_up": true,
+        "received_counter_available": true,
+        "remaining_ms": 74404,
+        "renewal_acknowledged": false,
+        "renewal_pending": true,
+        "traffic_counter_available": true,
+        "traffic_renewal_requested": true
+      },
+      {
+        "client_has_error": false,
+        "client_phase": "connected",
+        "elapsed_seconds": 61,
+        "handshake_age": 77,
+        "inbound_progress_recent": true,
+        "native_network": true,
+        "native_up": true,
+        "received_counter_available": true,
+        "remaining_ms": 76329,
+        "renewal_acknowledged": false,
+        "renewal_pending": true,
+        "traffic_counter_available": true,
+        "traffic_renewal_requested": true
+      },
+      {
+        "client_has_error": false,
+        "client_phase": "connected",
+        "elapsed_seconds": 67,
+        "handshake_age": 83,
+        "inbound_progress_recent": true,
+        "native_network": true,
+        "native_up": true,
+        "received_counter_available": true,
+        "remaining_ms": 76188,
+        "renewal_acknowledged": false,
+        "renewal_pending": true,
+        "traffic_counter_available": true,
+        "traffic_renewal_requested": true
+      },
+      {
+        "client_has_error": false,
+        "client_phase": "connected",
+        "elapsed_seconds": 72,
+        "handshake_age": 88,
+        "inbound_progress_recent": true,
+        "native_network": true,
+        "native_up": true,
+        "received_counter_available": true,
+        "remaining_ms": 78849,
+        "renewal_acknowledged": true,
+        "renewal_pending": false,
+        "traffic_counter_available": true,
+        "traffic_renewal_requested": true
+      },
+      {
+        "client_has_error": true,
+        "client_phase": "reconnecting",
+        "elapsed_seconds": 77,
+        "handshake_age": 93,
+        "inbound_progress_recent": true,
+        "native_network": true,
+        "native_up": true,
+        "received_counter_available": true,
+        "remaining_ms": 73673,
+        "renewal_acknowledged": true,
+        "renewal_pending": true,
+        "traffic_counter_available": true,
+        "traffic_renewal_requested": true
+      },
+      {
+        "client_has_error": true,
+        "client_phase": "reconnecting",
+        "elapsed_seconds": 82,
+        "handshake_age": 98,
+        "inbound_progress_recent": true,
+        "native_network": true,
+        "native_up": true,
+        "received_counter_available": true,
+        "remaining_ms": 68564,
+        "renewal_acknowledged": true,
+        "renewal_pending": true,
+        "traffic_counter_available": true,
+        "traffic_renewal_requested": true
+      },
+      {
+        "client_has_error": true,
+        "client_phase": "reconnecting",
+        "elapsed_seconds": 88,
+        "handshake_age": 104,
+        "inbound_progress_recent": true,
+        "native_network": true,
+        "native_up": true,
+        "received_counter_available": true,
+        "remaining_ms": 63429,
+        "renewal_acknowledged": true,
+        "renewal_pending": true,
+        "traffic_counter_available": true,
+        "traffic_renewal_requested": true
+      },
+      {
+        "client_has_error": true,
+        "client_phase": "connected",
+        "elapsed_seconds": 93,
+        "handshake_age": 109,
+        "inbound_progress_recent": true,
+        "native_network": true,
+        "native_up": true,
+        "received_counter_available": true,
+        "remaining_ms": 58241,
+        "renewal_acknowledged": false,
+        "renewal_pending": true,
+        "traffic_counter_available": true,
+        "traffic_renewal_requested": true
+      },
+      {
+        "client_has_error": false,
+        "client_phase": "connected",
+        "elapsed_seconds": 99,
+        "handshake_age": 115,
+        "inbound_progress_recent": true,
+        "native_network": true,
+        "native_up": true,
+        "received_counter_available": true,
+        "remaining_ms": 58922,
+        "renewal_acknowledged": true,
+        "renewal_pending": false,
+        "traffic_counter_available": true,
+        "traffic_renewal_requested": true
+      },
+      {
+        "client_has_error": false,
+        "client_phase": "connected",
+        "elapsed_seconds": 104,
+        "handshake_age": 120,
+        "inbound_progress_recent": true,
+        "native_network": true,
+        "native_up": true,
+        "received_counter_available": true,
+        "remaining_ms": 53881,
+        "renewal_acknowledged": true,
+        "renewal_pending": false,
+        "traffic_counter_available": true,
+        "traffic_renewal_requested": true
+      },
+      {
+        "client_has_error": false,
+        "client_phase": "connected",
+        "elapsed_seconds": 109,
+        "handshake_age": 3,
+        "inbound_progress_recent": true,
+        "native_network": true,
+        "native_up": true,
+        "received_counter_available": true,
+        "remaining_ms": 77899,
+        "renewal_acknowledged": false,
+        "renewal_pending": true,
+        "traffic_counter_available": true,
+        "traffic_renewal_requested": true
+      },
+      {
+        "client_has_error": false,
+        "client_phase": "connected",
+        "elapsed_seconds": 116,
+        "handshake_age": 11,
+        "inbound_progress_recent": true,
+        "native_network": true,
+        "native_up": true,
+        "received_counter_available": true,
+        "remaining_ms": 76495,
+        "renewal_acknowledged": false,
+        "renewal_pending": true,
+        "traffic_counter_available": true,
+        "traffic_renewal_requested": true
+      },
+      {
+        "client_has_error": false,
+        "client_phase": "connected",
+        "elapsed_seconds": 123,
+        "handshake_age": 17,
+        "inbound_progress_recent": true,
+        "native_network": true,
+        "native_up": true,
+        "received_counter_available": true,
+        "remaining_ms": 77781,
+        "renewal_acknowledged": false,
+        "renewal_pending": true,
+        "traffic_counter_available": true,
+        "traffic_renewal_requested": true
+      },
+      {
+        "client_has_error": true,
+        "client_phase": "reconnecting",
+        "elapsed_seconds": 130,
+        "handshake_age": 24,
+        "inbound_progress_recent": true,
+        "native_network": true,
+        "native_up": true,
+        "received_counter_available": true,
+        "remaining_ms": 77018,
+        "renewal_acknowledged": true,
+        "renewal_pending": true,
+        "traffic_counter_available": true,
+        "traffic_renewal_requested": true
+      },
+      {
+        "client_has_error": true,
+        "client_phase": "reconnecting",
+        "elapsed_seconds": 135,
+        "handshake_age": 29,
+        "inbound_progress_recent": true,
+        "native_network": true,
+        "native_up": true,
+        "received_counter_available": true,
+        "remaining_ms": 71856,
+        "renewal_acknowledged": true,
+        "renewal_pending": true,
+        "traffic_counter_available": true,
+        "traffic_renewal_requested": true
+      },
+      {
+        "client_has_error": true,
+        "client_phase": "reconnecting",
+        "elapsed_seconds": 140,
+        "handshake_age": 34,
+        "inbound_progress_recent": true,
+        "native_network": true,
+        "native_up": true,
+        "received_counter_available": true,
+        "remaining_ms": 66721,
+        "renewal_acknowledged": true,
+        "renewal_pending": true,
+        "traffic_counter_available": true,
+        "traffic_renewal_requested": true
+      }
+    ],
+    "sample_count": 21,
+    "stale_handshake_connected_with_recent_inbound": true,
+    "stale_handshake_threshold_seconds": 60
+  },
+  "egress_node_after_probe": {
+    "agent_active": true,
+    "available": true,
+    "byte_quota_exhausted": [
+      {
+        "exhausted": false,
+        "remaining_bytes": 830732,
+        "slot": 1
+      }
+    ],
+    "live_slots": [
+      1
+    ],
+    "native_transfer_bytes": [
+      {
+        "received": "253540",
+        "sent": "1814764",
+        "slot": 1
+      },
+      {
+        "received": "0",
+        "sent": "0",
+        "slot": 2
+      }
+    ],
+    "peer_counts": [
+      1,
+      0
+    ]
+  },
+  "egress_node_before_probe": {
+    "agent_active": true,
+    "available": true,
+    "byte_quota_exhausted": [
+      {
+        "exhausted": true,
+        "remaining_bytes": 0,
+        "slot": 1
+      }
+    ],
+    "live_slots": [
+      1
+    ],
+    "native_transfer_bytes": [
+      {
+        "received": "112452",
+        "sent": "878892",
+        "slot": 1
+      },
+      {
+        "received": "0",
+        "sent": "0",
+        "slot": 2
+      }
+    ],
+    "peer_counts": [
+      1,
+      0
+    ]
+  },
+  "egress_renewal_status": {
+    "acknowledged": true,
+    "available": true,
+    "generation": 30,
+    "renewal_seen": true,
+    "state": "active"
+  },
+  "exact_measured_bytes": "32772659",
+  "facts": {
+    "advisory_traffic_renewal_requested": true,
+    "included_ipv6_literal_blocked": true,
+    "included_probe_real_staging_ipv4_and_udp_dns": true,
+    "native_reports_fresh_handshake": true,
+    "real_account_refresh_after_android_process_restart": true,
+    "same_probe_uid_included_then_excluded_egress": true
+  },
+  "flutter_exit_code": 0,
+  "flutter_stage_marker_seen": false,
+  "independent_probes": [
+    {
+      "active_network_available": true,
+      "active_network_is_vpn": false,
+      "active_network_validated": true,
+      "active_transport_cellular": false,
+      "active_transport_wifi": true,
+      "application_initialized": true,
+      "dns_failure": "none",
+      "egress_is_staging": false,
+      "fixed_udp_dns_response": true,
+      "ipv4_available": true,
+      "ipv4_failure": "none",
+      "ipv4_primary_failure": "none",
+      "ipv6_available": true,
+      "ipv6_failure": "none",
+      "ipv6_literal_connect_attempted": true,
+      "ipv6_literal_connected": true,
+      "ipv6_literal_egress_port_control_connected": true,
+      "ipv6_literal_egress_port_control_failure": "none",
+      "ipv6_literal_failure": "none",
+      "probe_complete": true,
+      "process_uid_matches_target": true,
+      "test_internet_permission_declared": true,
+      "vpn_dns_configured": false
+    },
+    {
+      "active_network_available": true,
+      "active_network_is_vpn": true,
+      "active_network_validated": true,
+      "active_transport_cellular": false,
+      "active_transport_wifi": true,
+      "application_initialized": true,
+      "dns_failure": "none",
+      "egress_is_staging": true,
+      "fixed_udp_dns_response": true,
+      "ipv4_available": true,
+      "ipv4_failure": "none",
+      "ipv4_primary_failure": "none",
+      "ipv6_available": false,
+      "ipv6_failure": "io",
+      "ipv6_literal_connect_attempted": true,
+      "ipv6_literal_connected": false,
+      "ipv6_literal_failure": "io",
+      "probe_complete": true,
+      "process_uid_matches_target": true,
+      "test_internet_permission_declared": true,
+      "vpn_dns_configured": true
+    },
+    {
+      "application_initialized": true,
+      "dns_failure": "none",
+      "fixed_udp_dns_response": true,
+      "probe_complete": true,
+      "process_uid_matches_target": true,
+      "test_internet_permission_declared": true
+    },
+    {
+      "application_initialized": true,
+      "egress_is_staging": true,
+      "ipv4_available": true,
+      "ipv4_failure": "none",
+      "ipv4_primary_failure": "timeout",
+      "ipv4_used_fallback": true,
+      "probe_complete": true,
+      "process_uid_matches_target": true,
+      "test_internet_permission_declared": true
+    },
+    {
+      "application_initialized": true,
+      "egress_is_staging": true,
+      "ipv4_available": true,
+      "ipv4_failure": "none",
+      "ipv4_primary_failure": "none",
+      "probe_complete": true,
+      "process_uid_matches_target": true,
+      "test_internet_permission_declared": true
+    },
+    {
+      "active_network_available": true,
+      "active_network_is_vpn": false,
+      "active_network_validated": true,
+      "active_transport_cellular": false,
+      "active_transport_wifi": true,
+      "application_initialized": true,
+      "dns_failure": "none",
+      "egress_is_staging": false,
+      "fixed_udp_dns_response": true,
+      "ipv4_available": true,
+      "ipv4_failure": "none",
+      "ipv4_primary_failure": "none",
+      "ipv6_available": true,
+      "ipv6_failure": "none",
+      "ipv6_literal_connect_attempted": true,
+      "ipv6_literal_connected": true,
+      "ipv6_literal_egress_port_control_connected": true,
+      "ipv6_literal_egress_port_control_failure": "none",
+      "ipv6_literal_failure": "none",
+      "probe_complete": true,
+      "process_uid_matches_target": true,
+      "test_internet_permission_declared": true,
+      "vpn_dns_configured": false
+    }
+  ],
+  "independent_unprivileged_remote_postcheck": true,
+  "last_probe_runner": {
+    "aborted_marker_seen": false,
+    "adb_exit_code": 0,
+    "category": "completed",
+    "completion_marker_seen": true,
+    "instrumentation_result_line_count": 23,
+    "last_stage": "completed"
+  },
+  "ledger_consistent": true,
+  "measured_at": "2026-10-31T18:20:53.558865+00:00",
+  "native_egress_after_probe": {
+    "handshake_age": 8,
+    "network": true,
+    "remaining_ms": 78620,
+    "up": true
+  },
+  "native_egress_before_probe": {
+    "handshake_age": 1,
+    "network": true,
+    "remaining_ms": 77827,
+    "up": true
+  },
+  "node_before_cleanup": {
+    "agent_active": true,
+    "byte_quota_exhausted": [],
+    "live_slots": [],
+    "native_transfer_bytes": [
+      {
+        "received": "0",
+        "sent": "0",
+        "slot": 1
+      },
+      {
+        "received": "0",
+        "sent": "0",
+        "slot": 2
+      }
+    ],
+    "peer_counts": [
+      0,
+      0
+    ],
+    "prepared": true,
+    "remaining_seconds": 1366,
+    "slot_count": 2
+  },
+  "open_cases": [
+    "natural sleep and forced Doze",
+    "Wi-Fi/mobile transition",
+    "system VPN permission revoke",
+    "Disconnect during in-flight renewal",
+    "two simultaneous physical devices",
+    "independent provider failure",
+    "comprehensive DNS leak capture"
+  ],
+  "passed": true,
+  "quota_funding": "TEST FREE GRANT ONLY",
+  "receipt_count": 32,
+  "reserved_bytes": "0",
+  "scope": "bounded staging A, one physical Android, local disposable API/PostgreSQL",
+  "seed_package_installed": true,
+  "seed_postflight_checkpoint": "complete",
+  "seed_session_vault_present": true,
+  "seed_vpn_appop_set": true,
+  "source_sha256": {
+    "apps/android/app/src/androidTest/java/org/example/vpnpoc/I028Probe.java": "43d6612ceed71602b078226cf2f2baca3670030f7fbc7f292ff71115ca807695",
+    "apps/client/android/app/build.gradle.kts": "d0d230cd83bad22ac12956bab7599f3fc46d2104663f50e43233728fe250aa48",
+    "apps/client/android/app/gradle.lockfile": "21dee1dad17adbfbf6e00388bba1dd5780a3d6cc90d7ebfbfe1ccaa409987a10",
+    "apps/client/android/app/src/androidTest/java/org/example/vpnpoc/I028FlutterInstrumentationTest.java": "3fa15bf8f665526e016fa4b731921bbc81093fa97894bed225529fa95f3ad282",
+    "apps/client/android/app/src/main/java/org/example/vpnpoc/ClientActivity.java": "ebe40f8dc597ec5bde79d79394f3204093e123a21bf138636db0461ba0e348d2",
+    "apps/client/integration_test/i028_live_test.dart": "5e32d34fd904bf9dd82805578414998741143deb1393ee1084509e112c85330b",
+    "infra/staging-v3/dns_observer.py": "688dfba3c936ede754662632797e74149426452967ccb8c24a6b932e4cd186d1",
+    "infra/staging-v3/runtime.py": "c0a237bf6ba3751312cac796cbd858c6c4abc2ce64732799436598e0cff25363",
+    "scripts/i028_device_scenarios.py": "9fa824f5c2670674c999aef798ac213cf41e5b5566f82204d8870cb547463ae7",
+    "scripts/run_i028_staging.ps1": "8cb405f97b5c8846170e1de9f135eeb1d2d584176fd36b1a40d682ef81c9982e",
+    "services/api/tests/test_i028_live.py": "5d1565f80e399e01ec6d99962f3a7838c0d2a014c5efa8cb2771ba8fd24bb984"
+  },
+  "suite": "Egress",
+  "sustained_connection_after_probe": {
+    "available": true,
+    "budget_bytes": 1048576,
+    "generation": 15,
+    "lease_remaining_seconds": 89,
+    "state": "pending"
+  },
+  "sustained_connection_before_probe": {
+    "available": true,
+    "budget_bytes": 1048576,
+    "generation": 14,
+    "lease_remaining_seconds": 88,
+    "state": "pending"
+  },
+  "sustained_node_after_probe": {
+    "agent_active": true,
+    "available": true,
+    "byte_quota_exhausted": [
+      {
+        "exhausted": true,
+        "remaining_bytes": 0,
+        "slot": 1
+      }
+    ],
+    "live_slots": [
+      1
+    ],
+    "native_transfer_bytes": [
+      {
+        "received": "850228",
+        "sent": "13112476",
+        "slot": 1
+      },
+      {
+        "received": "0",
+        "sent": "0",
+        "slot": 2
+      }
+    ],
+    "peer_counts": [
+      1,
+      0
+    ]
+  },
+  "sustained_node_before_probe": {
+    "agent_active": true,
+    "available": true,
+    "byte_quota_exhausted": [
+      {
+        "exhausted": false,
+        "remaining_bytes": 1025904,
+        "slot": 1
+      }
+    ],
+    "live_slots": [
+      1
+    ],
+    "native_transfer_bytes": [
+      {
+        "received": "803428",
+        "sent": "12176532",
+        "slot": 1
+      },
+      {
+        "received": "0",
+        "sent": "0",
+        "slot": 2
+      }
+    ],
+    "peer_counts": [
+      1,
+      0
+    ]
+  },
+  "telegram": "TEST FAKE ONLY",
+  "temporary_staging_transport_and_phone_cleanup": true,
+  "vpn_dataplane_acceptance": false
+}

@@ -1,0 +1,137 @@
+{
+  "b_state_after_a_disconnect": "active",
+  "cleanup_steps": {
+    "device_0_restored": true,
+    "device_1_restored": true,
+    "independent_remote_postcheck": true,
+    "local_api_stopped": true,
+    "local_reverse_tunnel_closed": true,
+    "postcheck_resource_markers": [],
+    "postcheck_timer_state": "inactive",
+    "staging_a_closed": true
+  },
+  "cross_owner_revoke": {
+    "generation_unchanged": {
+      "a": true,
+      "b": true
+    },
+    "http_status": 404,
+    "state_after": {
+      "a": "active",
+      "b": "active"
+    },
+    "state_before": {
+      "a": "active",
+      "b": "active"
+    },
+    "window_unchanged": {
+      "a": true,
+      "b": true
+    }
+  },
+  "devices": [
+    {
+      "android_release": "17",
+      "model": "Pixel 8 Pro"
+    },
+    {
+      "android_release": "15",
+      "model": "25040RP0AG"
+    }
+  ],
+  "facts": {
+    "a_foreign_revoke_denied_b_unchanged": true,
+    "b_continues_after_a_disconnect": true,
+    "both_accounts_exact_settlement": true,
+    "both_devices_connected_distinct_windows_slots": true,
+    "both_devices_real_staging_egress": true,
+    "device_a_disconnected": true,
+    "device_b_disconnected": true,
+    "device_public_keys_distinct": true,
+    "first_device_connected": true
+  },
+  "initial_real_egress_probes": [
+    {
+      "active_network_available": true,
+      "active_network_is_vpn": true,
+      "active_network_validated": true,
+      "active_transport_cellular": true,
+      "active_transport_wifi": false,
+      "application_initialized": true,
+      "egress_is_staging": true,
+      "ipv4_available": true,
+      "ipv4_failure": "none",
+      "ipv4_primary_failure": "none",
+      "probe_complete": true,
+      "process_uid_matches_target": true,
+      "test_internet_permission_declared": true,
+      "vpn_dns_configured": true
+    },
+    {
+      "active_network_available": true,
+      "active_network_is_vpn": true,
+      "active_network_validated": true,
+      "active_transport_cellular": false,
+      "active_transport_wifi": true,
+      "application_initialized": true,
+      "egress_is_staging": true,
+      "ipv4_available": true,
+      "ipv4_failure": "none",
+      "ipv4_primary_failure": "none",
+      "probe_complete": true,
+      "process_uid_matches_target": true,
+      "test_internet_permission_declared": true,
+      "vpn_dns_configured": true
+    }
+  ],
+  "measured_at": "2026-10-29T10:15:52.469250+00:00",
+  "open_cases": [
+    "independent provider failure",
+    "comprehensive DNS/IPv6 packet capture"
+  ],
+  "passed": true,
+  "quota_funding": "TEST FREE GRANT ONLY",
+  "scope": "two physical Android devices, disposable local API/PostgreSQL, bounded staging A",
+  "settlement": {
+    "a": {
+      "measured_bytes": "245748",
+      "open_connections": 0,
+      "receipt_count": 1,
+      "reserved_bytes": "0",
+      "unknown_receipts": 0,
+      "unsettled_holds": 0
+    },
+    "b": {
+      "measured_bytes": "90439",
+      "open_connections": 0,
+      "receipt_count": 1,
+      "reserved_bytes": "0",
+      "unknown_receipts": 0,
+      "unsettled_holds": 0
+    }
+  },
+  "source_sha256": {
+    "apps/client/integration_test/i028_two_device_test.dart": "94c66a21248d3be9a99a3ce3723818575c5e1269fe21a78102d8ec21c5ccab06",
+    "infra/staging-v3/runtime.py": "dea3321d3c9181d27c01840b7a12f6c97bd46f3d5bdfac8aa53449ea0cb87b89",
+    "scripts/i028_two_device_driver.py": "cd77a00c92fd3d596f47c7b66e203f883dad090938c54adc510d8c74d3baa201",
+    "scripts/i028_two_device_preflight.py": "c2762c44c9d0cc3362a6a35106751f8588e71e4b97d550534b0d93b963e90476",
+    "scripts/run_i028_staging.ps1": "1f83587e13f99b9cae4daab21e5f6a922d297d91f8b6343cc3ed36a9767ba1d3",
+    "services/api/tests/test_i028_two_device_driver.py": "e29c05983c6bbb074ef6bf179248ecce3f4b0f8e44ad2361ea6f7bd47a7c0654",
+    "services/api/tests/test_i028_two_devices.py": "fba28a7cde8251bef6f158fa463ae43fde7683803b8f6d65d83034707123837b"
+  },
+  "staging_baseline": {
+    "agent_active": true,
+    "cleanup_complete": false,
+    "live_slots": [],
+    "peer_counts": [
+      0,
+      0
+    ],
+    "prepared": true,
+    "remaining_seconds": 1723,
+    "slot_count": 2
+  },
+  "staging_remaining_seconds_at_start": 1723,
+  "telegram": "TEST FAKE ONLY",
+  "vpn_dataplane_acceptance": false
+}

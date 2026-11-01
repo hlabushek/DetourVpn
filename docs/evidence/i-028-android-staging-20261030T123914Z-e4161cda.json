@@ -1,0 +1,274 @@
+{
+  "accounting_after_revoke": {
+    "ledger_consistent": true,
+    "measured_receipt_bytes": "10365298",
+    "open_connections": 0,
+    "receipt_count": 12,
+    "reserved_bytes": "0",
+    "unknown_receipts": 0,
+    "used_bytes": "10365298",
+    "violations": 0
+  },
+  "cleanup_steps": {
+    "agent_revoke_and_stop": true,
+    "isolated_i028_app_absent": true,
+    "local_api_stopped": true,
+    "owner_app_untouched": true,
+    "phone_restored": true,
+    "phone_session_absent": true,
+    "root_stop": {
+      "cleanup_complete": true,
+      "gate_close_errors_before_core_stop": 0,
+      "journal_preserved": true,
+      "temporary_grant_removed": true,
+      "timeout_timer_disarmed": true
+    },
+    "ssh_transport": true
+  },
+  "control_plane_settlement_complete": true,
+  "different_android_process_same_real_account_family_and_device": true,
+  "facts": {
+    "api_agent_loss_native_and_kernel_deadlines_close": true,
+    "disconnect_native_down_and_server_closed": true,
+    "included_probe_real_staging_ipv4_and_udp_dns": true,
+    "native_reports_fresh_handshake": true,
+    "real_account_refresh_after_android_process_restart": true,
+    "remote_revoke_stops_actual_android_tunnel": true,
+    "same_probe_uid_included_then_excluded_egress": true,
+    "sustained_real_renewals_over_three_minutes": true
+  },
+  "failed_at": "flutter_run",
+  "flutter_exit_code": 1,
+  "flutter_stage_marker_seen": true,
+  "independent_probes": [
+    {
+      "active_network_available": true,
+      "active_network_is_vpn": false,
+      "active_network_validated": true,
+      "active_transport_cellular": false,
+      "active_transport_wifi": true,
+      "application_initialized": true,
+      "dns_failure": "timeout",
+      "egress_is_staging": false,
+      "fixed_udp_dns_response": false,
+      "ipv4_available": true,
+      "ipv4_failure": "none",
+      "ipv4_primary_failure": "none",
+      "ipv6_available": false,
+      "ipv6_failure": "dns",
+      "probe_complete": true,
+      "process_uid_matches_target": true,
+      "test_internet_permission_declared": true,
+      "vpn_dns_configured": false
+    },
+    {
+      "active_network_available": true,
+      "active_network_is_vpn": true,
+      "active_network_validated": true,
+      "active_transport_cellular": false,
+      "active_transport_wifi": true,
+      "application_initialized": true,
+      "dns_failure": "none",
+      "egress_is_staging": true,
+      "fixed_udp_dns_response": true,
+      "ipv4_available": true,
+      "ipv4_failure": "none",
+      "ipv4_primary_failure": "timeout",
+      "ipv4_used_fallback": true,
+      "ipv6_available": false,
+      "ipv6_failure": "dns",
+      "probe_complete": true,
+      "process_uid_matches_target": true,
+      "test_internet_permission_declared": true,
+      "vpn_dns_configured": true
+    },
+    {
+      "application_initialized": true,
+      "egress_is_staging": true,
+      "ipv4_available": true,
+      "ipv4_failure": "none",
+      "ipv4_primary_failure": "none",
+      "probe_complete": true,
+      "process_uid_matches_target": true,
+      "test_internet_permission_declared": true
+    },
+    {
+      "application_initialized": true,
+      "egress_is_staging": true,
+      "ipv4_available": true,
+      "ipv4_failure": "none",
+      "ipv4_primary_failure": "none",
+      "probe_complete": true,
+      "process_uid_matches_target": true,
+      "test_internet_permission_declared": true
+    },
+    {
+      "application_initialized": true,
+      "egress_is_staging": true,
+      "ipv4_available": true,
+      "ipv4_failure": "none",
+      "ipv4_primary_failure": "none",
+      "probe_complete": true,
+      "process_uid_matches_target": true,
+      "test_internet_permission_declared": true
+    },
+    {
+      "application_initialized": true,
+      "egress_is_staging": true,
+      "ipv4_available": true,
+      "ipv4_failure": "none",
+      "ipv4_primary_failure": "none",
+      "probe_complete": true,
+      "process_uid_matches_target": true,
+      "test_internet_permission_declared": true
+    },
+    {
+      "application_initialized": true,
+      "egress_is_staging": true,
+      "ipv4_available": true,
+      "ipv4_failure": "none",
+      "ipv4_primary_failure": "none",
+      "probe_complete": true,
+      "process_uid_matches_target": true,
+      "test_internet_permission_declared": true
+    },
+    {
+      "application_initialized": true,
+      "egress_is_staging": true,
+      "ipv4_available": true,
+      "ipv4_failure": "none",
+      "ipv4_primary_failure": "none",
+      "probe_complete": true,
+      "process_uid_matches_target": true,
+      "test_internet_permission_declared": true
+    },
+    {
+      "application_initialized": true,
+      "egress_is_staging": true,
+      "ipv4_available": true,
+      "ipv4_failure": "none",
+      "ipv4_primary_failure": "none",
+      "probe_complete": true,
+      "process_uid_matches_target": true,
+      "test_internet_permission_declared": true
+    },
+    {
+      "application_initialized": true,
+      "egress_is_staging": true,
+      "ipv4_available": true,
+      "ipv4_failure": "none",
+      "ipv4_primary_failure": "none",
+      "probe_complete": true,
+      "process_uid_matches_target": true,
+      "test_internet_permission_declared": true
+    },
+    {
+      "application_initialized": true,
+      "egress_is_staging": false,
+      "ipv4_available": true,
+      "ipv4_failure": "none",
+      "ipv4_primary_failure": "none",
+      "probe_complete": true,
+      "process_uid_matches_target": true,
+      "test_internet_permission_declared": true
+    },
+    {
+      "active_network_available": true,
+      "active_network_is_vpn": true,
+      "active_network_validated": true,
+      "active_transport_cellular": false,
+      "active_transport_wifi": true,
+      "application_initialized": true,
+      "dns_failure": "timeout",
+      "egress_is_staging": false,
+      "fixed_udp_dns_response": false,
+      "ipv4_available": false,
+      "ipv4_failure": "timeout",
+      "ipv4_primary_failure": "timeout",
+      "ipv4_used_fallback": true,
+      "probe_complete": true,
+      "process_uid_matches_target": true,
+      "test_internet_permission_declared": true,
+      "vpn_dns_configured": true
+    }
+  ],
+  "independent_unprivileged_remote_postcheck": true,
+  "last_probe_runner": {
+    "aborted_marker_seen": false,
+    "adb_exit_code": 0,
+    "category": "completed",
+    "completion_marker_seen": true,
+    "instrumentation_result_line_count": 17,
+    "last_stage": "completed"
+  },
+  "last_sustained_native_observation": {
+    "handshake_age": 6,
+    "network": true,
+    "remaining_ms": 65616,
+    "up": true
+  },
+  "measured_at": "2026-10-30T12:31:36.729430+00:00",
+  "node_before_cleanup": {
+    "agent_active": true,
+    "live_slots": [
+      1
+    ],
+    "native_transfer_bytes": [
+      {
+        "received": "143588",
+        "sent": "850412",
+        "slot": 1
+      },
+      {
+        "received": "0",
+        "sent": "0",
+        "slot": 2
+      }
+    ],
+    "peer_counts": [
+      1,
+      0
+    ],
+    "prepared": true,
+    "remaining_seconds": 1168,
+    "slot_count": 2
+  },
+  "open_cases": [
+    "natural sleep and forced Doze",
+    "Wi-Fi/mobile transition",
+    "system VPN permission revoke",
+    "Disconnect during in-flight renewal",
+    "two simultaneous physical devices",
+    "independent provider failure",
+    "comprehensive DNS leak capture"
+  ],
+  "passed": false,
+  "phone_failure_stage": "recovery",
+  "quota_funding": "TEST FREE GRANT ONLY",
+  "scope": "bounded staging A, one physical Android, local disposable API/PostgreSQL",
+  "seed_package_installed": true,
+  "seed_postflight_checkpoint": "complete",
+  "seed_session_vault_present": true,
+  "seed_vpn_appop_set": true,
+  "source_sha256": {
+    "apps/android/app/src/androidTest/java/org/example/vpnpoc/I028Probe.java": "cd196afb1348f0eef72d63c5e0c0d09908eba7160e7510b400697a353f024485",
+    "apps/client/android/app/build.gradle.kts": "d0d230cd83bad22ac12956bab7599f3fc46d2104663f50e43233728fe250aa48",
+    "apps/client/android/app/gradle.lockfile": "21dee1dad17adbfbf6e00388bba1dd5780a3d6cc90d7ebfbfe1ccaa409987a10",
+    "apps/client/android/app/src/androidTest/java/org/example/vpnpoc/I028FlutterInstrumentationTest.java": "3fa15bf8f665526e016fa4b731921bbc81093fa97894bed225529fa95f3ad282",
+    "apps/client/android/app/src/main/java/org/example/vpnpoc/ClientActivity.java": "ebe40f8dc597ec5bde79d79394f3204093e123a21bf138636db0461ba0e348d2",
+    "apps/client/integration_test/i028_live_test.dart": "d43ddfdc2f4d86393a9097f1d99c7360b093f7394ae2fa187999eb0b48a86e20",
+    "infra/staging-v3/runtime.py": "dea3321d3c9181d27c01840b7a12f6c97bd46f3d5bdfac8aa53449ea0cb87b89",
+    "scripts/i028_device_scenarios.py": "9fa824f5c2670674c999aef798ac213cf41e5b5566f82204d8870cb547463ae7",
+    "scripts/run_i028_staging.ps1": "f614d77495ed7e6d8255d80f2f45fc279717f20124ba5c01d78a36a9381aa694",
+    "services/api/tests/test_i028_live.py": "1a967a6116d3fdb3640534fbad45fe300166792817e184709e1771bf6de15ed9"
+  },
+  "suite": "Main",
+  "sustained_acknowledged_generation": 8,
+  "sustained_renewal_server_check": {
+    "connection_present": true,
+    "generation": 8,
+    "state": "active"
+  },
+  "telegram": "TEST FAKE ONLY",
+  "temporary_staging_transport_and_phone_cleanup": true
+}

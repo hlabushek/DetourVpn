@@ -4,7 +4,11 @@ android {
     compileSdk = 36
     buildToolsVersion = "36.0.0"
     defaultConfig {
-        applicationId = "org.example.vpnpoc"
+        applicationId = if (providers.gradleProperty("i028ProbeIsolated").orNull == "true") {
+            "org.example.vpnpoc.i028"
+        } else {
+            "org.example.vpnpoc"
+        }
         minSdk = 24
         targetSdk = 36
         versionCode = 1

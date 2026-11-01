@@ -287,6 +287,14 @@ public final class ClientApplication extends Application implements Tunnel {
         value.put("up", up); value.put("network", network);
         value.put("handshakeAge", handshake > 0 && handshake <= now ? now - handshake : -1L);
         value.put("remainingMs", Math.max(0, deadline - SystemClock.elapsedRealtime()));
+        try {
+            long transfer = up && provider.capabilities().contains("traffic-stats-advisory.v1")
+                    ? provider.transferBytes() : -1;
+            if (transfer >= 0) value.put("trafficBytes", transfer);
+            long received = up && provider.capabilities().contains("traffic-stats-advisory.v1")
+                    ? provider.receivedBytes() : -1;
+            if (received >= 0) value.put("receivedBytes", received);
+        } catch (RuntimeException | LinkageError ignored) { /* Advisory unavailable. */ }
         value.put("reason", reason);
         return value;
     }

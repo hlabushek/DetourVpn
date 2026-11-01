@@ -284,7 +284,69 @@ class _LoginScreenState extends State<LoginScreen> {
   final code = TextEditingController();
   Map<String, dynamic>? challenge;
   bool working = false;
+  bool restoringChallenge = true;
   String? error;
+
+  @override
+  void initState() {
+    super.initState();
+    unawaited(_restoreChallenge());
+  }
+
+  Map<String, dynamic>? _validChallenge(Map<String, dynamic>? value) {
+    if (value == null) return null;
+    final requestId = value['request_id'];
+    final verifier = value['verifier'];
+    final botUrl = value['bot_url'];
+    final expiresAt = value['expires_at'];
+    if (requestId is! String ||
+        !RegExp(
+          r'^[0-9a-fA-F]{8}-(?:[0-9a-fA-F]{4}-){3}[0-9a-fA-F]{12}$',
+        ).hasMatch(requestId) ||
+        verifier is! String ||
+        verifier.isEmpty ||
+        verifier.length > 128 ||
+        botUrl is! String ||
+        expiresAt is! String) {
+      return null;
+    }
+    final uri = Uri.tryParse(botUrl);
+    final expiry = DateTime.tryParse(expiresAt)?.toUtc();
+    if (uri == null ||
+        uri.scheme != 'https' ||
+        uri.host != 't.me' ||
+        uri.userInfo.isNotEmpty ||
+        uri.hasPort ||
+        expiry == null ||
+        !expiry.isAfter(DateTime.now().toUtc())) {
+      return null;
+    }
+    return {
+      'request_id': requestId,
+      'verifier': verifier,
+      'bot_url': botUrl,
+      'expires_at': expiry.toIso8601String(),
+    };
+  }
+
+  Future<void> _restoreChallenge() async {
+    try {
+      final saved = await widget.api.readPendingLogin();
+      final restored = _validChallenge(saved);
+      if (restored != null) {
+        challenge = restored;
+      } else if (saved != null) {
+        await widget.api.writePendingLogin(null);
+        error =
+            'Сохранённая попытка входа больше недействительна. Запросите новый код.';
+      }
+    } catch (_) {
+      error = 'Не удалось восстановить попытку входа. Запросите новый код.';
+    } finally {
+      if (mounted) setState(() => restoringChallenge = false);
+    }
+  }
+
   Future<void> perform(Future<void> Function() action) async {
     if (working) return;
     setState(() {
@@ -328,17 +390,24 @@ class _LoginScreenState extends State<LoginScreen> {
       ),
       const SizedBox(height: 24),
       FilledButton(
-        onPressed: working
+        onPressed: working || restoringChallenge
             ? null
             : () => perform(() async {
                 final value = await widget.api.call(
                   'POST',
                   '/api/v1/auth/start',
                 );
-                if (mounted) setState(() => challenge = value);
+                final pending = _validChallenge(value);
+                if (pending == null)
+                  throw const ClientError('invalid_response');
+                await widget.api.writePendingLogin(pending);
+                code.clear();
+                if (mounted) setState(() => challenge = pending);
               }),
         child: Text(
-          challenge == null
+          restoringChallenge
+              ? 'Восстановление входа…'
+              : challenge == null
               ? 'Войти через Telegram'
               : 'Получить новый код входа',
         ),
@@ -387,6 +456,7 @@ class _LoginScreenState extends State<LoginScreen> {
                           value,
                         )
                       : null;
+                  await widget.api.writePendingLogin(null);
                   await widget.api.acceptSession(value);
                   code.clear();
                   challenge = null;
@@ -423,6 +493,11 @@ class _LoginScreenState extends State<LoginScreen> {
       if (working)
         const Padding(
           padding: EdgeInsets.all(16),
+          child: LinearProgressIndicator(),
+        ),
+      if (restoringChallenge && !working)
+        const Padding(
+          padding: EdgeInsets.symmetric(horizontal: 16),
           child: LinearProgressIndicator(),
         ),
       if (error != null)

@@ -82,7 +82,9 @@ switch settings and wake. Do not reset an unrelated pre-existing override.
   VPN, DetourVpn and revokes/forgets its permission. Observe native down, server
   closure and settlement; wait beyond a renewal interval to exclude self-restart.
   Regrant requires a later explicit owner connect. `appops` is not this UI action.
-- DNS/IPv6: first demonstrate working direct IPv6 for the same probe UID. Use
+- DNS/IPv6 (descoped from the owner's I-028 completion checklist by ADR-072;
+  retained below only as a future product-release audit): first demonstrate
+  working direct IPv6 for the same probe UID. Use
   fixed synthetic requests and aggregate destination/port/family counts on an
   approved observation network, with no unrelated packets, DNS names or payload
   capture retained. Check included/excluded routing on connect, transitions and
@@ -99,14 +101,17 @@ switch settings and wake. Do not reset an unrelated pre-existing override.
   `scripts/i028_packet_audit.py` из корня репозитория:
 
   ```sh
-  sudo python3 scripts/i028_packet_audit.py --interface wlan0 --phase baseline --duration 90 --max-packets 2000
+  sudo python3 scripts/i028_packet_audit.py --interface wlan0 --phase baseline --duration 90
   ```
 
   Укажите интерфейс, смотрящий в сторону Wi-Fi клиентов, до NAT. Утилита
-  интерактивно запрашивает IPv4/IPv6 тестового телефона и IP VPN endpoint без
-  отображения ввода; не передавайте эти адреса аргументами командной строки.
+  интерактивно запрашивает IPv4/IPv6 тестового устройства и IP/порт VPN endpoint
+  без отображения ввода; не передавайте эти адреса аргументами командной строки.
   Она запускает `tcpdump` с пределом 256 байт на пакет, без записи PCAP, и
-  печатает только счётчики. Признак обрезанного IP-заголовка делает результат
+  печатает только счётчики egress по IPv4/IPv6, UDP/TCP, DNS-порту 53,
+  категориям глобального IPv6-порта (53/443/прочие) и заданному порту VPN
+  endpoint. Полные адреса и произвольные порты назначения в отчёт не попадают.
+  Признак обрезанного IP-заголовка делает результат
   непригодным для приёмки. Для
   `included` повторите окно с подключённым VPN, для `excluded` — с исключённой
   probe UID. Сначала нужен direct baseline с DNS и global IPv6, а затем отдельный
@@ -114,11 +119,67 @@ switch settings and wake. Do not reset an unrelated pre-existing override.
   `packet_limit_reached=true`, ошибке/прерывании захвата или неясном результате
   ничего не принимайте: сохраните только безопасные агрегаты и оставьте ворота
   открытыми. Утилита не выставляет pass/fail и не заменяет физическую проверку.
-- Two devices: connect and authorize two actual physical Android devices, keep
-  separate keys/accounts and disposable test sessions, compare windows/counters,
-  deny cross-owner operations, revoke one and verify the other still transfers.
-  The existing one-device runner deliberately refuses two devices; a dedicated
-  two-device driver must be implemented and reviewed before that scenario.
+  Чтобы точно совместить included-окно с работающим туннелем, запустите capture
+  перед Egress-тестом с `--wait-for-vpn`: helper отбросит все строки до первого
+  исходящего UDP-пакета к фиксированному I-028 endpoint, затем измерит только
+  заданную длительность. Он ждёт endpoint не более 240 секунд; отсутствие
+  trigger — непригодный результат, повторять тест без выяснения причины нельзя.
+  Например, на контролируемом Linux AP:
+
+  ```sh
+  sudo python3 scripts/i028_packet_audit.py --interface br-i028 --ap-interface wlx6083e7cb1a29 --phase included --wait-for-vpn --start-timeout 240 --duration 90
+  ```
+
+  Сразу после старта ожидания запустите физический `Test -Suite Egress` на
+  Windows. Pre-trigger трафик не включается в счётчики; endpoint trigger и
+  следующие 90 секунд входят в aggregate. Receipt печатает UTC-время на часах
+  capture-хоста и trigger; при временном сопоставлении проверьте синхронизацию
+  часов Windows/Linux. Tcpdump считает пакеты, совпавшие с фильтром, уже во
+  время ожидания trigger, хотя их заголовки отбрасываются из отчёта; поэтому
+  утилита по умолчанию ограничивает захват 20 000 пакетами. Если лимит достигнут,
+  capture неполный и не принимается. Текущий Egress runner после подтверждённого
+  renewal удерживает реальный туннель ещё 140 секунд и каждые 5 секунд проверяет
+  native path и renewal status; это предназначено для покрытия всего 90-секундного
+  post-trigger окна и stale-handshake status observation. Во время hold выполняется
+  одна фиксированная same-UID IPv4 probe; receipt сохраняет только bounded phase,
+  handshake age, lease, native up/network и факт недавнего RX-progress, без точного
+  RX-счётчика. `adr070_stale_handshake_connected_with_recent_inbound=true` доказывает
+  fallback только если одновременно есть sample с handshake age >60 секунд,
+  недавним RX-progress и фазой `connected`; отсутствие этого флага оставляет ADR-070
+  физически непроверенным, но не меняет scoped pass Egress. В следующем receipt всё
+  равно проверьте timestamps и состояние
+  туннеля на всём интервале: если тест завершился или туннель закрылся до конца
+  окна, capture остаётся диагностическим, а не acceptance. PCAP не создаётся.
+
+  Для excluded positive control используйте второе окно в том же Egress-тесте.
+  Сначала запустите included capture, затем Egress `Test`. Когда 90-секундный
+  included capture завершится, сразу запустите команду ниже в Linux AP, пока
+  Egress runner продолжает hold. Helper ждёт фиксированный DNS-пакет probe UID
+  (source port 42428), отбрасывает весь предшествующий трафик и считает только
+  следующие 30 секунд. В конце runner временно исключит probe UID и отправит
+  контрольные DNS/IPv6 запросы. Результат должен содержать положительные
+  `probe_dns_source_port_packets` и
+  `probe_baseline_ipv6_https_source_port_packets`; отсутствие trigger или
+  достижение packet limit делает capture непригодным.
+
+  ```sh
+  sudo python3 scripts/i028_packet_audit.py --interface br-i028 --ap-interface wlx6083e7cb1a29 --phase excluded --wait-for-excluded-probe --start-timeout 300 --duration 30
+  ```
+- Two devices: use `Build -Suite TwoDevices`, then run the read-only
+  `TwoDevicePreflight` with exactly two authorized physical Android devices.
+  `Test -Suite TwoDevices` repeats the preflight immediately before execution,
+  creates separate fake-OTP test identities and app sessions, and runs both
+  isolated Android instrumentation processes concurrently against two slots on
+  staging A. It records distinct public keys, users, devices, families, windows
+  and slots; performs an A-token `DELETE` for B's connection (which must return
+  404); confirms real probe traffic on both devices and continued B traffic
+  after A disconnects; then checks each account's exact settlement. It refuses
+  preexisting isolated app/probe-test packages, ADB reverse mappings and
+  Always-on/Lockdown policy. Cleanup removes only test packages absent from the
+  initial inventory and only reverse mappings it created. A lost device or
+  uncertain cleanup fails the receipt; the independent A cleanup deadline
+  remains the staging backstop. Local harness checks and read-only preflight do
+  not count as physical acceptance. Retain failed physical receipts unchanged.
   A Wi-Fi-only tablet is suitable for this simultaneous-device scenario; a SIM
   is needed only for cellular handover, which remains a separate test.
 - Provider failure: identify an existing separately approved independent provider
@@ -185,6 +246,13 @@ The runner refuses an existing client session, an always-on VPN,
 or a pre-existing ADB reverse port. It temporarily grants ACTIVATE_VPN to the
 test client and restores its prior app-op mode. It does not enable always-on.
 
+`Test -Suite TwoDevices` builds a separate probe UID as
+`org.example.vpnpoc.i028` with instrumentation package
+`org.example.vpnpoc.i028.test` (`-Pi028ProbeIsolated=true`). The legacy
+`org.example.vpnpoc` app is preserved and may remain installed; TwoDevices never
+replaces it. Preflight rejects either isolated package if already present, and
+cleanup removes the probe base APK only when this run installed it.
+
 Before server preparation, run the phone-only diagnostic:
 
 ```powershell
@@ -192,9 +260,16 @@ Before server preparation, run the phone-only diagnostic:
 ```
 
 It temporarily installs/removes only the independent test APK and requires no
-server, API, database or sudo. Inspect `direct_network_ready` separately from
-`passed`; this baseline is never VPN dataplane acceptance. The sanitized receipt
-is `docs/evidence/i-028-probe-after-startup-fix.json`.
+server, API, database or sudo. Keep Android Private DNS/system DNS on Automatic;
+do not set a custom resolver for this acceptance. Inspect both
+`direct_network_ready` and `direct_ipv6_ready` separately from `passed`; require
+the direct IPv6 and fixed UDP-DNS baseline before preparing staging. If hostname
+resolution reports `dns` while fixed UDP DNS succeeds, stop and diagnose the
+phone/AP resolver path; do not classify it as an IPv6 leak or block. This
+baseline is never VPN dataplane acceptance. Each Probe writes a
+new timestamped sanitized receipt, so previous measurements remain intact. If
+post-test IPv6 appears unavailable, run Probe before reconnecting Wi-Fi to
+preserve that state in the measurement.
 
 Only when the complete runner is built and the phone is ready:
 
@@ -294,8 +369,12 @@ old timer, and moves only fixed closed-release/node/state/run paths into a priva
 recoverable archive. Existing services/rules/keys, linked receipts, or ambiguous
 state refuse restart. The private journal and wrapper are retained; partial move
 failures preserve data for targeted audit. `/run` can require a cross-filesystem
-copy. The fresh installer then performs its ordinary preflight and creates a new
-30-minute deadline. Default install never silently overwrites the previous run.
+copy. After reboot, `/run` may have lost the old empty runtime directory while
+the persistent cleanup receipt remains; the archiver records that missing
+volatile source and stores an empty `run/` entry in the private archive. It still
+refuses symlinks or any active runtime state. The fresh installer then performs
+its ordinary preflight and creates a new 30-minute deadline. Default install
+never silently overwrites the previous run.
 
 The revised probe waits for application initialization. Its network-error fields
 are fixed categories, not raw exception text. The runner records node aggregate
@@ -315,12 +394,35 @@ license/security review boundaries.
 
 ## Two-device preflight (read-only)
 
-Run `scripts/run_i028_staging.ps1 -Action Build -Suite Main`, then
+Run `scripts/run_i028_staging.ps1 -Action Build -Suite TwoDevices`, then
 `scripts/run_i028_staging.ps1 -Action TwoDevicePreflight` while both intended
 physical Android devices are ADB-authorized. This validates exactly two physical
 devices, source-bound probe APK hashes, absence of isolated test packages, and
 absence of an existing Android Always-on VPN policy. It makes no device or
 staging changes and does not run a tunnel. The current receipt records the Pixel
-8 Pro and Wi-Fi-only tablet as ready; the tablet needs the base probe APK. The
-dedicated simultaneous-window, cross-owner denial and isolated-revoke driver is
-still required before starting an I-028 staging window.
+8 Pro and Wi-Fi-only tablet as ready; the tablet needs the base probe APK. This
+historical receipt is not current device state. Before `Install -Suite
+TwoDevices`, obtain a fresh read-only staging A status and confirm the old
+cleanup timer is inactive. Install never replaces an existing probe base APK;
+the harness requires its installed hash to match the source-bound artifact and
+preserves it if the hash differs. After Install, the physical harness requires at
+least 1,500 seconds remaining on the 30-minute cleanup timer, no live slots or
+peers, and two closed slots before it starts either Android session. Do not
+start the test if the status cannot be read or this bound fails.
+
+## I-028 fixed DNS path diagnostic
+
+`Egress` can collect the bounded node-side DNS observation described in
+ADR-068. Before staging, run the synthetic observer lab in private WSL net/mount
+namespaces and the full source-bound bootstrap lab; the latter writes the new
+`docs/evidence/i-028-bootstrap-local-dns-observer.json` without replacing the
+older receipt. Build with `-Action Build -Suite Egress`. The owner then stages
+the updated fixed operator via `-Action Stage -Suite Egress -RestartClosed`,
+and only after successful staging starts `Install` and `Test` as one guarded
+PowerShell block. The fixed DNS observation requires tcpdump and GNU timeout on
+staging; the installer does not install these packages. A missing dependency
+makes only the observation incomplete and records a fixed error category.
+The `dns-observe` verb accepts no capture parameters, and no raw captures or
+DNS question/answer data are saved. Failed synchronization or missing counters
+is inconclusive, not proof of a network drop. This diagnostic does not meet the
+separate pre-NAT DNS/IPv6 leak-audit requirement.

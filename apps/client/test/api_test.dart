@@ -7,8 +7,9 @@ import 'package:vpn_client/api.dart';
 import 'package:vpn_client/session_store.dart';
 
 // TEST ONLY in-memory persistence, not an Android Keystore proof.
-class MemoryStore implements SessionStore {
+class MemoryStore implements SessionStore, PendingLoginStore {
   Map<String, dynamic>? value;
+  Map<String, dynamic>? pendingLogin;
   final writes = <Map<String, dynamic>?>[];
   bool fail = false;
   @override
@@ -18,6 +19,15 @@ class MemoryStore implements SessionStore {
     if (fail) throw StateError('TEST ONLY storage error');
     value = record;
     writes.add(record);
+  }
+
+  @override
+  Future<Map<String, dynamic>?> readPendingLogin() async => pendingLogin;
+
+  @override
+  Future<void> writePendingLogin(Map<String, dynamic>? record) async {
+    if (fail) throw StateError('TEST ONLY storage error');
+    pendingLogin = record;
   }
 }
 
@@ -93,6 +103,24 @@ void main() {
       expect(store.value, null);
     },
   );
+  test('pending login challenge is separate and can be erased', () async {
+    final store = MemoryStore();
+    final api = Api(Uri.parse('https://example.invalid'), store: store);
+    final challenge = {
+      'request_id': 'TEST ONLY REQUEST ID',
+      'verifier': 'TEST ONLY VERIFIER',
+      'bot_url': 'https://t.me/example_bot',
+      'expires_at': '2030-01-01T00:00:00Z',
+    };
+
+    await api.writePendingLogin(challenge);
+
+    expect(await api.readPendingLogin(), challenge);
+    expect(store.value, isNull);
+    await api.writePendingLogin(null);
+    expect(await api.readPendingLogin(), isNull);
+    api.close();
+  });
   test('origin mismatch erases without sending a refresh request', () async {
     final store = MemoryStore()
       ..value = {

@@ -2,10 +2,13 @@
 
 import hashlib
 import importlib.util
+import io
 import json
 import os
 import secrets
+import select
 import shutil
+import signal
 import ssl
 import subprocess
 import sys
@@ -51,7 +54,10 @@ def main() -> int:
     report["source_hashes"] = {
         name: hashlib.sha256((ROOT / name).read_text().encode()).hexdigest()
         for name in (
+            "scripts/check_i028_bootstrap.py",
+            "infra/staging-v3/install.sh",
             "infra/staging-v3/runtime.py",
+            "infra/staging-v3/dns_observer.py",
             "infra/staging-v3/archive_closed.py",
             "infra/staging-v3/tls_relay.py",
             "services/node-agent/window_gate.py",
@@ -104,6 +110,7 @@ def main() -> int:
         for name in ("window_gate.py", "window_peer.py"):
             shutil.copyfile(ROOT / "services/node-agent" / name, lab / name)
         shutil.copyfile(ROOT / "infra/staging-v3/tls_relay.py", lab / "tls_relay.py")
+        shutil.copyfile(ROOT / "infra/staging-v3/dns_observer.py", lab / "dns_observer.py")
 
         def service(name: str, command: list[str], *, tls: bool = False) -> None:
             del tls
@@ -212,6 +219,7 @@ def main() -> int:
             web = lab / "web"
             web.mkdir()
             (web / "probe").write_text("I028 LOCAL SYNTHETIC PACKETS ONLY\n")
+            (web / "large").write_bytes(b"X" * (2 * 1048576))
             service(
                 "http",
                 [
@@ -348,6 +356,110 @@ def main() -> int:
                 if not udp_dns():
                     raise RuntimeError("udp_dns_forward_probe_failed")
                 report["real_udp_dns_packets_through_awg_and_double_nat"] = True
+                stage = "dns_observation_real_awg"
+                observer_spec = importlib.util.spec_from_file_location(
+                    "i028_dns_observer", ROOT / "infra/staging-v3/dns_observer.py"
+                )
+                if observer_spec is None or observer_spec.loader is None:
+                    raise RuntimeError("dns_observer_missing")
+                observer = importlib.util.module_from_spec(observer_spec)
+                observer_spec.loader.exec_module(observer)
+                read_fd, write_fd = os.pipe()
+                try:
+                    def issue_observed_dns() -> None:
+                        report["dns_observer_started"] = True
+                        fixed_query = DNS_QUERY.replace(
+                            "s.settimeout(2);s.connect",
+                            "s.bind(('10.203.71.2',42428));s.settimeout(2);s.connect",
+                        )
+                        output = call(
+                            [ip, "netns", "exec", "i028client", sys.executable, "-c", fixed_query]
+                        )
+                        if output.strip() != "I028 LOCAL DNS PASS":
+                            raise RuntimeError("observed_dns_probe_failed")
+                        os.write(write_fd, b"done\n")
+                        report["dns_observer_query_completed"] = True
+
+                    with os.fdopen(read_fd, "rb") as stop_stream:
+                        try:
+                            observed = observer.observe(1, issue_observed_dns, stop_stream)
+                        except observer.ObservationError as exc:
+                            allowed = {
+                                "capture_linktype_unavailable", "capture_linktype_unsupported",
+                                "capture_unavailable", "capture_not_ready", "capture_ended_early",
+                                "capture_sync_timeout", "capture_sync_invalid",
+                                "packet_header_invalid", "packet_filter_mismatch",
+                                "capture_completion_unknown", "capture_incomplete",
+                                "capture_stream_closed", "capture_output_limit",
+                            }
+                            report["dns_observer_error"] = (
+                                str(exc) if str(exc) in allowed else "other"
+                            )
+                            raise
+                    expected = {"inbound": 1, "outbound": 1}
+                    if observed.get("counts") != {"tunnel": expected, "uplink": expected}:
+                        report["dns_observer_synthetic_counts"] = observed.get("counts")
+                        raise RuntimeError("dns_observation_incorrect")
+                    report["dns_observer_real_awg_two_points"] = True
+                finally:
+                    os.close(write_fd)
+                stage = "dns_observation_operator_protocol"
+                input_read, input_write = os.pipe()
+                output_read, output_write = os.pipe()
+                child = os.fork()
+                if child == 0:
+                    try:
+                        os.close(input_write)
+                        os.close(output_read)
+                        os.dup2(input_read, 0)
+                        os.dup2(output_write, 1)
+                        os.close(input_read)
+                        os.close(output_write)
+                        sys.stdin = io.TextIOWrapper(os.fdopen(0, "rb", buffering=0))
+                        sys.stdout = io.TextIOWrapper(os.fdopen(1, "wb", buffering=0))
+                        sys.argv = ["fixed-test-helper", "dns-observe"]
+                        os._exit(runtime.main())
+                    except BaseException:
+                        os._exit(1)
+                os.close(input_read)
+                os.close(output_write)
+                child_waited = False
+                try:
+                    with os.fdopen(output_read, "rb") as stream:
+                        if not select.select([stream], [], [], 8)[0]:
+                            raise RuntimeError("dns_operator_not_ready")
+                        if stream.readline(256) != b'{"ready":true}\n':
+                            raise RuntimeError("dns_operator_not_ready")
+                        fixed_query = DNS_QUERY.replace(
+                            "s.settimeout(2);s.connect",
+                            "s.bind(('10.203.71.2',42428));s.settimeout(2);s.connect",
+                        )
+                        output = call(
+                            [ip, "netns", "exec", "i028client", sys.executable, "-c", fixed_query]
+                        )
+                        if output.strip() != "I028 LOCAL DNS PASS":
+                            raise RuntimeError("dns_operator_probe_failed")
+                        os.write(input_write, b"done\n")
+                        if not select.select([stream], [], [], 8)[0]:
+                            raise RuntimeError("dns_operator_result_timeout")
+                        value = json.loads(stream.readline(4096))
+                        if value.get("complete") is not True or value.get("counts") != {
+                            "tunnel": expected, "uplink": expected
+                        }:
+                            raise RuntimeError("dns_operator_result_invalid")
+                    _, child_status = os.waitpid(child, 0)
+                    child_waited = True
+                    if os.waitstatus_to_exitcode(child_status) != 0:
+                        raise RuntimeError("dns_operator_failed")
+                    report["dns_observer_fixed_operator_protocol"] = True
+                finally:
+                    os.close(input_write)
+                    if not child_waited:
+                        try:
+                            os.kill(child, signal.SIGKILL)
+                        except ProcessLookupError:
+                            pass
+                        os.waitpid(child, 0)
                 report["dns_responder_is_local_synthetic_only"] = True
                 stage = "private_slot_metadata_isolation"
                 if curl("http://10.203.80.6:8080/probe") or curl(
@@ -360,6 +472,52 @@ def main() -> int:
                 current.close()
                 if current.closed_bytes() <= 0 or curl("http://8.8.8.8:8080/probe") or udp_dns():
                     raise RuntimeError("closed_gate_still_transfers")
+                stage = "real_byte_budget_exhaustion"
+                current.install_closed(1048576)
+                current.open(15000)
+                if runtime.quota_exhausted(current) is not False:
+                    raise RuntimeError("budget_lab_initial_quota_invalid")
+                call(
+                    [
+                        ip, "netns", "exec", "i028client", "/usr/bin/curl",
+                        "--fail", "--silent", "--max-time", "3", "--output", "/dev/null",
+                        "http://8.8.8.8:8080/large",
+                    ],
+                    required=False,
+                )
+                stage = "budget_live_after_bulk"
+                if not current.is_live():
+                    raise RuntimeError("budget_lab_deadline_expired")
+                stage = "budget_block_probe"
+                if curl("http://8.8.8.8:8080/probe") or udp_dns():
+                    raise RuntimeError("budget_lab_traffic_not_blocked")
+                stage = "budget_live_after_probe"
+                if not current.is_live():
+                    raise RuntimeError("budget_lab_deadline_expired")
+                quota_rows = [
+                    row["quota"]
+                    for row in json.loads(current.nft(
+                        ["-j", "list", "quota", "inet", "detour_window_v3", "budget"]
+                    ))["nftables"]
+                    if "quota" in row
+                ]
+                if (
+                    len(quota_rows) != 1
+                    or quota_rows[0].get("bytes") != 1048576
+                    or type(quota_rows[0].get("used")) is not int
+                    or quota_rows[0]["used"] < 1048576
+                ):
+                    raise RuntimeError("budget_lab_quota_not_exhausted")
+                if runtime.quota_exhausted(current) is not True:
+                    raise RuntimeError("budget_lab_exhaustion_diagnostic_invalid")
+                report["real_byte_budget_quota_object"] = quota_rows[0]
+                current.close()
+                final_bytes = current.closed_bytes()
+                report["real_byte_budget_closed_meter_bytes"] = final_bytes
+                stage = "budget_final_meter"
+                if not 0 < final_bytes <= 1048576:
+                    raise RuntimeError("budget_lab_unexpected_final_meter")
+                report["real_byte_budget_blocks_traffic_while_gate_timer_live"] = True
                 current.install_closed(1048576)
                 current.open(200)
                 time.sleep(0.4)
@@ -370,12 +528,22 @@ def main() -> int:
             finally:
                 current.dispose()
             stage = "cleanup"
-            if runtime.cleanup().get("cleanup_complete") is not True:
+            first_cleanup = runtime.cleanup()
+            if (
+                first_cleanup.get("cleanup_complete") is not True
+                or first_cleanup.get("timeout_timer_disarmed") is not True
+                or first_cleanup.get("gate_close_errors_before_core_stop") != 0
+            ):
                 raise RuntimeError("cleanup_failed")
             if supervision["timeout_active"]:
                 raise RuntimeError("old_timer_still_active")
             supervision["timeout_active"] = True  # Older closed run can retain its timer.
-            if runtime.cleanup().get("cleanup_complete") is not True:
+            retry_cleanup = runtime.cleanup()
+            if (
+                retry_cleanup.get("cleanup_complete") is not True
+                or retry_cleanup.get("timeout_timer_disarmed") is not True
+                or retry_cleanup.get("gate_close_errors_before_core_stop") != 0
+            ):
                 raise RuntimeError("cleanup_not_idempotent")
             if supervision["timeout_active"]:
                 raise RuntimeError("idempotent_cleanup_left_old_timer")
@@ -470,14 +638,70 @@ def main() -> int:
                 raise RuntimeError("private_archive_preservation_failed")
             report["real_closed_archive_preserves_private_files_and_refuses_unsafe_state"] = True
             report["real_archive_copies_private_run_tmpfs_to_persistent_filesystem"] = True
+
+            reboot_fixture = lab / "closed-archive-after-reboot"
+            reboot_fixture.mkdir(mode=0o700)
+            archiver.SOURCES = {
+                name: reboot_fixture / name for name in ("release", "node", "state", "run")
+            }
+            for label, path in archiver.SOURCES.items():
+                if label != "run":
+                    path.mkdir(mode=0o700)
+            reboot_marker = archiver.SOURCES["state"] / "i028-cleanup.json"
+            reboot_marker.write_text('{"cleanup_complete":true}')
+            archiver.HELPER = reboot_fixture / "control-wrapper"
+            archiver.HELPER.write_text("TEST ONLY INERT WRAPPER")
+            archiver.ARCHIVES = reboot_fixture / "archives"
+            archiver.ABSENT = (reboot_fixture / "absent-runtime",)
+            reboot_archive = archiver.archive_closed()
+            reboot_metadata = json.loads((reboot_archive / "archive.json").read_text())
+            if (
+                not (reboot_archive / "run").is_dir()
+                or any((reboot_archive / "run").iterdir())
+                or reboot_metadata.get("missing_sources") != ["run"]
+                or archiver.SOURCES["run"].exists()
+            ):
+                raise RuntimeError("rebooted_archive_did_not_record_missing_run")
+            report["rebooted_closed_archive_records_absent_volatile_run"] = True
+
+            symlink_fixture = lab / "closed-archive-dangling-run-link"
+            symlink_fixture.mkdir(mode=0o700)
+            archiver.SOURCES = {
+                name: symlink_fixture / name for name in ("release", "node", "state", "run")
+            }
+            for label, path in archiver.SOURCES.items():
+                if label != "run":
+                    path.mkdir(mode=0o700)
+            (archiver.SOURCES["state"] / "i028-cleanup.json").write_text(
+                '{"cleanup_complete":true}'
+            )
+            archiver.SOURCES["run"].symlink_to(symlink_fixture / "missing-run-target")
+            archiver.HELPER = symlink_fixture / "control-wrapper"
+            archiver.HELPER.write_text("TEST ONLY INERT WRAPPER")
+            archiver.ARCHIVES = symlink_fixture / "archives"
+            archiver.ABSENT = (symlink_fixture / "absent-runtime",)
+            try:
+                archiver.archive_closed()
+            except archiver.Refused:
+                pass
+            else:
+                raise RuntimeError("rebooted_archive_allowed_dangling_run_link")
+            report["rebooted_archive_still_refuses_dangling_run_link"] = True
             report["passed"] = True
-        except Exception:
+        except Exception as exc:
             report["failed_stage"] = stage
+            if stage == "dns_observation_real_awg":
+                report["dns_lab_exception_type"] = type(exc).__name__
+                allowed_errors = {
+                    "observed_dns_probe_failed", "dns_observer_missing", "dns_observation_incorrect"
+                }
+                if str(exc) in allowed_errors:
+                    report["dns_lab_failure"] = str(exc)
         finally:
             for name in list(processes):
                 stop(name)
     print(json.dumps(report, sort_keys=True))
-    (ROOT / "docs/evidence/i-028-bootstrap-local.json").write_text(
+    (ROOT / "docs/evidence/i-028-bootstrap-local-dns-observer.json").write_text(
         json.dumps(report, indent=2) + "\n"
     )
     return 0 if report["passed"] else 1

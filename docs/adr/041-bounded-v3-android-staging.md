@@ -62,6 +62,36 @@ not be replaced with the older v2 full-budget recovery policy from ADR-031.
 
 ## Separate physical lifecycle suite
 
+## Two-device native-ready and handshake probe ordering
+
+For the two-device harness, `native-ready` means only that the native interface,
+lease and underlying validated network are present. A fixed early probe may
+prompt WireGuard to handshake, but DNS/egress failure at this point is
+diagnostic and must not abort the test. The runner waits for both clients to
+report connected from a recent native handshake, then requires independent
+same-UID probes from both devices to confirm VPN routing and staging egress
+before any two-device acceptance fact is recorded. A missing connected barrier
+still fails at the existing bounded deadline; this changes no tunnel, DNS,
+admission or production behavior and does not weaken the egress gate.
+
+Remote teardown and its independent read-only post-check retry only after
+transport/command failure, with a hard limit of five attempts and ten seconds
+between attempts. The repeated operations are fixed and idempotent (`stop-agent`,
+`stop`, and the same timer/namespace/listener inspection). Exhaustion leaves the
+physical receipt failed; a separate cleanup observation cannot convert it to a
+pass.
+
+The idempotent cleanup-journal path returns the same timer-disarm and recorded
+gate-close fields as the first cleanup call. The private journal records the
+gate-close count so the caller does not infer a zero from a missing field.
+
+For a physical APK installation that returns Android's fixed
+`user_restricted` category, the two-device runner may retry the same
+source-hash-bound install once after five seconds only if `pm list packages`
+confirms that the exact isolated package is still absent. Other installer
+errors are not retried, and an installed package is accepted only after its
+APK hash matches the pinned artifact.
+
 `Test -Suite Lifecycle` uses the same disposable control plane and actual A
 runtime, with separate evidence and a fresh bounded installation after Main
 cleanup. Only its test driver changes the phone: background/screen off/forced

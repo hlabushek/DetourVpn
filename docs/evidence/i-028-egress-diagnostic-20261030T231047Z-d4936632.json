@@ -1,0 +1,325 @@
+{
+  "accounting_after_revoke": {
+    "ledger_consistent": true,
+    "measured_receipt_bytes": "2559859",
+    "open_connections": 0,
+    "receipt_count": 4,
+    "reserved_bytes": "1048576",
+    "unknown_receipts": 1,
+    "used_bytes": "2559859",
+    "violations": 0
+  },
+  "cleanup_steps": {
+    "agent_revoke_and_stop": true,
+    "isolated_i028_app_absent": true,
+    "local_api_stopped": true,
+    "owner_app_untouched": true,
+    "phone_restored": true,
+    "phone_session_absent": true,
+    "root_stop": {
+      "cleanup_complete": true,
+      "gate_close_errors_before_core_stop": 0,
+      "journal_preserved": true,
+      "temporary_grant_removed": true,
+      "timeout_timer_disarmed": true
+    },
+    "ssh_transport": true
+  },
+  "control_plane_settlement_complete": false,
+  "diagnostic_only": true,
+  "different_android_process_same_real_account_family_and_device": true,
+  "dns_observer_node_after": {
+    "agent_active": true,
+    "available": true,
+    "byte_quota_exhausted": [
+      {
+        "exhausted": false,
+        "remaining_bytes": 399896,
+        "slot": 1
+      }
+    ],
+    "live_slots": [
+      1
+    ],
+    "native_transfer_bytes": [
+      {
+        "received": "224276",
+        "sent": "2150684",
+        "slot": 1
+      },
+      {
+        "received": "0",
+        "sent": "0",
+        "slot": 2
+      }
+    ],
+    "peer_counts": [
+      1,
+      0
+    ]
+  },
+  "dns_observer_node_before": {
+    "agent_active": true,
+    "available": true,
+    "byte_quota_exhausted": [
+      {
+        "exhausted": false,
+        "remaining_bytes": 946252,
+        "slot": 1
+      }
+    ],
+    "live_slots": [
+      1
+    ],
+    "native_transfer_bytes": [
+      {
+        "received": "189236",
+        "sent": "1660684",
+        "slot": 1
+      },
+      {
+        "received": "0",
+        "sent": "0",
+        "slot": 2
+      }
+    ],
+    "peer_counts": [
+      1,
+      0
+    ]
+  },
+  "dns_path_action_state": "completed",
+  "dns_path_observation": {
+    "complete": true,
+    "counts": {
+      "tunnel": {
+        "inbound": 1,
+        "outbound": 1
+      },
+      "uplink": {
+        "inbound": 1,
+        "outbound": 1
+      }
+    },
+    "packet_loss": false,
+    "probe_response": true,
+    "timing_ms": {
+      "finish_ms": 700,
+      "probe_ms": 1600,
+      "ready_ms": 1100
+    }
+  },
+  "egress_connection_after_probe": {
+    "available": true,
+    "budget_bytes": 1048576,
+    "generation": 3,
+    "lease_remaining_seconds": 89,
+    "state": "pending"
+  },
+  "egress_connection_before_probe": {
+    "available": true,
+    "budget_bytes": 1048576,
+    "generation": 1,
+    "lease_remaining_seconds": 84,
+    "state": "active"
+  },
+  "egress_node_after_probe": {
+    "agent_active": true,
+    "available": true,
+    "byte_quota_exhausted": [
+      {
+        "exhausted": true,
+        "remaining_bytes": 0,
+        "slot": 1
+      }
+    ],
+    "live_slots": [
+      1
+    ],
+    "native_transfer_bytes": [
+      {
+        "received": "185572",
+        "sent": "1562452",
+        "slot": 1
+      },
+      {
+        "received": "0",
+        "sent": "0",
+        "slot": 2
+      }
+    ],
+    "peer_counts": [
+      1,
+      0
+    ]
+  },
+  "egress_node_before_probe": {
+    "agent_active": true,
+    "available": true,
+    "byte_quota_exhausted": [
+      {
+        "exhausted": false,
+        "remaining_bytes": 515193,
+        "slot": 1
+      }
+    ],
+    "live_slots": [
+      1
+    ],
+    "native_transfer_bytes": [
+      {
+        "received": "56692",
+        "sent": "450236",
+        "slot": 1
+      },
+      {
+        "received": "0",
+        "sent": "0",
+        "slot": 2
+      }
+    ],
+    "peer_counts": [
+      1,
+      0
+    ]
+  },
+  "facts": {
+    "advisory_traffic_renewal_requested": true,
+    "included_probe_real_staging_ipv4_and_udp_dns": true,
+    "native_reports_fresh_handshake": true,
+    "real_account_refresh_after_android_process_restart": true
+  },
+  "failed_at": "flutter_egress",
+  "flutter_exit_code": 1,
+  "flutter_stage_marker_seen": true,
+  "independent_probes": [
+    {
+      "active_network_available": true,
+      "active_network_is_vpn": false,
+      "active_network_validated": true,
+      "active_transport_cellular": false,
+      "active_transport_wifi": true,
+      "application_initialized": true,
+      "dns_failure": "none",
+      "egress_is_staging": false,
+      "fixed_udp_dns_response": true,
+      "ipv4_available": true,
+      "ipv4_failure": "none",
+      "ipv4_primary_failure": "none",
+      "ipv6_available": true,
+      "ipv6_failure": "none",
+      "probe_complete": true,
+      "process_uid_matches_target": true,
+      "test_internet_permission_declared": true,
+      "vpn_dns_configured": false
+    },
+    {
+      "active_network_available": true,
+      "active_network_is_vpn": true,
+      "active_network_validated": true,
+      "active_transport_cellular": false,
+      "active_transport_wifi": true,
+      "application_initialized": true,
+      "dns_failure": "none",
+      "egress_is_staging": true,
+      "fixed_udp_dns_response": true,
+      "ipv4_available": true,
+      "ipv4_failure": "none",
+      "ipv4_primary_failure": "none",
+      "ipv6_available": false,
+      "ipv6_failure": "dns",
+      "probe_complete": true,
+      "process_uid_matches_target": true,
+      "test_internet_permission_declared": true,
+      "vpn_dns_configured": true
+    },
+    {
+      "application_initialized": true,
+      "dns_failure": "none",
+      "fixed_udp_dns_response": true,
+      "probe_complete": true,
+      "process_uid_matches_target": true,
+      "test_internet_permission_declared": true
+    }
+  ],
+  "independent_unprivileged_remote_postcheck": true,
+  "last_probe_runner": {
+    "aborted_marker_seen": false,
+    "adb_exit_code": 0,
+    "category": "completed",
+    "completion_marker_seen": true,
+    "instrumentation_result_line_count": 6,
+    "last_stage": "completed"
+  },
+  "measured_at": "2026-10-30T23:08:57.074518+00:00",
+  "native_egress_after_probe": {
+    "handshake_age": 9,
+    "network": true,
+    "remaining_ms": 78259,
+    "up": true
+  },
+  "native_egress_before_probe": {
+    "handshake_age": 1,
+    "network": true,
+    "remaining_ms": 79447,
+    "up": true
+  },
+  "node_before_cleanup": {
+    "agent_active": true,
+    "byte_quota_exhausted": [],
+    "live_slots": [],
+    "native_transfer_bytes": [
+      {
+        "received": "0",
+        "sent": "0",
+        "slot": 1
+      },
+      {
+        "received": "0",
+        "sent": "0",
+        "slot": 2
+      }
+    ],
+    "peer_counts": [
+      0,
+      0
+    ],
+    "prepared": true,
+    "remaining_seconds": 1578,
+    "slot_count": 2
+  },
+  "open_cases": [
+    "natural sleep and forced Doze",
+    "Wi-Fi/mobile transition",
+    "system VPN permission revoke",
+    "Disconnect during in-flight renewal",
+    "two simultaneous physical devices",
+    "independent provider failure",
+    "comprehensive DNS leak capture"
+  ],
+  "passed": false,
+  "phone_failure_stage": "included_probe",
+  "quota_funding": "TEST FREE GRANT ONLY",
+  "scope": "bounded staging A, one physical Android, local disposable API/PostgreSQL",
+  "seed_package_installed": true,
+  "seed_postflight_checkpoint": "complete",
+  "seed_session_vault_present": true,
+  "seed_vpn_appop_set": true,
+  "source_sha256": {
+    "apps/android/app/src/androidTest/java/org/example/vpnpoc/I028Probe.java": "47e4c05d50c4c5f975d5490f4b5c5346de8c19fb4f54ef95f1c01050cc4d7e2e",
+    "apps/client/android/app/build.gradle.kts": "d0d230cd83bad22ac12956bab7599f3fc46d2104663f50e43233728fe250aa48",
+    "apps/client/android/app/gradle.lockfile": "21dee1dad17adbfbf6e00388bba1dd5780a3d6cc90d7ebfbfe1ccaa409987a10",
+    "apps/client/android/app/src/androidTest/java/org/example/vpnpoc/I028FlutterInstrumentationTest.java": "3fa15bf8f665526e016fa4b731921bbc81093fa97894bed225529fa95f3ad282",
+    "apps/client/android/app/src/main/java/org/example/vpnpoc/ClientActivity.java": "ebe40f8dc597ec5bde79d79394f3204093e123a21bf138636db0461ba0e348d2",
+    "apps/client/integration_test/i028_live_test.dart": "22c25c4a691663c9000a407c7e6d12f581a42787d2a2e76fab9f96620208593a",
+    "infra/staging-v3/dns_observer.py": "688dfba3c936ede754662632797e74149426452967ccb8c24a6b932e4cd186d1",
+    "infra/staging-v3/runtime.py": "c0a237bf6ba3751312cac796cbd858c6c4abc2ce64732799436598e0cff25363",
+    "scripts/i028_device_scenarios.py": "9fa824f5c2670674c999aef798ac213cf41e5b5566f82204d8870cb547463ae7",
+    "scripts/run_i028_staging.ps1": "9cf2211b4e5c5577416690122b58c3e14bf013b906246bbd67bef232f72b22cc",
+    "services/api/tests/test_i028_live.py": "596fcc017214c089f1060700c462557e4c89b7df70c9980054c80207e5000068"
+  },
+  "suite": "Egress",
+  "telegram": "TEST FAKE ONLY",
+  "temporary_staging_transport_and_phone_cleanup": true,
+  "vpn_dataplane_acceptance": false
+}

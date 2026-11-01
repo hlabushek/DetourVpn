@@ -1,0 +1,41 @@
+{
+  "issue": "I-030",
+  "observed_on": "2026-10-29",
+  "scope": "point-in-time read-only status inspection of the isolated beta API and VPN node",
+  "transport": {
+    "ssh_batch_mode": true,
+    "strict_host_key_checking": true,
+    "pinned_beta_identity": true,
+    "credentials_or_secret_values_emitted": false
+  },
+  "api_host": {
+    "api_service": "active",
+    "caddy_service": "active",
+    "internal_readiness_http": 200,
+    "readiness_contract_source": "local API readiness endpoint checks database connectivity, Alembic head, runtime-role least privilege, and primary-database state; it does not assert VPN or Telegram readiness"
+  },
+  "vpn_node_host": {
+    "node_agent_service": "active",
+    "slot_bootstrap_service": "active",
+    "core_slot_1_service": "active"
+  },
+  "beta_database_aggregate": {
+    "node_record_present": true,
+    "node_status": "active",
+    "runtime_identity_present": true,
+    "last_seen_age_seconds_by_database_clock": 0,
+    "nonclosed_peer_connection_count": 0,
+    "node_or_user_identifiers_emitted": false
+  },
+  "database_or_host_configuration_changed": false,
+  "remote_request_logging": "read-only queries may appear in host or database audit logs; logs were not inspected",
+  "not_verified": [
+    "External UDP ingress or a current peer handshake",
+    "Current Android user tunnel or egress",
+    "DNS/IPv6 packet privacy or pre-NAT capture",
+    "Independent-provider failure and recovery",
+    "Telegram delivery, friend invitation, or onboarding",
+    "Backup task schedule or restore recovery"
+  ],
+  "production_or_B_changed": false
+}

@@ -1,0 +1,83 @@
+{
+  "cleanup_steps": {
+    "device_0_restored": true,
+    "device_1_restored": true,
+    "local_api_stopped": true,
+    "staging_a_closed": false
+  },
+  "devices": [
+    {
+      "android_release": "17",
+      "model": "Pixel 8 Pro"
+    },
+    {
+      "android_release": "15",
+      "model": "25040RP0AG"
+    }
+  ],
+  "facts": {},
+  "failed_at": "i028_two_device_instrumentation_ended_before_barrier",
+  "measured_at": "2026-10-28T12:18:58.016157+00:00",
+  "open_cases": [
+    "independent provider failure",
+    "comprehensive DNS/IPv6 packet capture"
+  ],
+  "passed": false,
+  "quota_funding": "TEST FREE GRANT ONLY",
+  "run_flutter_diagnostics": {
+    "checkpoint": "connect_barrier_process_exit",
+    "processes": [
+      {
+        "exit_code": 1,
+        "log_present": true,
+        "process_index": 0,
+        "safe_categories": [
+          "test_failure"
+        ],
+        "safe_gradle_details": {
+          "failed_gradle_tasks": [],
+          "known_causes": []
+        },
+        "safe_markers": [
+          "i028_two_device_tunnel_not_confirmed"
+        ]
+      },
+      {
+        "exit_code": null,
+        "log_present": true,
+        "process_index": 1,
+        "safe_categories": [],
+        "safe_gradle_details": {
+          "failed_gradle_tasks": [],
+          "known_causes": []
+        },
+        "safe_markers": []
+      }
+    ]
+  },
+  "scope": "two physical Android devices, disposable local API/PostgreSQL, bounded staging A",
+  "source_sha256": {
+    "apps/client/integration_test/i028_two_device_test.dart": "cdcb8b5b5dccbfdf109355ec08f24be532e5e5ccc6518e777058acdfc8531a15",
+    "infra/staging-v3/runtime.py": "1898bb981c09b64f546a7b35635493d113e19f75c6f552fa10e0254552e24094",
+    "scripts/i028_two_device_driver.py": "b0ebfa7f6341fccc54f14eec154307aee09a6ca183f9d39c8a09016d292041f3",
+    "scripts/i028_two_device_preflight.py": "c2762c44c9d0cc3362a6a35106751f8588e71e4b97d550534b0d93b963e90476",
+    "scripts/run_i028_staging.ps1": "d128d14944bc99e3c1118d8f1a1b28498e7b96bf315cd1f6739ab3ef26b09890",
+    "services/api/tests/test_i028_two_device_driver.py": "0cb98c255f91ddf96629ffd314f221a82d1ac4a2c9e51e3b69412757f455d8fa",
+    "services/api/tests/test_i028_two_devices.py": "04f2fc9ba6b5fed12bcd3e345ba74d3626e9af530fe5df29b091f64e5067e9de"
+  },
+  "staging_baseline": {
+    "agent_active": true,
+    "cleanup_complete": false,
+    "live_slots": [],
+    "peer_counts": [
+      0,
+      0
+    ],
+    "prepared": true,
+    "remaining_seconds": 1732,
+    "slot_count": 2
+  },
+  "staging_remaining_seconds_at_start": 1732,
+  "telegram": "TEST FAKE ONLY",
+  "vpn_dataplane_acceptance": false
+}

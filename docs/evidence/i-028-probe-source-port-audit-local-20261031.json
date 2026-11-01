@@ -1,0 +1,38 @@
+{
+  "issue": "I-028",
+  "measured_at_utc": "2026-10-31",
+  "scope": "local test-only source-port attribution implementation and build; no physical run",
+  "probe_source_ports": {
+    "fixed_udp_dns": 42428,
+    "included_ipv6_https": 42429,
+    "direct_baseline_ipv6_https": 42430
+  },
+  "privacy": {
+    "raw_packet_capture_saved": false,
+    "packet_headers_or_addresses_in_receipt": false,
+    "source_port_counts_only": true,
+    "uid_wide_capture": false
+  },
+  "source_sha256": {
+    "apps/android/app/src/androidTest/java/org/example/vpnpoc/I028Probe.java": "4beb58ac294e0e776f4861425e8b5e2ba45616f3c07c3c57cd6a75ebeb2f1b2f",
+    "scripts/i028_packet_audit.py": "3d98882ab8d00fd324e440ee85d470da8c104f95295707ab3b82e3484fbb83cd",
+    "infra/ansible/tests/test_i028_packet_audit.py": "62744af719e1437dc2ec85cc6f4d37e3dab90bdd03252062a3a39f257de87f3d"
+  },
+  "source_bound_egress_build": {
+    "passed": true,
+    "input_count": 95,
+    "probe_test_apk_sha256": "9fbd764752fd381e925d5d84ed1943da8b0fba41bed19b11b2ff4e148390f386",
+    "probe_base_apk_sha256": "61006df375b245a808b779bdb5cbb02e1bfa44460737d0b61fe982f99a93481c",
+    "client_apk_sha256": "7357b5b62198add778ad3a1a8cf594f35ee04dfc061d0100b9f0aa8f829561aa"
+  },
+  "checks": {
+    "packet_audit_tests": "24 passed",
+    "diagnostic_sanitizer_tests": "36 passed",
+    "ruff": "passed",
+    "android_debug_and_instrumentation_apks": "BUILD SUCCESSFUL",
+    "git_diff_check": "passed"
+  },
+  "physical_validation_run": false,
+  "vpn_dataplane_acceptance": false,
+  "limitation": "Source-port counters identify only the fixed probe sockets, not all traffic from the Android UID. A physical direct-baseline positive control and included capture are still required."
+}

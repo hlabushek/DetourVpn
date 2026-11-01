@@ -1,0 +1,74 @@
+{
+  "issue": "I-019",
+  "mode": "full_two_host_failover",
+  "measured_at": "2026-10-31T22:28:56.504068+00:00",
+  "passed": false,
+  "telegram_delivery": "TEST FAKE ONLY",
+  "real_postgresql": true,
+  "physical_android": true,
+  "same_provider": false,
+  "provider_independence_verified": true,
+  "provider_independence_scope": "distinct_origin_asn",
+  "full_upstream_independence_verified": false,
+  "facts": {},
+  "cleanup": {
+    "45.10.166.106": {
+      "cleanup_complete": true,
+      "forwarding_restored": true,
+      "cleanup_receipt": {
+        "invocation_id": "257f5dd33a94433ba7d8d1fcad8d2383",
+        "events": [
+          {
+            "endpoint_ready": true,
+            "egress_verified": false
+          },
+          {
+            "cleanup_complete": true,
+            "restored": {
+              "containers": true,
+              "filter_nat": true,
+              "ipv6_filter": true,
+              "links": true,
+              "namespaces": true,
+              "routes4": true,
+              "routes6": true
+            }
+          }
+        ]
+      },
+      "owned_resources_absent": true,
+      "control_grant_retained_until_original_deadline": true
+    },
+    "150.241.99.227": {
+      "cleanup_complete": true,
+      "forwarding_restored": true,
+      "cleanup_receipt": {
+        "invocation_id": "622ea2070e6c460c9f9444ebb46be3e1",
+        "events": [
+          {
+            "endpoint_ready": true,
+            "egress_verified": false
+          },
+          {
+            "cleanup_complete": true,
+            "restored": {
+              "containers": true,
+              "filter_nat": true,
+              "ipv6_filter": true,
+              "links": true,
+              "namespaces": true,
+              "routes4": true,
+              "routes6": true
+            }
+          }
+        ]
+      },
+      "owned_resources_absent": true,
+      "control_grant_retained_until_original_deadline": true
+    }
+  },
+  "diagnostic_session": true,
+  "independent_probe_removed": false,
+  "phone_stopped_and_reverse_removed": false,
+  "failed_at": "preflight"
+}

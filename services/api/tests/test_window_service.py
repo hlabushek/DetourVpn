@@ -452,6 +452,16 @@ def test_http_v3_lifecycle_auth_replay_and_default_gate(harness: Harness, tmp_pa
         ).status_code
         == 404
     )
+    assert (
+        h.client.delete(
+            f"/api/v1/window-tunnels/{connection_id}", headers=headers(stranger)
+        ).status_code
+        == 404
+    )
+    still_active = h.client.get(
+        f"/api/v1/window-tunnels/{connection_id}", headers=headers(user.tokens)
+    )
+    assert still_active.status_code == 200 and still_active.json()["state"] == "active"
     response = h.client.delete(
         f"/api/v1/window-tunnels/{connection_id}", headers=headers(user.tokens)
     )

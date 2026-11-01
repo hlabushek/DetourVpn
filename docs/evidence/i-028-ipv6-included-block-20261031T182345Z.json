@@ -1,0 +1,62 @@
+{
+  "schema_version": 1,
+  "evidence_kind": "correlated_fixed_ipv6_probe_capture",
+  "source": "owner-pasted sanitized AP audit JSON; not independently signed",
+  "measured_at_utc": "2026-10-31T18:23:45.204354+00:00",
+  "physical_receipt": "i-028-egress-diagnostic-20261031T182523Z-91d07c8e.json",
+  "scope": "One fixed IPv6 TCP probe socket from the included Android test app during a bounded Wi-Fi AP capture.",
+  "scoped_result": "passed_same_port_ipv6_block_checkpoint",
+  "facts": {
+    "direct_probe_vpn_off": {
+      "active_network_is_vpn": false,
+      "active_network_validated": true,
+      "active_transport_wifi": true,
+      "ipv6_literal_connected": true,
+      "ipv6_literal_failure": "none",
+      "same_source_port_positive_control_connected": true
+    },
+    "included_probe": {
+      "active_network_is_vpn": true,
+      "active_network_validated": true,
+      "egress_is_staging": true,
+      "ipv4_available": true,
+      "fixed_udp_dns_response": true,
+      "ipv6_literal_connect_attempted": true,
+      "ipv6_literal_connected": false,
+      "ipv6_literal_failure": "io",
+      "same_source_port_as_positive_control": true
+    },
+    "capture": {
+      "phase": "included",
+      "phase_scope": "after_vpn_outer_trigger",
+      "client_filter_mode": "ap_station",
+      "vpn_outer_trigger_seen": true,
+      "vpn_outer_trigger_at_utc": "2026-10-31T18:22:15.017518+00:00",
+      "capture_started_at_utc": "2026-10-31T18:20:28.010152+00:00",
+      "capture_completed_at_utc": "2026-10-31T18:23:45.204354+00:00",
+      "duration_seconds": 90,
+      "bounded_window_ended": true,
+      "packet_count": 9902,
+      "packet_limit": 20000,
+      "packet_limit_reached": false,
+      "vpn_outer_endpoint_packets": 9898,
+      "vpn_outer_endpoint_udp_egress_packets": 9898,
+      "probe_ipv6_https_source_port": 42429,
+      "probe_ipv6_https_source_port_packets": 0,
+      "probe_dns_source_port_packets": 0,
+      "direct_dns_v4_packets": 0,
+      "global_ipv6_egress_packets": 4,
+      "global_ipv6_egress_tcp_packets": 4,
+      "global_ipv6_egress_udp_packets": 0,
+      "global_ipv6_egress_port_443_packets": 3,
+      "global_ipv6_egress_other_port_packets": 1,
+      "test_only": true
+    }
+  },
+  "limitations": [
+    "The capture was pasted by the operator and is not cryptographically signed; correlation uses the physical receipt and matching run times.",
+    "Four aggregate IPv6 packets were not attributed to an app or UID; this is not a device-wide IPv6 leak or leak-free finding.",
+    "This observes one fixed probe socket during one 90-second AP window, not all traffic, destinations, apps, transitions, or failure modes.",
+    "The Egress receipt remains diagnostic_only=true and vpn_dataplane_acceptance=false; broad DNS/IPv6 acceptance and overall I-028 closure remain open."
+  ]
+}

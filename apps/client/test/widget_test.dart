@@ -5,6 +5,7 @@ import 'package:vpn_client/main.dart';
 import 'package:vpn_client/connection_screen.dart' show ProfileScreen;
 import 'package:vpn_client/orbit_theme.dart';
 import 'package:vpn_client/api.dart';
+import 'package:vpn_client/session_store.dart';
 import 'package:vpn_client/quota_screen.dart';
 import 'package:vpn_client/orbit_widgets.dart';
 
@@ -12,14 +13,46 @@ import 'connection_test.dart' show FakeApi, FakeNative;
 
 // TEST ONLY API; no real login, credentials or network requests.
 class ShellApi extends Api {
-  ShellApi() : super(Uri.parse('https://example.invalid'));
+  ShellApi({SessionStore? store})
+    : super(Uri.parse('https://example.invalid'), store: store);
   final fake = FakeApi();
   @override
   Future<Map<String, dynamic>> call(
     String method,
     String path, [
     Map<String, dynamic>? body,
-  ]) => fake.call(method, path, body);
+  ]) {
+    if (method == 'POST' && path == '/api/v1/auth/start') {
+      return Future.value({
+        'request_id': '11111111-1111-4111-8111-111111111111',
+        'verifier': 'TEST ONLY VERIFIER',
+        'bot_url': 'https://t.me/example_bot?start=TEST_ONLY',
+        'expires_at': DateTime.now()
+            .toUtc()
+            .add(const Duration(minutes: 10))
+            .toIso8601String(),
+      });
+    }
+    return fake.call(method, path, body);
+  }
+}
+
+class _WidgetSessionStore implements SessionStore, PendingLoginStore {
+  Map<String, dynamic>? session;
+  Map<String, dynamic>? pendingLogin;
+
+  @override
+  Future<Map<String, dynamic>?> read() async => session;
+
+  @override
+  Future<void> write(Map<String, dynamic>? value) async => session = value;
+
+  @override
+  Future<Map<String, dynamic>?> readPendingLogin() async => pendingLogin;
+
+  @override
+  Future<void> writePendingLogin(Map<String, dynamic>? value) async =>
+      pendingLogin = value;
 }
 
 void main() {
@@ -95,6 +128,59 @@ void main() {
     expect(find.textContaining('API не настроен'), findsOneWidget);
     expect(find.text('Подключено'), findsNothing);
   });
+  testWidgets(
+    'pending login survives app recreation and expired challenge clears',
+    (tester) async {
+      final store = _WidgetSessionStore();
+      var api = ShellApi(store: store);
+      await tester.pumpWidget(VpnApp(api: api, native: FakeNative()));
+      await tester.pumpAndSettle();
+      await tester.ensureVisible(find.text('Войти через Telegram'));
+      await tester.tap(find.text('Войти через Telegram'));
+      await tester.pumpAndSettle();
+      expect(store.pendingLogin, isNotNull);
+      expect(find.text('Открыть бота в Telegram'), findsOneWidget);
+      expect(
+        find.byWidgetPredicate(
+          (widget) =>
+              widget is TextField &&
+              widget.decoration?.labelText == 'Код из Telegram',
+        ),
+        findsOneWidget,
+      );
+
+      await tester.pumpWidget(const SizedBox());
+      api = ShellApi(store: store);
+      await tester.pumpWidget(VpnApp(api: api, native: FakeNative()));
+      await tester.pumpAndSettle();
+      expect(find.text('Получить новый код входа'), findsOneWidget);
+      expect(find.text('Открыть бота в Telegram'), findsOneWidget);
+      final restoredCodeField = find.byWidgetPredicate(
+        (widget) =>
+            widget is TextField &&
+            widget.decoration?.labelText == 'Код из Telegram',
+      );
+      await tester.scrollUntilVisible(restoredCodeField, 200);
+      expect(restoredCodeField, findsOneWidget);
+
+      await tester.pumpWidget(const SizedBox());
+      store.pendingLogin!['expires_at'] = DateTime.now()
+          .toUtc()
+          .subtract(const Duration(seconds: 1))
+          .toIso8601String();
+      api = ShellApi(store: store);
+      await tester.pumpWidget(VpnApp(api: api, native: FakeNative()));
+      await tester.pumpAndSettle();
+      expect(find.text('Открыть бота в Telegram'), findsNothing);
+      expect(store.pendingLogin, isNull);
+      expect(
+        find.text(
+          'Сохранённая попытка входа больше недействительна. Запросите новый код.',
+        ),
+        findsOneWidget,
+      );
+    },
+  );
   testWidgets(
     'connected action disconnects; profile remains usable at large text',
     (tester) async {

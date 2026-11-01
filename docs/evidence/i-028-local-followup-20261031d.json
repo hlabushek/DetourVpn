@@ -1,0 +1,43 @@
+{
+  "issue": "I-028",
+  "measured_at_utc": "2026-10-31T11:05:42Z",
+  "scope": "local Egress harness follow-up after physical receipt 20261031T105725Z-e4575a58",
+  "physical_receipt": "i-028-egress-diagnostic-20261031T105725Z-e4575a58.json",
+  "packet_audit": "i-028-packet-audit-included-20261031T1057Z.json",
+  "diagnosis": {
+    "server_renewal_acknowledged": true,
+    "server_generation": 9,
+    "hold_same_uid_staging_ipv4_probe": true,
+    "phone_failure_stage": "egress_hold_client_not_connected",
+    "cleanup_complete": true,
+    "timeout_timer_disarmed": true,
+    "accounting_exact": true,
+    "client_phase_reason_at_failure": "not recorded; exact cause unresolved"
+  },
+  "local_change": {
+    "files": [
+      "apps/client/integration_test/i028_live_test.dart",
+      "services/api/tests/test_i028_live.py"
+    ],
+    "acceptance": "keep initial connected barrier; during the capture hold require acknowledged renewal, native up/network/lease, and either connected phase or a successful same-UID staging IPv4 probe",
+    "diagnostic": "record fixed client phase, error-present boolean, and bounded native snapshot after the hold probe; suppress diagnostic failures"
+  },
+  "build": {
+    "suite": "Egress",
+    "flutter_analyze": "passed",
+    "flutter_tests": "passed",
+    "android_client_apk": "passed",
+    "android_instrumentation_apk": "passed",
+    "python_compile_test_i028_live": "passed",
+    "git_diff_check": "passed; CRLF advisory only",
+    "source_hashes_match_ready": true,
+    "client_apk_sha256": "ba872b6fc01a8c6c4fb673e863534c3330b5461f2f538709d4c1b03b9049d126",
+    "probe_test_apk_sha256": "c27c0612bf03ccda51cfbd880c6f4f0a9b1f7d4697d551bcf531ac7266c3eecb"
+  },
+  "vpn_dataplane_acceptance": false,
+  "physical_followup_pending": true,
+  "limitations": [
+    "The AP capture is station-filtered and cannot attribute the single global IPv6 TCP/443 packet to the probe UID.",
+    "No production tunnel or connection-status behavior was changed."
+  ]
+}

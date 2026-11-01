@@ -121,6 +121,12 @@
 - Анти-DDoS: оценка L3/L4 mitigation провайдера; WAF/rate-limit только для API.
 - Регламент переноса пользователей без утери начисленной квоты.
 
+I-031: для закрытой beta сначала свести в операторский inventory уже имеющиеся
+VPN data nodes и включать их по одному. Текущий client/API уже поддерживает
+ручной выбор узла через root-owned window manifest; heartbeat/slot capacity
+задают честный статус каталога. Это не включает новые host/provider changes,
+автоматический failover или публичную доступность.
+
 **DoD:** физическое выключение узла А не портит баланс; узел Б продолжает обслуживать новые подключения; происходит ясное информирование пользователя.
 
 ## 9. Legal/payment/commercial gate (спринты 18–19; только после подтверждения)
@@ -364,10 +370,18 @@
   I-020 payment sandbox не начат; требует отдельного legal gate.
   Уточнение владельца 2026-10-22, ADR-033: текущий drill разрешён на двух
   существующих серверах одного провайдера (45.10.166.106 / 85.209.132.205).
-  Отказ провайдера остаётся отдельным открытым gate. Read-only SSH preflight
+  Это был отдельный same-provider gate. Read-only SSH preflight
   выполнен; pinned artifacts на B установлены и проверены (ok=14, failed=0).
   Bounded runner завершил drill и отозвал временные grants.
   История подготовки: docs/evidence/i-019-drill-preparation.json.
+
+- I-019 independent-provider gate: **принят 2026-11-01** по ADR-073/ADR-076.
+  Physical Android drill на A `45.10.166.106` и B `150.241.99.227` прошёл:
+  свежие egress A/B/A/B, expiry/recovery/cutoff, четыре settlement,
+  `reserved_bytes=0`, cleanup обоих hosts и удаление grants. Разные origin ASN
+  подтверждают ограниченную provider separation; полная upstream независимость
+  и automatic failover не проверялись. Receipt:
+  `docs/evidence/i-019-attempt-2df6394bc51e41e3b1fb066a1ba7e395.json`.
 
 ### Отдельная UI-задача владельца — Android Soft Orbit, 2026-10-22
 
@@ -494,6 +508,16 @@ DNS/IPv6 аудит, два физических устройства и отк�
 I-028 не закрыт. Временный staging A очищен, но свободного места ниже порога
 повторной установки; он не является beta-площадкой для друзей.
 
+Актуализация 2026-10-29: двухустройственный I-028 staging acceptance прошёл,
+receipt `docs/evidence/i-028-two-device-staging-20261029T101845Z-b0085c2a.json`.
+Pixel 8 Pro cellular и 25040RP0AG Wi-Fi использовали разные windows/slots и
+реальный staging egress; cross-owner revoke isolation, продолжение B после
+отключения A, точная сверка трафика и cleanup прошли. Ложный failed receipt
+предыдущего запуска сохранён без изменений. I-028 всё ещё открыт для полного
+packet-level DNS/IPv6 аудита и отказа независимого провайдера; независимая
+площадка пока не выбрана/не разрешена. Результат staging не означает готовность
+к production.
+
 Актуализация 2026-10-26, I-026: на собственном Android устройстве владелец
 прошёл live Telegram Mini App → OTP → Android sign-in happy path на отдельном
 beta-боте; Telegram работал через включённый владельцем Sota Connect. Telegram
@@ -509,9 +533,16 @@ Raw IDs, OTP и `initData` не читались; текущая сессия н
 так как VPN не запускали. I-026 принят только для owner-only login/replay scope;
 друзья и data plane не проверялись. Подробности: `docs/issues/I-026.md` и
 `docs/evidence/i-026-beta-live-delivery-receipt-20261026.json`.
-I-027 передача/restore зашифрованной копии с ПК и I-028 полный DNS/IPv6, второе
-физическое устройство и независимый провайдер по-прежнему блокируют приглашение
-друзей. Evidence I-026: `docs/evidence/i-026-live-miniapp-otp-20261026.json`.
+Актуальный статус на 2026-10-29: ручная передача зашифрованной копии и restore
+I-027 прошли. После ошибки доступа scheduled task исправлен: он использует
+текущего интерактивного пользователя с ограниченными правами, action и principal
+проверены повторной идемпотентной регистрацией. Исправленный плановый запуск ещё
+не подтверждён. См. `docs/evidence/i-027-beta-task-principal-20261029.json`. В I-028 отдельный
+двухустройственный физический критерий прошёл, но полный DNS/IPv6 packet audit и
+независимый-provider failure остаются открытыми по acceptance matrix. Эти остатки
+нельзя подменять старыми формулировками о непроверенном втором устройстве или
+провозглашать выполненными. См. `docs/beta-readiness-20261029.md` и evidence
+I-026: `docs/evidence/i-026-live-miniapp-otp-20261026.json`.
 
 1. Передать контекст (`TECHNICAL_SPEC.md`, ADR, `AGENTS.md`) и **одну** issue.
 2. Попросить 3–8 конкретных шагов, затрагиваемые файлы, риски, тесты; без немедленного огромного изменения.
@@ -544,3 +575,40 @@ I-027 передача/restore зашифрованной копии с ПК и 
 3. Какой способ входа обеспечивает надёжную идентичность без избыточных персональных данных и соответствует правилам платформ?
 
 Не начинать красивую геймификацию до завершения базового backend ledger и рабочего туннеля.
+
+Historical I-019 attempt `docs/evidence/i-019-attempt-5b914fde876e4c0e866bcce4729835f8.json`
+failed at B reconnect with four `dns` probe results and no fresh handshake
+despite the DNS-free trigger. The later successful attempt is recorded above;
+this earlier failure remains in the evidence archive for diagnosis history.
+
+Earlier I-019 attempt `docs/evidence/i-019-attempt-d16cc96c0cd54f59b940d98e4331bb41.json`
+failed at B reconnect without a fresh handshake. Its `other` probe result was
+the sanitizer's lost `dns` category; the DNS/handshake cause remains unknown.
+The sanitizer now retains all fixed categories (six diagnostic tests passed).
+Operator recovery and read-only checks confirmed B stopped and forwarding=0;
+independent-provider acceptance remains open.
+
+I-028 owner-scoped bounded staging disposition (updated 2026-11-01): per ADR-071, the
+personal VPN profile uses IPv4 and blocks included IPv6. The source-bound Egress
+receipt and correlated capture passed this bounded fixed-socket check. Per
+ADR-072, no further broad DNS/IPv6 audit is required to finish this personal
+staging checkpoint; this does not assert device-wide leak freedom or satisfy
+broader product-release requirements. The bounded independent-provider
+criterion passed on 2026-11-01 in
+`docs/evidence/i-019-attempt-2df6394bc51e41e3b1fb066a1ba7e395.json`: 15/15
+facts, fresh A/B egress, both recovery paths, four settlements, two full
+lost-counter debits, zero reserved bytes, and cleanup on both hosts. The report
+cap defect in earlier failed attempts was raised from 16 to 32 and
+regression-tested. This verifies distinct origin ASNs for the bounded run, not
+full upstream independence or automatic failover. ADR-072 keeps the broad
+packet audit deferred for this personal checkpoint; neither acceptance implies
+device-wide leak freedom or broader product-release readiness. The separate
+physical ADR-070 established-session status observation remains open. Earlier
+failed receipts remain preserved. Evidence:
+`docs/evidence/i-019-attempt-d17af2fd6b494e42a769f2ab53493771.json`,
+`docs/evidence/i-019-attempt-4817ce4af80647f492b4e9bcc1f2d4ba.json`,
+`docs/evidence/i-019-attempt-627387de1c87477bac1f3f71de8f5ca0.json`,
+`docs/evidence/i-019-attempt-5dcc929ff4cd47ae8fe3b58fb794773b.json`,
+`docs/evidence/i-019-staging.json`,
+`docs/evidence/i-019-b-reuse-diagnostic.json`, and
+`docs/evidence/i-019-session-cleanup.json`.

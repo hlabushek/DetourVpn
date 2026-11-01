@@ -20,7 +20,7 @@ def main() -> None:
         or Path("/proc/self/ns/net").stat().st_ino == Path("/proc/1/ns/net").stat().st_ino
     ):
         raise RuntimeError("fresh_local_wsl_network_namespace_required")
-    window.configure_i019("85.209.132.205")
+    window.configure_i019("150.241.99.227")
     before = window.i019_tables()
     if before:
         raise RuntimeError("fresh_empty_namespace_required")

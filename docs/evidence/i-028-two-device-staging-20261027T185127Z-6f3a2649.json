@@ -1,0 +1,58 @@
+{
+  "cleanup_steps": {
+    "device_0_restored": true,
+    "device_1_restored": true,
+    "independent_remote_postcheck": false,
+    "local_api_stopped": true,
+    "staging_a_closed": false
+  },
+  "devices": [],
+  "diagnostics": {
+    "phase": "seed",
+    "return_code": 1,
+    "safe_categories": [
+      "test_failure"
+    ],
+    "safe_gradle_details": {
+      "failed_gradle_tasks": [],
+      "known_causes": []
+    },
+    "safe_markers": [
+      "i028_two_device_local_cleanup_failed"
+    ]
+  },
+  "facts": {},
+  "failed_at": "i028_two_device_seed_failed",
+  "measured_at": "2026-10-27T18:50:26.892892+00:00",
+  "open_cases": [
+    "independent provider failure",
+    "comprehensive DNS/IPv6 packet capture"
+  ],
+  "passed": false,
+  "quota_funding": "TEST FREE GRANT ONLY",
+  "scope": "two physical Android devices, disposable local API/PostgreSQL, bounded staging A",
+  "source_sha256": {
+    "apps/client/integration_test/i028_two_device_test.dart": "2f08c3852494bd37cf52fedb303111e2fb64557733871b28b16c836ca8a5c508",
+    "infra/staging-v3/runtime.py": "1898bb981c09b64f546a7b35635493d113e19f75c6f552fa10e0254552e24094",
+    "scripts/i028_two_device_driver.py": "293a14de1ae6bc3d56bfcbe373469f810395e75afe91853d365678657a410237",
+    "scripts/i028_two_device_preflight.py": "c2762c44c9d0cc3362a6a35106751f8588e71e4b97d550534b0d93b963e90476",
+    "scripts/run_i028_staging.ps1": "66c6e2f8b162fe339705f3bb7d32492812e858aea9b1a8f2e70616133a572ffd",
+    "services/api/tests/test_i028_two_device_driver.py": "9ba2164e29d027c95a12256ef979fd429a1da796524218f69c17be2d38a69aa0",
+    "services/api/tests/test_i028_two_devices.py": "26af5d61cd1b158d93eb756172af9e9a2f333cfe1b8d86bad86d00318337b9ca"
+  },
+  "staging_baseline": {
+    "agent_active": true,
+    "cleanup_complete": false,
+    "live_slots": [],
+    "peer_counts": [
+      0,
+      0
+    ],
+    "prepared": true,
+    "remaining_seconds": 1768,
+    "slot_count": 2
+  },
+  "staging_remaining_seconds_at_start": 1768,
+  "telegram": "TEST FAKE ONLY",
+  "vpn_dataplane_acceptance": false
+}

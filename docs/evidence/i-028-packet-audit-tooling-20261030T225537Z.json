@@ -1,0 +1,19 @@
+{
+  "acceptance_eligible": false,
+  "capture_mode_tested": "synthetic_local_pipe_only",
+  "measured_at": "2026-10-30T22:55:37Z",
+  "physical_capture_performed": false,
+  "physical_packet_audit_accepted": false,
+  "ruff_check_passed": true,
+  "ruff_format_check_passed": true,
+  "scope": "local I-028 packet-audit parser, fixed trigger, bounded streaming and aggregate output checks",
+  "source_sha256": {
+    "infra/ansible/tests/test_i028_packet_audit.py": "4cc635a840305e2972d7438cbde253a5ef22c229c56605d6ca6da1d648ceabf1",
+    "scripts/i028_packet_audit.py": "7c01b76def9181862835a8e7451d61a64de5d671844b8ff3db23ba536a61cd1a"
+  },
+  "synthetic_test_command": "python -m pytest infra/ansible/tests/test_i028_packet_audit.py -q",
+  "synthetic_tests_passed": 23,
+  "synthetic_tests_total": 23,
+  "test_only": true,
+  "vpn_dataplane_acceptance": false
+}

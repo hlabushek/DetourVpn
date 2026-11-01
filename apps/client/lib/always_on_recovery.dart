@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart' show visibleForTesting;
 import 'package:flutter/services.dart';
 
 import 'api.dart';
@@ -16,6 +17,39 @@ const _recoveryChannel = MethodChannel('project.vpn/tunnel.v1');
 Future<void> runAlwaysOnRecovery() async {
   final store = PlatformSessionStore();
   final native = PlatformTunnel();
+  await _runAlwaysOnRecovery(
+    store: store,
+    native: native,
+    readSelectedNode: native.readSelectedNode,
+    createApi: (origin, sessionStore) => Api.protected(
+      origin,
+      relayProvider: PlatformProtectedRelayProvider(),
+      store: sessionStore,
+    ),
+  );
+}
+
+/// Injects local fakes for the startup state machine; production uses the
+/// platform-backed entrypoint above and never receives these dependencies.
+@visibleForTesting
+Future<void> runAlwaysOnRecoveryWithDependencies({
+  required SessionStore store,
+  required WindowNative native,
+  required Future<String?> Function() readSelectedNode,
+  required Api Function(Uri origin, SessionStore store) createApi,
+}) => _runAlwaysOnRecovery(
+  store: store,
+  native: native,
+  readSelectedNode: readSelectedNode,
+  createApi: createApi,
+);
+
+Future<void> _runAlwaysOnRecovery({
+  required SessionStore store,
+  required WindowNative native,
+  required Future<String?> Function() readSelectedNode,
+  required Api Function(Uri origin, SessionStore store) createApi,
+}) async {
   Api? api;
   WindowConnectionController? controller;
   try {
@@ -25,11 +59,7 @@ Future<void> runAlwaysOnRecovery() async {
     final origin = Uri.tryParse(rawOrigin);
     if (origin == null) throw const ClientError('invalid_origin');
 
-    api = Api.protected(
-      origin,
-      relayProvider: PlatformProtectedRelayProvider(),
-      store: store,
-    );
+    api = createApi(origin, store);
     await api.restoreSession();
     if (!api.authenticated) throw const ClientError('session_expired');
 
@@ -42,7 +72,7 @@ Future<void> runAlwaysOnRecovery() async {
     if (controller.nodesError != null) {
       throw const ClientError('node_validation_failed');
     }
-    final selected = await native.readSelectedNode();
+    final selected = await readSelectedNode();
     if (selected == null) throw const ClientError('window_node_required');
     controller.selectNode(selected);
     if (controller.selectedNode != selected) {

@@ -1,0 +1,57 @@
+{
+  "measured_at_utc": "2026-10-31T15:02:30Z",
+  "scope": "local source-bound I-028 Egress diagnostic build only",
+  "passed": true,
+  "vpn_dataplane_acceptance": false,
+  "source_input_count": 94,
+  "source_sha256": {
+    "apps/android/app/src/androidTest/java/org/example/vpnpoc/I028Probe.java": "ef96307c2911d32e7e338ab12c368aab196b6c150390a1e6f99ce8e8b8a9ac1c",
+    "apps/client/integration_test/i028_live_test.dart": "9a95875cbebd2430016a5987a03587de518e930f28055bfeacf9adb6770566d3",
+    "scripts/run_i028_staging.ps1": "d3a791279f9aa3b5bd6b908a5f97dd40096f141fd992fe7720e032ba83b1eae5"
+  },
+  "artifacts": {
+    "client_apk_sha256": "cf986ae75fd9f516314aa5edcb026a69fd2fc2665377ea5950c642203515dac9",
+    "probe_test_apk_sha256": "3f2ae72242bde8733bd826fb32f51fe7a3940b81e27939eea0e9b3564640c484",
+    "probe_base_apk_sha256": "61006df375b245a808b779bdb5cbb02e1bfa44460737d0b61fe982f99a93481c",
+    "awg_arm64_sha256": "df0a0e3365d5f9b2a857165c4b09a3b7eb1c683c3337821c8107721a77a5893d",
+    "awg_x86_64_sha256": "e321d2962e9f7b59c37974a10d21633a247acc01c53f6a6f5797c2c16826660c"
+  },
+  "checks": {
+    "flutter_analyze": true,
+    "flutter_tests": true,
+    "android_egress_entrypoints_compiled": true,
+    "independent_uid_probe_apks_compiled": true,
+    "diagnostic_pytest_passed": 36,
+    "ruff": true,
+    "git_diff_check": true
+  },
+  "changes": [
+    "Test-only IPv6 probe resolves addresses through the selected Android Network and binds its fixed audit source port.",
+    "Egress hold observations are sent before the refresh probe can lose its control-plane path.",
+    "Generated Flutter plugin registration is excluded from checked-in source hashes because the build regenerates it."
+  ],
+  "phone_probe_at_build_time": {
+    "evidence_file": "i-028-probe-after-startup-fix-20261031T150225982Z.json",
+    "probe_completed": true,
+    "direct_network_ready": true,
+    "direct_ipv6_ready": false,
+    "ipv6_failure": "dns",
+    "temporary_apks_removed": true,
+    "ipv6_default_route_present": false,
+    "global_ipv6_address_count": 0
+  },
+  "latest_phone_probe": {
+    "evidence_file": "i-028-probe-after-startup-fix-20261031T151102737Z.json",
+    "probe_completed": true,
+    "direct_network_ready": true,
+    "direct_ipv6_ready": true,
+    "fixed_udp_dns_response": true,
+    "test_apks_removed": true,
+    "vpn_dataplane_acceptance": false
+  },
+  "limitations": [
+    "A phone-only Probe followed the build; no Egress server session or VPS action was performed.",
+    "The prior physical Egress run still failed after its 1 MiB window was nearly exhausted.",
+    "No DNS leak or leak-free conclusion follows from this local build."
+  ]
+}

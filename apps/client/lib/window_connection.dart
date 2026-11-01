@@ -30,6 +30,16 @@ class WindowConnectionController extends ConnectionController {
   String? _config;
   int _deadline = 0;
   int _intentAt = 0;
+  int? _trafficBaseline;
+  int? _lastTraffic;
+  int? _renewTrafficAnchor;
+  final InboundTrafficFreshness _inboundTraffic = InboundTrafficFreshness();
+  bool _hasEstablishedHandshake = false;
+  bool _trafficRenewalRequested = false;
+  @visibleForTesting
+  bool get trafficRenewalRequested => _trafficRenewalRequested;
+  @visibleForTesting
+  bool get renewalPending => _renewIntent != null;
   int _version = 0;
   bool _closed = false;
   bool _working = false;
@@ -244,6 +254,12 @@ class WindowConnectionController extends ConnectionController {
       }
       _grant = grant;
       _deadline = deadline;
+      // A newly connected backend starts a new cumulative statistics lifetime.
+      _trafficBaseline = 0;
+      _lastTraffic = 0;
+      _renewTrafficAnchor = null;
+      _inboundTraffic.reset();
+      _hasEstablishedHandshake = false;
       diagnosticStage = null;
       detail = 'Ожидается handshake';
       startPolling();
@@ -357,6 +373,11 @@ class WindowConnectionController extends ConnectionController {
     _grant = null;
     _config = null;
     _renewIntent = null;
+    _trafficBaseline = null;
+    _lastTraffic = null;
+    _renewTrafficAnchor = null;
+    _inboundTraffic.reset();
+    _hasEstablishedHandshake = false;
     try {
       if (_createIntent != null) await _create();
       if (_id != null) {
@@ -433,14 +454,43 @@ class WindowConnectionController extends ConnectionController {
           !snapshot.up ||
           snapshot.remainingMs <= 0)
         throw const ClientError('lease_expired');
+      _inboundTraffic.observe(
+        snapshot.receivedBytes,
+        _clock.elapsedMilliseconds,
+      );
+      if (snapshot.confirmed) _hasEstablishedHandshake = true;
+      final traffic = snapshot.trafficBytes;
+      if (traffic != null && traffic >= 0) {
+        if (_trafficBaseline == null ||
+            (_lastTraffic != null && traffic < _lastTraffic!)) {
+          // Missing/reset stats are advisory only; start a fresh baseline.
+          _trafficBaseline = traffic;
+          _renewTrafficAnchor = null;
+        }
+        _lastTraffic = traffic;
+      }
+      final trafficSuggestsRenewal =
+          traffic != null &&
+          traffic >= 0 &&
+          _trafficBaseline != null &&
+          traffic >= _trafficBaseline! &&
+          traffic - _trafficBaseline! >= (_grant!['budget_bytes'] as int) ~/ 2;
       if (_renewIntent == null &&
-          _deadline - _clock.elapsedMilliseconds <= renewBeforeMs) {
+          (_deadline - _clock.elapsedMilliseconds <= renewBeforeMs ||
+              trafficSuggestsRenewal)) {
+        if (trafficSuggestsRenewal &&
+            _deadline - _clock.elapsedMilliseconds > renewBeforeMs) {
+          _trafficRenewalRequested = true;
+        }
         _renewIntent = {
           'previous_window_id': _grant!['window_id'],
           'idempotency_key': newId(),
           'budget_bytes': budgetBytes,
         };
         _intentAt = _clock.elapsedMilliseconds;
+        // Capture before issuing the request: bytes sent during rotation are
+        // counted conservatively in the next window's advisory estimate.
+        _renewTrafficAnchor = traffic != null && traffic >= 0 ? traffic : null;
       }
       var value = await api.call('GET', '$root/$_id');
       if (_cancelled(version)) return;
@@ -454,8 +504,15 @@ class WindowConnectionController extends ConnectionController {
       if (_clock.elapsedMilliseconds >= _deadline)
         throw const ClientError('lease_expired');
       if (value['state'] == 'pending' && _renewIntent != null) {
-        phase = ConnectionPhase.reconnecting;
-        detail = 'Ожидается подтверждение продления';
+        final confirmed = _establishedStatusConfirmed(snapshot);
+        phase = confirmed
+            ? ConnectionPhase.connected
+            : ConnectionPhase.reconnecting;
+        detail = confirmed
+            ? (snapshot.confirmed
+                  ? 'Свежий handshake подтверждён'
+                  : 'Входящий трафик через VPN подтверждён')
+            : 'Ожидается подтверждение продления';
         return;
       }
       final grant = _validate(value);
@@ -467,6 +524,13 @@ class WindowConnectionController extends ConnectionController {
         if (_cancelled(version)) return;
         _grant = grant;
         _deadline = end;
+        _trafficBaseline =
+            _renewTrafficAnchor != null &&
+                traffic != null &&
+                traffic >= _renewTrafficAnchor!
+            ? _renewTrafficAnchor
+            : traffic;
+        _renewTrafficAnchor = null;
         _renewIntent = null;
       }
       snapshot = await native.snapshot();
@@ -476,11 +540,14 @@ class WindowConnectionController extends ConnectionController {
           _clock.elapsedMilliseconds >= _deadline)
         throw const ClientError('lease_expired');
       error = null;
-      phase = snapshot.confirmed
+      final confirmed = _establishedStatusConfirmed(snapshot);
+      phase = confirmed
           ? ConnectionPhase.connected
           : ConnectionPhase.reconnecting;
       detail = snapshot.confirmed
           ? 'Свежий handshake подтверждён'
+          : confirmed
+          ? 'Входящий трафик через VPN подтверждён'
           : 'Ожидается сеть и handshake';
     } catch (e) {
       if (_cancelled(version)) return;
@@ -501,6 +568,19 @@ class WindowConnectionController extends ConnectionController {
         await _cleanup();
       }
     }
+  }
+
+  bool _establishedStatusConfirmed(NativeSnapshot snapshot) {
+    if (snapshot.confirmed) _hasEstablishedHandshake = true;
+    return snapshot.confirmed ||
+        (_hasEstablishedHandshake &&
+            snapshot.up &&
+            snapshot.network &&
+            snapshot.remainingMs > 0 &&
+            _inboundTraffic.observe(
+              snapshot.receivedBytes,
+              _clock.elapsedMilliseconds,
+            ));
   }
 
   @override

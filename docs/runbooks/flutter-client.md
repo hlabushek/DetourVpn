@@ -1,7 +1,8 @@
 # Flutter Android client — I-013
 
 Scope и ограничения: ADR-025; acceptance: `docs/issues/I-013.md`.
-Новый package `org.example.vpnclient`, старый I-011 harness не заменяется.
+Установленный application ID beta-клиента — `com.detourvpn.client`; старый I-011
+harness не заменяется. Внутренний Android namespace остаётся `org.example.vpnclient`.
 Нельзя одновременно держать другой VPN и измерять этот тестовый туннель.
 
 ## Локальная сборка
@@ -41,6 +42,114 @@ snapshot остаётся для диагностики, не является �
 environment настройки не сохраняются. Сборка устанавливает зависимости локально,
 запускает analyze/tests и Android unit/lint/release checks. Unsigned release APK
 не является публичным выпуском; signing/publication этим этапом не выполняются.
+Проверка 2026-10-29 показала, что release-вариант не был подписан; последний
+owner beta install был debug APK. Gradle теперь поддерживает отдельный beta key,
+поданный только через переменные окружения процесса сборки. Если заданы не все
+четыре переменные, release signing не конфигурируется; при частичном наборе
+Gradle отказывает с перечислением только отсутствующих имён переменных. Штатный
+build script требует существующий keystore по абсолютному пути вне checkout.
+Gradle запрещает включить release signing, пока application ID равен
+временному placeholder `org.example.vpnclient`.
+Конфигурация и проверка описаны в ADR-066 и
+`docs/evidence/i-030-beta-signing-config-20261029.json`.
+
+Перед сборкой signed beta APK владелец должен вне репозитория создать/выбрать
+beta signing key, организовать закрытое хранение и резервное восстановление
+ключа. `com.detourvpn.client` — постоянный beta ID;
+его смена после первой раздачи нарушит совместимость обновлений. Не отправлять
+ключ, пароли или переменные с ними в чат и не записывать их в репозиторий.
+Перед передачей APK тестерам требуется проверить подпись, application ID,
+версию, SHA-256 и непрерывность обновления с предыдущей beta-версии.
+
+`scripts/build_beta_apk.ps1` выполняет release build с этим ключом. Для beta API,
+настроенного на window tunnel catalog, добавляйте `-WindowTunnels`, чтобы клиент
+обращался к соответствующему API и native tunnel controller. При первом
+запуске скрипт предлагает создать JKS в `%LOCALAPPDATA%\ProjectVpn\beta-signing`
+и продолжает только после локального ввода `CREATE`. `keytool` запрашивает
+пароль JKS и пароль ключа в терминале; путь вводить не надо. Выбрать пароли не
+короче 16 символов и сохранить у владельца. При запросе пароля ключа Enter
+повторно использует пароль хранилища. Перед build скрипт повторно запрашивает
+оба пароля скрытыми полями, временно передаёт их только процессу сборки и
+очищает переменные после проверки APK. Установки на устройство и передачи APK
+скрипт не выполняет.
+Ключ и пароли нужно отдельно сохранить в контролируемом владельцем резерве;
+локальный каталог сам по себе не является backup.
+
+### Резервная копия signing JKS на BitLocker USB
+
+Для `GERFFINSUSB (E:)` сначала завершить BitLocker To Go и убедиться, что диск
+разблокирован. Сохранить пароль разблокировки и recovery key BitLocker в
+менеджере паролей; оба пароля JKS хранить там же как отдельные секреты. Не
+класть recovery key только на зашифрованный USB и не передавать значения в чат.
+
+Из PowerShell, запущенного с повышенными правами под той же учётной записью
+JetGame, выполнить:
+
+```powershell
+.\scripts\backup_beta_signing_keystore.ps1 -DriveLetter E:
+```
+
+Скрипт сверяет метку и съёмный тип диска, требует полностью завершённое
+BitLocker-шифрование и включённую защиту, отказывается перезаписывать готовую
+или оставшуюся частичную копию и сравнивает SHA-256 исходного JKS с копией.
+Успешный вывод `code=beta_signing_keystore_backup_verified` подтверждает точную
+копию на зашифрованном диске; он не подтверждает, что recovery key BitLocker
+или пароли JKS сохранены. Хранить сам JKS и любые резервные ключи вне checkout.
+
+### Проверка восстановления signing JKS
+
+Перед проверкой локально убедиться в менеджере паролей, что там сохранены пароль
+разблокировки и recovery key BitLocker, а также оба пароля JKS. Значения никуда не
+копировать и не отправлять. Разблокировать `GERFFINSUSB (E:)` и выполнить из
+обычного PowerShell под владельцем; тестовая копия создаётся в уже защищённом
+каталоге `%LOCALAPPDATA%\ProjectVpn\beta-signing` вне checkout:
+
+```powershell
+$restoreCopy = Join-Path $env:LOCALAPPDATA ('ProjectVpn\beta-signing\detourvpn-beta-restore-' + (Get-Date -Format 'yyyyMMdd-HHmmss') + '.jks')
+$backup = 'E:\DetourVpn-Beta-Backup\detourvpn-beta-signing.jks'
+if (Test-Path -LiteralPath $restoreCopy) { throw 'Restore-check destination already exists.' }
+Copy-Item -LiteralPath $backup -Destination $restoreCopy
+$sourceHash = (Get-FileHash -LiteralPath $backup -Algorithm SHA256).Hash
+$restoreHash = (Get-FileHash -LiteralPath $restoreCopy -Algorithm SHA256).Hash
+if ($sourceHash -ne $restoreHash) { throw 'Restore-copy SHA-256 mismatch.' }
+'restore_copy_sha256=verified'
+.\scripts\build_beta_apk.ps1 -KeystorePath $restoreCopy -ApiOrigin 'https://193.68.88.239'
+```
+
+Сборка запросит оба пароля JKS скрыто и подпишет локальный beta APK восстановленной
+копией. До очистки тестовой копии сверить fingerprint в новом receipt с предыдущим
+beta receipt. После успешной сверки удалить только файл из `$restoreCopy`; исходный
+JKS и резерв на USB не трогать. Если сборка или сверка не удалась, сохранить
+тестовую копию до выяснения причины. Эта проверка не заменяет естественный запуск
+ежедневного backup task и не доказывает хранение BitLocker recovery key в менеджере
+паролей.
+
+```powershell
+.\scripts\build_beta_apk.ps1 -ApiOrigin 'https://YOUR_APPROVED_API_HOST'
+```
+
+Для beta сборки `-ApiOrigin` обязателен. Скрипт принимает только HTTPS origin
+без credentials, пути, query или fragment и передаёт его в debug и release
+сборки как `VPN_API_ORIGIN`.
+
+Для локальной проверки уже подписанного APK создать отдельный receipt:
+
+```powershell
+uv run --frozen python scripts/verify_beta_apk.py `
+  --apk apps/client/build/app/outputs/flutter-apk/app-release.apk `
+  --expected-application-id com.detourvpn.client `
+  --output docs/evidence/i-030-beta-apk-20261029.json `
+  --sdk-root "$env:LOCALAPPDATA\Android\Sdk" `
+  --java-home 'C:\Program Files\Android\Android Studio\jbr'
+```
+
+Владельцем выбран `com.detourvpn.client`. Для каждого следующего receipt укажите
+новый путь, чтобы не перезаписывать прежнее evidence. Receipt содержит ID,
+версию, SHA-256 APK и fingerprint сертификата, но не путь к APK. Скрипт
+использует `aapt` и `apksigner` из Android
+SDK/JDK без вызова Windows batch wrapper, не устанавливает APK и оставляет `update_install: not_verified` и
+`distribution: not_accepted`. Физическую установку поверх предыдущей beta-версии
+и фактическую передачу тестерам надо принять отдельно.
 
 Debug и release собираются последовательно через `flutter build apk` с явным
 `--target lib/main.dart`. Между ними Gradle выполняет только debug unit/lint.
@@ -58,7 +167,7 @@ APK: `apps/client/build/app/outputs/flutter-apk/app-debug.apk`.
 
 ```powershell
 & "$env:LOCALAPPDATA\Android\Sdk\platform-tools\adb.exe" install -r apps/client/build/app/outputs/flutter-apk/app-debug.apk
-& "$env:LOCALAPPDATA\Android\Sdk\platform-tools\adb.exe" shell am start -W -n org.example.vpnclient/org.example.vpnpoc.ClientActivity
+& "$env:LOCALAPPDATA\Android\Sdk\platform-tools\adb.exe" shell am start -W -n com.detourvpn.client/org.example.vpnpoc.ClientActivity
 ```
 
 Без API origin приложение честно показывает setup screen. Для настоящего API:
@@ -71,6 +180,21 @@ APK: `apps/client/build/app/outputs/flutter-apk/app-debug.apk`.
 HTTPS с системной проверкой сертификатов. Локальный debug-only transport:
 `http://127.0.0.1:18766` через ADB reverse; plaintext remote hosts запрещены.
 Исключение Android network security config существует только в debug source set.
+
+## Диагностика по согласию
+
+При ошибке подключения кнопка «Поделиться диагностикой» открывает предпросмотр.
+Проверьте код и этап; отмена закрывает диалог без вызова Android share API.
+После подтверждения Android показывает системный Sharesheet, а текст попадёт
+только в выбранное пользователем приложение. Отчёт содержит фиксированный код
+ошибки и этап; неизвестные значения заменяются на `unknown_error`/`unknown`.
+Аккаунт, ключи, адреса, список приложений, DNS, история трафика и содержимое
+туннеля не включаются. Автоматической отправки и crash reporting нет.
+
+Постоянный контакт поддержки пока не настроен. Тестер выбирает получателя
+самостоятельно; до отправки следует сверить предпросмотр и не дополнять его
+секретами, профилем, OTP или пользовательским трафиком. Физическая проверка
+Sharesheet и инструкции на beta APK остаётся открытой.
 
 ## Проверки телефона без внешнего endpoint
 

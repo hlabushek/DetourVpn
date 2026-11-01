@@ -1,0 +1,59 @@
+{
+  "issue": "I-028",
+  "measured_at_utc": "2026-10-31T11:57:39Z",
+  "scope": "source-bound physical Egress suite after ADR-070 client-status correction",
+  "receipt": "i-028-egress-diagnostic-20261031T120213Z-ca62ed0e.json",
+  "passed": true,
+  "receipt_source_hashes_match_checkout": true,
+  "matched_source_hash_count": 11,
+  "physical_facts": {
+    "included_same_uid_staging_ipv4_and_fixed_udp_dns": true,
+    "later_same_uid_staging_ipv4_probe": true,
+    "renewal_acknowledged": true,
+    "renewal_generation": 22
+  },
+  "auxiliary_dns_path_observation": {
+    "complete": true,
+    "probe_response": false,
+    "tunnel_inbound_packets": 0,
+    "tunnel_outbound_packets": 0,
+    "uplink_inbound_packets": 0,
+    "uplink_outbound_packets": 0,
+    "interpretation": "The auxiliary observer completed but did not see/respond to its probe. The independent same-UID fixed UDP-DNS included probe passed; this auxiliary observation supplies no positive path-capture evidence and is not evidence of a leak."
+  },
+  "hold_observation": {
+    "client_phase": "connected",
+    "client_has_error": false,
+    "native_up": true,
+    "native_network": true,
+    "lease_remaining_ms": 80758,
+    "handshake_age_seconds": 36,
+    "renewal_acknowledged": true
+  },
+  "accounting": {
+    "ledger_consistent": true,
+    "measured_bytes": "20203511",
+    "receipt_count": 22,
+    "reserved_bytes": "0",
+    "unknown_receipts": 0,
+    "open_connections": 0,
+    "violations": 0
+  },
+  "cleanup": {
+    "complete": true,
+    "agent_revoked_and_stopped": true,
+    "temporary_grant_removed": true,
+    "timeout_timer_disarmed": true,
+    "journal_preserved": true,
+    "phone_restored": true,
+    "phone_session_absent": true,
+    "independent_postcheck": true
+  },
+  "status_correction_fallback_physically_verified": false,
+  "vpn_dataplane_acceptance": false,
+  "limitations": [
+    "The hold handshake age was 36 seconds, below the 60-second fresh-handshake threshold; this run does not demonstrate that inbound-counter freshness kept an established session connected after the handshake became stale.",
+    "This is one physical diagnostic Egress pass, not full I-028 acceptance.",
+    "The earlier AP-station packet audit is a separate run and is not attributed to this receipt."
+  ]
+}

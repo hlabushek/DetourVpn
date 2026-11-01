@@ -6,12 +6,20 @@ class NativeSnapshot {
     required this.network,
     required this.handshakeAge,
     required this.remainingMs,
+    this.trafficBytes,
+    this.receivedBytes,
     this.reason = '',
   });
   final bool up;
   final bool network;
   final int handshakeAge;
   final int remainingMs;
+
+  /// Approximate native transfer; never a quota meter or settlement evidence.
+  final int? trafficBytes;
+
+  /// Approximate inbound tunnel bytes; used only as recent data-path evidence.
+  final int? receivedBytes;
   final String reason;
   bool get confirmed =>
       up &&
@@ -19,6 +27,43 @@ class NativeSnapshot {
       handshakeAge >= 0 &&
       handshakeAge <= 60 &&
       remainingMs > 0;
+}
+
+/// Tracks recent inbound progress without treating outbound-only traffic as
+/// confirmation that the tunnel's return path is working.
+class InboundTrafficFreshness {
+  InboundTrafficFreshness({this.freshFor = const Duration(seconds: 60)});
+
+  final Duration freshFor;
+  int? _lastBytes;
+  int? _lastProgressAtMs;
+
+  bool observe(int? receivedBytes, int nowMs) {
+    if (receivedBytes == null || receivedBytes < 0) return _isFresh(nowMs);
+    final previous = _lastBytes;
+    if (previous == null || receivedBytes < previous) {
+      _lastBytes = receivedBytes;
+      _lastProgressAtMs = null;
+      return false;
+    }
+    if (receivedBytes > previous) {
+      _lastBytes = receivedBytes;
+      _lastProgressAtMs = nowMs;
+    }
+    return _isFresh(nowMs);
+  }
+
+  bool _isFresh(int nowMs) {
+    final lastProgressAtMs = _lastProgressAtMs;
+    return lastProgressAtMs != null &&
+        nowMs >= lastProgressAtMs &&
+        nowMs - lastProgressAtMs <= freshFor.inMilliseconds;
+  }
+
+  void reset() {
+    _lastBytes = null;
+    _lastProgressAtMs = null;
+  }
 }
 
 abstract interface class NativeTunnel {
@@ -100,6 +145,14 @@ class PlatformTunnel implements WindowNative, NodePreferenceStore {
       network: value['network'] as bool,
       handshakeAge: value['handshakeAge'] as int,
       remainingMs: value['remainingMs'] as int,
+      trafficBytes:
+          value['trafficBytes'] is int && (value['trafficBytes'] as int) >= 0
+          ? value['trafficBytes'] as int
+          : null,
+      receivedBytes:
+          value['receivedBytes'] is int && (value['receivedBytes'] as int) >= 0
+          ? value['receivedBytes'] as int
+          : null,
       reason: value['reason'] as String,
     );
   }

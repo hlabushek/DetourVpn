@@ -1,0 +1,48 @@
+{
+  "observed_on": "2026-10-29",
+  "source": "OSV querybatch API, Maven ecosystem",
+  "lockfiles": {
+    "apps/android/tunnel/gradle.lockfile": "8caf9eb655817f58ad8ff937072ebb662595892ec246b05018b192b6ff994068",
+    "apps/android/app/gradle.lockfile": "53bee6e5e3d8f449b166267c2d591be96151dba908944be897ac4b21bf6bb21c",
+    "apps/client/android/app/gradle.lockfile": "21dee1dad17adbfbf6e00388bba1dd5780a3d6cc90d7ebfbfe1ccaa409987a10",
+    "apps/client/android/tunnel-gradle.lockfile": "8caf9eb655817f58ad8ff937072ebb662595892ec246b05018b192b6ff994068"
+  },
+  "whole_lockfile_scope": {
+    "unique_coordinate_versions_queried": 196,
+    "affected_coordinate_versions": 18,
+    "advisory_matches": 87,
+    "affected_components": [
+      "com.google.guava:guava 32.0.1-jre, 33.3.1-jre, 28.1-android",
+      "com.google.protobuf:protobuf-java 3.24.4",
+      "com.google.protobuf:protobuf-kotlin 3.24.4",
+      "io.netty:netty-codec-http2 4.1.93.Final, 4.1.110.Final",
+      "io.netty:netty-codec-http 4.1.93.Final, 4.1.110.Final",
+      "io.netty:netty-codec 4.1.93.Final, 4.1.110.Final",
+      "io.netty:netty-common 4.1.93.Final, 4.1.110.Final",
+      "io.netty:netty-handler-proxy 4.1.93.Final, 4.1.110.Final",
+      "io.netty:netty-handler 4.1.93.Final, 4.1.110.Final",
+      "junit:junit 4.12"
+    ],
+    "configuration_scope": "Internal unified test-platform configurations or debug/test runtime and unit-test configurations"
+  },
+  "beta_release_runtime_scope": {
+    "lockfile": "apps/client/android/app/gradle.lockfile",
+    "configuration": "releaseRuntimeClasspath",
+    "coordinate_versions_queried": 49,
+    "advisory_matches": 0
+  },
+  "interpretation": "Package/version matches are present in test/build/debug configurations. None of the queried releaseRuntimeClasspath coordinates matched an OSV advisory. This does not prove test-code exploitability or replace artifact-level review.",
+  "not_covered": [
+    "Android SDK, NDK, Gradle wrapper, and build plugins as separate artifacts",
+    "Flutter, Dart, native Go, and operating-system dependencies",
+    "artifact provenance and signature verification",
+    "license review or SBOM completeness",
+    "independent security review"
+  ],
+  "side_effects": {
+    "Gradle_lockfiles_changed": false,
+    "build_or_install_run": false,
+    "beta_host_changed": false,
+    "production_or_staging_accessed": false
+  }
+}

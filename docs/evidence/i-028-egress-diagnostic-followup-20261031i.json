@@ -1,0 +1,87 @@
+{
+  "issue": "I-028",
+  "measured_at_utc": "2026-10-31T13:10:28Z",
+  "scope": "local source-bound Egress harness follow-up and audit of the operator-provided physical run; no staging action by Codex",
+  "local_followup_passed": true,
+  "physical_egress_run_passed": false,
+  "vpn_dataplane_acceptance": false,
+  "physical_run": {
+    "receipt": "i-028-egress-diagnostic-20261031T130117Z-023d007d.json",
+    "passed": false,
+    "failed_at": "flutter_egress",
+    "phone_failure_stage": "included_probe",
+    "flutter_exit_code": 1,
+    "source_hashes_matching_at_run": 11,
+    "source_hash_count": 11,
+    "included_probe": {
+      "active_network_is_vpn": true,
+      "active_network_validated": true,
+      "process_uid_matches_target": true,
+      "ipv4_available": true,
+      "ipv4_used_fallback": true,
+      "egress_is_staging": true,
+      "fixed_udp_dns_response": false,
+      "dns_failure": "timeout",
+      "ipv6_available": false,
+      "ipv6_failure": "dns"
+    },
+    "separate_fixed_dns_path_observer": {
+      "complete": true,
+      "probe_response": true,
+      "packet_loss": false,
+      "tunnel_inbound": 1,
+      "tunnel_outbound": 1,
+      "uplink_inbound": 1,
+      "uplink_outbound": 1
+    },
+    "settlement": {
+      "complete": true,
+      "receipt_count": 3,
+      "measured_bytes": "1876236",
+      "used_bytes": "1876236",
+      "reserved_bytes": "0",
+      "unknown_receipts": 0,
+      "open_connections": 0,
+      "violations": 0
+    },
+    "cleanup": {
+      "complete": true,
+      "timeout_timer_disarmed": true,
+      "temporary_grant_removed": true,
+      "private_journal_preserved": true,
+      "phone_restored": true,
+      "independent_unprivileged_remote_postcheck": true
+    }
+  },
+  "packet_audit": "i-028-packet-audit-included-20261031T1302Z.json",
+  "local_change": {
+    "file": "apps/client/integration_test/i028_live_test.dart",
+    "behavior": "For the exact case of a completed target-UID probe with validated VPN, real staging IPv4, UDP DNS timeout, and IPv6 result unavailable due to DNS, defer the failed assertion until the existing 140-second hold and normal settlement finish. The DNS acceptance fact is not recorded and the test still fails. Other failures remain fail-fast."
+  },
+  "source_bound_build": {
+    "suite": "Egress",
+    "input_count": 95,
+    "input_hash_mismatches": 0,
+    "flutter_analyze": "passed",
+    "flutter_unit_tests": "passed",
+    "physical_entrypoint_phases_compiled": [
+      "seed",
+      "egress",
+      "cleanup"
+    ],
+    "android_gradle_build": "BUILD SUCCESSFUL",
+    "client_apk_sha256": "7357b5b62198add778ad3a1a8cf594f35ee04dfc061d0100b9f0aa8f829561aa",
+    "probe_test_apk_sha256": "c27c0612bf03ccda51cfbd880c6f4f0a9b1f7d4697d551bcf531ac7266c3eecb",
+    "probe_base_apk_sha256": "61006df375b245a808b779bdb5cbb02e1bfa44460737d0b61fe982f99a93481c"
+  },
+  "checks": {
+    "dart_format": "passed; 0 changes",
+    "python_diagnostics_and_packet_audit_pytest": "59 passed",
+    "git_diff_check": "passed"
+  },
+  "remaining": [
+    "source-bound physical Egress run with the updated APK and a fully held, correlated included packet window",
+    "accepted DNS and IPv6 baseline, included, excluded positive-control, transition, and outage evidence",
+    "remaining I-028 acceptance scenarios outside this diagnostic Egress run"
+  ]
+}

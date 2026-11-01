@@ -1,0 +1,35 @@
+{
+  "issue": "I-026",
+  "scope": "one invited tester sign-in, bounded connection, revoke, and cleanup",
+  "measured_on": "",
+  "secret_values_recorded": false,
+  "personal_identifiers_recorded": false,
+  "build": {
+    "application_id": "com.detourvpn.client",
+    "version": "",
+    "artifact_sha256": ""
+  },
+  "device": {
+    "platform": "Android",
+    "android_major_version": ""
+  },
+  "checks": {
+    "invite_path_completed": "not_run",
+    "otp_entered_in_android_client": "not_run",
+    "sign_in_completed": "not_run",
+    "vpn_permission_approved": "not_run",
+    "bounded_egress_owner_verified": "not_run",
+    "disconnect_completed": "not_run",
+    "remote_revoke_completed": "not_run",
+    "traffic_settlement_verified": "not_run",
+    "cleanup_verified": "not_run"
+  },
+  "diagnostic_sharing": {
+    "preview_checked": false,
+    "tester_consented": false,
+    "report_shared": false
+  },
+  "result": "not_run",
+  "failure_stage": "",
+  "limitations": []
+}

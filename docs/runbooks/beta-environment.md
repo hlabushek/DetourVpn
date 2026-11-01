@@ -1,10 +1,16 @@
 # Бесплатная закрытая beta — среда и операционные ворота
 
-Статус: частичный hosted rollout 2026-10-26. `infra/beta/` развернута только на
-двух отдельных beta VMs и не заменяет временный staging A или control plane B.
-API/DB остаются loopback-only; Caddy отдаёт challenge/redirect и закрытый HTTPS
-404; один VPN slot работает с закрытым gate, node-agent не запущен. Решение:
-ADR-045; issue: I-030.
+Статус: частичный hosted rollout на двух выделенных beta VMs; они не заменяют
+временный staging A или control plane B. По receipt 2026-10-26 beta API↔node
+control plane был активен, а ограниченный owner-only Android VPN smoke передал
+реальный трафик. Read-only checks 2026-10-29 подтвердили Mini App `200`,
+защищённый referrals API `401` без сессии, закрытый readiness path `404`,
+internal DB/migration readiness `200`, активные API/Caddy/node services и active
+beta node с недавним poll и нулём открытых peers. Это не внешний UDP handshake,
+текущий Android tunnel или privacy acceptance. Receipts и границы: `../issues/I-030.md`,
+`../evidence/i-030-beta-ingress-readonly-20261029.json` и
+`../evidence/i-030-beta-runtime-readonly-20261029.json`. Решение: ADR-045; issue:
+I-030.
 
 ## Локальная проверка templates
 
@@ -108,10 +114,16 @@ Get-ScheduledTaskInfo -TaskName 'DetourVpn Beta Backup Daily'
 правами; общий secrets-каталог не менялся.
 
 Systemd timer template `infra/beta/detourvpn-beta-backup.timer` не включён:
-расписание выполняет ПК владельца. Первый плановый запуск Windows-задачи ещё не
-состоялся. `StartWhenAvailable` поможет выполнить пропущенный запуск, когда ПК
-станет доступен и пользователь войдёт в Windows. Retention и автоматическое
-удаление копий не настроены; независимого монитора/уведомлений нет.
+расписание выполняет ПК владельца. Первый плановый запуск Windows-задачи
+завершился ошибкой до передачи: задача выполнялась с principal, которому был
+недоступен ключ текущего пользователя. Principal исправлен на текущего
+интерактивного пользователя с ограниченными правами; повторная регистрация
+подтвердила совпадение action и principal. Исправленная задача ещё не запускалась,
+поэтому успешный плановый backup не доказан. `StartWhenAvailable` поможет
+выполнить пропущенный запуск, когда ПК станет доступен и пользователь войдёт в
+Windows. Retention и автоматическое удаление копий не настроены; независимого
+монитора/уведомлений нет. См. sanitized receipt
+`../evidence/i-027-beta-task-principal-20261029.json`.
 
 ## Изоляция и подготовка
 
@@ -247,14 +259,21 @@ Credential не восстанавливается из хеша в БД. Node �
 нулевое число активных peer connections и целостность backup. Не редактировать
 API env или DB вручную в обход runner.
 
-Перед приглашением остаются I-026 end-to-end Telegram-issued `initData` → OTP
-delivery → Android verify, I-027 ежедневная зашифрованная копия на ПК владельца,
-передача и restore drill, I-028 comprehensive DNS/IPv6,
-two-device, lifecycle и failure acceptance, а также peer handshake и проверка
-пользовательского туннеля на beta node. Invite-only конфигурация и MFA admin уже
-активированы; приглашать друзей до закрытия перечисленных gates нельзя.
-Резервирование квот, agent polling или handshake сами по себе не доказывают
-приватность.
+Актуальные ворота перед приглашением (2026-10-29): I-026 принят только для
+owner-only Telegram Mini App → Android OTP sign-in; onboarding друзей не принят.
+I-027: ручная зашифрованная передача и restore прошли; principal Windows scheduled
+task исправлен после ошибки доступа к ключу, но успешный плановый запуск после
+исправления не доказан; независимый мониторинг ограничен. I-028: отдельный
+физический двухустройственный сценарий,
+lifecycle и network/revoke приняты; полный pre-NAT DNS/IPv6 audit и независимый
+provider-failure критерий остаются открыты. I-030: ограниченный реальный
+owner-only tunnel smoke прошёл; свежая read-only проверка подтвердила доступность
+API/DB, active node и недавний agent poll, но широкая peer совместимость, внешний
+handshake и recovery не приняты. Не приглашать друзей до закрытия действующих gates;
+не направлять чувствительный трафик. Always-on/Lockdown и kill switch не заявлять:
+физическая приёмка I-029 остаётся открыта, а release manifest выключает эту
+поддержку. Резервирование квоты, agent polling или ограниченный handshake сами по
+себе не доказывают privacy acceptance.
 
 Для одного owner-only smoke перед подключением доступен операторский helper
 `scripts/start_beta_owner_test_credit.ps1`. Он через beta MFA admin API один раз
@@ -297,6 +316,31 @@ reserved balance 0. Ledger receipt:
 Пока privacy acceptance не завершена, не рекомендовать друзьям подключать
 чувствительный трафик. Kill switch/Always-on не заявлять до принятия Android
 Lockdown и безопасного восстановления.
+
+## Подготовленный локальный helper приглашения тестера
+
+`scripts/start_beta_invite_grant.ps1` поддерживает `grant` и `revoke` для
+изолированного beta API. Идентификатор Telegram вводится только в скрытом
+локальном prompt; пароль beta-admin и текущий TOTP также вводятся скрыто. Не
+передавать ID аргументом команды или в чат. Приглашение включает реальную
+учётную запись closed beta; запускать `grant` можно после закрытия ворот из
+`docs/beta-readiness-20261029.md` и актуальной I-028 acceptance matrix.
+
+```powershell
+& '.\scripts\start_beta_invite_grant.ps1' -Operation grant
+```
+
+После завершения одобренного теста сначала попросить тестера отключить VPN,
+затем выполнить отзыв:
+
+```powershell
+& '.\scripts\start_beta_invite_grant.ps1' -Operation revoke
+```
+
+Отзыв блокирует beta account и его сессии, отзывает VPN windows и ставит
+отзывающие команды для активных tunnel peers. Проверить подтверждение node
+cleanup до заявления, что доступ полностью снят. Helper не отправляет сообщение
+тестеру и не раздаёт APK.
 
 Изменения production/B, DNS/аккаунтов, платежей и внешняя публикация остаются за
 пределами этого beta runbook и требуют отдельного явного решения. B/production не

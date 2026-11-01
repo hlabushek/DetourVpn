@@ -7,7 +7,7 @@ if ($taskDevices.Count -ne 1) { throw 'Connect and unlock exactly one physical A
 $taskDetectedSerial = ($taskDevices[0] -split '\s+')[0]
 if ($Serial -and $Serial -ne $taskDetectedSerial) { throw 'Unexpected Android serial.' }
 $Serial = $taskDetectedSerial
-if (!$Session -and !$BuildOnly -and (& $taskAdb -s $Serial shell pm list packages org.example.vpnclient) -match '^package:org.example.vpnclient') {
+if (!$Session -and !$BuildOnly -and (& $taskAdb -s $Serial shell pm list packages com.detourvpn.client) -match '^package:com.detourvpn.client') {
     throw 'Test target already installed: preserve account/data, do not clear or uninstall it.'
 }
 if (!$ClientDirectory) {

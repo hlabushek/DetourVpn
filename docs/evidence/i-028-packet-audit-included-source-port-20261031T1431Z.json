@@ -1,0 +1,58 @@
+{
+  "issue": "I-028",
+  "scope": "operator-provided 90-second included AP-station capture correlated with physical Egress run",
+  "source": "sanitized console output supplied by operator",
+  "phase": "included",
+  "phase_scope": "after_vpn_outer_trigger",
+  "client_filter_mode": "ap_station",
+  "capture_started_at_utc": "2026-10-31T14:31:04.706154+00:00",
+  "vpn_outer_trigger_at_utc": "2026-10-31T14:32:41.813386+00:00",
+  "capture_completed_at_utc": "2026-10-31T14:34:11.936967+00:00",
+  "trigger_wait_seconds": 97.11,
+  "duration_seconds": 90,
+  "packet_count": 5668,
+  "packet_limit": 20000,
+  "packet_limit_reached": false,
+  "bounded_window_ended": true,
+  "vpn_outer_endpoint_packets": 5529,
+  "vpn_outer_endpoint_udp_egress_packets": 5529,
+  "direct_dns_v4_packets": 6,
+  "direct_dns_v6_packets": 0,
+  "global_ipv6_egress_packets": 133,
+  "probe_source_port_counters": {
+    "probe_dns_source_port_packets": 0,
+    "probe_ipv6_https_source_port_packets": 0,
+    "probe_baseline_ipv6_https_source_port_packets": 0
+  },
+  "correlated_physical_test": {
+    "evidence_file": "i-028-egress-diagnostic-20261031T143401Z-5344375a.json",
+    "passed": false,
+    "failed_at": "flutter_egress",
+    "phone_failure_stage": "egress_hold_refresh_probe",
+    "phone_failure": "hold refresh probe did not confirm staging egress; IPv4 primary and fallback DNS timed out",
+    "quota_remaining_bytes_before_probe": 3004,
+    "quota_remaining_bytes_after_probe": 0,
+    "renewal_acknowledged": true,
+    "generation": 12,
+    "cleanup_complete": true,
+    "timeout_timer_disarmed": true,
+    "phone_restored": true,
+    "accounting_settled": true,
+    "independent_remote_postcheck": true
+  },
+  "result": "included_window_observed_with_fixed_probe_counters_zero; suite failed during hold refresh",
+  "vpn_dataplane_acceptance": false,
+  "limitations": [
+    "AP-station filtering is not Android UID-wide attribution",
+    "zero fixed IPv6 source-port count is inconclusive because the included IPv6 probe failed DNS resolution before its socket flow",
+    "aggregate direct DNS and global IPv6 packets cannot be attributed to the test UID",
+    "the failed hold-refresh probe and quota exhaustion prevent treating this as an included acceptance pass"
+  ],
+  "privacy": {
+    "raw_packet_capture_saved": false,
+    "packet_headers_or_addresses_in_receipt": false,
+    "station_mac_saved": false,
+    "source_port_counts_only": true
+  },
+  "auditor_sha256": "3d98882ab8d00fd324e440ee85d470da8c104f95295707ab3b82e3484fbb83cd"
+}

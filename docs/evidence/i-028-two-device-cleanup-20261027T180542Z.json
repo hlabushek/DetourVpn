@@ -1,0 +1,20 @@
+{
+  "measured_at": "2026-10-27T18:05:42+00:00",
+  "scope": "post-run staging A cleanup only",
+  "source_failure_receipt": "i-028-two-device-staging-20261027T175710Z-f3d70bca.json",
+  "passed": true,
+  "vpn_dataplane_acceptance": false,
+  "staging_a": {
+    "stop_exit_code": 0,
+    "stop_result": {
+      "cleanup_complete": true,
+      "journal_preserved": true,
+      "temporary_grant_removed": true
+    },
+    "status": {
+      "prepared": false,
+      "cleanup_complete": true
+    }
+  },
+  "independent_remote_postcheck": false
+}

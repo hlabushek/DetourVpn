@@ -10,6 +10,21 @@ $ErrorActionPreference = 'Stop'
 $taskRoot = Split-Path -Parent $PSScriptRoot
 $taskClient = Join-Path $taskRoot 'apps\client'
 $taskAndroid = Join-Path $taskClient 'android'
+$taskBetaKeystorePath = $env:DETOURVPN_BETA_KEYSTORE_PATH
+if (![string]::IsNullOrWhiteSpace($taskBetaKeystorePath)) {
+    if (![IO.Path]::IsPathRooted($taskBetaKeystorePath)) {
+        throw 'DETOURVPN_BETA_KEYSTORE_PATH must be an absolute path outside the source checkout.'
+    }
+    $taskSourceRoot = [IO.Path]::GetFullPath($taskRoot).TrimEnd([IO.Path]::DirectorySeparatorChar, [IO.Path]::AltDirectorySeparatorChar)
+    $taskSourcePrefix = $taskSourceRoot + [IO.Path]::DirectorySeparatorChar
+    $taskBetaKeystoreFullPath = [IO.Path]::GetFullPath($taskBetaKeystorePath)
+    if ($taskBetaKeystoreFullPath.StartsWith($taskSourcePrefix, [StringComparison]::OrdinalIgnoreCase)) {
+        throw 'DETOURVPN_BETA_KEYSTORE_PATH must be outside the source checkout.'
+    }
+    if (!(Test-Path -LiteralPath $taskBetaKeystoreFullPath -PathType Leaf)) {
+        throw 'Configured beta keystore is unavailable.'
+    }
+}
 $taskPin = Get-Content -LiteralPath (Join-Path $taskClient 'toolchain.json') | ConvertFrom-Json
 if (!(Test-Path -LiteralPath (Join-Path $FlutterSdk 'bin\flutter.bat'))) { throw 'Run scripts/install_flutter.ps1 first.' }
 if ((& git -C $FlutterSdk rev-parse HEAD).Trim() -ne $taskPin.revision) { throw 'Flutter revision mismatch' }
@@ -18,10 +33,58 @@ if ((Get-FileHash -LiteralPath $taskWrapper -Algorithm SHA256).Hash.ToLowerInvar
     throw 'Gradle wrapper SHA256 mismatch'
 }
 if (!(Test-Path -LiteralPath (Join-Path $AndroidSdk 'platforms\android-36\android.jar'))) { throw 'Android SDK 36 missing' }
-foreach ($taskAbi in @('arm64-v8a', 'x86_64')) {
-    if (!(Test-Path -LiteralPath (Join-Path $taskRoot ".cache\i-011\sdk-go-only\jniLibs\$taskAbi\libwg-go.so"))) {
-        throw 'Prepare the reviewed I-011 native SDK first; see docs/runbooks/android-poc.md.'
+$taskTunnelBuildFile = Join-Path $taskRoot 'apps\android\tunnel\build.gradle.kts'
+$taskTunnelBuildText = Get-Content -LiteralPath $taskTunnelBuildFile -Raw
+if ($taskTunnelBuildText -notmatch '(?m)^val expectedPatchHash = "([a-f0-9]{64})"$') {
+    throw 'Could not read the pinned native SDK patch hash from apps/android/tunnel/build.gradle.kts.'
+}
+$taskExpectedPatchHash = $Matches[1]
+$taskPrepareScript = Get-Content -LiteralPath (Join-Path $taskRoot 'scripts\prepare_android_poc.py') -Raw
+if ($taskPrepareScript -notmatch '(?m)^REVISION = "([a-f0-9]{40})"$') {
+    throw 'Could not read the pinned upstream revision from scripts/prepare_android_poc.py.'
+}
+$taskExpectedSdkRevision = $Matches[1]
+$taskPreparedCandidates = @()
+$taskDefaultPreparedPath = Join-Path $taskRoot '.cache\i-011\sdk-go-only'
+if (Test-Path -LiteralPath $taskDefaultPreparedPath -PathType Container) {
+    $taskPreparedCandidates += Get-Item -LiteralPath $taskDefaultPreparedPath
+}
+$taskPreparedCandidates += Get-ChildItem -LiteralPath (Join-Path $taskRoot '.cache\i-011') -Directory |
+    Where-Object { $_.FullName -ne $taskDefaultPreparedPath } |
+    Sort-Object -Property Name -Descending
+$taskPreparedSdkSource = $null
+foreach ($taskCandidate in $taskPreparedCandidates) {
+    $taskReceiptPath = Join-Path $taskCandidate.FullName 'PREPARED.json'
+    if (!(Test-Path -LiteralPath $taskReceiptPath -PathType Leaf)) { continue }
+    try { $taskReceipt = Get-Content -LiteralPath $taskReceiptPath -Raw | ConvertFrom-Json }
+    catch { continue }
+    if ($taskReceipt.patch_sha256 -ne $taskExpectedPatchHash) { continue }
+    if ($taskReceipt.sdk_revision -ne $taskExpectedSdkRevision) { continue }
+    if (!$taskReceipt.source_sha256) { continue }
+    $taskCandidateRoot = [IO.Path]::GetFullPath($taskCandidate.FullName).TrimEnd([IO.Path]::DirectorySeparatorChar, [IO.Path]::AltDirectorySeparatorChar)
+    $taskCandidatePrefix = $taskCandidateRoot + [IO.Path]::DirectorySeparatorChar
+    $taskSourcesMatch = $true
+    foreach ($taskSourceHash in $taskReceipt.source_sha256.PSObject.Properties) {
+        if ($taskSourceHash.Value -notmatch '^[a-f0-9]{64}$') { $taskSourcesMatch = $false; break }
+        $taskSourcePath = [IO.Path]::GetFullPath((Join-Path $taskCandidateRoot $taskSourceHash.Name))
+        if (!$taskSourcePath.StartsWith($taskCandidatePrefix, [StringComparison]::OrdinalIgnoreCase) -or
+            !(Test-Path -LiteralPath $taskSourcePath -PathType Leaf) -or
+            (Get-FileHash -LiteralPath $taskSourcePath -Algorithm SHA256).Hash.ToLowerInvariant() -ne $taskSourceHash.Value) {
+            $taskSourcesMatch = $false
+            break
+        }
     }
+    if (!$taskSourcesMatch) { continue }
+    $taskHasAllAbis = @('arm64-v8a', 'x86_64') | ForEach-Object {
+        Test-Path -LiteralPath (Join-Path $taskCandidate.FullName "jniLibs\$_\libwg-go.so") -PathType Leaf
+    }
+    if (@($taskHasAllAbis).Where({ !$_ }).Count -eq 0) {
+        $taskPreparedSdkSource = $taskCandidate.FullName
+        break
+    }
+}
+if (!$taskPreparedSdkSource) {
+    throw 'No prepared I-011 SDK matches the pinned GoBackend patch and both required ABIs; see docs/runbooks/android-poc.md.'
 }
 # Build an explicit source snapshot outside OneDrive: Dart stat() can reject
 # cloud reparse points even when their contents are readable. Never copy private
@@ -47,7 +110,7 @@ New-Item -ItemType Directory -Force -Path (Join-Path $taskBuildRoot 'apps\androi
 foreach ($taskName in @('build.gradle.kts', 'gradle.lockfile')) {
     Copy-Item -LiteralPath (Join-Path $taskRoot "apps\android\tunnel\$taskName") -Destination (Join-Path $taskBuildRoot "apps\android\tunnel\$taskName")
 }
-Copy-ClientBuildSource (Join-Path $taskRoot '.cache\i-011\sdk-go-only') (Join-Path $taskBuildRoot '.cache\i-011\sdk-go-only')
+Copy-ClientBuildSource $taskPreparedSdkSource (Join-Path $taskBuildRoot '.cache\i-011\sdk-go-only')
 $taskSourceClient = $taskClient
 $taskClient = Join-Path $taskBuildRoot 'apps\client'
 $taskAndroid = Join-Path $taskClient 'android'

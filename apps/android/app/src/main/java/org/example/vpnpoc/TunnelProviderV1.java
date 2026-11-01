@@ -11,4 +11,8 @@ interface TunnelProviderV1 {
     void disconnect() throws Exception;
     boolean isUp();
     long lastHandshakeSeconds();
+    // Optional advisory only; -1 means unavailable. Never use for settlement.
+    default long transferBytes() { return -1; }
+    // Optional inbound-only advisory; -1 means unavailable. Never use for settlement.
+    default long receivedBytes() { return -1; }
 }

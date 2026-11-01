@@ -7,6 +7,7 @@ No altered database clocks, fake node ACKs, device keys or payload logging.
 from __future__ import annotations
 
 import base64
+import hashlib
 import http.client
 import json
 import os
@@ -50,10 +51,134 @@ from vpn_api.tunnels.lifecycle import apply_ack as lifecycle_apply_ack
 from vpn_api.tunnels.lifecycle import commands as lifecycle_commands
 
 __all__ = ["harness"]
-HOSTS = ("45.10.166.106", "85.209.132.205")
+HOSTS = ("45.10.166.106", "150.241.99.227")
+
+
+def cancel_job_and_wait(cancel: threading.Event, thread: threading.Thread | None) -> None:
+    """Do not overlap a running host operation with final cleanup."""
+    cancel.set()
+    if thread is not None:
+        thread.join()
+
+
+def check_job_cancelled(cancel: threading.Event | None) -> None:
+    if cancel is not None and cancel.is_set():
+        raise RuntimeError("job_cancelled")
+
+
 PRIVATE = Path(os.environ.get("LOCALAPPDATA", "")) / "ProjectVpn/i019-private"
 CONTROL = "/opt/project-vpn/acceptance/i019_control.py"
 PACKAGE = "org.example.vpnclient"
+PROBE_PACKAGE = "org.example.vpnpoc.i028"
+PROBE_TEST_PACKAGE = PROBE_PACKAGE + ".test"
+PROBE_RESULTS = frozenset(
+    {
+        "node_a",
+        "node_b",
+        "other_address",
+        "dns",
+        "timeout",
+        "route",
+        "tls",
+        "connect",
+        "permission",
+        "io",
+        "http_error",
+        "instrumentation_missing",
+        "unexpected_result",
+        "adb_error",
+        "probe_task_error",
+    }
+)
+MAX_EGRESS_PROBE_RECORDS = 32
+TRIGGER_RESULTS = frozenset({"connected", "timeout", "route", "permission", "connect", "io"})
+MAX_AGENT_EVENTS = 32
+I019_API_ERROR_CODES = frozenset(
+    {
+        "agent_unavailable",
+        "agent_unauthorized",
+        "agent_runtime_mismatch",
+        "agent_capability_mismatch",
+        "agent_replay",
+        "tunnel_profile_unavailable",
+        "storage_unavailable",
+        "invalid_request",
+        "peer_protocol_downgrade_forbidden",
+        "agent_inventory_invalid",
+    }
+)
+I019_API_EXCEPTION_TYPES = frozenset(
+    {
+        "ResponseValidationError",
+        "ValidationError",
+        "IntegrityError",
+        "OperationalError",
+        "ProgrammingError",
+        "TypeError",
+        "ValueError",
+        "KeyError",
+        "AttributeError",
+        "AssertionError",
+    }
+)
+
+
+class I019ApiFailureObserver:
+    """TEST ONLY: persist fixed endpoint/status/error categories, never response bodies."""
+
+    def __init__(self, app: Any, *, report: dict[str, Any]) -> None:
+        self.app, self.report = app, report
+
+    async def __call__(self, scope: dict[str, Any], receive: Any, send: Any) -> None:
+        endpoints = {
+            "/api/internal/v1/agent/peers/lifecycle/poll": "poll",
+            "/api/internal/v1/agent/peers/lifecycle/ack": "ack",
+        }
+        endpoint = endpoints.get(scope.get("path")) if scope.get("type") == "http" else None
+        if endpoint is None:
+            await self.app(scope, receive, send)
+            return
+
+        response: dict[str, Any] = {"status": 0, "body": bytearray()}
+
+        async def observe_send(message: dict[str, Any]) -> None:
+            if message.get("type") == "http.response.start":
+                response["status"] = message.get("status", 0)
+            elif message.get("type") == "http.response.body":
+                chunk = message.get("body", b"")
+                if len(response["body"]) + len(chunk) <= 2048:
+                    response["body"].extend(chunk)
+            await send(message)
+
+        exception_type = ""
+        try:
+            await self.app(scope, receive, observe_send)
+        except Exception as failure:
+            candidate = type(failure).__name__
+            exception_type = candidate if candidate in I019_API_EXCEPTION_TYPES else "other"
+            if response["status"] == 0:
+                response["status"] = 500
+            raise
+        finally:
+            status = response["status"]
+            if isinstance(status, int) and status >= 500:
+                event: dict[str, Any] = {"endpoint": endpoint, "status": status}
+                if exception_type:
+                    event["exception"] = exception_type
+                try:
+                    body = json.loads(bytes(response["body"]))
+                except (ValueError, TypeError):
+                    body = None
+                error = body.get("error") if isinstance(body, dict) else None
+                code = error.get("code") if isinstance(error, dict) else None
+                if isinstance(code, str) and code in I019_API_ERROR_CODES:
+                    event["error_code"] = code
+                prior = self.report.setdefault("api_failures", [])
+                if event not in prior:
+                    prior.append(event)
+                    del prior[:-6]
+
+
 FACTS = frozenset(
     {
         "b_initial_handshake_egress",
@@ -166,7 +291,7 @@ def normal_android_network(raw: str) -> dict[str, bool]:
 def sanitized_egress_probe(value: dict[str, Any]) -> dict[str, Any]:
     result: dict[str, Any] = {}
     for key, allowed in {
-        "stage": CONNECT_STAGES,
+        "stage": FAILURE_STAGES,
         "phase": {"request", "response", "body"},
         "result": {
             "pending",
@@ -175,7 +300,19 @@ def sanitized_egress_probe(value: dict[str, Any]) -> dict[str, Any]:
             "node_a",
             "node_b",
             "other_address",
+            "dns",
             "timeout",
+            "route",
+            "tls",
+            "connect",
+            "permission",
+            "io",
+            "http_error",
+            "instrumentation_missing",
+            "unexpected_result",
+            "adb_error",
+            "probe_task_error",
+            "unavailable",
             "socket_error",
             "tls_error",
             "other_error",
@@ -187,7 +324,92 @@ def sanitized_egress_probe(value: dict[str, Any]) -> dict[str, Any]:
         candidate = value.get(key)
         if type(candidate) is int and lower <= candidate <= upper:
             result[key] = candidate
+    trigger = value.get("trigger")
+    if isinstance(trigger, str):
+        result["trigger"] = trigger if trigger in TRIGGER_RESULTS else "unavailable"
     return result
+
+
+def append_egress_probe(records: list[dict[str, Any]], value: dict[str, Any]) -> dict[str, Any]:
+    """Append one sanitized probe record while keeping the receipt strictly bounded."""
+    if len(records) >= MAX_EGRESS_PROBE_RECORDS:
+        raise ValueError("i019_egress_probe_limit_reached")
+    sanitized = sanitized_egress_probe(value)
+    records.append(sanitized)
+    return sanitized
+
+
+class AgentEventRecorder:
+    """Bounded test receipt events; peer IDs are replaced with per-run ordinals."""
+
+    def __init__(self) -> None:
+        self._peer_aliases: dict[UUID, int] = {}
+        self.events: list[dict[str, Any]] = []
+        self.truncated = False
+        self._lock = threading.Lock()
+
+    def record(
+        self,
+        kind: str,
+        peer_id: UUID,
+        operation: str,
+        version: int,
+        *,
+        handler_returned: bool | None = None,
+        applied: bool | None = None,
+    ) -> None:
+        if kind not in {"delivery", "ack"} or operation not in {"add_peer", "remove_peer"}:
+            raise ValueError("i019_agent_event_invalid")
+        if type(version) is not int or not 1 <= version <= 2**63 - 1:
+            raise ValueError("i019_agent_event_invalid")
+        if kind == "ack" and (type(handler_returned) is not bool or type(applied) is not bool):
+            raise ValueError("i019_agent_event_invalid")
+        with self._lock:
+            if len(self.events) >= MAX_AGENT_EVENTS:
+                self.truncated = True
+                return
+            if peer_id not in self._peer_aliases:
+                self._peer_aliases[peer_id] = len(self._peer_aliases) + 1
+            event: dict[str, Any] = {
+                "kind": kind,
+                "peer_ordinal": self._peer_aliases[peer_id],
+                "operation": operation,
+                "version": version,
+            }
+            if kind == "ack":
+                event["handler_returned"] = handler_returned
+                event["applied"] = applied
+            self.events.append(event)
+
+    def snapshot(self) -> tuple[list[dict[str, Any]], bool]:
+        with self._lock:
+            return [dict(event) for event in self.events], self.truncated
+
+
+def independent_egress_result(output: bytes) -> str:
+    """Parse only the instrumentation's fixed category; discard all raw output."""
+    matches = re.findall(
+        rb"^INSTRUMENTATION_RESULT: i019_egress_result=([a-z_]{1,24})\r?$",
+        output,
+        flags=re.MULTILINE,
+    )
+    if len(matches) != 1:
+        return "instrumentation_missing"
+    candidate = matches[0].decode("ascii")
+    return candidate if candidate in PROBE_RESULTS else "unexpected_result"
+
+
+def independent_trigger_result(output: bytes) -> str:
+    """Keep only one fixed trigger category, never raw instrumentation output."""
+    matches = re.findall(
+        rb"^INSTRUMENTATION_RESULT: i019_trigger_result=([a-z_]{1,24})\r?$",
+        output,
+        flags=re.MULTILINE,
+    )
+    if len(matches) != 1:
+        return "unavailable"
+    candidate = matches[0].decode("ascii")
+    return candidate if candidate in TRIGGER_RESULTS else "unavailable"
 
 
 def sanitized_phone_failure(value: dict[str, Any]) -> dict[str, Any]:
@@ -223,6 +445,34 @@ def sanitized_phone_failure(value: dict[str, Any]) -> dict[str, Any]:
     return result
 
 
+class CleanupNotConfirmed(RuntimeError):
+    """Carry only fixed cleanup checks, never remote output or exception text."""
+
+    def __init__(self, message: str, phase: str, values: dict[str, Any]) -> None:
+        super().__init__(message)
+        self.phase = phase
+        self.checks = {
+            key: values[key]
+            for key in (
+                "cleanup_complete",
+                "agent_resume_failed",
+                "agent_state_query_failed",
+                "agent_stop_command_ok",
+                "endpoint_stop_command_ok",
+                "receipt_read_failed",
+                "forwarding_restored",
+                "owned_resources_absent",
+                "control_grant_removed",
+                "endpoint_active",
+                "agent_active",
+            )
+            if type(values.get(key)) is bool
+        }
+
+    def receipt(self) -> dict[str, Any]:
+        return {"error": "cleanup_not_confirmed", "phase": self.phase, "checks": self.checks}
+
+
 def finish_node_attempt(host: str, *, retain_grant: bool) -> dict[str, Any]:
     """A failed cleanup never qualifies for reuse; no grant renewal is performed."""
     result = remote(host, "stop" if retain_grant else "expire")
@@ -234,13 +484,14 @@ def finish_node_attempt(host: str, *, retain_grant: bool) -> dict[str, Any]:
             "owned_resources_absent",
         )
     ):
-        raise RuntimeError("i019_attempt_cleanup_not_confirmed")
+        raise CleanupNotConfirmed("i019_attempt_cleanup_not_confirmed", "stop_result", result)
     if retain_grant:
-        if remote(host, "status") != {"endpoint_active": False, "agent_active": False}:
-            raise RuntimeError("i019_attempt_still_active")
+        status = remote(host, "status")
+        if status != {"endpoint_active": False, "agent_active": False}:
+            raise CleanupNotConfirmed("i019_attempt_still_active", "status", status)
         result["control_grant_retained_until_original_deadline"] = True
     elif result.get("control_grant_removed") is not True:
-        raise RuntimeError("i019_grant_removal_not_confirmed")
+        raise CleanupNotConfirmed("i019_grant_removal_not_confirmed", "grant", result)
     return result
 
 
@@ -254,6 +505,10 @@ def finish_diagnostic_session() -> bool:
     for host in HOSTS:
         try:
             result["cleanup"][host] = finish_node_attempt(host, retain_grant=False)
+        except CleanupNotConfirmed as failure:
+            result["cleanup"][host] = failure.receipt()
+        except RemoteActionFailure:
+            result["cleanup"][host] = {"error": "cleanup_not_confirmed", "phase": "remote_action"}
         except (RuntimeError, ValueError, subprocess.SubprocessError):
             result["cleanup"][host] = {"error": "cleanup_not_confirmed"}
     result["passed"] = all(
@@ -314,7 +569,7 @@ def remote(host: str, action: str, data: bytes | None = None) -> dict[str, Any]:
         [*ssh_args(), "vpn-deploy@" + host, f"sudo -n {CONTROL} {action}"],
         input=data,
         capture_output=True,
-        timeout=250,
+        timeout=480 if action in {"stop", "expire"} else 250,
         check=False,
     )
     if result.returncode:
@@ -442,8 +697,10 @@ def test_i019_physical_two_host_failover(harness: Harness, monkeypatch: pytest.M
         "telegram_delivery": "TEST FAKE ONLY",
         "real_postgresql": True,
         "physical_android": True,
-        "same_provider": True,
-        "provider_independence_verified": False,
+        "same_provider": False,
+        "provider_independence_verified": True,
+        "provider_independence_scope": "distinct_origin_asn",
+        "full_upstream_independence_verified": False,
         "facts": {},
         "cleanup": {},
         "diagnostic_session": os.environ.get("VPN_I019_DIAGNOSTIC_SESSION") == "true",
@@ -465,6 +722,7 @@ def test_i019_physical_two_host_failover(harness: Harness, monkeypatch: pytest.M
                 "live_phone": report.get("live_phone"),
                 "egress_probes": list(report.get("egress_probes", [])),
                 "agent_b": report.get("agent_b"),
+                "api_failures": list(report.get("api_failures", [])),
             }
             temporary = progress_path.with_suffix(".next.json")
             temporary.write_text(json.dumps(value, indent=2) + "\n")
@@ -477,14 +735,21 @@ def test_i019_physical_two_host_failover(harness: Harness, monkeypatch: pytest.M
     touched: set[str] = set()
     approved_grants: set[str] = set()
     phone_touched = False
+    probe_base_touched = False
+    probe_test_touched = False
     reverse_touched = False
+    probe_executor = ThreadPoolExecutor(max_workers=1)
+    probe_jobs: dict[str, tuple[Any, str]] = {}
     a_tunnels: list[UUID] = []
     job: dict[str, Any] = {"thread": None, "done": False, "failed": False}
+    job_cancel = threading.Event()
     app = create_app(h.settings, database_engine=h.engine, telegram_sender=h.sender)
+    app.add_middleware(I019ApiFailureObserver, report=report)
     stage = "preflight"
     progress(stage)
     actual_commands = lifecycle_commands
     actual_ack = lifecycle_apply_ack
+    agent_events = AgentEventRecorder()
 
     def observe_commands(
         session: Session, node_id: UUID, inventory: list[str]
@@ -494,6 +759,10 @@ def test_i019_physical_two_host_failover(harness: Harness, monkeypatch: pytest.M
             state = report.setdefault("agent_b", {"deliveries": 0, "acks": 0})
             state["deliveries"] += 1
             command = result.commands[0]
+            agent_events.record(
+                "delivery", command.peer_id, command.operation, command.peer_version
+            )
+            state["events"], state["events_truncated"] = agent_events.snapshot()
             state["last_delivery"] = {
                 "operation": command.operation,
                 "version": command.peer_version,
@@ -517,8 +786,27 @@ def test_i019_physical_two_host_failover(harness: Harness, monkeypatch: pytest.M
             "version": body.peer_version,
         }
         try:
-            return actual_ack(session, node_id, body)
+            result = actual_ack(session, node_id, body)
+            agent_events.record(
+                "ack",
+                body.peer_id,
+                body.operation,
+                body.peer_version,
+                handler_returned=True,
+                applied=body.applied,
+            )
+            state["events"], state["events_truncated"] = agent_events.snapshot()
+            return result
         except NodeError as failure:
+            agent_events.record(
+                "ack",
+                body.peer_id,
+                body.operation,
+                body.peer_version,
+                handler_returned=False,
+                applied=body.applied,
+            )
+            state["events"], state["events_truncated"] = agent_events.snapshot()
             state["ack_error"] = (
                 failure.code
                 if failure.code
@@ -546,14 +834,17 @@ def test_i019_physical_two_host_failover(harness: Harness, monkeypatch: pytest.M
         temporary.write_text(json.dumps({"version": 1, "profiles": list(profiles.values())}))
         temporary.replace(manifest)  # Inherits owner-only directory ACL.
 
-    def start_node(host: str) -> None:
+    def start_node(host: str, cancel: threading.Event | None = None) -> None:
+        check_job_cancelled(cancel)
         if tunnels[host] is None:
             tunnels[host] = transport(host)
         body = bootstraps[host] | {"runtime_id": str(uuid4())}
         bootstraps[host] = body
         touched.add(host)  # Ambiguous SSH response still requires cleanup.
         remote(host, "prepare", json.dumps(body).encode())
+        check_job_cancelled(cancel)
         remote(host, "start")
+        check_job_cancelled(cancel)
         selected = remote(host, "profile")
         try:
             NodeProfile.model_validate(selected)
@@ -562,6 +853,7 @@ def test_i019_physical_two_host_failover(harness: Harness, monkeypatch: pytest.M
         profiles[host] = selected
         write_manifest()
         for _ in range(50):
+            check_job_cancelled(cancel)
             with Session(h.engine) as session:
                 node = session.get(VPNNode, node_ids[host])
                 if (
@@ -590,14 +882,18 @@ def test_i019_physical_two_host_failover(harness: Harness, monkeypatch: pytest.M
 
         def work() -> None:
             try:
+                check_job_cancelled(job_cancel)
                 if operation == "stop":
                     assert remote(HOSTS[0], "stop").get("cleanup_complete") is True
                     report["node_a_runtime_stopped_before_expiry"] = True
                 else:
                     state = remote(HOSTS[0], "status")
+                    check_job_cancelled(job_cancel)
                     if state["endpoint_active"]:
                         assert remote(HOSTS[0], "stop").get("cleanup_complete") is True
-                    start_node(HOSTS[0])
+                    check_job_cancelled(job_cancel)
+                    start_node(HOSTS[0], job_cancel)
+                    check_job_cancelled(job_cancel)
                     assert remote(HOSTS[0], "gate").get("kernel_gate_empty") is True
                     with Session(h.engine) as session:
                         for tunnel_id in a_tunnels:
@@ -716,10 +1012,66 @@ def test_i019_physical_two_host_failover(harness: Harness, monkeypatch: pytest.M
     def test_probe(request: Request, value: dict[str, Any]) -> dict[str, bool]:
         owner(request)
         probes = report.setdefault("egress_probes", [])
-        assert len(probes) < 16
-        probes.append(sanitized_egress_probe(value))
+        append_egress_probe(probes, value)
         progress("egress_probe")
         return {"recorded": True}
+
+    @app.post("/api/v1/__i019__/egress-probe", include_in_schema=False)
+    def test_independent_egress_probe(request: Request, value: dict[str, Any]) -> dict[str, str]:
+        owner(request)
+        probe_stage = value.get("stage")
+        assert isinstance(probe_stage, str) and probe_stage in FAILURE_STAGES
+        assert len(probe_jobs) < 2
+        probe_id = uuid4().hex
+
+        def perform_probe() -> tuple[str, str]:
+            try:
+                output = adb(
+                    "shell",
+                    "am",
+                    "instrument",
+                    "-w",
+                    "-r",
+                    "-e",
+                    "mode",
+                    "i019",
+                    f"{PROBE_TEST_PACKAGE}/org.example.vpnpoc.I028Probe",
+                    timeout=25,
+                )
+                outcome = independent_egress_result(output)
+                trigger = independent_trigger_result(output)
+                del output
+                return outcome, trigger
+            except (RuntimeError, subprocess.SubprocessError):
+                return "adb_error", "unavailable"
+
+        probe_jobs[probe_id] = (probe_executor.submit(perform_probe), probe_stage)
+        return {"probe_id": probe_id}
+
+    @app.post("/api/v1/__i019__/egress-probe-result", include_in_schema=False)
+    def test_independent_egress_probe_result(
+        request: Request, value: dict[str, Any]
+    ) -> dict[str, Any]:
+        owner(request)
+        probe_id = value.get("probe_id")
+        assert isinstance(probe_id, str) and re.fullmatch(r"[0-9a-f]{32}", probe_id)
+        job_value = probe_jobs.get(probe_id)
+        assert job_value is not None
+        future, probe_stage = job_value
+        if not future.done():
+            return {"done": False}
+        try:
+            outcome, trigger = future.result()
+        except Exception:
+            outcome, trigger = "probe_task_error", "unavailable"
+        probe_jobs.pop(probe_id, None)
+        probes = report.setdefault("egress_probes", [])
+        sanitized = append_egress_probe(
+            probes,
+            {"stage": probe_stage, "phase": "response", "result": outcome, "trigger": trigger},
+        )
+        progress("egress_probe")
+        return {"done": True, "result": sanitized["result"]}
 
     @app.post("/api/v1/__i019__/normal-network", include_in_schema=False)
     def test_normal_network(request: Request) -> dict[str, bool]:
@@ -890,6 +1242,24 @@ def test_i019_physical_two_host_failover(harness: Harness, monkeypatch: pytest.M
                     X25519PrivateKey.generate().public_key().public_bytes_raw()
                 ).decode(),
             }
+        probe_base = Path(os.environ["VPN_I019_PROBE_BASE_APK"])
+        probe_test = Path(os.environ["VPN_I019_PROBE_TEST_APK"])
+        for path, variable in (
+            (probe_base, "VPN_I019_PROBE_BASE_SHA256"),
+            (probe_test, "VPN_I019_PROBE_TEST_SHA256"),
+        ):
+            assert path.is_file()
+            assert hashlib.sha256(path.read_bytes()).hexdigest() == os.environ[variable]
+        installed = adb("shell", "pm", "list", "packages").decode("ascii", "ignore")
+        if any(
+            line.strip() in {f"package:{PROBE_PACKAGE}", f"package:{PROBE_TEST_PACKAGE}"}
+            for line in installed.splitlines()
+        ):
+            raise RuntimeError("independent_probe_package_already_installed")
+        adb("install", str(probe_base), timeout=90)
+        probe_base_touched = True
+        adb("install", str(probe_test), timeout=90)
+        probe_test_touched = True
         report["clock_offset_upper_bounds_seconds"] = {}
         for host in active_hosts:
             try:
@@ -960,8 +1330,7 @@ def test_i019_physical_two_host_failover(harness: Harness, monkeypatch: pytest.M
         active_failure = sys.exc_info()[1]
         if isinstance(active_failure, RemoteActionFailure):
             report["remote_failure"] = active_failure.facts
-        if job["thread"] is not None:
-            job["thread"].join(timeout=260)
+        cancel_job_and_wait(job_cancel, job["thread"])
         if stage == "physical_failover" and not report["passed"]:
             report["failure_nodes"] = {}
             for host in touched:
@@ -995,11 +1364,21 @@ def test_i019_physical_two_host_failover(harness: Harness, monkeypatch: pytest.M
                             is True
                         )
                     )
+                except CleanupNotConfirmed as failure:
+                    report["passed"] = False
+                    report["cleanup"][host] = failure.receipt()
+                except RemoteActionFailure:
+                    report["passed"] = False
+                    report["cleanup"][host] = {
+                        "error": "cleanup_not_confirmed",
+                        "phase": "remote_action",
+                    }
                 except (RuntimeError, ValueError, subprocess.SubprocessError):
                     report["passed"] = False
                     report["cleanup"][host] = {"error": "cleanup_not_confirmed"}
             terminate(tunnels[host])
         server.should_exit = True
+        probe_executor.shutdown(wait=True, cancel_futures=True)
         if thread.is_alive():
             thread.join(timeout=15)
         phone_clean = True
@@ -1023,6 +1402,26 @@ def test_i019_physical_two_host_failover(harness: Harness, monkeypatch: pytest.M
             phone_clean &= not reverse_touched or b"tcp:18766" not in adb("reverse", "--list")
         except (RuntimeError, subprocess.SubprocessError):
             phone_clean = False
+        probe_clean = True
+        for package, was_touched in (
+            (PROBE_TEST_PACKAGE, probe_test_touched),
+            (PROBE_PACKAGE, probe_base_touched),
+        ):
+            if was_touched:
+                try:
+                    adb("uninstall", package)
+                except (RuntimeError, subprocess.SubprocessError):
+                    probe_clean = False
+        try:
+            installed_after = adb("shell", "pm", "list", "packages").decode("ascii", "ignore")
+            probe_clean &= all(
+                f"package:{package}" not in installed_after.splitlines()
+                for package in (PROBE_PACKAGE, PROBE_TEST_PACKAGE)
+            )
+        except (RuntimeError, subprocess.SubprocessError):
+            probe_clean = False
+        report["independent_probe_removed"] = probe_clean
+        phone_clean &= probe_clean
         report["phone_stopped_and_reverse_removed"] = phone_clean
         manifest.unlink(missing_ok=True)
         (PRIVATE / "nodes.next.json").unlink(missing_ok=True)

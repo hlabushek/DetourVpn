@@ -4,14 +4,19 @@ let access = null, selected = null, role = null;
 const pending = new Map();
 const $ = id => document.getElementById(id);
 const status = message => { $('status').textContent = message; };
-const decimalFields = new Set(['amount_bytes','quota_bytes','price_minor','period_days']);
+const decimalFields = new Set(['amount_bytes','quota_bytes','price_minor','period_days','telegram_subject']);
 function encode(body) {
   // Decimal integers are never converted through JS Number, including int64 values.
-  return JSON.stringify(body).replace(/"(amount_bytes|quota_bytes|price_minor|period_days)":"([0-9]+)"/g, '"$1":$2');
+  return JSON.stringify(body).replace(/"(amount_bytes|quota_bytes|price_minor|period_days|telegram_subject)":"([0-9]+)"/g, '"$1":$2');
 }
 function integer(value, positive = false) {
   if (!/^(0|[1-9][0-9]*)$/.test(value) || BigInt(value) > 9223372036854775807n || (positive && BigInt(value) === 0n)) throw new Error('invalid_integer');
   return value;
+}
+function telegramSubject(value) {
+  const subject=integer(value,true);
+  if(BigInt(subject)>4503599627370495n) throw new Error('invalid_telegram_id');
+  return subject;
 }
 async function request(path, body) {
   const response = await fetch('/api/admin/v1/' + path, { method: body === undefined ? 'GET' : 'POST',
@@ -66,19 +71,20 @@ async function refresh() {
   table('audit',await request('audit'),[['Время',r=>r.time],['Автор',r=>r.actor],['Действие',r=>r.operation],['Пользователь',r=>r.user_id],['Причина',r=>r.reason],['Ключ',r=>r.idempotency_key]]);
   if(selected) await loadUser(selected);
 }
-async function run(fn) { try { status('Выполняется…'); await fn(); status('Готово'); } catch(e) { status('Операция не завершена: '+(e.message || 'network_error')); } }
+async function run(fn) { try { status('Выполняется…'); const result=await fn(); status(typeof result==='string' ? result : 'Готово'); } catch(e) { status('Операция не завершена: '+(e.message || 'network_error')); } }
 async function action(body) {
   const signature=JSON.stringify(body); let key=pending.get(signature);
   if(!key) { key=crypto.randomUUID(); pending.set(signature,key); }
-  await request('actions',{...body,idempotency_key:key});
+  const result=await request('actions',{...body,idempotency_key:key});
   // Keep a completed form's key too: accidental duplicate submit must not grant twice.
   await refresh();
+  return result;
 }
 $('login-form').addEventListener('submit',e=>{e.preventDefault(); run(async()=>{
   const form=e.target, body=Object.fromEntries(new FormData(form));
   const result=await request('login',body); access=result.access_token; role=result.role;
   form.reset(); $('workspace').hidden=false; $('login').hidden=true;
-  for(const id of ['changes','plan-form','demo-catalog']) $(id).hidden=role!=='admin';
+  for(const id of ['changes','plan-form','demo-catalog','beta-invites']) $(id).hidden=role!=='admin';
   await refresh();
 });});
 $('search-form').addEventListener('submit',e=>{e.preventDefault(); run(()=>loadUsers(new FormData(e.target).get('q')));});
@@ -98,3 +104,14 @@ $('plan-form').addEventListener('submit',e=>{e.preventDefault(); run(async()=>{
   for(const key of decimalFields) if(key in f) f[key]=integer(f[key],key!=='price_minor');
   await action({operation:'revise_plan',reason,plan:f});
 });});
+for(const [formId,operation] of [['beta-grant-form','grant_beta_invite'],['beta-revoke-form','revoke_beta_invite']]) {
+  $(formId).addEventListener('submit',e=>{e.preventDefault(); run(async()=>{
+    const f=Object.fromEntries(new FormData(e.target));
+    const subject=telegramSubject(f.telegram_subject);
+    if(f.reason.includes(subject)) throw new Error('reason_must_not_contain_identifier');
+    if(operation==='revoke_beta_invite' && !window.confirm('Отзыв отключит аккаунт тестировщика и отзовёт его сессии и VPN-туннели. Продолжить?')) return;
+    await action({operation,telegram_subject:subject,reason:f.reason});
+    e.target.reset();
+    return operation==='grant_beta_invite' ? 'Приглашение активно' : 'Приглашение отозвано; завершение отзыва на узле проверяйте отдельно';
+  });});
+}

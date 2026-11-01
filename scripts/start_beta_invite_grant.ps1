@@ -1,21 +1,17 @@
 [CmdletBinding()]
 param(
-    [Parameter(Mandatory)]
-    [long]$TelegramId,
-    [switch]$RunHere
+    [switch]$RunHere,
+    [ValidateSet('grant', 'revoke')]
+    [string]$Operation = 'grant'
 )
 
 $ErrorActionPreference = 'Stop'
 $PSNativeCommandUseErrorActionPreference = $false
 $betaOrigin = 'https://193.68.88.239'
 
-if ($TelegramId -lt 1 -or $TelegramId -ge [long]4503599627370496) {
-    throw 'Telegram ID is outside the supported range.'
-}
-
 if (-not $RunHere) {
     $pwshPath = (Get-Command pwsh.exe -ErrorAction Stop).Source
-    $arguments = '-NoExit -ExecutionPolicy Bypass -File "{0}" -TelegramId {1} -RunHere' -f $PSCommandPath, $TelegramId
+    $arguments = '-NoExit -ExecutionPolicy Bypass -File "{0}" -RunHere -Operation {1}' -f $PSCommandPath, $Operation
     Start-Process -FilePath $pwshPath -ArgumentList $arguments -WindowStyle Normal
     return
 }
@@ -34,14 +30,24 @@ function ConvertFrom-SecureInput([Security.SecureString]$Value) {
 
 $securePassword = $null
 $secureCode = $null
+$secureTelegramId = $null
 $password = $null
 $code = $null
+$telegramIdText = $null
+$telegramId = $null
 $adminToken = $null
 
 try {
-    Write-Host 'Target: isolated beta API only. Do not paste credentials in chat.'
+    Write-Host "Target: isolated beta API only. Operation: $Operation. Do not paste credentials in chat."
+    $secureTelegramId = Read-Host 'Tester Telegram numeric ID (hidden)' -AsSecureString
     $securePassword = Read-Host 'beta-owner admin password (hidden)' -AsSecureString
     $secureCode = Read-Host 'Current TOTP code (hidden)' -AsSecureString
+    $telegramIdText = ConvertFrom-SecureInput $secureTelegramId
+    if ($telegramIdText -notmatch '^[1-9][0-9]{0,14}$' -or
+        -not [long]::TryParse($telegramIdText, [ref]$telegramId) -or
+        $telegramId -ge [long]4503599627370496) {
+        throw 'Tester Telegram ID is outside the supported range.'
+    }
     if ($securePassword.Length -lt 16 -or $securePassword.Length -gt 256) {
         throw 'Admin password length is invalid.'
     }
@@ -61,19 +67,26 @@ try {
         throw 'Beta admin login did not return an administrator session.'
     }
 
+    $operationName = if ($Operation -eq 'grant') { 'grant_beta_invite' } else { 'revoke_beta_invite' }
+    $reason = if ($Operation -eq 'grant') {
+        'Owner-requested closed beta access for account login validation.'
+    } else {
+        'Owner-requested beta access removal after account login validation.'
+    }
     $actionBody = @{
-        operation = 'grant_beta_invite'
+        operation = $operationName
         idempotency_key = [guid]::NewGuid().ToString()
-        reason = 'Owner-requested closed beta access for account login validation.'
-        telegram_subject = $TelegramId
+        reason = $reason
+        telegram_subject = $telegramId
     } | ConvertTo-Json -Compress
     $result = Invoke-RestMethod -Method Post -Uri "$betaOrigin/api/admin/v1/actions" `
         -Headers @{ Authorization = "Bearer $adminToken" } `
         -ContentType 'application/json' -Body $actionBody -TimeoutSec 20
-    if ($result.status -ne 'active') { throw 'Beta invite did not become active.' }
-    Write-Host "beta_invite_status=active; telegram_id=$TelegramId"
+    $expectedStatus = if ($Operation -eq 'grant') { 'active' } else { 'revoked' }
+    if ($result.status -ne $expectedStatus) { throw "Beta invite status was not confirmed for $Operation." }
+    Write-Host "beta_invite_status=$expectedStatus"
 } catch {
-    Write-Host 'Beta invite was not confirmed. Check the non-secret error state in this window.'
+    Write-Host "Beta invite $Operation was not confirmed. Check the non-secret error state in this window."
     if ($_.Exception.Response) {
         try {
             $status = [int]$_.Exception.Response.StatusCode
@@ -91,6 +104,15 @@ try {
     }
     $password = $null
     $code = $null
+    $telegramIdText = $null
+    $telegramId = $null
+    $operationName = $null
+    $reason = $null
+    $actionBody = $null
+    $login = $null
+    $result = $null
+    $expectedStatus = $null
+    if ($secureTelegramId) { $secureTelegramId.Dispose() }
     if ($securePassword) { $securePassword.Dispose() }
     if ($secureCode) { $secureCode.Dispose() }
     $adminToken = $null

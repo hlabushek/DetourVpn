@@ -1,0 +1,821 @@
+{
+  "accounting_after_revoke": {
+    "ledger_consistent": true,
+    "measured_receipt_bytes": "38768559",
+    "open_connections": 0,
+    "receipt_count": 45,
+    "reserved_bytes": "0",
+    "unknown_receipts": 0,
+    "used_bytes": "38768559",
+    "violations": 0
+  },
+  "cleanup_steps": {
+    "agent_revoke_and_stop": true,
+    "isolated_i028_app_absent": true,
+    "local_api_stopped": true,
+    "owner_app_untouched": true,
+    "phone_restored": true,
+    "phone_session_absent": true,
+    "root_stop": {
+      "cleanup_complete": true,
+      "gate_close_errors_before_core_stop": 0,
+      "journal_preserved": true,
+      "temporary_grant_removed": true,
+      "timeout_timer_disarmed": true
+    },
+    "ssh_transport": true
+  },
+  "control_plane_settlement_complete": true,
+  "diagnostic_only": false,
+  "different_android_process_same_real_account_family_and_device": true,
+  "exact_measured_bytes": "38768559",
+  "facts": {
+    "advisory_traffic_renewal_requested": true,
+    "agent_restart_reconciles_before_new_real_tunnel": true,
+    "api_agent_loss_native_and_kernel_deadlines_close": true,
+    "disconnect_during_real_renewal_response_cannot_reopen": true,
+    "disconnect_native_down_and_server_closed": true,
+    "included_probe_real_staging_ipv4_and_udp_dns": true,
+    "native_reports_fresh_handshake": true,
+    "real_account_refresh_after_android_process_restart": true,
+    "remote_revoke_stops_actual_android_tunnel": true,
+    "same_probe_uid_included_then_excluded_egress": true,
+    "sustained_real_renewals_over_three_minutes": true
+  },
+  "flutter_exit_code": 0,
+  "flutter_stage_marker_seen": false,
+  "independent_probes": [
+    {
+      "active_network_available": true,
+      "active_network_is_vpn": false,
+      "active_network_validated": true,
+      "active_transport_cellular": false,
+      "active_transport_wifi": true,
+      "application_initialized": true,
+      "dns_failure": "none",
+      "egress_is_staging": false,
+      "fixed_udp_dns_response": true,
+      "ipv4_available": true,
+      "ipv4_failure": "none",
+      "ipv4_primary_failure": "none",
+      "ipv6_available": false,
+      "ipv6_failure": "dns",
+      "probe_complete": true,
+      "process_uid_matches_target": true,
+      "test_internet_permission_declared": true,
+      "vpn_dns_configured": false
+    },
+    {
+      "active_network_available": true,
+      "active_network_is_vpn": true,
+      "active_network_validated": true,
+      "active_transport_cellular": false,
+      "active_transport_wifi": true,
+      "application_initialized": true,
+      "dns_failure": "none",
+      "egress_is_staging": true,
+      "fixed_udp_dns_response": true,
+      "ipv4_available": true,
+      "ipv4_failure": "none",
+      "ipv4_primary_failure": "none",
+      "ipv6_available": false,
+      "ipv6_failure": "dns",
+      "probe_complete": true,
+      "process_uid_matches_target": true,
+      "test_internet_permission_declared": true,
+      "vpn_dns_configured": true
+    },
+    {
+      "application_initialized": true,
+      "egress_is_staging": true,
+      "ipv4_available": true,
+      "ipv4_failure": "none",
+      "ipv4_primary_failure": "none",
+      "probe_complete": true,
+      "process_uid_matches_target": true,
+      "test_internet_permission_declared": true
+    },
+    {
+      "application_initialized": true,
+      "egress_is_staging": true,
+      "ipv4_available": true,
+      "ipv4_failure": "none",
+      "ipv4_primary_failure": "timeout",
+      "ipv4_used_fallback": true,
+      "probe_complete": true,
+      "process_uid_matches_target": true,
+      "test_internet_permission_declared": true
+    },
+    {
+      "application_initialized": true,
+      "egress_is_staging": true,
+      "ipv4_available": true,
+      "ipv4_failure": "none",
+      "ipv4_primary_failure": "none",
+      "probe_complete": true,
+      "process_uid_matches_target": true,
+      "test_internet_permission_declared": true
+    },
+    {
+      "application_initialized": true,
+      "egress_is_staging": true,
+      "ipv4_available": true,
+      "ipv4_failure": "none",
+      "ipv4_primary_failure": "none",
+      "probe_complete": true,
+      "process_uid_matches_target": true,
+      "test_internet_permission_declared": true
+    },
+    {
+      "application_initialized": true,
+      "egress_is_staging": true,
+      "ipv4_available": true,
+      "ipv4_failure": "none",
+      "ipv4_primary_failure": "none",
+      "probe_complete": true,
+      "process_uid_matches_target": true,
+      "test_internet_permission_declared": true
+    },
+    {
+      "application_initialized": true,
+      "egress_is_staging": true,
+      "ipv4_available": true,
+      "ipv4_failure": "none",
+      "ipv4_primary_failure": "none",
+      "probe_complete": true,
+      "process_uid_matches_target": true,
+      "test_internet_permission_declared": true
+    },
+    {
+      "application_initialized": true,
+      "egress_is_staging": true,
+      "ipv4_available": true,
+      "ipv4_failure": "none",
+      "ipv4_primary_failure": "none",
+      "probe_complete": true,
+      "process_uid_matches_target": true,
+      "test_internet_permission_declared": true
+    },
+    {
+      "application_initialized": true,
+      "egress_is_staging": true,
+      "ipv4_available": true,
+      "ipv4_failure": "none",
+      "ipv4_primary_failure": "timeout",
+      "ipv4_used_fallback": true,
+      "probe_complete": true,
+      "process_uid_matches_target": true,
+      "test_internet_permission_declared": true
+    },
+    {
+      "application_initialized": true,
+      "egress_is_staging": false,
+      "ipv4_available": true,
+      "ipv4_failure": "none",
+      "ipv4_primary_failure": "none",
+      "probe_complete": true,
+      "process_uid_matches_target": true,
+      "test_internet_permission_declared": true
+    },
+    {
+      "application_initialized": true,
+      "egress_is_staging": true,
+      "ipv4_available": true,
+      "ipv4_failure": "none",
+      "ipv4_primary_failure": "none",
+      "probe_complete": true,
+      "process_uid_matches_target": true,
+      "test_internet_permission_declared": true
+    }
+  ],
+  "independent_unprivileged_remote_postcheck": true,
+  "last_probe_runner": {
+    "aborted_marker_seen": false,
+    "adb_exit_code": 0,
+    "category": "completed",
+    "completion_marker_seen": true,
+    "instrumentation_result_line_count": 8,
+    "last_stage": "completed"
+  },
+  "last_sustained_native_observation": {
+    "handshake_age": 75,
+    "network": true,
+    "remaining_ms": 77427,
+    "up": true
+  },
+  "ledger_consistent": true,
+  "measured_at": "2026-10-31T12:15:12.457776+00:00",
+  "native_recovery_after_probe": {
+    "handshake_age": 9,
+    "network": true,
+    "remaining_ms": 79942,
+    "up": true
+  },
+  "native_recovery_before_probe": {
+    "handshake_age": 1,
+    "network": true,
+    "remaining_ms": 79377,
+    "up": true
+  },
+  "node_before_cleanup": {
+    "agent_active": true,
+    "byte_quota_exhausted": [],
+    "live_slots": [],
+    "native_transfer_bytes": [
+      {
+        "received": "0",
+        "sent": "0",
+        "slot": 1
+      },
+      {
+        "received": "0",
+        "sent": "0",
+        "slot": 2
+      }
+    ],
+    "peer_counts": [
+      0,
+      0
+    ],
+    "prepared": true,
+    "remaining_seconds": 1307,
+    "slot_count": 2
+  },
+  "open_cases": [
+    "natural sleep and forced Doze",
+    "Wi-Fi/mobile transition",
+    "system VPN permission revoke",
+    "two simultaneous physical devices",
+    "independent provider failure",
+    "comprehensive DNS leak capture"
+  ],
+  "passed": true,
+  "quota_funding": "TEST FREE GRANT ONLY",
+  "receipt_count": 45,
+  "recovery_connection_after_probe": {
+    "available": true,
+    "budget_bytes": 1048576,
+    "generation": 3,
+    "lease_remaining_seconds": 87,
+    "state": "active"
+  },
+  "recovery_connection_before_probe": {
+    "available": true,
+    "budget_bytes": 1048576,
+    "generation": 2,
+    "lease_remaining_seconds": 88,
+    "state": "pending"
+  },
+  "recovery_node_after_probe": {
+    "agent_active": true,
+    "available": true,
+    "byte_quota_exhausted": [
+      {
+        "exhausted": false,
+        "remaining_bytes": 589148,
+        "slot": 1
+      }
+    ],
+    "live_slots": [
+      1
+    ],
+    "native_transfer_bytes": [
+      {
+        "received": "161204",
+        "sent": "2285308",
+        "slot": 1
+      },
+      {
+        "received": "0",
+        "sent": "0",
+        "slot": 2
+      }
+    ],
+    "peer_counts": [
+      1,
+      0
+    ]
+  },
+  "recovery_node_before_probe": {
+    "agent_active": true,
+    "available": true,
+    "byte_quota_exhausted": [],
+    "live_slots": [],
+    "native_transfer_bytes": [
+      {
+        "received": "73092",
+        "sent": "929964",
+        "slot": 1
+      },
+      {
+        "received": "0",
+        "sent": "0",
+        "slot": 2
+      }
+    ],
+    "peer_counts": [
+      1,
+      0
+    ]
+  },
+  "renewal_race_real_node_ack_before_disconnect": true,
+  "renewal_race_server_closed_zero_holds_and_peers": true,
+  "renewal_response_released_by_test": true,
+  "reserved_bytes": "0",
+  "scope": "bounded staging A, one physical Android, local disposable API/PostgreSQL",
+  "seed_package_installed": true,
+  "seed_postflight_checkpoint": "complete",
+  "seed_session_vault_present": true,
+  "seed_vpn_appop_set": true,
+  "source_sha256": {
+    "apps/android/app/src/androidTest/java/org/example/vpnpoc/I028Probe.java": "47e4c05d50c4c5f975d5490f4b5c5346de8c19fb4f54ef95f1c01050cc4d7e2e",
+    "apps/client/android/app/build.gradle.kts": "d0d230cd83bad22ac12956bab7599f3fc46d2104663f50e43233728fe250aa48",
+    "apps/client/android/app/gradle.lockfile": "21dee1dad17adbfbf6e00388bba1dd5780a3d6cc90d7ebfbfe1ccaa409987a10",
+    "apps/client/android/app/src/androidTest/java/org/example/vpnpoc/I028FlutterInstrumentationTest.java": "3fa15bf8f665526e016fa4b731921bbc81093fa97894bed225529fa95f3ad282",
+    "apps/client/android/app/src/main/java/org/example/vpnpoc/ClientActivity.java": "ebe40f8dc597ec5bde79d79394f3204093e123a21bf138636db0461ba0e348d2",
+    "apps/client/integration_test/i028_live_test.dart": "4206005946343c015f1e4ed1d961fc0c04248835d7848b638853da319ef5bbb1",
+    "infra/staging-v3/dns_observer.py": "688dfba3c936ede754662632797e74149426452967ccb8c24a6b932e4cd186d1",
+    "infra/staging-v3/runtime.py": "c0a237bf6ba3751312cac796cbd858c6c4abc2ce64732799436598e0cff25363",
+    "scripts/i028_device_scenarios.py": "9fa824f5c2670674c999aef798ac213cf41e5b5566f82204d8870cb547463ae7",
+    "scripts/run_i028_staging.ps1": "9cf2211b4e5c5577416690122b58c3e14bf013b906246bbd67bef232f72b22cc",
+    "services/api/tests/test_i028_live.py": "cc9c8d748a98ae3861dab5cc72617f0f43da6778cd2471fd0281e6e07667ba5a"
+  },
+  "suite": "Main",
+  "sustained_acknowledged_generation": 35,
+  "sustained_connection_after_probe": {
+    "available": true,
+    "budget_bytes": 1048576,
+    "generation": 3,
+    "lease_remaining_seconds": 89,
+    "state": "pending"
+  },
+  "sustained_connection_before_probe": {
+    "available": true,
+    "budget_bytes": 1048576,
+    "generation": 1,
+    "lease_remaining_seconds": 85,
+    "state": "active"
+  },
+  "sustained_node_after_probe": {
+    "agent_active": true,
+    "available": true,
+    "byte_quota_exhausted": [
+      {
+        "exhausted": true,
+        "remaining_bytes": 0,
+        "slot": 1
+      }
+    ],
+    "live_slots": [
+      1
+    ],
+    "native_transfer_bytes": [
+      {
+        "received": "105748",
+        "sent": "1902196",
+        "slot": 1
+      },
+      {
+        "received": "0",
+        "sent": "0",
+        "slot": 2
+      }
+    ],
+    "peer_counts": [
+      1,
+      0
+    ]
+  },
+  "sustained_node_before_probe": {
+    "agent_active": true,
+    "available": true,
+    "byte_quota_exhausted": [
+      {
+        "exhausted": true,
+        "remaining_bytes": 0,
+        "slot": 1
+      }
+    ],
+    "live_slots": [
+      1
+    ],
+    "native_transfer_bytes": [
+      {
+        "received": "64036",
+        "sent": "932420",
+        "slot": 1
+      },
+      {
+        "received": "0",
+        "sent": "0",
+        "slot": 2
+      }
+    ],
+    "peer_counts": [
+      1,
+      0
+    ]
+  },
+  "sustained_renewal_server_check": {
+    "connection_present": true,
+    "generation": 35,
+    "state": "active"
+  },
+  "sustained_window_observations": [
+    {
+      "connection": {
+        "available": true,
+        "budget_bytes": 1048576,
+        "generation": 4,
+        "lease_remaining_seconds": 89,
+        "state": "pending"
+      },
+      "native": {
+        "network": true,
+        "remaining_ms": 78231,
+        "up": true
+      }
+    },
+    {
+      "connection": {
+        "available": true,
+        "budget_bytes": 1048576,
+        "generation": 5,
+        "lease_remaining_seconds": 88,
+        "state": "active"
+      },
+      "native": {
+        "network": true,
+        "remaining_ms": 81009,
+        "up": true
+      }
+    },
+    {
+      "connection": {
+        "available": true,
+        "budget_bytes": 1048576,
+        "generation": 7,
+        "lease_remaining_seconds": 89,
+        "state": "pending"
+      },
+      "native": {
+        "network": true,
+        "remaining_ms": 77827,
+        "up": true
+      }
+    },
+    {
+      "connection": {
+        "available": true,
+        "budget_bytes": 1048576,
+        "generation": 7,
+        "lease_remaining_seconds": 84,
+        "state": "active"
+      },
+      "native": {
+        "network": true,
+        "remaining_ms": 77520,
+        "up": true
+      }
+    },
+    {
+      "connection": {
+        "available": true,
+        "budget_bytes": 1048576,
+        "generation": 9,
+        "lease_remaining_seconds": 86,
+        "state": "active"
+      },
+      "native": {
+        "network": true,
+        "remaining_ms": 79647,
+        "up": true
+      }
+    },
+    {
+      "connection": {
+        "available": true,
+        "budget_bytes": 1048576,
+        "generation": 9,
+        "lease_remaining_seconds": 81,
+        "state": "active"
+      },
+      "native": {
+        "network": true,
+        "remaining_ms": 74507,
+        "up": true
+      }
+    },
+    {
+      "connection": {
+        "available": true,
+        "budget_bytes": 1048576,
+        "generation": 10,
+        "lease_remaining_seconds": 88,
+        "state": "pending"
+      },
+      "native": {
+        "network": true,
+        "remaining_ms": 69273,
+        "up": true
+      }
+    },
+    {
+      "connection": {
+        "available": true,
+        "budget_bytes": 1048576,
+        "generation": 10,
+        "lease_remaining_seconds": 83,
+        "state": "active"
+      },
+      "native": {
+        "network": true,
+        "remaining_ms": 76155,
+        "up": true
+      }
+    },
+    {
+      "connection": {
+        "available": true,
+        "budget_bytes": 1048576,
+        "generation": 12,
+        "lease_remaining_seconds": 87,
+        "state": "active"
+      },
+      "native": {
+        "network": true,
+        "remaining_ms": 80326,
+        "up": true
+      }
+    },
+    {
+      "connection": {
+        "available": true,
+        "budget_bytes": 1048576,
+        "generation": 13,
+        "lease_remaining_seconds": 88,
+        "state": "pending"
+      },
+      "native": {
+        "network": true,
+        "remaining_ms": 75108,
+        "up": true
+      }
+    },
+    {
+      "connection": {
+        "available": true,
+        "budget_bytes": 1048576,
+        "generation": 13,
+        "lease_remaining_seconds": 83,
+        "state": "active"
+      },
+      "native": {
+        "network": true,
+        "remaining_ms": 75934,
+        "up": true
+      }
+    },
+    {
+      "connection": {
+        "available": true,
+        "budget_bytes": 1048576,
+        "generation": 13,
+        "lease_remaining_seconds": 78,
+        "state": "active"
+      },
+      "native": {
+        "network": true,
+        "remaining_ms": 70775,
+        "up": true
+      }
+    },
+    {
+      "connection": {
+        "available": true,
+        "budget_bytes": 1048576,
+        "generation": 14,
+        "lease_remaining_seconds": 78,
+        "state": "active"
+      },
+      "native": {
+        "network": true,
+        "remaining_ms": 71543,
+        "up": true
+      }
+    },
+    {
+      "connection": {
+        "available": true,
+        "budget_bytes": 1048576,
+        "generation": 15,
+        "lease_remaining_seconds": 87,
+        "state": "active"
+      },
+      "native": {
+        "network": true,
+        "remaining_ms": 80412,
+        "up": true
+      }
+    },
+    {
+      "connection": {
+        "available": true,
+        "budget_bytes": 1048576,
+        "generation": 16,
+        "lease_remaining_seconds": 89,
+        "state": "pending"
+      },
+      "native": {
+        "network": true,
+        "remaining_ms": 75203,
+        "up": true
+      }
+    },
+    {
+      "connection": {
+        "available": true,
+        "budget_bytes": 1048576,
+        "generation": 17,
+        "lease_remaining_seconds": 89,
+        "state": "pending"
+      },
+      "native": {
+        "network": true,
+        "remaining_ms": 77407,
+        "up": true
+      }
+    },
+    {
+      "connection": {
+        "available": true,
+        "budget_bytes": 1048576,
+        "generation": 18,
+        "lease_remaining_seconds": 85,
+        "state": "active"
+      },
+      "native": {
+        "network": true,
+        "remaining_ms": 73289,
+        "up": true
+      }
+    },
+    {
+      "connection": {
+        "available": true,
+        "budget_bytes": 1048576,
+        "generation": 19,
+        "lease_remaining_seconds": 86,
+        "state": "active"
+      },
+      "native": {
+        "network": true,
+        "remaining_ms": 79569,
+        "up": true
+      }
+    },
+    {
+      "connection": {
+        "available": true,
+        "budget_bytes": 1048576,
+        "generation": 20,
+        "lease_remaining_seconds": 85,
+        "state": "active"
+      },
+      "native": {
+        "network": true,
+        "remaining_ms": 78436,
+        "up": true
+      }
+    },
+    {
+      "connection": {
+        "available": true,
+        "budget_bytes": 1048576,
+        "generation": 21,
+        "lease_remaining_seconds": 86,
+        "state": "active"
+      },
+      "native": {
+        "network": true,
+        "remaining_ms": 79193,
+        "up": true
+      }
+    },
+    {
+      "connection": {
+        "available": true,
+        "budget_bytes": 1048576,
+        "generation": 24,
+        "lease_remaining_seconds": 88,
+        "state": "active"
+      },
+      "native": {
+        "network": true,
+        "remaining_ms": 77451,
+        "up": true
+      }
+    },
+    {
+      "connection": {
+        "available": true,
+        "budget_bytes": 1048576,
+        "generation": 25,
+        "lease_remaining_seconds": 89,
+        "state": "pending"
+      },
+      "native": {
+        "network": true,
+        "remaining_ms": 76271,
+        "up": true
+      }
+    },
+    {
+      "connection": {
+        "available": true,
+        "budget_bytes": 1048576,
+        "generation": 26,
+        "lease_remaining_seconds": 89,
+        "state": "pending"
+      },
+      "native": {
+        "network": true,
+        "remaining_ms": 77037,
+        "up": true
+      }
+    },
+    {
+      "connection": {
+        "available": true,
+        "budget_bytes": 1048576,
+        "generation": 27,
+        "lease_remaining_seconds": 89,
+        "state": "pending"
+      },
+      "native": {
+        "network": true,
+        "remaining_ms": 77414,
+        "up": true
+      }
+    },
+    {
+      "connection": {
+        "available": true,
+        "budget_bytes": 1048576,
+        "generation": 30,
+        "lease_remaining_seconds": 88,
+        "state": "pending"
+      },
+      "native": {
+        "network": true,
+        "remaining_ms": 77148,
+        "up": true
+      }
+    },
+    {
+      "connection": {
+        "available": true,
+        "budget_bytes": 1048576,
+        "generation": 31,
+        "lease_remaining_seconds": 89,
+        "state": "pending"
+      },
+      "native": {
+        "network": true,
+        "remaining_ms": 76015,
+        "up": true
+      }
+    },
+    {
+      "connection": {
+        "available": true,
+        "budget_bytes": 1048576,
+        "generation": 32,
+        "lease_remaining_seconds": 89,
+        "state": "pending"
+      },
+      "native": {
+        "network": true,
+        "remaining_ms": 76800,
+        "up": true
+      }
+    },
+    {
+      "connection": {
+        "available": true,
+        "budget_bytes": 1048576,
+        "generation": 33,
+        "lease_remaining_seconds": 88,
+        "state": "pending"
+      },
+      "native": {
+        "network": true,
+        "remaining_ms": 77427,
+        "up": true
+      }
+    }
+  ],
+  "telegram": "TEST FAKE ONLY",
+  "temporary_staging_transport_and_phone_cleanup": true,
+  "vpn_dataplane_acceptance": false
+}

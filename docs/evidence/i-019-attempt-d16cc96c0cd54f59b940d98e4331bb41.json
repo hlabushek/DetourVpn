@@ -1,0 +1,312 @@
+{
+  "issue": "I-019",
+  "mode": "full_two_host_failover",
+  "measured_at": "2026-11-01T11:37:43.002679+00:00",
+  "passed": false,
+  "telegram_delivery": "TEST FAKE ONLY",
+  "real_postgresql": true,
+  "physical_android": true,
+  "same_provider": false,
+  "provider_independence_verified": true,
+  "provider_independence_scope": "distinct_origin_asn",
+  "full_upstream_independence_verified": false,
+  "facts": {
+    "b_initial_handshake_egress": true,
+    "b_initial_disconnect_restores_network": true,
+    "a_handshake_egress": true,
+    "early_recovery_denied": true,
+    "second_peer_denied": true,
+    "kernel_expiry_without_agent_or_api": true,
+    "normal_network_after_expiry": true,
+    "first_recovery": true,
+    "a_restart_egress": true,
+    "node_failure_cutoff_before_expiry": true,
+    "normal_network_after_node_failure": true,
+    "second_recovery": true
+  },
+  "cleanup": {
+    "45.10.166.106": {
+      "cleanup_complete": true,
+      "forwarding_restored": true,
+      "cleanup_receipt": {
+        "invocation_id": "25ba65535149486eb3ec46256d1baffd",
+        "events": [
+          {
+            "endpoint_ready": true,
+            "egress_verified": false
+          },
+          {
+            "cleanup_complete": true,
+            "restored": {
+              "containers": true,
+              "filter_nat": true,
+              "ipv6_filter": true,
+              "links": true,
+              "namespaces": true,
+              "routes4": true,
+              "routes6": true
+            }
+          }
+        ]
+      },
+      "owned_resources_absent": true,
+      "control_grant_retained_until_original_deadline": true
+    },
+    "150.241.99.227": {
+      "error": "cleanup_not_confirmed"
+    }
+  },
+  "diagnostic_session": true,
+  "clock_offset_upper_bounds_seconds": {
+    "45.10.166.106": 0.583359346,
+    "150.241.99.227": 0.59859793
+  },
+  "api_failures": [
+    {
+      "endpoint": "poll",
+      "status": 503,
+      "error_code": "tunnel_profile_unavailable"
+    },
+    {
+      "endpoint": "poll",
+      "status": 503,
+      "error_code": "agent_unavailable"
+    }
+  ],
+  "egress_probes": [
+    {
+      "stage": "authentication",
+      "phase": "response",
+      "result": "other_address"
+    },
+    {
+      "stage": "authentication",
+      "phase": "response",
+      "result": "other_address"
+    },
+    {
+      "stage": "b_initial_connect_handshake",
+      "phase": "response",
+      "result": "node_b"
+    },
+    {
+      "stage": "b_initial_connect_egress",
+      "phase": "response",
+      "result": "node_b"
+    },
+    {
+      "stage": "b_initial_connect_egress",
+      "phase": "response",
+      "result": "node_b"
+    },
+    {
+      "stage": "b_initial_disconnect",
+      "phase": "response",
+      "result": "other_address"
+    },
+    {
+      "stage": "a_first_connect_handshake",
+      "phase": "response",
+      "result": "node_a"
+    },
+    {
+      "stage": "a_first_connect_egress",
+      "phase": "response",
+      "result": "node_a"
+    },
+    {
+      "stage": "a_first_connect_egress",
+      "phase": "response",
+      "result": "node_a"
+    },
+    {
+      "stage": "kernel_expiry",
+      "phase": "response",
+      "result": "other_address"
+    },
+    {
+      "stage": "restart_a_handshake",
+      "phase": "response",
+      "result": "node_a"
+    },
+    {
+      "stage": "restart_a_egress",
+      "phase": "response",
+      "result": "node_a"
+    },
+    {
+      "stage": "restart_a_egress",
+      "phase": "response",
+      "result": "node_a"
+    },
+    {
+      "stage": "node_failure_cutoff",
+      "phase": "response",
+      "result": "timeout"
+    },
+    {
+      "stage": "second_recovery",
+      "phase": "response",
+      "result": "other_address"
+    },
+    {
+      "stage": "b_connect_handshake",
+      "phase": "response",
+      "result": "other"
+    }
+  ],
+  "last_default_network": {
+    "identified": true,
+    "vpn": false,
+    "validated": true,
+    "not_vpn": true,
+    "normal": true
+  },
+  "live_phone": {
+    "stage": "b_connect_handshake",
+    "phase": "connecting",
+    "error": "none",
+    "nodes_error": "other",
+    "has_lease": true,
+    "native_up": true,
+    "native_network": true,
+    "handshake_age": -1,
+    "remaining_ms": 58589
+  },
+  "agent_b": {
+    "deliveries": 4,
+    "acks": 4,
+    "last_delivery": {
+      "operation": "remove_peer",
+      "version": 2,
+      "budget_bytes": 16777216,
+      "remaining_seconds": 11.513,
+      "inventory_count": 1
+    },
+    "last_ack": {
+      "operation": "remove_peer",
+      "applied": true,
+      "version": 2
+    }
+  },
+  "agent_frozen_and_api_transport_removed": true,
+  "kernel_gate_empty_with_agent_frozen_and_api_absent": true,
+  "node_a_runtime_stopped_before_expiry": true,
+  "phone_failure": {
+    "stage": "b_connect_handshake",
+    "phase": "reconnecting",
+    "error": "none",
+    "nodes_error": "none",
+    "has_lease": true,
+    "remote_pending": false,
+    "native_up": true,
+    "native_network": true,
+    "handshake_age": -1,
+    "remaining_ms": 11452,
+    "node_reasons": [
+      "heartbeat_stale",
+      "available"
+    ],
+    "last_probe": {
+      "stage": "other",
+      "phase": "response",
+      "result": "other"
+    }
+  },
+  "failure_control_plane": {
+    "a": {
+      "heartbeat_age_seconds": 108.776,
+      "runtime_matches": true,
+      "tunnel_states": [
+        "revoked",
+        "revoked"
+      ],
+      "commands": [
+        {
+          "operation": "add_peer",
+          "acknowledged": true
+        },
+        {
+          "operation": "remove_peer",
+          "acknowledged": false
+        },
+        {
+          "operation": "add_peer",
+          "acknowledged": true
+        },
+        {
+          "operation": "remove_peer",
+          "acknowledged": false
+        }
+      ]
+    },
+    "b": {
+      "heartbeat_age_seconds": 0.067,
+      "runtime_matches": true,
+      "tunnel_states": [
+        "revoked",
+        "active"
+      ],
+      "commands": [
+        {
+          "operation": "add_peer",
+          "acknowledged": true
+        },
+        {
+          "operation": "remove_peer",
+          "acknowledged": true
+        },
+        {
+          "operation": "add_peer",
+          "acknowledged": true
+        }
+      ]
+    }
+  },
+  "failure_settlement": {
+    "budget_bytes": 16777216,
+    "observed_bytes": 264,
+    "charged_bytes": 264
+  },
+  "phone_failure_stage": "b_connect_handshake",
+  "failure_nodes": {
+    "45.10.166.106": {
+      "unavailable": true
+    },
+    "150.241.99.227": {
+      "status": {
+        "endpoint_active": true,
+        "agent_active": true
+      },
+      "diagnostics": {
+        "endpoint_state": "active",
+        "agent_failure_stage": null,
+        "agent_request_diagnostic": {
+          "stage": "poll",
+          "reason": "control_plane_http_503"
+        },
+        "agent_request_diagnostics": [
+          {
+            "stage": "poll",
+            "reason": "control_plane_http_503"
+          }
+        ],
+        "receipt": {
+          "invocation_id": "fca9b1a5997b42dea00b59cfdc9b94f5",
+          "events": [
+            {
+              "endpoint_ready": true,
+              "egress_verified": false
+            }
+          ]
+        }
+      },
+      "gate": {
+        "kernel_gate_empty": true
+      }
+    }
+  },
+  "independent_probe_removed": true,
+  "phone_stopped_and_reverse_removed": true,
+  "failed_at": "physical_failover"
+}

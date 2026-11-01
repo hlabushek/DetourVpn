@@ -1,8 +1,35 @@
 # I-019 — проверка multi-node selection / bounded recovery
 
-Обновлено: 2026-10-23. Ветка: codex/i-019-node-failover. ADR-031/ADR-033.
+Обновлено: 2026-11-01. Ветка: codex/i-019-node-failover. ADR-031/ADR-033/ADR-073/ADR-076.
 
-## Текущий результат: полный physical staging drill passed
+## Дополнительный independent-provider gate: passed 2026-11-01
+
+Attempt `2df6394bc51e41e3b1fb066a1ba7e395`, `1 passed, 1032 deselected in
+273.35s`; receipt `docs/evidence/i-019-attempt-2df6394bc51e41e3b1fb066a1ba7e395.json`.
+Операторские A `45.10.166.106` и B `150.241.99.227` имеют разные origin ASN
+(AS41745/AS215590). На физическом Android по два свежих egress-ответа
+подтвердили B, A, повторный A и B после отказа A. Подтверждены cutoff и
+обычная сеть после отказа, expiry при отключённых agent/API, оба recovery,
+возврат A без оживления старого peer и обычная сеть после disconnect.
+
+Ledger: четыре settlement, два полных lost-counter debit по 16 MiB,
+`reserved_bytes=0`, `available_bytes=33460216`. На B подтверждены четыре
+delivery и четыре applied ACK. Clock upper bounds: A 0.0954s, B 0.0970s.
+Финальная квитанция cleanup: оба узла `cleanup_complete`, forwarding restored,
+owned resources absent, control grants removed; `passed=true`.
+
+Перед успешной попыткой в адаптере AWG удалён дублирующий `stopService` после
+`GoBackend.setState(DOWN)`, который сам останавливает VPN service для активного
+туннеля. После этой правки повторное подключение B прошло. Это подтверждает
+результат исправления на данном drill, хотя одного физического прогона
+недостаточно, чтобы доказать, что гонка была единственной причиной прежних
+сбоев. Все заявленные acceptance facts выполнены; полностью независимая цепочка
+upstream/datacenter и automatic/seamless failover не проверялись.
+
+Предыдущий same-provider physical drill ниже остаётся историческим результатом
+ADR-033 и не заменяет отдельный cross-provider receipt.
+
+## Исторический результат same-provider drill: passed 2026-10-23
 
 Attempt `14652957080243ddab229e9cf37b59d8`, mode `full_two_host_failover`:
 `1 passed, 552 deselected in 238.22s`. Receipt `docs/evidence/i-019-staging.json`
@@ -103,9 +130,9 @@ initial commit/staging чужих исходников и публикация �
 поймал собственный незакрытый timer; timer явно остановлен, повтор прошёл.
 Tooling warnings закреплённых Gradle/AGP/Kotlin/NDK не скрывались и не обходились.
 
-## Ограничения / следующая работа
+## Ограничения на дату 2026-10-23 / следующая работа
 
-I-019 **не закрыт как live failover**: второй реальный узел и node-failure drill
+На дату этого среза I-019 **не был закрыт как live failover**: второй реальный узел и node-failure drill
 не выполнены. Полный резерв может списываться при counters_lost: это сохранённая
 bounded policy I-012, не политика готового коммерческого тарифа. Нет бесшовной
 миграции TCP sessions, capacity scaling, автоматического переподключения и

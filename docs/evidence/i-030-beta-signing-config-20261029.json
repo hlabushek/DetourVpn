@@ -1,0 +1,40 @@
+{
+  "observed_on": "2026-10-29",
+  "scope": "local Android beta release-signing configuration",
+  "gradle_task_without_signing_environment": ":app:signingReport",
+  "unsigned_configuration": {
+    "result": "BUILD SUCCESSFUL",
+    "release_signing_config": null
+  },
+  "partial_environment_check": {
+    "result": "rejected during Gradle configuration",
+    "missing_variable_names_reported": true,
+    "provided_values_or_path_reported": false
+  },
+  "complete_synthetic_environment_check": {
+    "result": "rejected before keystore access",
+    "reason": "application ID is still the org.example placeholder",
+    "synthetic_values_or_path_reported": false
+  },
+  "build_script_keystore_path_checks": {
+    "inside_checkout_rejected": true,
+    "relative_path_rejected": true,
+    "missing_external_file_rejected": true
+  },
+  "source_sha256": {
+    "apps/client/android/app/build.gradle.kts": "d0d230cd83bad22ac12956bab7599f3fc46d2104663f50e43233728fe250aa48",
+    "scripts/build_flutter_client.ps1": "fab363919f0514f0cab6726d161dc5d6f5632400a1f20f5a4cec492387246bf2"
+  },
+  "beta_keystore_created_or_read": false,
+  "apk_built_or_installed": false,
+  "signer_fingerprint_or_secret_emitted": false,
+  "not_verified": [
+    "Stable non-placeholder application ID",
+    "Owner-managed beta signing key custody and recovery",
+    "Signing config selected with a stable application ID and valid keystore",
+    "Signed release APK",
+    "Signer certificate and APK hash",
+    "Update installation with the same signer",
+    "Private tester distribution"
+  ]
+}

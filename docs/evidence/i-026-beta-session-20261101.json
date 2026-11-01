@@ -1,0 +1,23 @@
+{
+  "observed_at": "2026-11-01T20:31:08Z",
+  "issues": ["I-026", "I-030"],
+  "scope": "signed closed-beta Android update and authenticated-session restart",
+  "source_apk_receipt": "i-030-beta-apk-20261101T202503784Z-e22246fa.json",
+  "application_id": "com.detourvpn.client",
+  "version_code": 2,
+  "version_name": "0.1.0-beta.1",
+  "artifact_sha256": "9eb9de472405ed8625cce70ab1831838b0a559862408937c06fe9f2e9e41046d",
+  "signer_matches_previous_beta": true,
+  "update_install": "adb_install_replace_passed",
+  "activity_launch": "passed",
+  "cold_process_restart": "adb_force_stop_and_activity_launch_passed",
+  "separate_test_account_login": "owner_reported_success",
+  "account_after_restart": "owner_reported_still_signed_in",
+  "authenticated_tabs_smoke": "owner_reported_loaded_and_controls_responsive",
+  "pending_login_process_death": "not_physically_tested",
+  "beta_invite": "left_active_by_owner_choice",
+  "vpn_data_plane": "not_tested",
+  "personal_identifiers_recorded": false,
+  "otp_or_session_tokens_recorded": false,
+  "distribution": "not_accepted"
+}

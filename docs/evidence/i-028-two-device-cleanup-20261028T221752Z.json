@@ -1,0 +1,16 @@
+{
+  "measured_at": "2026-10-28T22:17:52Z",
+  "scope": "staging A cleanup after two-device physical attempt",
+  "source": "scoped stop/status output and independent unprivileged host post-check",
+  "prepared": false,
+  "cleanup_complete": true,
+  "temporary_grant_removed": true,
+  "timeout_timer_state": "inactive",
+  "i028_namespaces_absent": true,
+  "i028_interfaces_absent": true,
+  "i028_tcp_udp_listener_markers_absent": true,
+  "local_api_stopped": true,
+  "devices_restored_and_test_packages_absent": true,
+  "always_on_vpn_unconfigured": true,
+  "vpn_dataplane_acceptance": false
+}

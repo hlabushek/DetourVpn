@@ -1,0 +1,51 @@
+{
+  "issue": "I-028",
+  "measured_on": "2026-10-31",
+  "scope": "local-only Egress runner diagnostics, packet-audit bounds, and source-bound build",
+  "changes": [
+    "Egress test uses one monotonic 30-second deadline across initial status, controller refreshes, status polls, and backoff before ordinary disconnect",
+    "Egress failure stages distinguish renewal ACK, disconnect, settlement, and logout",
+    "AP packet-audit cap raised to 20000; the 4 MiB output bound and fail-closed packet-limit result remain"
+  ],
+  "tests": {
+    "packet_audit": {
+      "command": "uv run --group dev -- python -m pytest infra/ansible/tests/test_i028_packet_audit.py -q",
+      "passed": 23
+    },
+    "api_diagnostics": {
+      "command": "uv run --group dev -- python -m pytest services/api/tests/test_i028_diagnostics.py -q",
+      "passed": 34
+    },
+    "ruff_check": true,
+    "ruff_format_check": true,
+    "flutter_analyze": true,
+    "flutter_tests_passed": 99,
+    "android_app_and_instrumentation_apk_build": true
+  },
+  "source_sha256": {
+    "scripts/i028_packet_audit.py": "72756d373efad67ce8069ddd78dd93ac4cbe540004afd25741e2880903b2d145",
+    "infra/ansible/tests/test_i028_packet_audit.py": "8385c0720b36f608a37bef10cf8456e1cebcce60f45466a30c42f47cba68a9fa",
+    "services/api/tests/test_i028_live.py": "e1d26896feb092c0080899f4c92795f382075b69b461600637fb05daebd6fb0b",
+    "services/api/tests/test_i028_diagnostics.py": "ad808e86264de0acdac18769448259fe2e1429198791e2437be82d2bbe9bc866",
+    "apps/client/integration_test/i028_live_test.dart": "dfe070be142bb2d4fb99e9450c0871b45c51c30b8cf780481c8b23b14c762407"
+  },
+  "artifact_sha256": {
+    "client_apk": "6c3c6bece762407f1cee8d5c1f307f81d8ba6f3c69169cf228d6712126341aa3",
+    "probe_test_apk": "c27c0612bf03ccda51cfbd880c6f4f0a9b1f7d4697d551bcf531ac7266c3eecb",
+    "native_bundle": "7c287ac773c45ec6b12b1a53fd9cd43beb404b430362872f338dad490826fed2"
+  },
+  "physical_install_or_test_run": false,
+  "vpn_dataplane_acceptance": false,
+  "remaining": [
+    "Run the source-bound physical Egress diagnostic and confirm exact settlement",
+    "Repeat the triggered AP capture with the new packet cap; the prior five IPv6 TCP/443 packets remain unclassified",
+    "Complete included/excluded and transition/outage DNS/IPv6 capture phases",
+    "Complete independent-provider failure acceptance"
+  ],
+  "source_bound_build": {
+    "suite": "Egress",
+    "input_hash_mismatches": 0,
+    "integration_test_entrypoint_compiled": true,
+    "physical_install_or_test_run": false
+  }
+}

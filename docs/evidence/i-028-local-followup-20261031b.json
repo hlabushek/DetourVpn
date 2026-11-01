@@ -1,0 +1,32 @@
+{
+  "issue": "I-028",
+  "measured_on": "2026-10-31",
+  "scope": "local-only Egress capture-window timing correction and source-bound build",
+  "changes": [
+    "After active renewal ACK, Egress keeps the real tunnel up for 100 seconds with five-second native path and server renewal-state checks",
+    "A pending renewal during the hold has a separate 30-second bounded ACK wait before the test can disconnect"
+  ],
+  "tests": {
+    "flutter_analyze": true,
+    "flutter_tests_passed": 99,
+    "android_app_and_instrumentation_apk_build": true,
+    "source_bound_build_suite": "Egress",
+    "source_hash_mismatches": 0,
+    "integration_test_entrypoint_compiled": true
+  },
+  "source_sha256": {
+    "apps/client/integration_test/i028_live_test.dart": "6255f7b7fd05926371bdbbebdbd2e8e079c3725eb1c23be0c5520d2a7c03033a"
+  },
+  "artifact_sha256": {
+    "client_apk": "1faa601797deb83d3bdb200f43e9e85938fa102b462fc8bc34c4c5b8543025de",
+    "probe_test_apk": "c27c0612bf03ccda51cfbd880c6f4f0a9b1f7d4697d551bcf531ac7266c3eecb",
+    "native_bundle": "7c287ac773c45ec6b12b1a53fd9cd43beb404b430362872f338dad490826fed2"
+  },
+  "physical_install_or_test_run": false,
+  "vpn_dataplane_acceptance": false,
+  "remaining": [
+    "Stage this exact source-bound Egress build and run the physical Egress test with the triggered AP capture",
+    "The prior 90-second post-trigger capture outlasted its 133.65-second Egress test by about 75 seconds and is not a full active-VPN window",
+    "UID-attributed DNS/IPv6 capture, excluded positive control, transition/outage captures, and independent-provider failure acceptance remain open"
+  ]
+}

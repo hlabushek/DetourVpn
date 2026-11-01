@@ -1,0 +1,43 @@
+{
+  "issue": "I-030",
+  "observed_on": "2026-11-02",
+  "scope": "owner-only signed window-tunnel APK update and bounded Android connection attempt",
+  "apk": {
+    "application_id": "com.detourvpn.client",
+    "version_code": 2,
+    "version_name": "0.1.0-beta.1",
+    "sha256": "b6c1d1988279c5ca02b46fb7952f58f84870152d7fe18f912410264618bca746",
+    "signer_certificate_sha256": "6b99a02bee6dc8dba659af64fcd025782fc3011a41099168e3f3a766b84ef3b8",
+    "vpn_window_tunnels": true,
+    "signature_verification": "passed",
+    "adb_update_install": "passed",
+    "app_data_cleared": false
+  },
+  "device": {
+    "model": "Pixel 8 Pro",
+    "account_scope": "owner",
+    "session_after_update": "preserved"
+  },
+  "catalog": {
+    "beta_node_present": true,
+    "reported_reason": "available",
+    "node_uuid_recorded": false
+  },
+  "tunnel_attempt": {
+    "configured_window_seconds": 60,
+    "requested_budget_bytes": 1048576,
+    "ui_phase_before_disconnect": "reconnecting",
+    "handshake_confirmed": false,
+    "controlled_egress_probes_sent": false,
+    "disconnect_ui_state": "disconnected",
+    "client_lease_state_after_disconnect": "no_pending_lease",
+    "database_state_independently_verified": false
+  },
+  "not_verified": [
+    "External UDP ingress and peer handshake",
+    "VPN egress, DNS, or IPv6 behavior",
+    "Independent beta database confirmation of lease closure",
+    "Tester onboarding or distribution acceptance"
+  ],
+  "secrets_or_personal_identifiers_recorded": false
+}

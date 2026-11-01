@@ -1,0 +1,29 @@
+{
+  "observed_on": "2026-10-29",
+  "scope": "local Android beta-artifact signing readiness",
+  "gradle_task": ":app:signingReport",
+  "result": "BUILD SUCCESSFUL",
+  "variants": {
+    "debug": "debug signing configuration present",
+    "release": "signing configuration absent; Store and Alias are null"
+  },
+  "source_security_settings": {
+    "release_supports_always_on": false,
+    "application_backup_disabled": true,
+    "cleartext_traffic_disabled": true
+  },
+  "latest_owner_beta_install": {
+    "mode": "debug",
+    "date": "2026-10-26",
+    "scope": "owner-only install and bounded smoke; not a tester distribution artifact"
+  },
+  "beta_release_keystore_created_or_read": false,
+  "apk_built_or_installed_by_this_check": false,
+  "secrets_or_key_fingerprints_emitted": false,
+  "not_verified": [
+    "A signed release APK",
+    "Signing-key custody and update continuity",
+    "Private APK distribution and artifact version/hash tracking"
+  ],
+  "production_or_beta_host_changed": false
+}

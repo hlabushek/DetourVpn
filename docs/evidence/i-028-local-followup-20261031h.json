@@ -1,0 +1,70 @@
+{
+  "issue": "I-028",
+  "measured_at_utc": "2026-10-31T12:44:02Z",
+  "scope": "local source-bound Egress diagnostic build and evidence audit; no staging connection or physical Install/Test",
+  "passed": true,
+  "source_bound_build": {
+    "suite": "Egress",
+    "input_count": 95,
+    "input_hash_mismatches": 0,
+    "flutter_analyze": "passed",
+    "flutter_unit_tests": 102,
+    "physical_entrypoint_phases_compiled": [
+      "seed",
+      "egress",
+      "cleanup"
+    ],
+    "independent_uid_probe_apks": "built",
+    "android_gradle_build": "BUILD SUCCESSFUL",
+    "client_apk_sha256": "1b56ede17de9868bf66c4467bde23490181de19c650e270cf0c76a00f9a75d68",
+    "probe_test_apk_sha256": "c27c0612bf03ccda51cfbd880c6f4f0a9b1f7d4697d551bcf531ac7266c3eecb",
+    "probe_base_apk_sha256": "61006df375b245a808b779bdb5cbb02e1bfa44460737d0b61fe982f99a93481c"
+  },
+  "adr_070_diagnostic": {
+    "hold_seconds": 140,
+    "sample_interval_seconds": 5,
+    "fixed_same_uid_ipv4_probe_after_seconds": 35,
+    "max_samples": 32,
+    "fixed_probe_attempted_and_succeeded_are_sanitized": true,
+    "raw_received_bytes_retained": false,
+    "suite_pass_fail_changed": false,
+    "physical_fallback_verified": false
+  },
+  "checks": {
+    "ruff": "passed",
+    "dart_format": "passed; 0 changes",
+    "test_i028_diagnostics_pytest": "36 passed",
+    "test_i028_packet_audit_pytest": "23 passed",
+    "git_diff_check": "passed"
+  },
+  "historical_physical_receipt_source_audit": {
+    "main_receipt": "i-028-android-staging-20261031T122302Z-4de68407.json",
+    "main_passed": true,
+    "main_source_hashes_matching_current_checkout": 9,
+    "main_source_hash_count": 11,
+    "egress_receipt": "i-028-egress-diagnostic-20261031T120213Z-ca62ed0e.json",
+    "egress_passed": true,
+    "egress_source_hashes_matching_current_checkout": 9,
+    "egress_source_hash_count": 11,
+    "mismatched_files": [
+      "apps/client/integration_test/i028_live_test.dart",
+      "services/api/tests/test_i028_live.py"
+    ],
+    "production_sources_in_those_receipts_changed": false
+  },
+  "fresh_phone_only_probe": {
+    "receipt": "i-028-probe-after-startup-fix-20261031T123945453Z.json",
+    "passed": true,
+    "direct_ipv4": true,
+    "direct_ipv6": true,
+    "fixed_udp_dns": true,
+    "validated_wifi_without_vpn": true,
+    "android_dns_settings_changed": false
+  },
+  "vpn_dataplane_acceptance": false,
+  "remaining": [
+    "source-bound physical Egress Install/Test and independent cleanup/post-check",
+    "physical ADR-070 sample with handshake age over 60 seconds, recent inbound progress, connected phase, native path up, validated network, and valid lease",
+    "phase-separated DNS/IPv6 baseline, included, excluded positive-control, transition, and outage capture evidence"
+  ]
+}

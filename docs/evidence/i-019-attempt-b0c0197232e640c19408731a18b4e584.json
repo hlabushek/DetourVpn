@@ -1,0 +1,231 @@
+{
+  "issue": "I-019",
+  "mode": "full_two_host_failover",
+  "measured_at": "2026-10-31T23:07:30.518868+00:00",
+  "passed": false,
+  "telegram_delivery": "TEST FAKE ONLY",
+  "real_postgresql": true,
+  "physical_android": true,
+  "same_provider": false,
+  "provider_independence_verified": true,
+  "provider_independence_scope": "distinct_origin_asn",
+  "full_upstream_independence_verified": false,
+  "facts": {},
+  "cleanup": {
+    "45.10.166.106": {
+      "cleanup_complete": true,
+      "forwarding_restored": true,
+      "cleanup_receipt": {
+        "invocation_id": "b25b55d99fa240e9bdde32060352832d",
+        "events": [
+          {
+            "endpoint_ready": true,
+            "egress_verified": false
+          },
+          {
+            "cleanup_complete": true,
+            "restored": {
+              "containers": true,
+              "filter_nat": true,
+              "ipv6_filter": true,
+              "links": true,
+              "namespaces": true,
+              "routes4": true,
+              "routes6": true
+            }
+          }
+        ]
+      },
+      "owned_resources_absent": true,
+      "control_grant_retained_until_original_deadline": true
+    },
+    "150.241.99.227": {
+      "error": "cleanup_not_confirmed"
+    }
+  },
+  "diagnostic_session": true,
+  "clock_offset_upper_bounds_seconds": {
+    "45.10.166.106": 0.625279088,
+    "150.241.99.227": 0.678249658
+  },
+  "api_failures": [
+    {
+      "endpoint": "poll",
+      "status": 503,
+      "error_code": "tunnel_profile_unavailable"
+    },
+    {
+      "endpoint": "poll",
+      "status": 503,
+      "error_code": "agent_unavailable"
+    }
+  ],
+  "egress_probes": [
+    {
+      "stage": "authentication",
+      "phase": "response",
+      "result": "other_address"
+    },
+    {
+      "stage": "authentication",
+      "phase": "response",
+      "result": "other_address"
+    },
+    {
+      "stage": "b_initial_connect_handshake",
+      "phase": "response",
+      "result": "other"
+    }
+  ],
+  "last_default_network": {
+    "identified": true,
+    "vpn": false,
+    "validated": true,
+    "not_vpn": true,
+    "normal": true
+  },
+  "live_phone": {
+    "stage": "b_initial_connect_handshake",
+    "phase": "connecting",
+    "error": "none",
+    "nodes_error": "other",
+    "has_lease": true,
+    "native_up": true,
+    "native_network": true,
+    "handshake_age": -1,
+    "remaining_ms": 57120
+  },
+  "agent_b": {
+    "deliveries": 2,
+    "acks": 2,
+    "last_delivery": {
+      "operation": "remove_peer",
+      "version": 2,
+      "budget_bytes": 16777216,
+      "remaining_seconds": 10.518,
+      "inventory_count": 1
+    },
+    "last_ack": {
+      "operation": "remove_peer",
+      "applied": true,
+      "version": 2
+    }
+  },
+  "phone_failure": {
+    "stage": "b_initial_connect_handshake",
+    "phase": "reconnecting",
+    "error": "none",
+    "nodes_error": "none",
+    "has_lease": true,
+    "remote_pending": false,
+    "native_up": true,
+    "native_network": true,
+    "handshake_age": -1,
+    "remaining_ms": 9102,
+    "node_reasons": [
+      "available",
+      "available"
+    ],
+    "last_probe": {
+      "stage": "other",
+      "phase": "response",
+      "result": "unavailable"
+    }
+  },
+  "failure_control_plane": {
+    "a": {
+      "heartbeat_age_seconds": 0.776,
+      "runtime_matches": true,
+      "tunnel_states": [],
+      "commands": []
+    },
+    "b": {
+      "heartbeat_age_seconds": 0.677,
+      "runtime_matches": true,
+      "tunnel_states": [
+        "active"
+      ],
+      "commands": [
+        {
+          "operation": "add_peer",
+          "acknowledged": true
+        }
+      ]
+    }
+  },
+  "failure_settlement": {
+    "budget_bytes": 16777216,
+    "observed_bytes": 0,
+    "charged_bytes": 0
+  },
+  "phone_failure_stage": "b_initial_connect_handshake",
+  "failure_nodes": {
+    "150.241.99.227": {
+      "status": {
+        "endpoint_active": true,
+        "agent_active": true
+      },
+      "diagnostics": {
+        "endpoint_state": "active",
+        "agent_failure_stage": null,
+        "agent_request_diagnostic": {
+          "stage": "poll",
+          "reason": "control_plane_http_503"
+        },
+        "agent_request_diagnostics": [
+          {
+            "stage": "poll",
+            "reason": "control_plane_http_503"
+          }
+        ],
+        "receipt": {
+          "invocation_id": "a62656861cca4a49bd1fd65867a169b1",
+          "events": [
+            {
+              "endpoint_ready": true,
+              "egress_verified": false
+            }
+          ]
+        }
+      },
+      "gate": {
+        "kernel_gate_empty": true
+      }
+    },
+    "45.10.166.106": {
+      "status": {
+        "endpoint_active": true,
+        "agent_active": true
+      },
+      "diagnostics": {
+        "endpoint_state": "active",
+        "agent_failure_stage": null,
+        "agent_request_diagnostic": {
+          "stage": "poll",
+          "reason": "control_plane_http_503"
+        },
+        "agent_request_diagnostics": [
+          {
+            "stage": "poll",
+            "reason": "control_plane_http_503"
+          }
+        ],
+        "receipt": {
+          "invocation_id": "b25b55d99fa240e9bdde32060352832d",
+          "events": [
+            {
+              "endpoint_ready": true,
+              "egress_verified": false
+            }
+          ]
+        }
+      },
+      "gate": {
+        "kernel_gate_empty": true
+      }
+    }
+  },
+  "independent_probe_removed": true,
+  "phone_stopped_and_reverse_removed": true,
+  "failed_at": "physical_failover"
+}

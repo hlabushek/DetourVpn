@@ -81,9 +81,11 @@ component-level license review.
 
 ## Verification required before enabling
 
-- Add/run focused tests proving process/service restart never reuses an old grant
-  and all bootstrap failures keep the tunnel down; current local checks cover
-  missing-session and invalid-origin rejection, not every startup failure.
+- Focused Dart tests now cover missing session, non-HTTPS origin, refresh
+  rejection, unavailable saved node, and an old remote lease that must close
+  before permission denial. The tested failures request no new tunnel start.
+  These use synthetic fakes; they do not prove Android process/service restart,
+  callback delivery, or every possible bootstrap failure.
 - Native tests verify service-start policy and protected-socket restrictions;
   local relay tests pass, but system-start callback behavior remains unverified.
 - Inspect merged manifests and the pinned backend patch: debug advertises

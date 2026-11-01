@@ -145,11 +145,29 @@ changed Flutter files passed.
   Always-on callback, Lockdown DNS reachability, fresh lease recovery, service
   failure/restart, and recovery behavior remain unverified on Android/OEM hardware.
 - No expiry/revoke/outage integration test exercised the new headless entrypoint
-  end to end. The deterministic Dart negative tests verify that missing encrypted
-  session or a non-HTTPS origin cannot request a relay or a new lease.
+  end to end. The deterministic Dart startup tests below use synthetic fakes and
+  do not replace Android/OEM acceptance.
 - The debug build is for controlled testing only. Do not invite friends or route
   sensitive traffic through it; I-028 privacy acceptance and the separate beta
   environment/operations gates remain open. Do not claim a kill switch.
+
+## Focused headless recovery negative tests — 2026-10-29
+
+`apps/client/test/always_on_recovery_test.dart`: **5 passed**. Existing cases
+cover a missing encrypted session and non-HTTPS origin. Added synthetic cases
+cover refresh rejection, a saved node that is no longer available, and an old
+active remote lease that must be closed before Android permission is checked.
+The permission-denied case verifies that no new lease or native tunnel start is
+requested. Test dependencies are injected only through the `@visibleForTesting`
+entrypoint; the production entrypoint still constructs the platform session
+store, native tunnel bridge, and origin-pinned protected API client.
+
+Direct bundled Dart analyzer on the changed source/test files: **no issues**.
+`flutter analyze` for those files exited 255 because its analysis server received
+truncated JSON; that tool failure is not counted as a pass. These tests prove
+local orchestration behavior only. Android service callback delivery, actual
+lease recovery, system Lockdown, DNS reachability, and OEM restart behavior
+remain unverified physically.
 
 ## Next acceptance action
 

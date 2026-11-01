@@ -1,0 +1,55 @@
+{
+  "observed_on": "2026-10-29",
+  "scope": "locked Python dependencies only",
+  "lockfile_sha256": "4f09ce7b2c004c89147ac037ad979874fc2d036fed38e0af34cb27c048962716",
+  "tools": {
+    "uv": "0.11.17",
+    "pip_audit": "2.10.1",
+    "vulnerability_service": "PyPI"
+  },
+  "pre_remediation_development_scan": {
+    "source": "current local development environment",
+    "finding_records": 26,
+    "packages": {
+      "certifi": "2026.7.22",
+      "filelock": "4.2.0",
+      "virtualenv": "21.14.7"
+    }
+  },
+  "lock_updates": {
+    "certifi": {
+      "from": "2026.7.22",
+      "to": "2026.10.23"
+    },
+    "filelock": {
+      "from": "4.2.0",
+      "to": "4.2.4"
+    },
+    "virtualenv": {
+      "from": "21.14.7",
+      "to": "21.15.1"
+    }
+  },
+  "post_remediation": {
+    "runtime_groups_without_dev": "no known vulnerabilities",
+    "all_locked_groups": "no known vulnerabilities",
+    "lock_check": "passed"
+  },
+  "method": [
+    "uv export --locked --no-dev --no-emit-project --format requirements.txt",
+    "uv export --locked --all-groups --no-emit-project --format requirements.txt",
+    "pip-audit --require-hashes --disable-pip against each export"
+  ],
+  "not_covered": [
+    "Flutter and Android dependencies",
+    "Node dependencies",
+    "OS packages and container base images",
+    "independent security review",
+    "SBOM completeness or license review"
+  ],
+  "side_effects": {
+    "application_sources_changed": false,
+    "beta_host_changed": false,
+    "production_or_staging_accessed": false
+  }
+}

@@ -3,9 +3,19 @@
 set -euo pipefail
 repo=$(cd -- "$(dirname -- "$0")/.." && pwd)
 work=${VPN_ANDROID_BUILD_DIR:-/tmp/vpn-android-build}
+sdk=${VPN_ANDROID_SDK_ROOT:-$repo/.cache/i-011/sdk-go-only}
 ndk_archive="$work/ndk.zip"
 go_archive=${VPN_ANDROID_GO_ARCHIVE:-/tmp/go1.25.14.linux-amd64.tar.gz}
 test "$(uname -sm)" = 'Linux x86_64'
+test -f "$sdk/PREPARED.json"
+test -f "$sdk/tunnel/tools/libwg-go/go.mod"
+test -f "$sdk/tunnel/tools/libwg-go/goruntime-boottime-over-monotonic.diff"
+python3 - "$sdk/PREPARED.json" <<'PY'
+import json, pathlib, sys
+receipt = json.loads(pathlib.Path(sys.argv[1]).read_text())
+if receipt.get("sdk_revision") != "ff15093bf3856fea0947923474870b86efb682f0":
+    raise SystemExit("Unexpected prepared Android SDK revision")
+PY
 echo 'fdf33d9f6c1b3f16e5459d53a82c7d2201edbcc4  '"$ndk_archive" | sha1sum -c -
 echo 'a21ae5633a269bcd7e90cf767e48225633795e99d831742cbf3397064fee7712  '"$go_archive" | sha256sum -c -
 mkdir -p "$work/ndk" "$work/go" "$work/source"
@@ -30,10 +40,10 @@ PY
 fi
 if [ ! -f "$work/go/.boottime-patched" ]; then
     tar -xzf "$go_archive" --strip-components=1 -C "$work/go"
-    patch --batch --fuzz=0 -p1 -d "$work/go" < "$repo/.cache/i-011/sdk-go-only/tunnel/tools/libwg-go/goruntime-boottime-over-monotonic.diff"
+    patch --batch --fuzz=0 -p1 -d "$work/go" < "$sdk/tunnel/tools/libwg-go/goruntime-boottime-over-monotonic.diff"
     touch "$work/go/.boottime-patched"
 fi
-cp "$repo/.cache/i-011/sdk-go-only/tunnel/tools/libwg-go/"* "$work/source/"
+cp "$sdk/tunnel/tools/libwg-go/"* "$work/source/"
 export PATH="$work/go/bin:$PATH"
 export GOTOOLCHAIN=local CGO_ENABLED=1 GOOS=android
 cd "$work/source"
@@ -48,7 +58,7 @@ for abi in arm64-v8a x86_64; do
     export CC="$ndk/bin/clang"
     export CGO_CFLAGS="--target=$target --sysroot=$ndk/sysroot"
     export CGO_LDFLAGS="--target=$target --sysroot=$ndk/sysroot -Wl,-z,max-page-size=16384 -Wl,--build-id=none -Wl,-soname=libwg-go.so"
-    output="$repo/.cache/i-011/sdk-go-only/jniLibs/$abi"
+    output="$sdk/jniLibs/$abi"
     mkdir -p "$output"
     go build -mod=readonly -tags linux -trimpath -buildvcs=false \
         -ldflags='-buildid=' -buildmode=c-shared -o "$output/libwg-go.so"
@@ -57,7 +67,7 @@ for abi in arm64-v8a x86_64; do
     sha256sum "$output/libwg-go.so"
 done
 go list -m -json all > "$work/android-module-graph.json"
-python3 - "$work/android-module-graph.json" "$repo/.cache/i-011/sdk-go-only" "$work/go" <<'PY'
+python3 - "$work/android-module-graph.json" "$sdk" "$work/go" <<'PY'
 import json, pathlib, re, shutil, sys
 text = pathlib.Path(sys.argv[1]).read_text()
 prepared = pathlib.Path(sys.argv[2])

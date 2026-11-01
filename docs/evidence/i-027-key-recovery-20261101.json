@@ -1,0 +1,46 @@
+{
+  "issue": "I-027",
+  "measured_on": "2026-11-01",
+  "scope": "recover the existing beta backup key in the owner Windows profile and retry the scheduled pull",
+  "secret_values_recorded": false,
+  "owner_reported_before_recovery": {
+    "local_backup_key_exists": false,
+    "scheduled_task_started_by_helper": false
+  },
+  "codex_execution_shell": {
+    "local_backup_key_exists": true,
+    "backup_key_visibility_matches_owner": false,
+    "removable_volume_available": false
+  },
+  "recovery_helper": {
+    "implemented": true,
+    "powershell_5_1_parse": "passed",
+    "no_overwrite_guard": "passed; stopped before SSH/scp in the Codex shell",
+    "owner_profile_recovery": "passed",
+    "existing_archive_authenticated": true,
+    "local_key_installed": true,
+    "scheduled_task_started": true,
+    "scheduled_task_result": 0,
+    "new_local_archive_verified": true,
+    "natural_daily_trigger_observed": false,
+    "scheduled_backup_acceptance": "explicit task start passed; natural trigger pending",
+    "task_scheduler_observation": {
+      "last_run_local": "2026-11-01 21:05:10",
+      "last_task_result": 0,
+      "next_run_local": "2026-11-02 07:00:00",
+      "last_run_was_natural_daily_trigger": false
+    }
+  },
+  "security": {
+    "existing_key_rotation": false,
+    "remote_key_contents_logged": false,
+    "encrypted_archive_authenticated_before_install": true,
+    "temporary_files_acl_restricted": true,
+    "remote_access": "pinned SSH read only"
+  },
+  "limitations": [
+    "The initial Codex process and owner Windows PowerShell had different backup-key visibility; the owner-profile copy was restored by the helper.",
+    "The successful result is an explicit Task Scheduler start; a natural daily trigger has not yet been observed.",
+    "The evidence confirms an encrypted local archive, not a database restore from that newly imported archive."
+  ]
+}
