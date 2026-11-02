@@ -319,6 +319,16 @@ reserved balance 0. Ledger receipt:
 квоту выбранной owner-записи, завершает admin-сессию и не вызывает credit action.
 Не отправлять ID, OTP или admin credentials в чат.
 
+На 2026-11-02 owner ledger показал 6,291,456 granted, 5,416,782 used, 0
+reserved и 874,674 available bytes. Release-клиент запрашивает окно 1,048,576
+bytes, поэтому остатка недостаточно для нового окна. Одноразовый helper
+`scripts/start_beta_owner_window_credit.ps1` может добавить 262,144 bytes только
+при полном совпадении этого снимка и owner ID, введённого локально. Это даст
+ровно один 1 MiB owner-only smoke budget с небольшим буфером; helper проверит
+ledger до и после операции и откажет при любом расхождении. Один раз после
+запуска этого helper повторять нельзя; не направлять этим остатком Telegram,
+чувствительный трафик или трафик тестера.
+
 Пока privacy acceptance не завершена, не рекомендовать друзьям подключать
 чувствительный трафик. Kill switch/Always-on не заявлять до принятия Android
 Lockdown и безопасного восстановления.
