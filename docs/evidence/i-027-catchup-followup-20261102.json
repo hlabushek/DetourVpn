@@ -1,0 +1,30 @@
+{
+  "issue": "I-027",
+  "observed_at_local": "2026-11-02T16:40:00+03:00",
+  "registered_daily_task": {
+    "name": "DetourVpn Beta Backup Daily",
+    "last_run_local": "2026-11-02T15:04:15+03:00",
+    "last_task_result": 0,
+    "next_run_local": "2026-11-03T07:00:00+03:00",
+    "invocation_classification": "explicit_start; not natural daily trigger"
+  },
+  "latest_imported_archive": {
+    "name": "detourvpn-beta-20261102T120419.115336Z-6a8d23672d954f16b6d0512bbb8a16bf.enc",
+    "bytes": 58246116,
+    "sha256": "326D156B1E956101EAD09319DEF722E28F25C3C868474FD614A98305F7E8B50A",
+    "last_write_local": "2026-11-02T15:05:45+03:00",
+    "fernet_authentication": "passed by the task import helper"
+  },
+  "missed_trigger_probe": {
+    "scope": "temporary one-time task using the registered task action and limited interactive principal",
+    "trigger_time": "in the past at task registration",
+    "start_when_available": true,
+    "observed_state": "Ready; no run observed",
+    "result": "not_demonstrated",
+    "temporary_task_removed": true,
+    "registered_daily_task_modified": false
+  },
+  "restore_drill_from_latest_archive": "not_run; current execution shell lacks configured isolated database URL and pg_restore command",
+  "secrets_or_database_contents_recorded": false,
+  "beta_host_changed_beyond_existing_backup_task": false
+}

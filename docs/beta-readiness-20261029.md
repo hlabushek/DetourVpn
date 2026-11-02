@@ -139,3 +139,22 @@ packet audit and does not establish device-wide leak freedom. The beta remains
 not ready for tester invitations: friend onboarding, the natural scheduled
 backup trigger, signing-key restore/password recovery, physical update install,
 and tester operations/support acceptance are still open.
+
+## Superseding owner follow-up — 2026-11-02
+
+The owner has now signed in on Pixel 8 Pro, installed/launched the signed beta
+APK, connected and disconnected the tunnel, and completed one controlled IPv4
+ping plus one hostname-resolution/IPv4 ping while ADB observed the VPN network
+agent. These are limited owner smoke results; they do not prove DNS privacy,
+exit IP/location, IPv6 behavior, server-side revoke acknowledgement, or friend
+onboarding. Current owner quota is below the 1 MiB minimum for another window.
+
+The daily backup task completed at 15:04 local with result 0 and imported a new
+Fernet-authenticated archive. This was an explicit task start, not a natural
+07:00 trigger. A disposable past-trigger `StartWhenAvailable` task remained
+Ready and was removed without running; catch-up remains unproven. The newly
+imported archive has not had a restore drill. Signing-key restoration and
+password recovery, private tester distribution, a selected support recipient,
+and required phase-6 operating evidence remain open. Therefore the decision
+remains **not ready to invite testers**. See I-026, I-027, I-030 and
+`evidence/i-027-catchup-followup-20261102.json`.
