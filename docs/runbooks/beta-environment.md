@@ -350,6 +350,11 @@ the owner reported `Подключено`; ADB observed an active VPN network ag
 the probe and zero agents after disconnect. This is limited IPv4 reachability
 evidence only; exit IP, DNS/IPv6 privacy and server revoke acknowledgement remain
 unverified. Receipt: `../evidence/i-030-owner-ipv4-probe-20261102.json`.
+The next owner probe resolved `example.com` and received one ICMPv4 reply while
+ADB observed an active VPN agent. After disconnect ADB showed no VPN agent and
+the ledger returned to zero reserved bytes with a 10,338-byte `peer_window`
+debit. This does not verify DNS leak protection, exit IP or IPv6. Receipt:
+`../evidence/i-030-owner-dns-ipv4-probe-20261102.json`.
 
 Для безопасной диагностики control-plane статуса beta узла выполнить локально
 `scripts/check_beta_node_status.ps1 -RunHere`. Helper использует только

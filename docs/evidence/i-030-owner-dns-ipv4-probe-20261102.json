@@ -1,0 +1,42 @@
+{
+  "issue": "I-030",
+  "observed_on": "2026-11-02",
+  "scope": "single owner Android-shell hostname resolution and IPv4 ICMP probe during VPN transport",
+  "probe": {
+    "command_scope": "ADB shell ping -c 1 -W 3 example.com",
+    "hostname": "example.com",
+    "resolved_ipv4": "172.66.147.243",
+    "protocol": "ICMPv4",
+    "packets_sent": 1,
+    "packets_received": 1,
+    "packet_loss_percent": 0,
+    "rtt_ms": 94.813
+  },
+  "vpn_state": {
+    "owner_reported_app_state_during_probe": "connected",
+    "adb_active_vpn_network_agents_after_probe": 1,
+    "adb_active_vpn_network_agents_after_disconnect": 0,
+    "latest_android_vpn_event_after_disconnect": "DISCONNECTED"
+  },
+  "ledger_before": {
+    "granted_bytes": 6553600,
+    "used_bytes": 5503125,
+    "reserved_bytes": 0,
+    "available_bytes": 1050475
+  },
+  "ledger_after": {
+    "granted_bytes": 6553600,
+    "used_bytes": 5513463,
+    "reserved_bytes": 0,
+    "available_bytes": 1040137
+  },
+  "latest_peer_window_debit_bytes": 10338,
+  "interpretation": "The hostname resolved and the Android shell received an IPv4 ICMP reply while the owner reported VPN connected and ADB observed an active VPN agent after the probe. This is limited reachability evidence; it does not verify DNS leak protection, packet path, exit identity or IPv6. The ledger confirms a 10,338-byte peer-window debit and zero remaining reservation.",
+  "not_verified": [
+    "DNS leak protection or resolver path",
+    "VPN exit IP or location",
+    "IPv6 behavior",
+    "server-side peer revoke acknowledgement"
+  ],
+  "owner_identifier_or_secret_recorded": false
+}
