@@ -1,5 +1,9 @@
 [CmdletBinding()]
-param([switch]$RunHere)
+param(
+    [switch]$RunHere,
+    # Authenticated aggregate quota read only; never submits a credit action.
+    [switch]$VerifyOnly
+)
 
 $ErrorActionPreference = 'Stop'
 $PSNativeCommandUseErrorActionPreference = $false
@@ -10,6 +14,7 @@ $acceptanceCreditBytes = [long]4194304
 if (-not $RunHere) {
     $windowsPowerShell = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
     $arguments = '-NoExit -ExecutionPolicy Bypass -File "{0}" -RunHere' -f $PSCommandPath
+    if ($VerifyOnly) { $arguments += ' -VerifyOnly' }
     Start-Process -FilePath $windowsPowerShell -ArgumentList $arguments -WindowStyle Normal
     return
 }
@@ -31,10 +36,15 @@ $secureCode = $null
 $password = $null
 $code = $null
 $adminToken = $null
+$failureStage = 'input'
 
 try {
-    Write-Host 'Beta-only owner acceptance credit: exactly 4 MiB; no payment.'
-    Write-Host 'Requires one active beta account, exactly 2 MiB previously granted, and zero reserved bytes.'
+    if ($VerifyOnly) {
+        Write-Host 'Read-only beta owner quota check: no credit or ledger changes.'
+    } else {
+        Write-Host 'Beta-only owner acceptance credit: exactly 4 MiB; no payment.'
+        Write-Host 'Requires one active beta account, exactly 2 MiB previously granted, and zero reserved bytes.'
+    }
     Write-Host 'B/production are not contacted. Password and TOTP stay in this local window.'
     $securePassword = Read-Host 'beta-owner admin password (hidden)' -AsSecureString
     $secureCode = Read-Host 'Current TOTP code (hidden)' -AsSecureString
@@ -47,6 +57,7 @@ try {
 
     $loginBody = @{ username = 'beta-owner'; password = $password; code = $code } |
         ConvertTo-Json -Compress
+    $failureStage = 'admin_login'
     $login = Invoke-RestMethod -Method Post -Uri "$betaOrigin/api/admin/v1/login" `
         -ContentType 'application/json' -Body $loginBody -TimeoutSec 20
     $adminToken = [string]$login.access_token
@@ -55,16 +66,31 @@ try {
     }
     $headers = @{ Authorization = "Bearer $adminToken" }
 
+    $failureStage = 'account_list'
     $users = @(Invoke-RestMethod -Method Get -Uri "$betaOrigin/api/admin/v1/users" `
         -Headers $headers -TimeoutSec 20)
     if ($users.Count -ne 1 -or $users[0].status -ne 'active') {
+        if ($VerifyOnly) {
+            Write-Host "beta_owner_quota_status=ambiguous; active_account_count=$($users.Count); no identifiers shown"
+            return
+        }
         throw 'Refusing acceptance credit: beta account is not uniquely identified and active.'
     }
     $userId = [string]$users[0].id
     if ($userId -notmatch '^[0-9a-fA-F-]{36}$') { throw 'Beta account identifier is invalid.' }
+    $failureStage = 'quota_read'
     $user = Invoke-RestMethod -Method Get -Uri "$betaOrigin/api/admin/v1/users/$userId" `
         -Headers $headers -TimeoutSec 20
     $before = $user.quota
+
+    if ($VerifyOnly) {
+        Write-Host ("beta_owner_quota_status=read_only; active_account_count=1; granted_bytes={0}; used_bytes={1}; reserved_bytes={2}; available_bytes={3}" -f `
+            [long]$before.granted_bytes, [long]$before.used_bytes, `
+            [long]$before.reserved_bytes, [long]$before.available_bytes)
+        return
+    }
+
+    $failureStage = 'credit_precondition'
     if ($user.status -ne 'active' -or
         [long]$before.granted_bytes -ne $previousGrantBytes -or
         [long]$before.used_bytes -le 0 -or
@@ -83,6 +109,7 @@ try {
         amount_bytes = $acceptanceCreditBytes
     } | ConvertTo-Json -Compress
     $action = $null
+    $failureStage = 'credit_action'
     for ($attempt = 0; $attempt -lt 2 -and $null -eq $action; $attempt++) {
         try {
             $action = Invoke-RestMethod -Method Post -Uri "$betaOrigin/api/admin/v1/actions" `
@@ -92,6 +119,7 @@ try {
         }
     }
 
+    $failureStage = 'credit_verification'
     $verifiedUser = Invoke-RestMethod -Method Get -Uri "$betaOrigin/api/admin/v1/users/$userId" `
         -Headers $headers -TimeoutSec 20
     $after = $verifiedUser.quota
@@ -103,7 +131,7 @@ try {
     }
     Write-Host 'beta_owner_acceptance_credit=4194304_bytes; granted_total=6291456_bytes; account_count=1; reserved_bytes=0'
 } catch {
-    Write-Host 'Beta owner acceptance credit was not confirmed. No secret or account identifier is shown.'
+    Write-Host "beta_owner_acceptance_credit=not_confirmed; failure_stage=$failureStage; no secret or account identifier is shown"
     if ($_.Exception.Response) {
         try { Write-Host "http_status=$([int]$_.Exception.Response.StatusCode)" } catch { }
     }
