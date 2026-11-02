@@ -345,6 +345,11 @@ The next owner report showed automatic disconnect; a new read-only ledger sample
 matched the latest 11,364-byte `peer_window` debit, with zero reserved bytes.
 The balance before this attempt exceeded 1 MiB, so quota insufficiency is not
 confirmed as the cause. Do not claim egress; controlled ping was not sent.
+In the subsequent owner-only probe, one IPv4 ping to `8.8.8.8` returned while
+the owner reported `Подключено`; ADB observed an active VPN network agent after
+the probe and zero agents after disconnect. This is limited IPv4 reachability
+evidence only; exit IP, DNS/IPv6 privacy and server revoke acknowledgement remain
+unverified. Receipt: `../evidence/i-030-owner-ipv4-probe-20261102.json`.
 
 Для безопасной диагностики control-plane статуса beta узла выполнить локально
 `scripts/check_beta_node_status.ps1 -RunHere`. Helper использует только

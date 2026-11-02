@@ -1,0 +1,42 @@
+{
+  "issue": "I-030",
+  "observed_on": "2026-11-02",
+  "scope": "single owner-controlled IPv4 ICMP probe during an Android VPN session",
+  "probe": {
+    "origin_device": "Pixel 8 Pro Android shell via ADB",
+    "destination": "8.8.8.8",
+    "protocol": "ICMPv4",
+    "packets_sent": 1,
+    "packets_received": 1,
+    "packet_loss_percent": 0,
+    "rtt_ms": 254.940,
+    "dns_used": false
+  },
+  "vpn_state": {
+    "owner_reported_app_state_during_probe": "connected",
+    "adb_active_vpn_network_agent_after_probe": true,
+    "adb_active_vpn_network_agents_after_disconnect": 0,
+    "latest_android_vpn_event_after_disconnect": "DISCONNECTED"
+  },
+  "ledger_before": {
+    "granted_bytes": 6553600,
+    "used_bytes": 5475714,
+    "reserved_bytes": 0,
+    "available_bytes": 1077886
+  },
+  "ledger_after": {
+    "granted_bytes": 6553600,
+    "used_bytes": 5503125,
+    "reserved_bytes": 0,
+    "available_bytes": 1050475
+  },
+  "latest_peer_window_debit_bytes": 27411,
+  "interpretation": "The controlled Android-shell ping received a reply while the owner reported the VPN connected and ADB immediately afterward showed an active VPN network agent. This supports IPv4 reachability during the VPN session but does not independently trace the probe route or identify the exit IP. The ledger confirms a 27,411-byte peer-window debit and zero remaining reservation; it does not attribute those bytes solely to the ICMP probe.",
+  "not_verified": [
+    "VPN exit IP or location",
+    "DNS privacy",
+    "IPv6 behavior",
+    "server-side peer revoke acknowledgement"
+  ],
+  "owner_identifier_or_secret_recorded": false
+}
