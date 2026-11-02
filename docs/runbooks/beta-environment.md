@@ -337,6 +337,10 @@ UI не подтвердил handshake. Не повторять соединен
 Read-only owner history showed newest peer-window debits of 797 and 795 bytes,
 exactly matching the 1,592-byte aggregate increase. This is consistent with two
 small window settlements but does not identify packet direction or prove handshake.
+The later owner-reported connected/disconnected attempt produced a
+`revoke_unconfirmed` report; afterward ADB found VPN off and the ledger showed
+zero reserved bytes. Its four newest window debits summed to 45,976 bytes. Server
+connection closure and controlled egress remain unverified.
 
 Для безопасной диагностики control-plane статуса beta узла выполнить локально
 `scripts/check_beta_node_status.ps1 -RunHere`. Helper использует только

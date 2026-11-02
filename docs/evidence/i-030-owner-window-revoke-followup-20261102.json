@@ -1,0 +1,41 @@
+{
+  "issue": "I-030",
+  "observed_on": "2026-11-02",
+  "scope": "owner-reported handshake/connection followed by local disconnect and read-only quota reconciliation",
+  "source": [
+    "owner-reported app status",
+    "owner-shared sanitized app diagnostic report",
+    "owner-run read-only beta admin quota and ledger history query",
+    "read-only ADB connectivity snapshot after disconnect"
+  ],
+  "client_report": {
+    "connected_status_reported": true,
+    "handshake_passed_reported": true,
+    "user_disconnected_in_app": true,
+    "disconnect_diagnostic_code": "revoke_unconfirmed",
+    "disconnect_diagnostic_stage": "unknown"
+  },
+  "adb_after_disconnect": {
+    "application_id": "com.detourvpn.client",
+    "version_code": 2,
+    "active_vpn_transport": false
+  },
+  "ledger_before": {
+    "granted_bytes": 6553600,
+    "used_bytes": 5418374,
+    "reserved_bytes": 0,
+    "available_bytes": 1135226
+  },
+  "ledger_after": {
+    "granted_bytes": 6553600,
+    "used_bytes": 5464350,
+    "reserved_bytes": 0,
+    "available_bytes": 1089250
+  },
+  "recent_peer_window_debits_bytes": [25023, 8588, 11588, 777, 797],
+  "newest_four_debits_sum_bytes": 45976,
+  "interpretation": "The four newest peer_window ledger entries after the prior snapshot sum exactly to the 45976-byte used increase. This confirms measured window debits, not destination traffic or successful VPN egress. Local VPN transport was off after disconnect; aggregate reservation was zero. Server connection closure was not independently queried.",
+  "controlled_egress_probe_sent": false,
+  "destination_or_payload_recorded": false,
+  "owner_identifier_or_secret_recorded": false
+}
