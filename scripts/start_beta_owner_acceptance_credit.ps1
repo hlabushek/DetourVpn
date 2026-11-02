@@ -66,9 +66,10 @@ try {
     }
     $headers = @{ Authorization = "Bearer $adminToken" }
 
-    $failureStage = 'account_list'
+    $failureStage = 'account_list_request'
     $users = @(Invoke-RestMethod -Method Get -Uri "$betaOrigin/api/admin/v1/users" `
         -Headers $headers -TimeoutSec 20)
+    $failureStage = 'account_list_shape'
     if ($users.Count -ne 1 -or $users[0].status -ne 'active') {
         if ($VerifyOnly) {
             Write-Host "beta_owner_quota_status=ambiguous; active_account_count=$($users.Count); no identifiers shown"
@@ -76,8 +77,17 @@ try {
         }
         throw 'Refusing acceptance credit: beta account is not uniquely identified and active.'
     }
-    $userId = [string]$users[0].id
-    if ($userId -notmatch '^[0-9a-fA-F-]{36}$') { throw 'Beta account identifier is invalid.' }
+    $idValue = $users[0].id
+    $userId = [string]$idValue
+    $failureStage = 'account_id_validation'
+    $idMatchesExpectedUuid = $userId -match '^[0-9a-fA-F-]{36}$'
+    if ($VerifyOnly) {
+        $idType = if ($null -eq $idValue) { 'null' } else { $idValue.GetType().Name }
+        $idLength = if ($null -eq $idValue) { 0 } else { $userId.Length }
+        Write-Host "beta_owner_account_shape=read_only; id_present=$($null -ne $idValue); id_type=$idType; id_length=$idLength; expected_uuid_format=$idMatchesExpectedUuid"
+        if (-not $idMatchesExpectedUuid) { return }
+    }
+    if (-not $idMatchesExpectedUuid) { throw 'Beta account identifier is invalid.' }
     $failureStage = 'quota_read'
     $user = Invoke-RestMethod -Method Get -Uri "$betaOrigin/api/admin/v1/users/$userId" `
         -Headers $headers -TimeoutSec 20
