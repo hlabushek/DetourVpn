@@ -147,7 +147,10 @@ APK, connected and disconnected the tunnel, and completed one controlled IPv4
 ping plus one hostname-resolution/IPv4 ping while ADB observed the VPN network
 agent. These are limited owner smoke results; they do not prove DNS privacy,
 exit IP/location, IPv6 behavior, server-side revoke acknowledgement, or friend
-onboarding. Current owner quota is below the 1 MiB minimum for another window.
+onboarding. ADB readback of the installed APK matched the latest signed build
+receipt by SHA-256, confirming the exact owner artifact. It does not verify
+distribution to another tester. Current owner quota is below the 1 MiB minimum
+for another window.
 
 The daily backup task completed at 15:04 local with result 0 and imported a new
 Fernet-authenticated archive. This was an explicit task start, not a natural

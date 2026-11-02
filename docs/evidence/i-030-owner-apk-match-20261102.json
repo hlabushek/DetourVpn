@@ -1,0 +1,19 @@
+{
+  "issue": "I-030",
+  "observed_on": "2026-11-02",
+  "scope": "read-only ADB readback and hash comparison of installed owner APK",
+  "device_model": "Pixel 8 Pro",
+  "device_identifier_recorded": false,
+  "package": {
+    "application_id": "com.detourvpn.client",
+    "version_name": "0.1.0-beta.1",
+    "version_code": 2
+  },
+  "installed_base_apk_sha256": "b6c1d1988279c5ca02b46fb7952f58f84870152d7fe18f912410264618bca746",
+  "matched_signed_build_receipt": "i-030-beta-apk-20261101T212446474Z-d70a1207.json",
+  "receipt_sha256": "b6c1d1988279c5ca02b46fb7952f58f84870152d7fe18f912410264618bca746",
+  "sha256_match": true,
+  "vpn_started": false,
+  "tester_distribution_verified": false,
+  "secrets_recorded": false
+}
