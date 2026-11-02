@@ -117,13 +117,19 @@ try {
         $peerWindowDebits = @($history | Where-Object {
             $_.source_type -ceq 'peer_window' -and $_.kind -ceq 'debit'
         })
-        $latestPeerWindowBytes = 'none'
-        if ($peerWindowDebits.Count -gt 0) {
-            $latestDelta = [long]$peerWindowDebits[0].delta_bytes
-            if ($latestDelta -ge 0) { throw 'Peer-window debit history has an invalid delta sign.' }
-            $latestPeerWindowBytes = [string][Math]::Abs($latestDelta)
+        $recentPeerWindowBytes = @(
+            $peerWindowDebits | Select-Object -First 5 | ForEach-Object {
+                $delta = [long]$_.delta_bytes
+                if ($delta -ge 0) { throw 'Peer-window debit history has an invalid delta sign.' }
+                [string][Math]::Abs($delta)
+            }
+        )
+        $recentPeerWindowSummary = if ($recentPeerWindowBytes.Count -gt 0) {
+            $recentPeerWindowBytes -join ','
+        } else {
+            'none'
         }
-        Write-Host "beta_owner_window_history=read_only; recent_peer_window_debits=$($peerWindowDebits.Count); newest_peer_window_debit_bytes=$latestPeerWindowBytes"
+        Write-Host "beta_owner_window_history=read_only; recent_peer_window_debits=$($peerWindowDebits.Count); newest_five_peer_window_debit_bytes=$recentPeerWindowSummary"
         return
     }
 
