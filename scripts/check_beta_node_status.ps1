@@ -67,8 +67,8 @@ try {
     }
     $node = $matches[0]
     $lastSeenPresent = $null -ne $node.last_seen_at
-    Write-Host "beta_node_status=read_only; status=$($node.status); protocol=$($node.peer_protocol_version); occupied=$($node.occupied); unacknowledged=$($node.unacknowledged_commands); stalled=$($node.stalled_commands); last_seen_present=$($lastSeenPresent.ToString().ToLower())"
-    Write-Host 'This reports node control-plane health only; it does not confirm a peer handshake or VPN egress.'
+    Write-Host "beta_node_status=read_only; status=$($node.status); protocol=$($node.peer_protocol_version); legacy_tunnels=$($node.occupied); legacy_unacknowledged_commands=$($node.unacknowledged_commands); legacy_stalled_commands=$($node.stalled_commands); last_seen_present=$($lastSeenPresent.ToString().ToLower())"
+    Write-Host 'The counters are legacy Tunnel/PeerCommand data, not v3 window peer occupancy; no peer handshake or VPN egress is confirmed.'
 } catch {
     $failureType = $_.Exception.GetType().Name
     Write-Host "beta_node_status=not_confirmed; failure_stage=$failureStage; exception_type=$failureType; no secret or node identifier is shown"

@@ -336,8 +336,11 @@ UI не подтвердил handshake. Не повторять соединен
 Для безопасной диагностики control-plane статуса beta узла выполнить локально
 `scripts/check_beta_node_status.ps1 -RunHere`. Helper использует только
 `GET /api/admin/v1/nodes`, выводит статус Helsinki node, heartbeat presence и
-счётчики активных/незавершённых команд без node ID. Результат не подтверждает
-VPN handshake или egress; не запускать новое окно только на основании `active`.
+legacy-счётчики `Tunnel`/`PeerCommand` без node ID. Эти счётчики не отражают
+v3 window peer occupancy. Результат не подтверждает VPN handshake или egress;
+не запускать новое окно только на основании `active`. Снимок от 2026-11-02:
+beta node `active`, protocol 3, heartbeat present; receipt:
+`../evidence/i-030-beta-node-status-20261102.json`.
 
 Пока privacy acceptance не завершена, не рекомендовать друзьям подключать
 чувствительный трафик. Kill switch/Always-on не заявлять до принятия Android

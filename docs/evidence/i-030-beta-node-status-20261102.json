@@ -1,0 +1,24 @@
+{
+  "issue": "I-030",
+  "observed_on": "2026-11-02",
+  "scope": "owner-run read-only beta control-plane node status check after the Android window attempt",
+  "node": {
+    "name": "detourvpn-beta-helsinki",
+    "status": "active",
+    "peer_protocol_version": 3,
+    "last_seen_present": true
+  },
+  "legacy_counters": {
+    "tunnel_count": 0,
+    "unacknowledged_peer_commands": 0,
+    "stalled_peer_commands": 0
+  },
+  "not_exposed_by_this_endpoint": [
+    "v3 peer connection occupancy",
+    "v3 window state",
+    "node-side handshake result",
+    "external UDP ingress or VPN egress"
+  ],
+  "owner_identifiers_or_secrets_recorded": false,
+  "account_or_ledger_mutation": false
+}
