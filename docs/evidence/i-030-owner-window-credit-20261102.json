@@ -1,0 +1,26 @@
+{
+  "issue": "I-030",
+  "observed_on": "2026-11-02",
+  "scope": "one-time owner-only beta quota credit for a single bounded Android window smoke",
+  "operation": {
+    "kind": "beta_credit",
+    "amount_bytes": 262144,
+    "payment": false,
+    "owner_identifier_recorded": false,
+    "secret_recorded": false
+  },
+  "ledger_before": {
+    "granted_bytes": 6291456,
+    "used_bytes": 5416782,
+    "reserved_bytes": 0,
+    "available_bytes": 874674
+  },
+  "ledger_after": {
+    "granted_bytes": 6553600,
+    "used_bytes": 5416782,
+    "reserved_bytes": 0,
+    "available_bytes": 1136818
+  },
+  "verification": "owner-run helper matched exact preconditions and confirmed exact post-action ledger totals",
+  "next_step": "one owner-only 60-second, 1048576-byte Android window smoke; do not repeat credit"
+}
