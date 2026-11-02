@@ -1,0 +1,45 @@
+{
+  "issue": "I-030",
+  "observed_on": "2026-11-02",
+  "scope": "owner-reported Android window attempt with read-only post-attempt quota reconciliation",
+  "source": [
+    "owner-reported app UI",
+    "owner-run read-only beta admin quota query",
+    "read-only ADB connectivity snapshot"
+  ],
+  "client_report": {
+    "vpn_icon_appeared": true,
+    "ui_phases": ["connecting", "restoring_connection", "waiting_network_handshake"],
+    "handshake_confirmed": false,
+    "reported_remaining_window_seconds": 26,
+    "reported_reserved_bytes": 1048576,
+    "connect_action_available_after_wait": true,
+    "displayed_quota_appeared_unchanged": true
+  },
+  "ledger_before": {
+    "granted_bytes": 6553600,
+    "used_bytes": 5416782,
+    "reserved_bytes": 0,
+    "available_bytes": 1136818
+  },
+  "ledger_after": {
+    "granted_bytes": 6553600,
+    "used_bytes": 5418374,
+    "reserved_bytes": 0,
+    "available_bytes": 1135226
+  },
+  "ledger_delta": {
+    "used_bytes": 1592,
+    "available_bytes": -1592,
+    "reserved_bytes_after": 0
+  },
+  "adb_after_attempt": {
+    "application_id": "com.detourvpn.client",
+    "version_code": 2,
+    "active_vpn_transport": false
+  },
+  "interpretation": "The aggregate ledger confirms 1592 bytes were charged and no bytes remain reserved. This does not confirm a successful handshake, usable VPN egress, or which packets caused the charge.",
+  "controlled_egress_probe_sent": false,
+  "destination_or_payload_recorded": false,
+  "owner_identifier_or_secret_recorded": false
+}

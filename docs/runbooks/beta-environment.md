@@ -328,6 +328,11 @@ reserved и 874,674 available bytes. Одноразовый helper
 запускать. Остаток предназначен для одного owner-only 1 MiB smoke; не
 направлять им Telegram, чувствительный трафик или трафик тестера.
 
+После owner-only попытки 2026-11-02 read-only ledger подтвердил расход 1,592
+bytes и `reserved_bytes=0`; read-only ADB не обнаружил активный VPN transport.
+UI не подтвердил handshake. Не повторять соединение до диагностики UDP пути и
+проверки server-side handshake/lease evidence.
+
 Пока privacy acceptance не завершена, не рекомендовать друзьям подключать
 чувствительный трафик. Kill switch/Always-on не заявлять до принятия Android
 Lockdown и безопасного восстановления.
