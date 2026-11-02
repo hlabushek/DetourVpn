@@ -1,0 +1,36 @@
+{
+  "issue": "I-030",
+  "observed_on": "2026-11-02",
+  "scope": "owner-reported follow-up to bounded beta Android tunnel attempt",
+  "source": "owner_report plus read-only ADB package and connectivity state",
+  "device": {
+    "model": "Pixel 8 Pro",
+    "account_scope": "owner",
+    "application_id": "com.detourvpn.client",
+    "version_code": 2,
+    "version_name": "0.1.0-beta.1"
+  },
+  "owner_report": {
+    "tunnel_became_active": true,
+    "transient_application_traffic_delivered": true,
+    "ui_reported_handshake": "confirmed",
+    "ui_reported_renewal_required": true,
+    "client_disconnected_after_quota_decreased": true,
+    "initial_available_quota_approx": "2.6 MB",
+    "remaining_quota_approx": "800 KB",
+    "exact_usage_or_disconnect_cause_independently_verified": false
+  },
+  "read_only_device_check": {
+    "active_vpn_transport_after_report": false
+  },
+  "controlled_egress_probe_sent": false,
+  "server_side_handshake_usage_or_lease_closure_verified": false,
+  "not_verified": [
+    "Egress identity and location",
+    "DNS and IPv6 behavior",
+    "Exact usage settlement and disconnect cause",
+    "Independent server-side lease cleanup"
+  ],
+  "destination_or_payload_recorded": false,
+  "secrets_or_personal_identifiers_recorded": false
+}
