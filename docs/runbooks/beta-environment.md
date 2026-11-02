@@ -304,14 +304,20 @@ ledger полностью нулевой; затем сверяет ledger и з
 reserved balance 0. Ledger receipt:
 `../evidence/i-030-beta-owner-topup-20261026.json`.
 
-Для оставшихся коротких Android acceptance checks отдельный helper
-`scripts/start_beta_owner_acceptance_credit.ps1` может добавить ровно 4 MiB
-только если единственный активный аккаунт имеет grant ровно 2 MiB, ненулевой
-расход меньше этого grant и нулевой резерв. Он сверяет итог 6 MiB, неизменный
-расход и нулевой резерв; повторный запуск после успеха откажет. Пароль/TOTP
-вводятся локально. Не использовать этот тестовый остаток для друзей или
-чувствительного трафика. Такой top-up выполнен 2026-10-26; receipt:
-`../evidence/i-030-beta-owner-acceptance-credit-20261026.json`.
+Одноразовый owner acceptance credit ровно 4 MiB выполнен 2026-10-26; итоговый
+грант был 6 MiB при нулевом резерве. Receipt:
+`../evidence/i-030-beta-owner-acceptance-credit-20261026.json`. Не запускать
+повторное начисление как часть этой проверки. Для чтения текущего owner ledger
+без изменений запустить локально:
+
+```powershell
+.\scripts\start_beta_owner_acceptance_credit.ps1 -RunHere -VerifyOnly
+```
+
+Скрипт скрыто спросит owner Telegram ID, пароль и TOTP; ID вводится только в
+локальном prompt и не выводится в результат. Режим `-VerifyOnly` читает только
+квоту выбранной owner-записи, завершает admin-сессию и не вызывает credit action.
+Не отправлять ID, OTP или admin credentials в чат.
 
 Пока privacy acceptance не завершена, не рекомендовать друзьям подключать
 чувствительный трафик. Kill switch/Always-on не заявлять до принятия Android

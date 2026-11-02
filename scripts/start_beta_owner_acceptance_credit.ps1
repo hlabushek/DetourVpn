@@ -33,8 +33,11 @@ function ConvertFrom-SecureInput([Security.SecureString]$Value) {
 
 $securePassword = $null
 $secureCode = $null
+$secureOwnerId = $null
 $password = $null
 $code = $null
+$ownerIdText = $null
+$ownerId = 0L
 $adminToken = $null
 $failureStage = 'input'
 
@@ -43,11 +46,18 @@ try {
         Write-Host 'Read-only beta owner quota check: no credit or ledger changes.'
     } else {
         Write-Host 'Beta-only owner acceptance credit: exactly 4 MiB; no payment.'
-        Write-Host 'Requires one active beta account, exactly 2 MiB previously granted, and zero reserved bytes.'
+        Write-Host 'Requires the locally selected owner account to resolve exactly once, with a 2 MiB grant and zero reserved bytes.'
     }
     Write-Host 'B/production are not contacted. Password and TOTP stay in this local window.'
+    $secureOwnerId = Read-Host 'Owner Telegram numeric ID (hidden)' -AsSecureString
     $securePassword = Read-Host 'beta-owner admin password (hidden)' -AsSecureString
     $secureCode = Read-Host 'Current TOTP code (hidden)' -AsSecureString
+    $ownerIdText = ConvertFrom-SecureInput $secureOwnerId
+    if ($ownerIdText -notmatch '^[1-9][0-9]{0,14}$' -or
+        -not [long]::TryParse($ownerIdText, [ref]$ownerId) -or
+        $ownerId -ge [long]4503599627370496) {
+        throw 'Owner identifier is outside the supported numeric range.'
+    }
     if ($securePassword.Length -lt 16 -or $securePassword.Length -gt 256) {
         throw 'Admin password length is invalid.'
     }
@@ -67,15 +77,18 @@ try {
     $headers = @{ Authorization = "Bearer $adminToken" }
 
     $failureStage = 'account_list_request'
-    $users = @(Invoke-RestMethod -Method Get -Uri "$betaOrigin/api/admin/v1/users" `
+    $users = @(Invoke-RestMethod -Method Get -Uri "$betaOrigin/api/admin/v1/users?q=$ownerIdText" `
         -Headers $headers -TimeoutSec 20)
+    while ($users.Count -eq 1 -and $users[0] -is [System.Array]) {
+        $users = @($users[0])
+    }
     $failureStage = 'account_list_shape'
     if ($users.Count -ne 1 -or $users[0].status -ne 'active') {
         if ($VerifyOnly) {
-            Write-Host "beta_owner_quota_status=ambiguous; active_account_count=$($users.Count); no identifiers shown"
+            Write-Host "beta_owner_quota_status=ambiguous; matched_account_count=$($users.Count); no identifiers shown"
             return
         }
-        throw 'Refusing acceptance credit: beta account is not uniquely identified and active.'
+        throw 'Refusing acceptance credit: owner account did not uniquely resolve as active.'
     }
     $idValue = $users[0].id
     $userId = [string]$idValue
@@ -157,7 +170,10 @@ try {
     }
     $password = $null
     $code = $null
+    $ownerIdText = $null
+    $ownerId = 0L
     $adminToken = $null
     if ($securePassword) { $securePassword.Dispose() }
     if ($secureCode) { $secureCode.Dispose() }
+    if ($secureOwnerId) { $secureOwnerId.Dispose() }
 }
