@@ -1,0 +1,32 @@
+{
+  "issue": "I-030",
+  "observed_on": "2026-11-02",
+  "scope": "owner-reported automatic Android VPN disconnect with read-only quota reconciliation",
+  "source": [
+    "owner report",
+    "owner-run read-only beta admin quota and ledger history query",
+    "read-only ADB VPN state query"
+  ],
+  "owner_report": {
+    "vpn_disconnected_automatically": true,
+    "disconnect_cause": "unknown",
+    "controlled_egress_probe_sent": false
+  },
+  "ledger_before": {
+    "granted_bytes": 6553600,
+    "used_bytes": 5464350,
+    "reserved_bytes": 0,
+    "available_bytes": 1089250
+  },
+  "ledger_after": {
+    "granted_bytes": 6553600,
+    "used_bytes": 5475714,
+    "reserved_bytes": 0,
+    "available_bytes": 1077886
+  },
+  "latest_peer_window_debit_bytes": 11364,
+  "used_delta_bytes": 11364,
+  "interpretation": "The newest peer_window debit matches the used-byte increase. The pre-attempt available balance exceeded the 1 MiB window budget, and no bytes remain reserved. This does not identify whether the disconnect was lease expiry, renewal failure, or another cause; it does not confirm VPN egress.",
+  "adb_active_vpn_transport_after_attempt": false,
+  "owner_identifier_or_secret_recorded": false
+}

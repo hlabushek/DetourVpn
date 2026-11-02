@@ -341,6 +341,10 @@ The later owner-reported connected/disconnected attempt produced a
 `revoke_unconfirmed` report; afterward ADB found VPN off and the ledger showed
 zero reserved bytes. Its four newest window debits summed to 45,976 bytes. Server
 connection closure and controlled egress remain unverified.
+The next owner report showed automatic disconnect; a new read-only ledger sample
+matched the latest 11,364-byte `peer_window` debit, with zero reserved bytes.
+The balance before this attempt exceeded 1 MiB, so quota insufficiency is not
+confirmed as the cause. Do not claim egress; controlled ping was not sent.
 
 Для безопасной диагностики control-plane статуса beta узла выполнить локально
 `scripts/check_beta_node_status.ps1 -RunHere`. Helper использует только
