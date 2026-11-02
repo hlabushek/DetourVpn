@@ -131,7 +131,8 @@ try {
     }
     Write-Host 'beta_owner_acceptance_credit=4194304_bytes; granted_total=6291456_bytes; account_count=1; reserved_bytes=0'
 } catch {
-    Write-Host "beta_owner_acceptance_credit=not_confirmed; failure_stage=$failureStage; no secret or account identifier is shown"
+    $failureType = $_.Exception.GetType().Name
+    Write-Host "beta_owner_acceptance_credit=not_confirmed; failure_stage=$failureStage; exception_type=$failureType; no secret or account identifier is shown"
     if ($_.Exception.Response) {
         try { Write-Host "http_status=$([int]$_.Exception.Response.StatusCode)" } catch { }
     }
