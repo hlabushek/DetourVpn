@@ -315,9 +315,11 @@ reserved balance 0. Ledger receipt:
 ```
 
 Скрипт скрыто спросит owner Telegram ID, пароль и TOTP; ID вводится только в
-локальном prompt и не выводится в результат. Режим `-VerifyOnly` читает только
-квоту выбранной owner-записи, завершает admin-сессию и не вызывает credit action.
-Не отправлять ID, OTP или admin credentials в чат.
+локальном prompt и не выводится в результат. Режим `-VerifyOnly` читает квоту и
+сводку последних 20 ledger entries выбранной owner-записи, показывает только
+число недавних `peer_window` списаний и сумму самого нового. Он завершает
+admin-сессию и не вызывает credit action. Не отправлять ID, OTP или admin
+credentials в чат.
 
 На 2026-11-02 owner ledger показал 6,291,456 granted, 5,416,782 used, 0
 reserved и 874,674 available bytes. Одноразовый helper

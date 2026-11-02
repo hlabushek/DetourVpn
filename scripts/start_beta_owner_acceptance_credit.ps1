@@ -110,6 +110,20 @@ try {
         Write-Host ("beta_owner_quota_status=read_only; active_account_count=1; granted_bytes={0}; used_bytes={1}; reserved_bytes={2}; available_bytes={3}" -f `
             [long]$before.granted_bytes, [long]$before.used_bytes, `
             [long]$before.reserved_bytes, [long]$before.available_bytes)
+        $history = @($user.history)
+        while ($history.Count -eq 1 -and $history[0] -is [System.Array]) {
+            $history = @($history[0])
+        }
+        $peerWindowDebits = @($history | Where-Object {
+            $_.source_type -ceq 'peer_window' -and $_.kind -ceq 'debit'
+        })
+        $latestPeerWindowBytes = 'none'
+        if ($peerWindowDebits.Count -gt 0) {
+            $latestDelta = [long]$peerWindowDebits[0].delta_bytes
+            if ($latestDelta -ge 0) { throw 'Peer-window debit history has an invalid delta sign.' }
+            $latestPeerWindowBytes = [string][Math]::Abs($latestDelta)
+        }
+        Write-Host "beta_owner_window_history=read_only; recent_peer_window_debits=$($peerWindowDebits.Count); newest_peer_window_debit_bytes=$latestPeerWindowBytes"
         return
     }
 
