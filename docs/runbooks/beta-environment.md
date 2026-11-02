@@ -334,6 +334,9 @@ reserved и 874,674 available bytes. Одноразовый helper
 bytes и `reserved_bytes=0`; read-only ADB не обнаружил активный VPN transport.
 UI не подтвердил handshake. Не повторять соединение до диагностики UDP пути и
 проверки server-side handshake/lease evidence.
+Read-only owner history showed newest peer-window debits of 797 and 795 bytes,
+exactly matching the 1,592-byte aggregate increase. This is consistent with two
+small window settlements but does not identify packet direction or prove handshake.
 
 Для безопасной диагностики control-plane статуса beta узла выполнить локально
 `scripts/check_beta_node_status.ps1 -RunHere`. Helper использует только

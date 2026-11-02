@@ -1,0 +1,24 @@
+{
+  "issue": "I-030",
+  "observed_on": "2026-11-02",
+  "scope": "owner-run read-only quota ledger history review after two reported connection attempts",
+  "source": "owner-run beta admin VerifyOnly helper; last 20 ledger entries summarized without identifiers",
+  "current_quota": {
+    "granted_bytes": 6553600,
+    "used_bytes": 5418374,
+    "reserved_bytes": 0,
+    "available_bytes": 1135226
+  },
+  "recent_peer_window_debits": {
+    "count_in_history_sample": 17,
+    "newest_five_bytes": [797, 795, 1047500, 1046797, 793],
+    "newest_two_sum_bytes": 1592,
+    "difference_from_prior_quota_snapshot_bytes": 1592
+  },
+  "interpretation": "The two newest peer_window debits exactly match the aggregate used-byte increase observed after the reported connection attempts. This is consistent with two small window settlements, but the read-only history output has no timestamps or per-window identifiers to correlate them individually.",
+  "handshake_confirmed": false,
+  "vpn_egress_confirmed": false,
+  "reserved_bytes_after": 0,
+  "window_meter_contract": "kernel-outer-ip.v1 counts combined UDP bytes entering and leaving the slot port; this evidence has no direction breakdown",
+  "owner_identifier_or_secret_recorded": false
+}
