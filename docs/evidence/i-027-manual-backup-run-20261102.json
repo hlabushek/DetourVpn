@@ -1,0 +1,27 @@
+{
+  "issue": "I-027",
+  "observed_at_local": "2026-11-02T15:03:03+03:00",
+  "scope": "manual invocation of registered daily backup task and local encrypted archive import verification",
+  "task": {
+    "name": "DetourVpn Beta Backup Daily",
+    "invocation": "explicit_task_scheduler_start",
+    "start_when_available": true,
+    "wake_to_run": true,
+    "last_task_result": 0,
+    "state_after_run": "Ready"
+  },
+  "backup": {
+    "encrypted_remote_service": "completed",
+    "pinned_ssh_transfer": "completed",
+    "local_fernet_authentication": "passed",
+    "archive_name": "detourvpn-beta-20261102T120306.959379Z-a4f7e7b23d674dfc948b4f4cb2aff017.enc",
+    "archive_bytes": 58239268,
+    "archive_sha256": "467c0f0795c33064eb5bdf2307e5405c2fb2f67b3d08406c4cf56f2b7c706c92",
+    "previous_local_archive_bytes": 52078456,
+    "maximum_accepted_bytes": 67108864
+  },
+  "natural_missed_run_catchup": "not_observed",
+  "database_restore_from_this_archive": "not_run",
+  "secret_values_or_database_contents_recorded": false,
+  "remote_beta_host_modified_beyond_backup_creation": false
+}
