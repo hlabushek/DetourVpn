@@ -80,6 +80,7 @@ class AdminChange(BaseModel):
         "seed_demo_catalog",
         "grant_beta_invite",
         "revoke_beta_invite",
+        "resolve_unknown_window",
     ]
     idempotency_key: UUID
     reason: str = Field(min_length=3, max_length=500)
@@ -88,6 +89,15 @@ class AdminChange(BaseModel):
     amount_bytes: int | None = Field(default=None, strict=True, gt=0, le=MAX_BYTES)
     plan: PlanInput | None = None
     telegram_subject: int | None = Field(default=None, strict=True, ge=1, lt=2**52)
+    evidence_digest: str | None = Field(default=None, pattern=r"^[0-9a-f]{64}$")
+
+
+class AdminWindowStatus(BaseModel):
+    """Sanitized, read-only owner peer and reservation status for beta support."""
+
+    latest_connection_state: Literal["pending", "active", "revoke_pending", "closed"] | None
+    non_closed_connection_count: int = Field(ge=0)
+    reserved_bytes: int = Field(ge=0)
 
 
 class AdminService:
@@ -208,7 +218,8 @@ class AdminService:
         session.execute(
             text("SELECT pg_advisory_xact_lock(:key)"), {"key": body.idempotency_key.int % (2**63)}
         )
-        fingerprint_body = body.model_dump_json(exclude={"telegram_subject"})
+        # Keep the pre-resolution fingerprint stable for existing idempotency records.
+        fingerprint_body = body.model_dump_json(exclude={"telegram_subject", "evidence_digest"})
         if body.telegram_subject is not None:
             if self.settings.auth_pepper is None:
                 raise QuotaError("beta_invites_disabled", 409)
@@ -216,6 +227,8 @@ class AdminService:
             fingerprint_body += ":" + beta_invite_digest(
                 self.settings.auth_pepper.get_secret_value(), body.telegram_subject
             )
+        if body.evidence_digest is not None:
+            fingerprint_body += ":evidence:" + body.evidence_digest
         fingerprint = digest(str(identity.id) + ":" + fingerprint_body)
         prior = session.scalar(
             select(AdminAction).where(AdminAction.idempotency_key == body.idempotency_key)
@@ -226,15 +239,16 @@ class AdminService:
             return prior.result
         op = body.operation
         required = {
-            "credit": (True, False, True, False, False),
-            "debit": (True, False, True, False, False),
-            "grant_subscription": (True, True, False, False, False),
-            "revoke_subscription": (True, True, False, False, False),
-            "revoke_device": (True, True, False, False, False),
-            "revise_plan": (False, False, False, True, False),
-            "seed_demo_catalog": (False, False, False, False, False),
-            "grant_beta_invite": (False, False, False, False, True),
-            "revoke_beta_invite": (False, False, False, False, True),
+            "credit": (True, False, True, False, False, False),
+            "debit": (True, False, True, False, False, False),
+            "grant_subscription": (True, True, False, False, False, False),
+            "revoke_subscription": (True, True, False, False, False, False),
+            "revoke_device": (True, True, False, False, False, False),
+            "revise_plan": (False, False, False, True, False, False),
+            "seed_demo_catalog": (False, False, False, False, False, False),
+            "grant_beta_invite": (False, False, False, False, True, False),
+            "revoke_beta_invite": (False, False, False, False, True, False),
+            "resolve_unknown_window": (True, True, False, False, False, True),
         }[op]
         if required != tuple(
             value is not None
@@ -244,6 +258,7 @@ class AdminService:
                 body.amount_bytes,
                 body.plan,
                 body.telegram_subject,
+                body.evidence_digest,
             )
         ):
             raise QuotaError("invalid_admin_action", 422)
@@ -266,6 +281,20 @@ class AdminService:
             if receipt.status != "applied":
                 raise QuotaError(receipt.error_code or "quota_adjustment_failed")
             result = {"operation_id": str(receipt.operation_id)}
+        elif op == "resolve_unknown_window":
+            assert body.user_id is not None and body.resource_id is not None  # noqa: S101
+            assert body.evidence_digest is not None  # noqa: S101
+            from vpn_api.tunnels.window_resolution import charge_unknown_window
+
+            result = charge_unknown_window(
+                session,
+                user_id=body.user_id,
+                window_id=body.resource_id,
+                admin_id=identity.id,
+                idempotency_key=body.idempotency_key,
+                reason=body.reason,
+                evidence_digest=body.evidence_digest,
+            )
         elif op == "grant_subscription":
             assert body.user_id is not None and body.resource_id is not None  # noqa: S101
             row = entitlements.grant(
@@ -475,7 +504,7 @@ Admin = Annotated[AdminService, Depends(admin_service)]
 router = APIRouter(
     prefix="/api/admin/v1",
     tags=["administration"],
-    responses={code: {"model": ErrorResponse} for code in (401, 403, 409, 422, 429, 503)},
+    responses={code: {"model": ErrorResponse} for code in (401, 403, 404, 409, 422, 429, 503)},
 )
 
 
@@ -561,6 +590,37 @@ def user(user_id: UUID, admin: Admin, access: Access) -> dict[str, object]:
                 for d in session.scalars(select(Device).where(Device.user_id == user_id).limit(100))
             ],
         }
+
+
+@router.get("/users/{user_id}/window-status", response_model=AdminWindowStatus)
+def user_window_status(user_id: UUID, admin: Admin, access: Access) -> AdminWindowStatus:
+    """Read peer state without resolving grants or changing connection state."""
+    with transaction(admin.engine) as session:
+        admin.authenticate(session, access)
+        if session.get(User, user_id) is None:
+            raise QuotaError("user_not_found", 404)
+        # Serialize with owner ledger/admission writes. This acquires locks only.
+        LedgerService._lock_owner(session, user_id, active=False)
+        latest_state = session.scalar(
+            select(PeerConnection.state)
+            .where(PeerConnection.user_id == user_id)
+            .order_by(PeerConnection.created_at.desc(), PeerConnection.id.desc())
+            .limit(1)
+        )
+        non_closed = int(
+            session.scalar(
+                select(func.count())
+                .select_from(PeerConnection)
+                .where(PeerConnection.user_id == user_id, PeerConnection.state != "closed")
+            )
+            or 0
+        )
+        quota = LedgerService(admin.engine)._state(session, user_id)
+        return AdminWindowStatus(
+            latest_connection_state=latest_state,
+            non_closed_connection_count=non_closed,
+            reserved_bytes=quota.reserved_bytes,
+        )
 
 
 @router.get("/plans", response_model=list[PlanView])

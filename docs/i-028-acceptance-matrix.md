@@ -5,7 +5,19 @@ component receipt does not make the full issue or an earlier runner pass.
 ADR-072 supersedes older dated notes below that list the broad DNS/IPv6 audit
 as an open requirement for the owner's personal I-028 checkpoint.
 
-## Current status — 2026-11-01
+## Current status — 2026-11-02
+
+The fresh source-bound physical Egress receipt
+`evidence/i-028-egress-diagnostic-20261102T191650Z-90138cda.json` passed in
+276.19 seconds. All six scoped facts are true; settlement is 19,723,210 bytes
+over 20 receipts with zero reserved, unknown, open, or inconsistent bytes; and
+phone, revoke, staging, timer, and independent post-run cleanup passed. This
+repeats scoped Egress/renewal coverage. It remains diagnostic-only and does not
+set `vpn_dataplane_acceptance=true`. Its included IPv6 result was generic `io`;
+the already accepted ADR-071 same-port/AP capture remains the bounded IPv6
+evidence, while ADR-072 keeps the comprehensive packet audit deferred. The
+receipt's internal DNS observer saw no packets and is not treated as a capture
+result.
 
 Earlier I-019 receipt `evidence/i-019-attempt-5b914fde876e4c0e866bcce4729835f8.json`
 failed at B reconnect despite the DNS-free trigger: four HTTPS probes reported

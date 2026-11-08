@@ -1,0 +1,28 @@
+[Unit]
+Description=Mirror the encrypted DetourVpn beta backup from the API host
+After=network-online.target
+Wants=network-online.target
+ConditionPathIsDirectory=/var/lib/detourvpn-backup-mirror/archives
+
+[Service]
+Type=oneshot
+User=detourvpn-backup-mirror
+Group=detourvpn-backup-mirror
+ExecStart=/usr/bin/python3 -I /opt/detourvpn-backup-mirror/beta_backup_mirror.py --dest /var/lib/detourvpn-backup-mirror/archives --host __API_HOST__ --key /etc/detourvpn-backup-mirror/id_ed25519 --known-hosts /etc/detourvpn-backup-mirror/known_hosts --keep 14
+TimeoutStartSec=420
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=false
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+RestrictNamespaces=true
+LockPersonality=true
+CapabilityBoundingSet=
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+ReadOnlyPaths=/etc/detourvpn-backup-mirror /opt/detourvpn-backup-mirror
+ReadWritePaths=/var/lib/detourvpn-backup-mirror

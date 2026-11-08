@@ -119,6 +119,10 @@ class ConnectionScreen extends StatelessWidget {
     builder: (context, _) {
       final c = controller;
       final connected = c.phase == ConnectionPhase.connected;
+      final waitingForServerClose =
+          c is WindowConnectionController && c.remotePending;
+      final failedAttemptWaitingForServerClose =
+          waitingForServerClose && c.phase == ConnectionPhase.failed;
       final mustDisconnect =
           c.hasLease || c.busy || c.error == 'native_disconnect_failed';
       final title = switch (c.phase) {
@@ -195,9 +199,17 @@ class ConnectionScreen extends StatelessWidget {
                   SizedBox(
                     width: double.infinity,
                     child: FilledButton(
-                      onPressed: mustDisconnect ? c.disconnect : c.connect,
+                      onPressed: waitingForServerClose
+                          ? null
+                          : mustDisconnect
+                          ? c.disconnect
+                          : c.connect,
                       child: Text(
-                        c.busy
+                        waitingForServerClose
+                            ? failedAttemptWaitingForServerClose
+                                  ? 'Ожидание закрытия попытки'
+                                  : 'Ожидание подтверждения сервера'
+                            : c.busy
                             ? 'Отменить подключение'
                             : mustDisconnect
                             ? 'Отключить VPN'
@@ -323,8 +335,10 @@ class ConnectionScreen extends StatelessWidget {
                       'Ожидается подтверждение удаления peer на сервере.',
                     ),
                     const SizedBox(height: 8),
-                    const Text(
-                      'Дождитесь подтверждения закрытия соединения. При потере счётчиков резерв удерживается до операторской сверки.',
+                    Text(
+                      c.phase == ConnectionPhase.failed
+                          ? 'VPN на телефоне остановлен после ошибки. Сервер ещё подтверждает закрытие этой попытки; подключение станет доступно после подтверждения.'
+                          : 'Дождитесь подтверждения закрытия соединения. При потере счётчиков резерв удерживается до операторской сверки.',
                     ),
                     if (c is! WindowConnectionController)
                       TextButton(

@@ -8,8 +8,10 @@ final class DiagnosticReportText {
     private static final Set<String> ERROR_CODES = Set.of(
         "admission_closed", "api_unavailable", "device_conflict", "device_limit_reached",
         "device_revoked", "insufficient_quota", "insufficient_window_funding",
-        "invalid_response", "lease_expired", "login_failed", "native_disconnect_failed",
-        "native_down", "native_unavailable", "network_unavailable", "permission_denied",
+        "invalid_response", "lease_expired", "login_failed", "native_config_invalid",
+        "native_disconnect_failed", "native_down", "native_engine_unavailable",
+        "native_io_error", "native_permission_error", "native_service_state_invalid",
+        "native_start_failed", "native_unavailable", "network_unavailable", "permission_denied",
         "rate_limited", "remote_revoked", "revoke_unconfirmed", "session_device_mismatch",
         "session_erasure_failed", "session_expired", "session_storage_failed",
         "tunnel_node_capacity", "tunnel_node_unavailable", "tunnel_profile_unavailable",

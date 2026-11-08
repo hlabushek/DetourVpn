@@ -76,6 +76,7 @@ def test_empty_database_upgrade_repeat_and_no_schema_drift(engine: Engine) -> No
         "peer_window_holds",
         "peer_window_allocations",
         "peer_window_receipts",
+        "peer_window_resolutions",
         "peer_runtime_epochs",
         "peer_connections",
     }
@@ -147,7 +148,7 @@ def test_downgrade_with_data_fails_without_losing_rows_or_revision(engine: Engin
         assert session.scalar(select(func.count()).select_from(User)) == 1
         assert (
             session.scalar(text("SELECT version_num FROM alembic_version"))
-            == "0017_login_delivery_receipt"
+            == "0018_peer_window_resolution"
         )
 
 
@@ -184,7 +185,7 @@ def test_downgrade_cannot_delete_a_concurrently_committing_account(engine: Engin
         assert session.scalar(select(func.count()).select_from(User)) == 1
         assert (
             session.scalar(text("SELECT version_num FROM alembic_version"))
-            == "0017_login_delivery_receipt"
+            == "0018_peer_window_resolution"
         )
 
 

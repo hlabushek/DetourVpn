@@ -3,7 +3,13 @@ param(
     [string]$AndroidSdk = "$env:LOCALAPPDATA\Android\Sdk",
     [string]$JavaHome = 'C:\Program Files\Android\Android Studio\jbr',
     [string]$ApiOrigin = '',
+    [ValidateSet('android-arm64', 'android-arm64,android-x64')]
+    [string]$TargetPlatforms = 'android-arm64,android-x64',
+    [switch]$PhysicalTestBuild,
     [switch]$WindowTunnels,
+    # ADR-084: 16 MiB window; the API accepts 64 KiB..64 MiB per window.
+    [ValidateRange(65536, 67108864)]
+    [int]$WindowBudgetBytes = 16777216,
     [switch]$DeviceChecks
 )
 $ErrorActionPreference = 'Stop'
@@ -90,6 +96,7 @@ if (!$taskPreparedSdkSource) {
 # cloud reparse points even when their contents are readable. Never copy private
 # configuration, generated build trees or integration credentials into this copy.
 $taskBuildRoot = Join-Path $env:LOCALAPPDATA ('ProjectVpn\i013-builds\' + [guid]::NewGuid().ToString('N'))
+New-Item -ItemType Directory -Force -Path $taskBuildRoot | Out-Null
 function Copy-ClientBuildSource([string]$Source, [string]$Destination) {
     New-Item -ItemType Directory -Force -Path $Destination | Out-Null
     foreach ($taskEntry in Get-ChildItem -LiteralPath $Source -Force) {
@@ -138,37 +145,50 @@ try {
         if ($LASTEXITCODE -ne 0) { throw 'Dart formatting failed' }
         & $taskFlutter analyze --no-pub
         if ($LASTEXITCODE -ne 0) { throw 'Dart analysis failed' }
-        & $taskFlutter test --no-pub
-        if ($LASTEXITCODE -ne 0) { throw 'Flutter tests failed' }
+        if (!$PhysicalTestBuild) {
+            & $taskFlutter test --no-pub
+            if ($LASTEXITCODE -ne 0) { throw 'Flutter tests failed' }
+        }
     } finally { Pop-Location }
+    if (!$PhysicalTestBuild) {
+        Push-Location -LiteralPath $taskClient
+        try {
+            $taskArguments = @('build', 'apk', '--debug', '--no-pub', '--target', 'lib/main.dart', '--target-platform', $TargetPlatforms)
+            if ($ApiOrigin) { $taskArguments += "--dart-define=VPN_API_ORIGIN=$ApiOrigin" }
+            if ($WindowTunnels) {
+                $taskArguments += "--dart-define=VPN_WINDOW_TUNNELS=true"
+                $taskArguments += "--dart-define=VPN_WINDOW_BUDGET_BYTES=$WindowBudgetBytes"
+            }
+            & $taskFlutter @taskArguments
+            if ($LASTEXITCODE -ne 0) { throw 'Flutter Android build failed' }
+            # Flutter CLI rewrites Windows paths without escaping drive colons;
+            # normalize its generated file before Android lint (do not suppress lint).
+            [IO.File]::WriteAllText((Join-Path $taskAndroid 'local.properties'),
+                ('sdk.dir=' + $AndroidSdk.Replace('\', '/').Replace(':', '\:') + "`nflutter.sdk=" +
+                $FlutterSdk.Replace('\', '/').Replace(':', '\:') + "`n"), [Text.UTF8Encoding]::new($false))
+            Push-Location -LiteralPath $taskAndroid
+            try {
+                & (Join-Path $JavaHome 'bin\java.exe') '-classpath' (Join-Path $taskAndroid 'gradle\wrapper\gradle-wrapper.jar') org.gradle.wrapper.GradleWrapperMain `
+                    '--no-daemon' '-Ptarget=lib/main.dart' "-Ptarget-platform=$TargetPlatforms" ':app:testDebugUnitTest' ':app:lintDebug'
+                if ($LASTEXITCODE -ne 0) { throw 'Android tests/lint failed' }
+            } finally { Pop-Location }
+        } finally { Pop-Location }
+    }
     Push-Location -LiteralPath $taskClient
     try {
-        $taskArguments = @('build', 'apk', '--debug', '--no-pub', '--target', 'lib/main.dart', '--target-platform', 'android-arm64,android-x64')
-        if ($ApiOrigin) { $taskArguments += "--dart-define=VPN_API_ORIGIN=$ApiOrigin" }
-        if ($WindowTunnels) { $taskArguments += "--dart-define=VPN_WINDOW_TUNNELS=true" }
-        & $taskFlutter @taskArguments
-        if ($LASTEXITCODE -ne 0) { throw 'Flutter Android build failed' }
-        # Flutter CLI rewrites Windows paths without escaping drive colons;
-        # normalize its generated file before Android lint (do not suppress lint).
-        [IO.File]::WriteAllText((Join-Path $taskAndroid 'local.properties'),
-            ('sdk.dir=' + $AndroidSdk.Replace('\', '/').Replace(':', '\:') + "`nflutter.sdk=" +
-            $FlutterSdk.Replace('\', '/').Replace(':', '\:') + "`n"), [Text.UTF8Encoding]::new($false))
-        Push-Location -LiteralPath $taskAndroid
-        try {
-            & (Join-Path $JavaHome 'bin\java.exe') '-classpath' (Join-Path $taskAndroid 'gradle\wrapper\gradle-wrapper.jar') org.gradle.wrapper.GradleWrapperMain `
-                '--no-daemon' '-Ptarget=lib/main.dart' '-Ptarget-platform=android-arm64,android-x64' ':app:testDebugUnitTest' ':app:lintDebug'
-            if ($LASTEXITCODE -ne 0) { throw 'Android tests/lint failed' }
-        } finally { Pop-Location }
         # Flutter regenerates the native plugin registrant for each build mode.
         # Direct Gradle release after debug retains the integration_test reference
         # while release excludes that dev dependency, causing javac to fail.
         # In the pinned Flutter SDK, --no-pub also skips plugin regeneration.
         # Allow pub here after the enforced-lockfile check above so release can
         # replace the debug registrant and omit dev-only native plugins.
-        $taskReleaseArguments = @('build', 'apk', '--release', '--target', 'lib/main.dart', '--target-platform', 'android-arm64,android-x64')
+        $taskReleaseArguments = @('build', 'apk', '--release', '--target', 'lib/main.dart', '--target-platform', $TargetPlatforms)
         if ($ApiOrigin) { $taskReleaseArguments += "--dart-define=VPN_API_ORIGIN=$ApiOrigin" }
         $taskPubLockHash = (Get-FileHash -LiteralPath (Join-Path $taskClient 'pubspec.lock') -Algorithm SHA256).Hash
-        if ($WindowTunnels) { $taskReleaseArguments += "--dart-define=VPN_WINDOW_TUNNELS=true" }
+        if ($WindowTunnels) {
+            $taskReleaseArguments += "--dart-define=VPN_WINDOW_TUNNELS=true"
+            $taskReleaseArguments += "--dart-define=VPN_WINDOW_BUDGET_BYTES=$WindowBudgetBytes"
+        }
         & $taskFlutter @taskReleaseArguments
         if ($LASTEXITCODE -ne 0) { throw 'Flutter Android release build failed' }
         if ((Get-FileHash -LiteralPath (Join-Path $taskClient 'pubspec.lock') -Algorithm SHA256).Hash -ne $taskPubLockHash) {

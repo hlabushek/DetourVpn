@@ -1,0 +1,111 @@
+diff --git a/experimental/libbox/service.go b/experimental/libbox/service.go
+--- a/experimental/libbox/service.go
++++ b/experimental/libbox/service.go
+@@ -136,12 +136,27 @@ type platformInterfaceWrapper struct {
+ 	useProcFS              bool
+ 	networkManager         adapter.NetworkManager
+ 	myTunName              string
++	interfaceUpdateAccess  sync.Mutex
+ 	defaultInterfaceAccess sync.Mutex
+ 	defaultInterface       *control.Interface
+ 	isExpensive            bool
+ 	isConstrained          bool
+ }
+ 
++func (w *platformInterfaceWrapper) setNetworkCost(expensive bool, constrained bool) {
++	w.defaultInterfaceAccess.Lock()
++	w.isExpensive = expensive
++	w.isConstrained = constrained
++	w.defaultInterfaceAccess.Unlock()
++}
++
++func (w *platformInterfaceWrapper) networkCost(interfaceIndex int, metered bool) (bool, bool) {
++	w.defaultInterfaceAccess.Lock()
++	defer w.defaultInterfaceAccess.Unlock()
++	isDefault := w.defaultInterface != nil && interfaceIndex == w.defaultInterface.Index
++	return metered || isDefault && w.isExpensive, isDefault && w.isConstrained
++}
++
+ func (w *platformInterfaceWrapper) Initialize(networkManager adapter.NetworkManager) error {
+ 	w.networkManager = networkManager
+ 	return nil
+@@ -201,12 +216,7 @@ func (w *platformInterfaceWrapper) Interfaces() ([]adapter.NetworkInterface, err
+ 		if netInterface.Name == w.myTunName {
+ 			continue
+ 		}
+-		w.defaultInterfaceAccess.Lock()
+-		// (GOOS=windows) SA4006: this value of `isDefault` is never used
+-		// Why not used?
+-		//nolint:staticcheck
+-		isDefault := w.defaultInterface != nil && int(netInterface.Index) == w.defaultInterface.Index
+-		w.defaultInterfaceAccess.Unlock()
++		expensive, constrained := w.networkCost(int(netInterface.Index), netInterface.Metered)
+ 		interfaces = append(interfaces, adapter.NetworkInterface{
+ 			Interface: control.Interface{
+ 				Index:     int(netInterface.Index),
+@@ -217,8 +227,8 @@ func (w *platformInterfaceWrapper) Interfaces() ([]adapter.NetworkInterface, err
+ 			},
+ 			Type:        C.InterfaceType(netInterface.Type),
+ 			DNSServers:  iteratorToArray[string](netInterface.DNSServer),
+-			Expensive:   netInterface.Metered || isDefault && w.isExpensive,
+-			Constrained: isDefault && w.isConstrained,
++			Expensive:   expensive,
++			Constrained: constrained,
+ 		})
+ 	}
+ 	return interfaces, nil
+diff --git a/experimental/libbox/monitor.go b/experimental/libbox/monitor.go
+--- a/experimental/libbox/monitor.go
++++ b/experimental/libbox/monitor.go
+@@ -69,8 +69,9 @@ func (m *platformDefaultInterfaceMonitor) UpdateDefaultInterface(interfaceName s
+ }
+ 
+ func (m *platformDefaultInterfaceMonitor) updateDefaultInterface(interfaceName string, interfaceIndex32 int32, isExpensive bool, isConstrained bool) {
+-	m.isExpensive = isExpensive
+-	m.isConstrained = isConstrained
++	m.interfaceUpdateAccess.Lock()
++	defer m.interfaceUpdateAccess.Unlock()
++	m.setNetworkCost(isExpensive, isConstrained)
+ 	err := m.networkManager.UpdateInterfaces()
+ 	if err != nil {
+ 		m.logger.Error(E.Cause(err, "update interfaces"))
+diff --git a/experimental/libbox/monitor_race_test.go b/experimental/libbox/monitor_race_test.go
+new file mode 100644
+--- /dev/null
++++ b/experimental/libbox/monitor_race_test.go
+@@ -0,0 +1,35 @@
++package libbox
++
++import (
++	"sync"
++	"testing"
++
++	"github.com/sagernet/sing/common/control"
++)
++
++func TestNetworkCostSnapshot(t *testing.T) {
++	wrapper := &platformInterfaceWrapper{defaultInterface: &control.Interface{Index: 4}}
++	wrapper.setNetworkCost(true, true)
++	if expensive, constrained := wrapper.networkCost(4, false); !expensive || !constrained {
++		t.Fatalf("default interface policy = (%v, %v), want (true, true)", expensive, constrained)
++	}
++	if expensive, constrained := wrapper.networkCost(5, true); !expensive || constrained {
++		t.Fatalf("metered non-default policy = (%v, %v), want (true, false)", expensive, constrained)
++	}
++}
++
++func TestNetworkCostConcurrentSnapshot(t *testing.T) {
++	wrapper := new(platformInterfaceWrapper)
++	var workers sync.WaitGroup
++	for worker := 0; worker < 8; worker++ {
++		workers.Add(1)
++		go func(seed bool) {
++			defer workers.Done()
++			for i := 0; i < 10_000; i++ {
++				wrapper.setNetworkCost(seed, !seed)
++				wrapper.networkCost(4, false)
++			}
++		}(worker%2 == 0)
++	}
++	workers.Wait()
++}

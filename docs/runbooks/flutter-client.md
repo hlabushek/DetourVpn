@@ -19,7 +19,12 @@ Flutter engine ABI artifacts закреплены engine hash из SDK, а не 
 Обычный debug также включает штатный native plugin `integration_test` из SDK
 (dev dependency); его зависимости фиксируются в debug lock configurations.
 Release исключает dev plugin; это дополнительно проверяется APK audit.
-Gradle 8.14.3 (Apache-2.0) и Kotlin build plugin 2.2.20 (Apache-2.0) фиксированы.
+Gradle 8.14.3 (Apache-2.0) и Kotlin build plugin 2.4.21 (Apache-2.0) фиксированы.
+Kotlin 2.4.21 заменяет затронутый build plugin 2.2.20 (GHSA-r937-wjx7-w2jp);
+совместимость с AGP 8.13.0 и Gradle 8.14.3 подтверждена официальной матрицей.
+Закреплённый Flutter SDK 3.47.7 всё ещё использует KGP 2.2.20 во внутреннем
+Gradle-проекте Flutter tools; не патчить SDK в месте установки. До проверенного
+upstream stable SDK update этот build-tool advisory остаётся открытым.
 AGP 8.13.0 выбран для совместимости с проверенным native module; Flutter выдаёт
 предупреждения о будущем прекращении поддержки этих версий. Проверка требований
 SDK не отключается; переход на AGP 9 — отдельное совместимое обновление tooling.
@@ -61,9 +66,11 @@ beta signing key, организовать закрытое хранение и 
 Перед передачей APK тестерам требуется проверить подпись, application ID,
 версию, SHA-256 и непрерывность обновления с предыдущей beta-версии.
 
-`scripts/build_beta_apk.ps1` выполняет release build с этим ключом. Для beta API,
-настроенного на window tunnel catalog, добавляйте `-WindowTunnels`, чтобы клиент
-обращался к соответствующему API и native tunnel controller. При первом
+`scripts/build_beta_apk.ps1` выполняет release build с этим ключом и всегда
+включает v3 window-tunnel API/controller; signed beta APK не должен обращаться
+к закрытому v2 tunnel-admission endpoint. Для старых локальных сценариев v2
+используйте нижнеуровневый `scripts/build_flutter_client.ps1` без `-WindowTunnels`.
+При первом
 запуске скрипт предлагает создать JKS в `%LOCALAPPDATA%\ProjectVpn\beta-signing`
 и продолжает только после локального ввода `CREATE`. `keytool` запрашивает
 пароль JKS и пароль ключа в терминале; путь вводить не надо. Выбрать пароли не
@@ -160,6 +167,12 @@ Flutter должен заново сгенерировать native plugin regis
 запускается без него после `pub get --enforce-lockfile`; перед экспортом скрипт
 проверяет, что SHA256 `pubspec.lock` не изменился.
 `-ApiOrigin`, если задан, применяется к обеим сборкам.
+
+По умолчанию нативный AAR включает arm64-v8a и x86_64. Если цель Flutter —
+только `android-arm64`, для physical-test APK собирается arm64-only AAR, что
+уменьшает временный расход диска компилятором. Gradle выбирает AAR по
+`target-platform`; сборки с несколькими ABI продолжают использовать прежний
+двухABI AAR.
 
 APK: `apps/client/build/app/outputs/flutter-apk/app-debug.apk`.
 Для установки обычного debug APK после сборки и открытия на единственном

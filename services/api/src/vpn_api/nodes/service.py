@@ -5,13 +5,47 @@ from datetime import UTC, datetime, timedelta
 from typing import Literal
 from uuid import UUID, uuid4
 
-from sqlalchemy import Engine, select, text
+from sqlalchemy import Engine, delete, func, select, text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from vpn_api.db.connection import transaction
 from vpn_api.db.models import AgentRequestNonce, VPNNode
 from vpn_api.nodes.contracts import ProvisionNodeInput, ProvisionNodeResult
+
+# Agent requests older than 60 seconds are rejected before a nonce is stored, so a nonce
+# cannot be replayed once it is older than that. Ten minutes leaves a wide safety margin.
+NONCE_RETENTION = timedelta(minutes=10)
+NONCE_PRUNE_BATCH = 5000
+
+
+def cleanup_agent_request_nonces(
+    engine: Engine,
+    retention: timedelta = NONCE_RETENTION,
+    batch: int = NONCE_PRUNE_BATCH,
+) -> dict[str, int]:
+    """Delete replay-protection rows beyond the replay window, in bounded batches."""
+    if retention < timedelta(minutes=2) or batch < 1:
+        raise ValueError("Unsafe nonce retention")
+    deleted = 0
+    while True:
+        with transaction(engine) as session:
+            now = session.scalar(select(func.clock_timestamp()))
+            if not isinstance(now, datetime):
+                raise RuntimeError("Database clock unavailable")
+            expired = (
+                select(AgentRequestNonce.id)
+                .where(AgentRequestNonce.created_at < now - retention)
+                .limit(batch)
+            )
+            removed = session.execute(
+                delete(AgentRequestNonce)
+                .where(AgentRequestNonce.id.in_(expired))
+                .returning(AgentRequestNonce.id)
+            ).all()
+        deleted += len(removed)
+        if len(removed) < batch:
+            return {AgentRequestNonce.__tablename__: deleted}
 
 
 class NodeError(Exception):

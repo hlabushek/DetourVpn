@@ -49,8 +49,9 @@ from vpn_api.quota.service import LedgerService
 
 __all__ = ["harness"]
 ROOT = Path(__file__).resolve().parents[3]
-PACKAGE = "org.example.vpnclient.i028"
+PACKAGE = "com.detourvpn.client.i028"
 TEST_PACKAGE = f"{PACKAGE}.test"
+OWNER_PACKAGE = "com.detourvpn.client"
 SSH = [
     "wsl.exe",
     "-d",
@@ -1966,8 +1967,8 @@ def test_i028_real_android(harness: Harness) -> None:
                     )
                     adb("uninstall", "org.example.vpnpoc.test")
                     clean &= "tcp:18766" not in adb("reverse", "--list")
-                    cleanup_steps["owner_app_untouched"] = "package:org.example.vpnclient" in adb(
-                        "shell", "pm", "list", "packages", "org.example.vpnclient"
+                    cleanup_steps["owner_app_untouched"] = f"package:{OWNER_PACKAGE}" in adb(
+                        "shell", "pm", "list", "packages", OWNER_PACKAGE
                     )
                     cleanup_steps["phone_restored"] = (
                         cleanup_steps["isolated_i028_app_absent"]

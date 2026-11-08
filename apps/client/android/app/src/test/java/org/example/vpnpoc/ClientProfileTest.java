@@ -27,6 +27,27 @@ public class ClientProfileTest {
         assertEquals(1, config.getPeers().get(0).getAllowedIps().size());
         assertEquals(1, config.getInterface().getDnsServers().size());
     }
+    @Test public void allTrafficModeIgnoresRememberedSelectionAndKeepsControlAppOutside()
+            throws Exception {
+        var packages = ClientProfile.packagesForMode("all",
+            List.of("org.example.saved"), "com.detourvpn.client");
+        assertEquals(List.of("com.detourvpn.client"), packages);
+        var config = ClientProfile.parse(text(), key, packages,
+            ClientProfile.routingModeFor("all"));
+        assertEquals(List.of("com.detourvpn.client"),
+            List.copyOf(config.getInterface().getExcludedApplications()));
+        assertTrue(config.getInterface().getIncludedApplications().isEmpty());
+    }
+    @Test public void routingModeMapsOnlyKnownStoredValues() {
+        assertEquals(ClientProfile.RoutingMode.EXCLUDE_SELECTED,
+            ClientProfile.routingModeFor("all"));
+        assertEquals(ClientProfile.RoutingMode.EXCLUDE_SELECTED,
+            ClientProfile.routingModeFor("exclude"));
+        assertEquals(ClientProfile.RoutingMode.INCLUDE_SELECTED,
+            ClientProfile.routingModeFor("include"));
+        assertThrows(IllegalArgumentException.class,
+            () -> ClientProfile.routingModeFor("unknown"));
+    }
     @Test public void includedModeRejectsEmptySelectionToAvoidFailOpenRouting() {
         assertThrows(Exception.class, () -> ClientProfile.parse(text(), key, List.of(),
             ClientProfile.RoutingMode.INCLUDE_SELECTED));

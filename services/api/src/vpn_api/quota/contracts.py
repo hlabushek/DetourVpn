@@ -51,7 +51,13 @@ class LedgerEntryResponse(BaseModel):
     kind: Literal["credit", "debit"]
     delta_bytes: int
     source_type: Literal[
-        "registration", "internal", "usage", "tunnel_lease", "reward", "peer_window"
+        "registration",
+        "internal",
+        "usage",
+        "tunnel_lease",
+        "reward",
+        "peer_window",
+        "peer_window_resolution",
     ]
     source_id: UUID
     idempotency_key: UUID

@@ -513,9 +513,10 @@ def test_probe_drops_unknown_fields_and_unbounded_error_data() -> None:
 
 def test_egress_acceptance_requires_same_port_baseline_and_connect_attempt() -> None:
     dart = (ROOT / "apps/client/integration_test/i028_live_test.dart").read_text(encoding="utf-8")
-    assert "baseline['ipv6_literal_egress_port_control_connected'] == true" in dart
-    assert "included['ipv6_literal_connect_attempted'] == true" in dart
-    assert "included['ipv6_literal_failure'] == 'io'" in dart
+    normalized_dart = " ".join(dart.split())
+    assert "baseline['ipv6_literal_egress_port_control_connected'] == true" in normalized_dart
+    assert "included['ipv6_literal_connect_attempted'] == true" in normalized_dart
+    assert "included['ipv6_literal_failure'] == 'io'" in normalized_dart
 
 
 def test_failed_ipv4_followup_keeps_only_fixed_network_diagnostics() -> None:

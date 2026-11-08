@@ -3,131 +3,546 @@ import 'package:flutter/services.dart';
 
 class SplitAppsScreen extends StatefulWidget {
   const SplitAppsScreen({super.key});
+
   @override
   State<SplitAppsScreen> createState() => _SplitAppsState();
 }
 
-class _SplitAppsState extends State<SplitAppsScreen> {
+class _InstalledApp {
+  const _InstalledApp({
+    required this.packageName,
+    required this.label,
+    this.icon,
+  });
+
+  final String packageName;
+  final String label;
+  final Uint8List? icon;
+
+  factory _InstalledApp.fromPlatform(Object? value) {
+    if (value is String) {
+      return _InstalledApp(packageName: value, label: value);
+    }
+    if (value is! Map) throw const FormatException('Invalid app entry');
+    final entry = Map<String, Object?>.from(value);
+    final packageName = entry['packageName'];
+    final label = entry['label'];
+    final icon = entry['icon'];
+    if (packageName is! String || packageName.isEmpty) {
+      throw const FormatException('Invalid app package');
+    }
+    return _InstalledApp(
+      packageName: packageName,
+      label: label is String && label.trim().isNotEmpty ? label : packageName,
+      icon: icon is Uint8List ? icon : null,
+    );
+  }
+}
+
+class _SplitAppsState extends State<SplitAppsScreen>
+    with SingleTickerProviderStateMixin {
   static const channel = MethodChannel('project.vpn/tunnel.v1');
-  List<String> apps = [];
+
+  final searchController = TextEditingController();
+  final domainSearchController = TextEditingController();
+  final domainController = TextEditingController();
+  late final TabController tabController;
+  List<_InstalledApp> apps = [];
   Set<String> selected = {};
+  List<String> domains = [];
   String mode = 'exclude';
+  String lastSplitMode = 'exclude';
+  String searchQuery = '';
+  String domainSearchQuery = '';
   bool loading = true;
+  bool saving = false;
   String? error;
+
   @override
   void initState() {
     super.initState();
+    tabController = TabController(length: 2, vsync: this);
     load();
+  }
+
+  @override
+  void dispose() {
+    searchController.dispose();
+    domainSearchController.dispose();
+    domainController.dispose();
+    tabController.dispose();
+    super.dispose();
   }
 
   Future<void> load() async {
     try {
-      final listed = await channel.invokeListMethod<String>('apps') ?? [];
+      final listed = await channel.invokeListMethod<Object?>('apps') ?? [];
       final saved = await channel.invokeListMethod<String>('splitRead') ?? [];
+      // ADR-084: the beta engine has no domain routing; domain rules are never loaded.
+      const savedDomains = <String>[];
       final savedMode =
           await channel.invokeMethod<String>('splitModeRead') ?? 'exclude';
-      if (mounted)
-        setState(() {
-          apps = {...listed, ...saved}.toList()..sort();
-          selected = saved.toSet();
-          mode = savedMode;
-          loading = false;
+      final savedLastMode =
+          await channel.invokeMethod<String>('splitLastModeRead') ?? 'exclude';
+      final byPackage = <String, _InstalledApp>{};
+      for (final item in listed) {
+        final app = _InstalledApp.fromPlatform(item);
+        byPackage[app.packageName] = app;
+      }
+      for (final packageName in saved) {
+        byPackage.putIfAbsent(
+          packageName,
+          () => _InstalledApp(packageName: packageName, label: packageName),
+        );
+      }
+      final sortedApps = byPackage.values.toList()
+        ..sort((left, right) {
+          final byLabel = left.label.toLowerCase().compareTo(
+            right.label.toLowerCase(),
+          );
+          return byLabel != 0
+              ? byLabel
+              : left.packageName.compareTo(right.packageName);
         });
+      if (!mounted) return;
+      setState(() {
+        apps = sortedApps;
+        selected = saved.toSet();
+        domains = savedDomains;
+        mode = const {'all', 'exclude', 'include'}.contains(savedMode)
+            ? savedMode
+            : 'exclude';
+        lastSplitMode = const {'exclude', 'include'}.contains(savedMode)
+            ? savedMode
+            : const {'exclude', 'include'}.contains(savedLastMode)
+            ? savedLastMode
+            : 'exclude';
+        error = const {'all', 'exclude', 'include'}.contains(savedMode)
+            ? null
+            : 'Неизвестный режим. Выбери режим заново.';
+        loading = false;
+      });
     } catch (_) {
-      if (mounted)
-        setState(() {
-          loading = false;
-          error = 'Не удалось прочитать настройки';
-        });
+      if (!mounted) return;
+      setState(() {
+        loading = false;
+        error = 'Не удалось прочитать настройки на телефоне';
+      });
     }
   }
 
-  Future<void> save() async {
+  Future<void> saveChange({
+    required String nextMode,
+    required Set<String> nextSelected,
+    required List<String> nextDomains,
+  }) async {
+    if (loading || saving) return;
+    final previousMode = mode;
+    final previousLastMode = lastSplitMode;
+    final previousSelected = Set<String>.of(selected);
+    final previousDomains = List<String>.of(domains);
     setState(() {
-      loading = true;
+      mode = nextMode;
+      if (nextMode == 'exclude' || nextMode == 'include') {
+        lastSplitMode = nextMode;
+      }
+      selected = Set<String>.of(nextSelected);
+      domains = List<String>.of(nextDomains);
+      saving = true;
       error = null;
     });
+
     try {
-      await channel.invokeMethod<void>('splitWrite', {
-        'packages': selected.toList()..sort(),
-        'mode': mode,
-      });
-      if (mounted) Navigator.pop(context);
-    } catch (_) {
-      if (mounted)
+      final savedDomains = await channel
+          .invokeListMethod<String>('splitWrite', {
+            'packages': nextSelected.toList()..sort(),
+            'domains': nextDomains,
+            'mode': nextMode,
+          });
+      if (mounted) {
         setState(() {
-          loading = false;
-          error =
-              'Сначала отключите VPN. Проверьте, что выбранные приложения установлены.';
+          domains = savedDomains ?? nextDomains;
+          saving = false;
         });
+      }
+    } on PlatformException catch (failure) {
+      if (!mounted) return;
+      setState(() {
+        mode = previousMode;
+        lastSplitMode = previousLastMode;
+        selected = previousSelected;
+        domains = previousDomains;
+        saving = false;
+        error = failure.code == 'domain_invalid'
+            ? 'Добавь домен без https:// и пути, например example.org или *.ru.'
+            : failure.code == 'domain_duplicate'
+            ? 'Этот домен уже есть в списке.'
+            : 'Не удалось сохранить. Отключи VPN и попробуй снова.';
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        mode = previousMode;
+        lastSplitMode = previousLastMode;
+        selected = previousSelected;
+        domains = previousDomains;
+        saving = false;
+        error = 'Не удалось сохранить настройки на этом телефоне.';
+      });
     }
   }
+
+  void selectMode(String? value) {
+    if (value == null) return;
+    saveChange(nextMode: value, nextSelected: selected, nextDomains: domains);
+  }
+
+  void setSplitEnabled(bool enabled) => saveChange(
+    nextMode: enabled ? lastSplitMode : 'all',
+    nextSelected: selected,
+    nextDomains: domains,
+  );
+
+  void toggleApp(String packageName, bool? checked) {
+    final nextSelected = Set<String>.of(selected);
+    if (checked == true) {
+      nextSelected.add(packageName);
+    } else {
+      nextSelected.remove(packageName);
+    }
+    saveChange(
+      nextMode: mode,
+      nextSelected: nextSelected,
+      nextDomains: domains,
+    );
+  }
+
+  void toggleDomain(String domain, bool checked) {
+    final nextDomains = List<String>.of(domains);
+    if (checked) {
+      if (!nextDomains.contains(domain)) nextDomains.add(domain);
+    } else {
+      nextDomains.remove(domain);
+    }
+    saveChange(
+      nextMode: mode,
+      nextSelected: selected,
+      nextDomains: nextDomains,
+    );
+  }
+
+  Future<void> addDomain() async {
+    domainController.clear();
+    final value = await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Добавить домен'),
+        content: TextField(
+          controller: domainController,
+          autofocus: true,
+          autocorrect: false,
+          enableSuggestions: false,
+          textInputAction: TextInputAction.done,
+          onSubmitted: (value) => Navigator.of(context).pop(value),
+          decoration: const InputDecoration(
+            hintText: 'example.org или *.ru',
+            helperText: 'Без https://, пути и порта',
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Отмена'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(domainController.text),
+            child: const Text('Добавить'),
+          ),
+        ],
+      ),
+    );
+    final domain = value?.trim();
+    if (!mounted || domain == null || domain.isEmpty) return;
+    if (domains.any(
+      (existing) => existing.toLowerCase() == domain.toLowerCase(),
+    )) {
+      setState(() => error = 'Этот домен уже есть в списке.');
+      return;
+    }
+    await saveChange(
+      nextMode: mode,
+      nextSelected: selected,
+      nextDomains: [...domains, domain],
+    );
+  }
+
+  List<_InstalledApp> get visibleApps {
+    final query = searchQuery.trim().toLowerCase();
+    final filtered = query.isEmpty
+        ? apps
+        : apps.where(
+            (app) =>
+                app.label.toLowerCase().contains(query) ||
+                app.packageName.toLowerCase().contains(query),
+          );
+    return filtered.toList()..sort((left, right) {
+      final leftSelected = selected.contains(left.packageName);
+      final rightSelected = selected.contains(right.packageName);
+      if (leftSelected != rightSelected) return leftSelected ? -1 : 1;
+      return left.label.toLowerCase().compareTo(right.label.toLowerCase());
+    });
+  }
+
+  Widget appIcon(_InstalledApp app) {
+    final bytes = app.icon;
+    if (bytes == null) return const Icon(Icons.apps);
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(8),
+      child: Image.memory(
+        bytes,
+        width: 40,
+        height: 40,
+        fit: BoxFit.contain,
+        errorBuilder: (_, __, ___) => const Icon(Icons.apps),
+      ),
+    );
+  }
+
+  Widget buildSaveStatus() {
+    final currentError = error;
+    final icon = saving
+        ? Icons.sync
+        : currentError == null
+        ? Icons.check_circle_outline
+        : Icons.error_outline;
+    final message = saving
+        ? 'Сохраняю на телефоне…'
+        : currentError ?? 'Настройки сохраняются автоматически на телефоне.';
+    return SafeArea(
+      top: false,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(24, 8, 24, 16),
+        child: Row(
+          children: [
+            Icon(icon, size: 18),
+            const SizedBox(width: 8),
+            Expanded(child: Text(message)),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget buildDomainTab() {
+    final query = domainSearchQuery.trim().toLowerCase();
+    final visibleDomains =
+        domains.where((domain) => domain.toLowerCase().contains(query)).toList()
+          ..sort(
+            (left, right) => left.toLowerCase().compareTo(right.toLowerCase()),
+          );
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(20, 12, 20, 8),
+          child: TextField(
+            controller: domainSearchController,
+            onChanged: (value) => setState(() => domainSearchQuery = value),
+            decoration: InputDecoration(
+              prefixIcon: const Icon(Icons.search),
+              hintText: 'Поиск доменов',
+              suffixIcon: domainSearchQuery.isEmpty
+                  ? null
+                  : IconButton(
+                      tooltip: 'Очистить поиск',
+                      onPressed: () {
+                        domainSearchController.clear();
+                        setState(() => domainSearchQuery = '');
+                      },
+                      icon: const Icon(Icons.clear),
+                    ),
+              border: const OutlineInputBorder(),
+            ),
+          ),
+        ),
+        Expanded(
+          child: visibleDomains.isEmpty
+              ? Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(24),
+                    child: Text(
+                      domains.isEmpty
+                          ? 'Доменов пока нет. Добавь адрес или шаблон, например *.ru.'
+                          : 'Домены не найдены.',
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
+                )
+              : ListView.builder(
+                  padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
+                  itemCount: visibleDomains.length,
+                  itemBuilder: (context, index) {
+                    final domain = visibleDomains[index];
+                    return Card(
+                      child: ListTile(
+                        leading: const Icon(Icons.language),
+                        title: Text(domain),
+                        subtitle: Text(
+                          domain.startsWith('*.')
+                              ? 'Домен и его поддомены'
+                              : 'Точное имя домена',
+                        ),
+                        trailing: IconButton(
+                          tooltip: 'Удалить домен',
+                          onPressed: () => toggleDomain(domain, false),
+                          icon: const Icon(Icons.delete_outline),
+                        ),
+                      ),
+                    );
+                  },
+                ),
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(20, 4, 20, 12),
+          child: SizedBox(
+            width: double.infinity,
+            child: FilledButton.icon(
+              onPressed: addDomain,
+              icon: const Icon(Icons.add),
+              label: const Text('Добавить домен'),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget buildAppsTab() => Column(
+    children: [
+      Padding(
+        padding: const EdgeInsets.fromLTRB(20, 12, 20, 8),
+        child: TextField(
+          controller: searchController,
+          onChanged: (value) => setState(() => searchQuery = value),
+          decoration: InputDecoration(
+            prefixIcon: const Icon(Icons.search),
+            hintText: 'Название или код Android',
+            suffixIcon: searchQuery.isEmpty
+                ? null
+                : IconButton(
+                    tooltip: 'Очистить поиск',
+                    onPressed: () {
+                      searchController.clear();
+                      setState(() => searchQuery = '');
+                    },
+                    icon: const Icon(Icons.clear),
+                  ),
+            border: const OutlineInputBorder(),
+          ),
+        ),
+      ),
+      Expanded(
+        child: visibleApps.isEmpty
+            ? const Center(child: Text('Приложения не найдены.'))
+            : ListView.builder(
+                padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
+                itemCount: visibleApps.length,
+                itemBuilder: (context, index) {
+                  final app = visibleApps[index];
+                  return CheckboxListTile(
+                    key: ValueKey(app.packageName),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 8),
+                    controlAffinity: ListTileControlAffinity.trailing,
+                    secondary: appIcon(app),
+                    title: Text(app.label),
+                    subtitle: Text(app.packageName),
+                    value: selected.contains(app.packageName),
+                    onChanged: (value) => toggleApp(app.packageName, value),
+                  );
+                },
+              ),
+      ),
+      if (mode == 'include' && selected.isEmpty)
+        const Padding(
+          padding: EdgeInsets.fromLTRB(20, 0, 20, 12),
+          child: Text(
+            'Добавь хотя бы одно приложение, чтобы подключиться в этом режиме.',
+          ),
+        ),
+    ],
+  );
 
   @override
   Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(title: const Text('Разделение трафика')),
-    body: ListView(
-      padding: const EdgeInsets.all(24),
-      children: [
-        IgnorePointer(
-          ignoring: loading,
-          child: RadioGroup<String>(
-            groupValue: mode,
-            onChanged: (value) {
-              if (!loading && value != null) setState(() => mode = value);
-            },
-            child: const Column(
+    bottomNavigationBar: buildSaveStatus(),
+    body: loading
+        ? const Center(child: CircularProgressIndicator())
+        : IgnorePointer(
+            ignoring: saving,
+            child: Column(
               children: [
-                RadioListTile<String>(
-                  value: 'exclude',
-                  title: Text('Исключить выбранные приложения'),
-                  subtitle: Text('Они используют обычную сеть вне VPN.'),
-                ),
-                RadioListTile<String>(
-                  value: 'include',
-                  title: Text('Через VPN только выбранные'),
-                  subtitle: Text(
-                    'Остальные приложения используют обычную сеть.',
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 4, 20, 0),
+                  child: SwitchListTile.adaptive(
+                    key: const ValueKey('split-enabled'),
+                    contentPadding: EdgeInsets.zero,
+                    title: const Text('Разделение трафика'),
+                    subtitle: Text(
+                      mode == 'all'
+                          ? 'Выключено: весь обычный трафик через VPN.'
+                          : 'Включено: выбранные правила применяются ниже.',
+                    ),
+                    value: mode != 'all',
+                    onChanged: setSplitEnabled,
                   ),
                 ),
+                if (mode != 'all')
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    child: RadioGroup<String>(
+                      groupValue: mode,
+                      onChanged: selectMode,
+                      child: const Column(
+                        children: [
+                          RadioListTile<String>(
+                            contentPadding: EdgeInsets.zero,
+                            value: 'exclude',
+                            title: Text('Исключить выбранное из VPN'),
+                          ),
+                          RadioListTile<String>(
+                            contentPadding: EdgeInsets.zero,
+                            value: 'include',
+                            title: Text('Через VPN только выбранные'),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 4, 20, 8),
+                  child: Text(
+                    'Правила действуют для приложений. В режиме «только выбранное» выбери хотя бы одно приложение. Маршрутизация по доменам в этой бете недоступна.',
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                ),
+                if (mode != 'all') ...[
+                  // ADR-084: the beta engine has no domain routing, so the
+                  // domain tab is hidden instead of accepting rules it cannot enforce.
+                  Expanded(child: buildAppsTab()),
+                ] else
+                  const Expanded(
+                    child: Center(
+                      child: Padding(
+                        padding: EdgeInsets.all(24),
+                        child: Text(
+                          'Список сохранён, но разделение выключено. Весь обычный трафик направляется через VPN.',
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+                    ),
+                  ),
               ],
             ),
           ),
-        ),
-        const Text(
-          'Исключённые приложения, включая их DNS и IPv6, не защищены VPN. '
-          'Сам DetourVpn остаётся вне туннеля для управления подключением. '
-          'Android Lockdown может заблокировать приложения вне списка. '
-          'Настройки хранятся только на телефоне и меняются при отключённом VPN.',
-        ),
-        const SizedBox(height: 16),
-        if (loading) const LinearProgressIndicator(),
-        if (error != null) Text(error!),
-        if (mode == 'include' && selected.isEmpty)
-          const Text(
-            'Для режима «только выбранные» отметь хотя бы одно приложение.',
-          ),
-        for (final name in apps)
-          CheckboxListTile(
-            title: Text(name),
-            value: selected.contains(name),
-            onChanged: loading
-                ? null
-                : (value) => setState(() {
-                    if (value == true) {
-                      selected.add(name);
-                    } else {
-                      selected.remove(name);
-                    }
-                  }),
-          ),
-        FilledButton(
-          onPressed: loading || (mode == 'include' && selected.isEmpty)
-              ? null
-              : save,
-          child: const Text('Сохранить'),
-        ),
-      ],
-    ),
   );
 }

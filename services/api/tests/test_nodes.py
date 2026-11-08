@@ -1,6 +1,6 @@
 """PostgreSQL contract tests use synthetic node credentials, never a real VPN node."""
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from uuid import uuid4
 
 import pytest
@@ -13,7 +13,7 @@ from vpn_api.db.connection import transaction
 from vpn_api.db.models import AgentRequestNonce, Device, User, VPNNode
 from vpn_api.main import create_app
 from vpn_api.nodes.contracts import ProvisionNodeInput
-from vpn_api.nodes.service import NodeError, NodeRegistry
+from vpn_api.nodes.service import NodeError, NodeRegistry, cleanup_agent_request_nonces
 from vpn_api.quota.contracts import LedgerCommand
 from vpn_api.quota.service import LedgerService
 from vpn_api.usage.service import UsageService
@@ -102,6 +102,62 @@ def test_agent_nonce_is_one_time_and_credential_is_verified(engine: Engine) -> N
             )
     with transaction(engine) as session:
         assert session.scalar(select(AgentRequestNonce).where(AgentRequestNonce.nonce == nonce))
+
+
+def test_nonce_cleanup_removes_only_expired_rows_and_keeps_replay_protection(
+    engine: Engine,
+) -> None:
+    command.upgrade(migration_config(engine), "head")
+    registry = NodeRegistry(engine)
+    provisioned = registry.provision(
+        ProvisionNodeInput(idempotency_key=uuid4(), name="node", region="eu-test")
+    )
+    assert provisioned.secret is not None
+    node_id = provisioned.node_id
+    fresh = uuid4()
+    timestamp = str(int(datetime.now(UTC).timestamp()))
+    with transaction(engine) as session:
+        registry.verify_and_consume(
+            session,
+            node_id=node_id,
+            timestamp=timestamp,
+            nonce=fresh,
+            credential=provisioned.secret,
+        )
+        digest = session.scalar(select(VPNNode.secret_digest).where(VPNNode.id == node_id))
+        assert digest is not None
+        old = datetime.now(UTC) - timedelta(hours=1)
+        for _ in range(7):
+            session.add(
+                AgentRequestNonce(
+                    id=uuid4(), node_id=node_id, secret_digest=digest, nonce=uuid4(), created_at=old
+                )
+            )
+
+    # A tiny batch proves the loop continues until every expired row is gone.
+    result = cleanup_agent_request_nonces(engine, batch=3)
+
+    assert result == {"agent_request_nonces": 7}
+    with transaction(engine) as session:
+        remaining = list(session.scalars(select(AgentRequestNonce.nonce)))
+    assert remaining == [fresh]
+    with pytest.raises(NodeError, match="agent_replay"):
+        with transaction(engine) as session:
+            registry.verify_and_consume(
+                session,
+                node_id=node_id,
+                timestamp=timestamp,
+                nonce=fresh,
+                credential=provisioned.secret,
+            )
+    assert cleanup_agent_request_nonces(engine) == {"agent_request_nonces": 0}
+
+
+def test_nonce_cleanup_rejects_unsafe_retention(engine: Engine) -> None:
+    with pytest.raises(ValueError, match="Unsafe nonce retention"):
+        cleanup_agent_request_nonces(engine, retention=timedelta(seconds=30))
+    with pytest.raises(ValueError, match="Unsafe nonce retention"):
+        cleanup_agent_request_nonces(engine, batch=0)
 
 
 def test_agent_usage_endpoint_charges_once_and_retries_by_receipt(engine: Engine) -> None:

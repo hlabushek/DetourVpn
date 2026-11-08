@@ -210,7 +210,7 @@ if ($Action -eq 'Build') {
         $taskAapt = Join-Path $env:LOCALAPPDATA 'Android/Sdk/build-tools/36.0.0/aapt.exe'
         if (!(Test-Path -LiteralPath $taskAapt) -or !(Test-Path -LiteralPath $taskFinalAppApk)) { throw 'Isolated I-028 APK or aapt verifier missing.' }
         $taskPackageLine = & $taskAapt dump badging $taskFinalAppApk | Where-Object { $_ -match "^package: name='" }
-        if ($LASTEXITCODE -ne 0 -or $taskPackageLine -notmatch "^package: name='org\.example\.vpnclient\.i028'") { throw 'Built APK is not the isolated I-028 package; refusing physical runner readiness.' }
+        if ($LASTEXITCODE -ne 0 -or $taskPackageLine -notmatch ("^package: name='" + [regex]::Escape($taskClientPackage) + "'")) { throw 'Built APK is not the isolated I-028 package; refusing physical runner readiness.' }
         $taskProbeBaseApk = Join-Path $taskNativeAndroid 'app/build/outputs/apk/debug/app-debug.apk'
         $taskProbeTestApk = Join-Path $taskNativeAndroid 'app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk'
         if (!(Test-Path -LiteralPath $taskProbeBaseApk) -or !(Test-Path -LiteralPath $taskProbeTestApk)) { throw 'Independent UID probe APK pair missing.' }

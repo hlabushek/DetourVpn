@@ -103,7 +103,7 @@ def test_flutter_test_arguments_avoid_build_only_gradle_flags() -> None:
             "physical-device",
             phase=phase,
             role=role,
-            package="org.example.vpnclient.i028",
+            package="com.detourvpn.client.i028",
         )
         assert args[:3] == ["flutter", "test", "integration_test/i028_two_device_test.dart"]
         assert f"--dart-define=VPN_I028_TWO_PHASE={phase}" in args
@@ -116,7 +116,7 @@ def test_flutter_test_arguments_avoid_build_only_gradle_flags() -> None:
             "emulator-5554",
             phase="seed",
             role="a",
-            package="org.example.vpnclient.i028",
+            package="com.detourvpn.client.i028",
         )
 
 
@@ -134,7 +134,7 @@ def test_flutter_seed_can_collect_verbose_output_without_persisting_it() -> None
         "physical-device",
         phase="seed",
         role="a",
-        package="org.example.vpnclient.i028",
+        package="com.detourvpn.client.i028",
         verbose=True,
     )
     assert args[-1] == "--verbose"

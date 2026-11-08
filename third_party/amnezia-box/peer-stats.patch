@@ -1,0 +1,276 @@
+diff --git a/experimental/libbox/service.go b/experimental/libbox/service.go
+index 8c94b38..1ede61f 100644
+--- a/experimental/libbox/service.go
++++ b/experimental/libbox/service.go
+@@ -114,6 +114,18 @@ func (s *BoxService) NeedWIFIState() bool {
+ 	return s.instance.Router().NeedWIFIState()
+ }
+ 
++// PeerStats returns sanitized AWG peer counters for beta acceptance checks.
++func (s *BoxService) PeerStats() (string, error) {
++	for _, endpoint := range s.instance.Endpoint().Endpoints() {
++		if stats, ok := endpoint.(interface {
++			PeerStatsJSON() (string, error)
++		}); ok {
++			return stats.PeerStatsJSON()
++		}
++	}
++	return "", E.New("AWG peer statistics unavailable")
++}
++
+ var (
+ 	_ platform.Interface = (*platformInterfaceWrapper)(nil)
+ 	_ log.PlatformWriter = (*platformInterfaceWrapper)(nil)
+diff --git a/protocol/awg/endpoint.go b/protocol/awg/endpoint.go
+index fac45d2..1af7b9c 100644
+--- a/protocol/awg/endpoint.go
++++ b/protocol/awg/endpoint.go
+@@ -263,3 +263,8 @@ func (e *Endpoint) InterfaceUpdated() {
+ 		e.logger.Error("rebind after interface update: ", err)
+ 	}
+ }
++
++// PeerStatsJSON returns only the peer accounting tuple; UAPI key material is never exposed.
++func (e *Endpoint) PeerStatsJSON() (string, error) {
++	return e.Device.PeerStatsJSON()
++}
+diff --git a/transport/awg/device.go b/transport/awg/device.go
+index 68f72ab..3baa61a 100644
+--- a/transport/awg/device.go
++++ b/transport/awg/device.go
+@@ -1,10 +1,12 @@
+ package awg
+ 
+ import (
++	"bufio"
+ 	"context"
+ 	"fmt"
+ 	"net"
+ 	"net/netip"
++	"strconv"
+ 	"strings"
+ 	"sync"
+ 
+@@ -95,11 +97,14 @@
+ 	d.awgDevice = device.NewDevice(d.tun, d.bind, d.logger)
+ 	if err := d.awgDevice.IpcSet(d.ipcConfig); err != nil {
+ 		return E.Cause(err, "set ipc config")
+ 	}
+ 
+ 	if err := d.tun.Start(); err != nil {
+ 		return E.Cause(err, "tun start")
+ 	}
+ 
+-	return d.awgDevice.Up()
++	if err := d.awgDevice.Up(); err != nil {
++		return E.Cause(err, "awg device up")
++	}
++	return nil
+ }
+@@ -140,3 +142,47 @@ func (d *Device) DialContext(ctx context.Context, network string, destination me
+ func (d *Device) ListenPacket(ctx context.Context, destination metadata.Socksaddr) (net.PacketConn, error) {
+ 	return d.tun.ListenPacket(ctx, destination)
+ }
++
++// PeerStatsJSON exposes only single-peer accounting fields to the mobile wrapper.
++// In particular, it never returns the UAPI document, which contains private keys.
++func (d *Device) PeerStatsJSON() (string, error) {
++	d.access.Lock()
++	defer d.access.Unlock()
++	if d.closed || d.awgDevice == nil {
++		return "", net.ErrClosed
++	}
++	state, err := d.awgDevice.IpcGet()
++	if err != nil {
++		return "", err
++	}
++	var peerCount int
++	var handshake, received, sent int64
++	scanner := bufio.NewScanner(strings.NewReader(state))
++	for scanner.Scan() {
++		key, value, found := strings.Cut(scanner.Text(), "=")
++		if !found {
++			continue
++		}
++		switch key {
++		case "public_key":
++			peerCount++
++		case "last_handshake_time_sec":
++			handshake, err = strconv.ParseInt(value, 10, 64)
++		case "rx_bytes":
++			received, err = strconv.ParseInt(value, 10, 64)
++		case "tx_bytes":
++			sent, err = strconv.ParseInt(value, 10, 64)
++		}
++		if err != nil {
++			return "", err
++		}
++	}
++	if err := scanner.Err(); err != nil {
++		return "", err
++	}
++	if peerCount != 1 || handshake < 0 || received < 0 || sent < 0 {
++		return "", fmt.Errorf("unexpected AWG peer stats shape")
++	}
++	return fmt.Sprintf(`{"peer_count":%d,"last_handshake_time_sec":%d,"rx_bytes":%d,"tx_bytes":%d}`,
++		peerCount, handshake, received, sent), nil
++}
+
+diff --git a/transport/awg/bind.go b/transport/awg/bind.go
+index 801851e..d41d9fa 100644
+--- a/transport/awg/bind.go
++++ b/transport/awg/bind.go
+@@ -25,9 +25,14 @@ type bind_adapter struct {
+ }
+ 
+ func newBind(dial N.Dialer) conn.Bind {
++	return newBindWithContext(context.Background(), dial)
++}
++
++func newBindWithContext(ctx context.Context, dial N.Dialer) conn.Bind {
+ 	return &bind_adapter{
+ 		dialer: dial,
++		ctx:    ctx,
+ 	}
+ }
+ 
+ func (b *bind_adapter) connect(addr netip.Addr, port uint16) (net.PacketConn, error) {
+diff --git a/transport/awg/device.go b/transport/awg/device.go
+index 3baa61a..de50308 100644
+--- a/transport/awg/device.go
++++ b/transport/awg/device.go
+@@ -70,6 +70,6 @@ func NewDevice(ctx context.Context, logger logger.ContextLogger, dial network.Di
+ 	return &Device{
+ 		tun:       tun,
+-		bind:      newBind(dial),
++		bind:      newBindWithContext(ctx, dial),
+ 		logger:    awgLogger,
+ 		ipcConfig: ipcConfig,
+ 	}, nil
+diff --git a/transport/awg/bind_test.go b/transport/awg/bind_test.go
+index f16710b..9a0dc32 100644
+--- a/transport/awg/bind_test.go
++++ b/transport/awg/bind_test.go
+@@ -43,8 +43,34 @@ type packetDialer func(M.Socksaddr) (net.PacketConn, error)
+ func (f packetDialer) ListenPacket(_ context.Context, addr M.Socksaddr) (net.PacketConn, error) {
+ 	return f(addr)
+ }
+ func (packetDialer) DialContext(context.Context, string, M.Socksaddr) (net.Conn, error) {
+ 	return nil, errors.ErrUnsupported
+ }
++
++type contextPacketDialer func(context.Context, M.Socksaddr) (net.PacketConn, error)
++
++func (f contextPacketDialer) ListenPacket(ctx context.Context, addr M.Socksaddr) (net.PacketConn, error) {
++	return f(ctx, addr)
++}
++func (contextPacketDialer) DialContext(context.Context, string, M.Socksaddr) (net.Conn, error) {
++	return nil, errors.ErrUnsupported
++}
++
++func TestBindUsesEndpointContext(t *testing.T) {
++	type contextKey struct{}
++	ctx := context.WithValue(context.Background(), contextKey{}, "endpoint")
++	seen := false
++	b := newBindWithContext(ctx, contextPacketDialer(func(actual context.Context, _ M.Socksaddr) (net.PacketConn, error) {
++		seen = actual.Value(contextKey{}) == "endpoint"
++		return newPacketConn(), nil
++	}))
++	defer b.Close()
++	if _, _, err := b.Open(51820); err != nil {
++		t.Fatal(err)
++	}
++	if !seen {
++		t.Fatal("bind dialer did not receive endpoint context")
++	}
++}
+ 
+ func TestBindOpenRollsBackIPv4(t *testing.T) {
+
+diff --git a/box.go b/box.go
+--- a/box.go
++++ b/box.go
+@@ -526,3 +526,7 @@ func (s *Box) Outbound() adapter.OutboundManager {
+ func (s *Box) Outbound() adapter.OutboundManager {
+ 	return s.outbound
+ }
++
++func (s *Box) Endpoint() adapter.EndpointManager {
++	return s.endpoint
++}
+
+diff --git a/route/network.go b/route/network.go
+--- a/route/network.go
++++ b/route/network.go
+@@ -129,5 +129,15 @@ func (r *NetworkManager) Start(stage adapter.StartStage) error {
+ 	monitor := taskmonitor.New(r.logger, C.StartTimeout)
+ 	switch stage {
+ 	case adapter.StartStateInitialize:
++		// Android's default-network callback is asynchronous. Populate the
++		// physical-interface list before an endpoint can open its UDP bind.
++		if r.platformInterface != nil && r.autoDetectInterface {
++			monitor.Start("initialize available interfaces")
++			err := r.UpdateInterfaces()
++			monitor.Finish()
++			if err != nil {
++				return E.Cause(err, "initialize available interfaces")
++			}
++		}
+ 		if r.networkMonitor != nil {
+ 			monitor.Start("initialize network monitor")
+
+diff --git a/route/network_initial_test.go b/route/network_initial_test.go
+new file mode 100644
+--- /dev/null
++++ b/route/network_initial_test.go
+@@ -0,0 +1,50 @@
++package route
++
++import (
++	"net"
++	"testing"
++
++	"github.com/sagernet/sing-box/adapter"
++	"github.com/sagernet/sing-box/experimental/libbox/platform"
++	"github.com/sagernet/sing-box/log"
++	"github.com/sagernet/sing-tun"
++	"github.com/sagernet/sing/common/control"
++)
++
++type initialInterfacesPlatform struct {
++	platform.Interface
++	interfaces []adapter.NetworkInterface
++}
++
++func (p initialInterfacesPlatform) Interfaces() ([]adapter.NetworkInterface, error) {
++	return p.interfaces, nil
++}
++
++type beforeCallbackMonitor struct {
++	tun.DefaultInterfaceMonitor
++	start func() error
++}
++
++func (m beforeCallbackMonitor) Start() error { return m.start() }
++
++func TestPlatformInterfacesReadyBeforeMonitorCallback(t *testing.T) {
++	physical := adapter.NetworkInterface{Interface: control.Interface{
++		Name: "physical-test", Index: 123, Flags: net.FlagUp,
++	}}
++	manager := &NetworkManager{
++		logger:              log.NewNOPFactory().Logger(),
++		interfaceFinder:     control.NewDefaultInterfaceFinder(),
++		autoDetectInterface: true,
++		platformInterface:   initialInterfacesPlatform{interfaces: []adapter.NetworkInterface{physical}},
++	}
++	manager.interfaceMonitor = beforeCallbackMonitor{start: func() error {
++		available := manager.NetworkInterfaces()
++		if len(available) != 1 || available[0].Index != physical.Index {
++			t.Fatal("physical interfaces were unavailable before monitor callback")
++		}
++		return nil
++	}}
++	if err := manager.Start(adapter.StartStateInitialize); err != nil {
++		t.Fatal(err)
++	}
++}

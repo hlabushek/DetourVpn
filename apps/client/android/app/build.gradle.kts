@@ -7,6 +7,20 @@ plugins {
 }
 val i028IsolatedPackage = providers.gradleProperty("i028IsolatedPackage").orNull == "true"
 val clientApplicationId = "com.detourvpn.client"
+val targetAbiFilters = providers.gradleProperty("target-platform").orNull
+    ?.split(',')
+    ?.map { it.trim() }
+    ?.filter { it.isNotEmpty() }
+    ?.map { platform ->
+        when (platform) {
+            "android-arm64" -> "arm64-v8a"
+            "android-x64" -> "x86_64"
+            else -> throw GradleException("Unsupported Flutter Android target platform: $platform")
+        }
+    }
+    ?.distinct()
+    ?.takeIf { it.isNotEmpty() }
+    ?: listOf("arm64-v8a", "x86_64")
 val betaSigningEnvironment = linkedMapOf(
     "DETOURVPN_BETA_KEYSTORE_PATH" to providers.environmentVariable("DETOURVPN_BETA_KEYSTORE_PATH").orNull,
     "DETOURVPN_BETA_KEYSTORE_PASSWORD" to providers.environmentVariable("DETOURVPN_BETA_KEYSTORE_PASSWORD").orNull,
@@ -41,23 +55,33 @@ android {
         applicationId = clientApplicationId
         minSdk = 24
         targetSdk = 36
-        versionCode = 2
-        versionName = "0.1.0-beta.1"
+        versionCode = 23
+        versionName = "0.1.0-beta.22"
         testInstrumentationRunner = if (providers.gradleProperty("i028FlutterInstrumentation").orNull == "true")
             "androidx.test.runner.AndroidJUnitRunner" else "org.example.vpnpoc.I025DeviceTests"
-        ndk { abiFilters += listOf("arm64-v8a", "x86_64") }
+        ndk { abiFilters += targetAbiFilters }
     }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
+    lint { lintConfig = file("lint.xml") }
     // Compile the reviewed adapter and parser directly, without the I-011 UI.
     sourceSets["main"].java.apply {
         srcDir("../../../android/app/src/main/java")
         exclude("**/MainActivity.java", "**/PocApplication.java")
+        // ADR-084: the beta uses the proven AWG GoBackend; the experimental Libbox engine is not built.
+        exclude("**/LibboxProviderV1.java", "**/LibboxVpnService.java")
     }
     sourceSets["test"].java.srcDir("../../../android/app/src/test/java")
-    packaging { jniLibs.useLegacyPackaging = false }
+    packaging {
+        jniLibs.useLegacyPackaging = false
+        if (targetAbiFilters == listOf("arm64-v8a")) {
+            jniLibs.excludes += "**/x86_64/**"
+        } else if (targetAbiFilters == listOf("x86_64")) {
+            jniLibs.excludes += "**/arm64-v8a/**"
+        }
+    }
     if (betaSigningEnabled) {
         signingConfigs {
             create("betaRelease") {

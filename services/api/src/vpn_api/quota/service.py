@@ -8,6 +8,7 @@ from vpn_api.db.connection import transaction
 from vpn_api.db.models import (
     PeerWindowAllocation,
     PeerWindowReceipt,
+    PeerWindowResolution,
     QuotaFundingLot,
     QuotaFundingUse,
     QuotaLedger,
@@ -35,7 +36,7 @@ class LedgerService:
 
     @staticmethod
     def held_lots(session: Session, user_id: UUID) -> dict[UUID, int]:
-        """Unknown receipts retain their entire hold, including after expiry/revoke."""
+        """Unknown receipts retain the full hold until an audited resolution."""
         return {
             lot_id: int(amount)
             for lot_id, amount in session.execute(
@@ -48,8 +49,13 @@ class LedgerService:
                     PeerWindowAllocation.user_id == user_id,
                     or_(
                         PeerWindowReceipt.window_id.is_(None),
-                        PeerWindowReceipt.observation == "unknown",
+                        (PeerWindowReceipt.observation == "unknown")
+                        & PeerWindowResolution.window_id.is_(None),
                     ),
+                )
+                .outerjoin(
+                    PeerWindowResolution,
+                    PeerWindowResolution.window_id == PeerWindowAllocation.window_id,
                 )
                 .group_by(PeerWindowAllocation.lot_id)
             )
@@ -241,7 +247,8 @@ class LedgerService:
         expires_at: datetime | None = None,
         pinned: dict[UUID, int] | None = None,
     ) -> OperationResult:
-        if (source_type == "peer_window") != (pinned is not None):
+        pinned_source = source_type in ("peer_window", "peer_window_resolution")
+        if pinned_source != (pinned is not None):
             raise QuotaError("invalid_window_funding", 503)
         existing = session.scalar(
             select(QuotaOperation).where(

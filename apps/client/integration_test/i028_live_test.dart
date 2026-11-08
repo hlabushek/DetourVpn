@@ -335,9 +335,33 @@ void main() {
         stage = 'included_probe';
         if (phase == 'egress')
           await recordDiagnosticSnapshot('egress', 'before');
-        final included = await action(
+        var included = await action(
           phase == 'egress' ? 'egress_probe_all' : 'probe_all',
         );
+        if (phase == 'egress') {
+          // The independent egress oracle requires system DNS. A transient
+          // resolver timeout must not skip the bounded hold/recovery checks,
+          // but retries never turn a failed probe into a pass: the final
+          // result still has to prove the exact staging IPv4, fixed UDP DNS,
+          // and blocked IPv6 conditions below.
+          var retries = 0;
+          while (retries < 2 &&
+              included['probe_complete'] == true &&
+              included['process_uid_matches_target'] == true &&
+              included['active_network_is_vpn'] == true &&
+              included['ipv4_available'] != true &&
+              (included['ipv4_failure'] == 'dns' ||
+                  included['ipv4_failure'] == 'timeout') &&
+              included['fixed_udp_dns_response'] == true &&
+              included['ipv6_available'] == false &&
+              included['ipv6_literal_connected'] == false) {
+            retries++;
+            stage = 'included_probe_dns_retry';
+            await Future<void>.delayed(const Duration(seconds: 1));
+            included = await action('egress_probe_all');
+          }
+          stage = 'included_probe';
+        }
         if (phase == 'egress')
           await recordDiagnosticSnapshot('egress', 'after');
         if (phase == 'egress') {
@@ -520,7 +544,6 @@ void main() {
                     .call('GET', '/api/v1/__i028__/egress-renewal-status')
                     .timeout(remaining);
                 if (renewal['acknowledged'] == true &&
-                    controller.phase.name != 'connected' &&
                     !holdRefreshProbeAttempted) {
                   stage = 'egress_hold_refresh_probe';
                   if (holdObservations.isNotEmpty) {
@@ -540,9 +563,99 @@ void main() {
                       // Save the last bounded state before the tunnel probe.
                     }
                   }
-                  final probe = await action('probe_ipv4').timeout(remaining);
-                  if (probe['egress_is_staging'] != true &&
-                      holdObservations.isNotEmpty) {
+                  // The server can acknowledge a renewal before Android has
+                  // finished moving the client back from reconnecting to
+                  // connected. Give that local transition a bounded window,
+                  // then retry the real staging-egress probe while the
+                  // renewal deadline is still open. A server ACK alone never
+                  // satisfies this physical dataplane check.
+                  final probeRecoveryClock = Stopwatch()..start();
+                  const probeRecoveryBudget = Duration(seconds: 12);
+                  // A probe from before the reconnect cannot verify that the
+                  // renewed tunnel recovered, so require a fresh positive
+                  // result for this transition.
+                  holdProbeSucceeded = false;
+                  while (probeRecoveryClock.elapsed < probeRecoveryBudget &&
+                      holdAckClock.elapsed < renewalAckDeadline) {
+                    final probeRemaining =
+                        renewalAckDeadline - holdAckClock.elapsed;
+                    if (probeRemaining <= Duration.zero) break;
+                    final refreshTimeout =
+                        probeRemaining < const Duration(seconds: 5)
+                        ? probeRemaining
+                        : const Duration(seconds: 5);
+                    try {
+                      await controller.refresh().timeout(refreshTimeout);
+                    } catch (_) {
+                      // A control-plane refresh error must not skip the
+                      // independent native-state and fixed-egress checks.
+                      // Recovery still fails unless a fresh probe exits via A.
+                    }
+                    final snapshotRemaining =
+                        renewalAckDeadline - holdAckClock.elapsed;
+                    if (snapshotRemaining <= Duration.zero) break;
+                    final snapshotTimeout =
+                        snapshotRemaining < const Duration(seconds: 5)
+                        ? snapshotRemaining
+                        : const Duration(seconds: 5);
+                    final readySnapshot = await native.snapshot().timeout(
+                      snapshotTimeout,
+                    );
+                    final recoveryElapsed = captureHold.elapsed.inSeconds;
+                    final lastRecordedElapsed = holdObservations.isEmpty
+                        ? -1
+                        : holdObservations.last['elapsed_seconds']! as int;
+                    if (holdObservations.length < 32 &&
+                        recoveryElapsed > lastRecordedElapsed) {
+                      holdObservations.add({
+                        'elapsed_seconds': recoveryElapsed,
+                        'client_phase': controller.phase.name,
+                        'client_has_error': controller.error != null,
+                        'native_up': readySnapshot.up,
+                        'native_network': readySnapshot.network,
+                        'handshake_age': readySnapshot.handshakeAge,
+                        'remaining_ms': readySnapshot.remainingMs,
+                        'received_counter_available':
+                            readySnapshot.receivedBytes != null &&
+                            readySnapshot.receivedBytes! >= 0,
+                        'inbound_progress_recent': false,
+                        'renewal_acknowledged': renewal['acknowledged'] == true,
+                        'traffic_counter_available':
+                            readySnapshot.trafficBytes != null &&
+                            readySnapshot.trafficBytes! >= 0,
+                        'traffic_renewal_requested':
+                            controller.trafficRenewalRequested,
+                        'renewal_pending': controller.renewalPending,
+                      });
+                    }
+                    // The public UI phase can lag the native tunnel during a
+                    // renewal transition. Native readiness only gates the
+                    // attempt; a fresh fixed probe must still prove actual
+                    // staging egress before the recovery is accepted.
+                    if (readySnapshot.up &&
+                        readySnapshot.network &&
+                        readySnapshot.remainingMs > 0) {
+                      holdProbeAttempted = true;
+                      final probeTimeout =
+                          probeRemaining < const Duration(seconds: 8)
+                          ? probeRemaining
+                          : const Duration(seconds: 8);
+                      final probe = await action(
+                        'probe_ipv4',
+                      ).timeout(probeTimeout);
+                      holdProbeSucceeded = probe['egress_is_staging'] == true;
+                      if (holdProbeSucceeded) break;
+                    }
+                    final pause = renewalAckDeadline - holdAckClock.elapsed;
+                    if (pause <= Duration.zero) break;
+                    await Future<void>.delayed(
+                      pause < const Duration(seconds: 1)
+                          ? pause
+                          : const Duration(seconds: 1),
+                    );
+                  }
+                  holdRefreshProbeAttempted = true;
+                  if (!holdProbeSucceeded && holdObservations.isNotEmpty) {
                     try {
                       await api
                           .call(
@@ -556,11 +669,10 @@ void main() {
                           )
                           .timeout(const Duration(seconds: 5));
                     } catch (_) {
-                      // Preserve only bounded booleans if the physical probe fails.
+                      // Preserve bounded observations if recovery fails.
                     }
                   }
-                  check(probe['egress_is_staging'] == true);
-                  holdRefreshProbeAttempted = true;
+                  check(holdProbeSucceeded);
                   try {
                     await controller.refresh().timeout(remaining);
                     final refreshed = await native.snapshot().timeout(

@@ -1,5 +1,6 @@
 package org.example.vpnpoc;
 
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashSet;
 import org.amnezia.awg.config.Config;
@@ -7,6 +8,39 @@ import org.amnezia.awg.crypto.KeyPair;
 
 final class ClientProfile {
     enum RoutingMode { EXCLUDE_SELECTED, INCLUDE_SELECTED }
+
+    static RoutingMode routingModeFor(String storedMode) {
+        return switch (storedMode) {
+            case "all", "exclude" -> RoutingMode.EXCLUDE_SELECTED;
+            case "include" -> RoutingMode.INCLUDE_SELECTED;
+            default -> throw new IllegalArgumentException();
+        };
+    }
+
+    static java.util.List<String> packagesForMode(String storedMode,
+            Collection<String> selected, String ownPackage) {
+        if (selected == null || selected.size() > 63 || ownPackage == null
+                || !ownPackage.matches("[a-zA-Z][a-zA-Z0-9_]*(\\.[a-zA-Z][a-zA-Z0-9_]*)+"))
+            throw new IllegalArgumentException();
+        var unique = new HashSet<>(selected);
+        if (unique.size() != selected.size()) throw new IllegalArgumentException();
+        for (String name : selected) {
+            if (name == null || !name.matches("[a-zA-Z][a-zA-Z0-9_]*(\\.[a-zA-Z][a-zA-Z0-9_]*)+")
+                    || name.equals(ownPackage)) throw new IllegalArgumentException();
+        }
+
+        var packages = new ArrayList<String>();
+        switch (storedMode) {
+            case "all" -> packages.add(ownPackage);
+            case "exclude" -> {
+                packages.addAll(selected);
+                packages.add(ownPackage);
+            }
+            case "include" -> packages.addAll(selected);
+            default -> throw new IllegalArgumentException();
+        }
+        return packages;
+    }
 
     static Config parse(String text, KeyPair key, Collection<String> selected,
             RoutingMode mode) throws Exception {

@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<lint>
+    <!-- ADR-084: the experimental Libbox sources are kept in the tree but not compiled
+         into the beta. Lint scans source folders, so ignore the API-33 calls only there. -->
+    <issue id="NewApi">
+        <ignore path="**/LibboxVpnService.java" />
+    </issue>
+</lint>

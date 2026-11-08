@@ -12,6 +12,7 @@ from vpn_api.db.models import (
     PeerWindowAllocation,
     PeerWindowHold,
     PeerWindowReceipt,
+    PeerWindowResolution,
     QuotaFundingLot,
     QuotaFundingUse,
     QuotaOperation,
@@ -210,6 +211,11 @@ def reconcile_windows(
     window_ops = {
         row.source_id: row for row in operations.values() if row.source_type == "peer_window"
     }
+    resolution_ops = {
+        row.source_id: row
+        for row in operations.values()
+        if row.source_type == "peer_window_resolution"
+    }
     chains: dict[UUID, list[WindowGrant]] = {}
     for hold in session.scalars(select(PeerWindowHold).where(PeerWindowHold.user_id == user_id)):
         allocations = list(
@@ -261,10 +267,58 @@ def reconcile_windows(
             violations += 1
             receipt = session.get(PeerWindowReceipt, hold.id)
         operation = window_ops.pop(hold.id, None)
+        resolution = session.get(PeerWindowResolution, hold.id)
+        resolution_operation = resolution_ops.pop(hold.id, None)
         measured = receipt.observed_bytes if receipt is not None else None
         if not measured:
             violations += int(operation is not None)
+            if resolution is None:
+                violations += int(resolution_operation is not None)
+                continue
+            violations += int(
+                receipt is None
+                or receipt.observation != "unknown"
+                or receipt.observed_bytes is not None
+                or receipt.operation_id is not None
+                or resolution.user_id != hold.user_id
+                or resolution.amount_bytes != hold.amount_bytes
+                or resolution.kind != "charge_full_budget"
+                or len(resolution.reason.strip()) < 3
+                or len(resolution.evidence_digest) != 64
+                or resolution_operation is None
+                or (
+                    resolution.operation_id,
+                    resolution_operation.id if resolution_operation else None,
+                    resolution_operation.kind if resolution_operation else None,
+                    resolution_operation.status if resolution_operation else None,
+                    resolution_operation.amount_bytes if resolution_operation else None,
+                    resolution_operation.source_type if resolution_operation else None,
+                    resolution_operation.source_id if resolution_operation else None,
+                    resolution_operation.idempotency_key if resolution_operation else None,
+                )
+                != (
+                    resolution.operation_id,
+                    resolution.operation_id,
+                    "debit",
+                    "applied",
+                    hold.amount_bytes,
+                    "peer_window_resolution",
+                    hold.id,
+                    resolution.idempotency_key,
+                )
+            )
+            actual_resolution_uses = {
+                row.lot_id: row.amount_bytes
+                for row in session.scalars(
+                    select(QuotaFundingUse).where(
+                        QuotaFundingUse.operation_id == resolution.operation_id
+                    )
+                )
+            }
+            expected_resolution_uses = {row.lot_id: row.amount_bytes for row in allocations}
+            violations += int(actual_resolution_uses != expected_resolution_uses)
             continue
+        violations += int(resolution is not None or resolution_operation is not None)
         violations += int(
             operation is None
             or receipt is None
@@ -338,4 +392,4 @@ def reconcile_windows(
                 device.public_key,
             )
         )
-    return violations + len(window_ops)
+    return violations + len(window_ops) + len(resolution_ops)

@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:math';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 
 import 'api.dart';
 import 'connection.dart';
@@ -265,7 +266,11 @@ class WindowConnectionController extends ConnectionController {
       startPolling();
     } catch (e) {
       if (!_cancelled(version)) {
-        error = e is ClientError ? e.code : 'native_unavailable';
+        error = e is ClientError
+            ? e.code
+            : e is PlatformException && _nativeStartErrorCodes.contains(e.code)
+            ? e.code
+            : 'native_unavailable';
         phase = ConnectionPhase.failed;
         await _cleanup();
       }
@@ -389,7 +394,7 @@ class WindowConnectionController extends ConnectionController {
     }
     remotePending = hasLease;
     if (remotePending) {
-      error = 'revoke_unconfirmed';
+      error ??= 'revoke_unconfirmed';
       startPolling();
     } else if (error == 'revoke_unconfirmed') {
       error = null;
@@ -591,3 +596,12 @@ class WindowConnectionController extends ConnectionController {
     super.dispose();
   }
 }
+
+const _nativeStartErrorCodes = <String>{
+  'native_config_invalid',
+  'native_engine_unavailable',
+  'native_io_error',
+  'native_permission_error',
+  'native_service_state_invalid',
+  'native_start_failed',
+};

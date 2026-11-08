@@ -17,6 +17,18 @@
             ],
             "title": "Amount Bytes"
           },
+          "evidence_digest": {
+            "anyOf": [
+              {
+                "pattern": "^[0-9a-f]{64}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Evidence Digest"
+          },
           "idempotency_key": {
             "format": "uuid",
             "title": "Idempotency Key",
@@ -30,7 +42,10 @@
               "revoke_subscription",
               "revoke_device",
               "revise_plan",
-              "seed_demo_catalog"
+              "seed_demo_catalog",
+              "grant_beta_invite",
+              "revoke_beta_invite",
+              "resolve_unknown_window"
             ],
             "title": "Operation",
             "type": "string"
@@ -62,6 +77,19 @@
               }
             ],
             "title": "Resource Id"
+          },
+          "telegram_subject": {
+            "anyOf": [
+              {
+                "exclusiveMaximum": 4503599627370496.0,
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Telegram Subject"
           },
           "user_id": {
             "anyOf": [
@@ -115,6 +143,45 @@
           "code"
         ],
         "title": "AdminLogin",
+        "type": "object"
+      },
+      "AdminWindowStatus": {
+        "description": "Sanitized, read-only owner peer and reservation status for beta support.",
+        "properties": {
+          "latest_connection_state": {
+            "anyOf": [
+              {
+                "enum": [
+                  "pending",
+                  "active",
+                  "revoke_pending",
+                  "closed"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Latest Connection State"
+          },
+          "non_closed_connection_count": {
+            "minimum": 0.0,
+            "title": "Non Closed Connection Count",
+            "type": "integer"
+          },
+          "reserved_bytes": {
+            "minimum": 0.0,
+            "title": "Reserved Bytes",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "latest_connection_state",
+          "non_closed_connection_count",
+          "reserved_bytes"
+        ],
+        "title": "AdminWindowStatus",
         "type": "object"
       },
       "AwardResponse": {
@@ -607,7 +674,8 @@
               "usage",
               "tunnel_lease",
               "reward",
-              "peer_window"
+              "peer_window",
+              "peer_window_resolution"
             ],
             "title": "Source Type",
             "type": "string"
@@ -649,6 +717,48 @@
           "telegram_subject"
         ],
         "title": "MeResponse",
+        "type": "object"
+      },
+      "MiniAppCodeInput": {
+        "additionalProperties": false,
+        "properties": {
+          "init_data": {
+            "format": "password",
+            "maxLength": 16384,
+            "minLength": 1,
+            "title": "Init Data",
+            "type": "string",
+            "writeOnly": true
+          },
+          "request_id": {
+            "pattern": "^[0-9a-f]{32}$",
+            "title": "Request Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "init_data",
+          "request_id"
+        ],
+        "title": "MiniAppCodeInput",
+        "type": "object"
+      },
+      "MiniAppCodeResponse": {
+        "properties": {
+          "status": {
+            "enum": [
+              "processed",
+              "delivery_unknown",
+              "rejected"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status"
+        ],
+        "title": "MiniAppCodeResponse",
         "type": "object"
       },
       "MiniAppInput": {
@@ -1905,6 +2015,16 @@
             },
             "description": "Forbidden"
           },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
           "409": {
             "content": {
               "application/json": {
@@ -2010,6 +2130,16 @@
             },
             "description": "Forbidden"
           },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
           "409": {
             "content": {
               "application/json": {
@@ -2108,6 +2238,16 @@
             },
             "description": "Forbidden"
           },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
           "409": {
             "content": {
               "application/json": {
@@ -2192,6 +2332,16 @@
               }
             },
             "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
           },
           "409": {
             "content": {
@@ -2284,6 +2434,16 @@
             },
             "description": "Forbidden"
           },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
           "409": {
             "content": {
               "application/json": {
@@ -2373,6 +2533,16 @@
               }
             },
             "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
           },
           "409": {
             "content": {
@@ -2490,6 +2660,16 @@
             },
             "description": "Forbidden"
           },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
           "409": {
             "content": {
               "application/json": {
@@ -2590,6 +2770,16 @@
             },
             "description": "Forbidden"
           },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
           "409": {
             "content": {
               "application/json": {
@@ -2637,6 +2827,115 @@
           }
         ],
         "summary": "User",
+        "tags": [
+          "administration"
+        ]
+      }
+    },
+    "/api/admin/v1/users/{user_id}/window-status": {
+      "get": {
+        "description": "Read peer state without resolving grants or changing connection state.",
+        "operationId": "user_window_status_api_admin_v1_users__user_id__window_status_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "user_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "User Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminWindowStatus"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "User Window Status",
         "tags": [
           "administration"
         ]
@@ -2886,6 +3185,97 @@
           }
         },
         "summary": "Exchange",
+        "tags": [
+          "authentication"
+        ]
+      }
+    },
+    "/api/v1/auth/mini-app/request-code": {
+      "post": {
+        "operationId": "request_code_api_v1_auth_mini_app_request_code_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MiniAppCodeInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MiniAppCodeResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Request Code",
         "tags": [
           "authentication"
         ]

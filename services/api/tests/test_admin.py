@@ -37,6 +37,11 @@ from vpn_api.db.models import (
     BetaInvite,
     Device,
     PeerCommand,
+    PeerConnection,
+    PeerRuntimeEpoch,
+    PeerWindowHold,
+    PeerWindowReceipt,
+    PeerWindowResolution,
     QuotaLedger,
     SessionFamily,
     Tunnel,
@@ -46,6 +51,8 @@ from vpn_api.db.models import (
 from vpn_api.main import create_app
 from vpn_api.quota.contracts import QuotaError
 from vpn_api.quota.service import LedgerService
+from vpn_api.tunnels.v3_contracts import ClosedWindow, WindowGrant
+from vpn_api.tunnels.window_funding import reserve_window, settle_window
 
 __all__ = ["harness", "binaries", "key"]
 
@@ -435,6 +442,96 @@ def test_admin_reads_disabled_user_history(admin: Harness) -> None:
     assert len(response.json()["history"]) == 1
 
 
+def test_admin_window_status_is_read_only_and_contains_no_peer_identifiers(admin: Harness) -> None:
+    h = admin
+    auth = authorization(h)
+    with transaction(h.engine) as session:
+        now = database_now(session)
+    node_id, runtime_id = uuid4(), uuid4()
+    device_id, connection_id, window_id = uuid4(), uuid4(), uuid4()
+    created = now - timedelta(seconds=15)
+    with transaction(h.engine) as session:
+        session.add(
+            VPNNode(
+                id=node_id,
+                provisioning_key=uuid4(),
+                name="TEST ONLY status node",
+                region="test",
+                secret_digest=secrets.token_hex(32),
+                peer_protocol_version=3,
+            )
+        )
+        session.flush()
+        session.add(
+            PeerRuntimeEpoch(
+                node_id=node_id,
+                runtime_id=runtime_id,
+                previous_runtime_id=None,
+                manifest_digest="0" * 64,
+                created_at=created,
+            )
+        )
+        session.add(
+            Device(
+                id=device_id,
+                user_id=h.user_id,
+                platform="android",
+                key_type="x25519",
+                public_key=base64.b64encode(secrets.token_bytes(32)).decode(),
+                created_at=created,
+            )
+        )
+        session.flush()
+        session.add(
+            PeerWindowHold(
+                id=window_id,
+                user_id=h.user_id,
+                connection_id=connection_id,
+                generation=1,
+                node_id=node_id,
+                runtime_id=runtime_id,
+                slot_id=1,
+                amount_bytes=65536,
+                grant={},
+                created_at=created,
+                not_after=now + timedelta(seconds=60),
+            )
+        )
+        session.flush()
+        session.add(
+            PeerConnection(
+                id=connection_id,
+                user_id=h.user_id,
+                device_id=device_id,
+                node_id=node_id,
+                runtime_id=runtime_id,
+                slot_id=1,
+                window_id=window_id,
+                generation=1,
+                state="active",
+                idempotency_key=uuid4(),
+                created_at=created,
+            )
+        )
+
+    response = h.client.get(f"/api/admin/v1/users/{h.user_id}/window-status", headers=auth)
+    assert response.status_code == 200
+    assert response.json() == {
+        "latest_connection_state": "active",
+        "non_closed_connection_count": 1,
+        "reserved_bytes": 0,
+    }
+    assert h.client.get(f"/api/admin/v1/users/{h.user_id}/window-status").status_code == 401
+    schema = h.client.app.openapi()
+    operation = schema["paths"]["/api/admin/v1/users/{user_id}/window-status"]["get"]
+    assert operation["responses"]["200"]["content"]["application/json"]["schema"]["$ref"].endswith(
+        "/AdminWindowStatus"
+    )
+    with transaction(h.engine) as session:
+        saved = session.get(PeerConnection, connection_id)
+        assert saved is not None and saved.state == "active"
+
+
 def test_nodes_show_current_capacity_and_stalled_commands_only(admin: Harness) -> None:
     h = admin
     auth = authorization(h)
@@ -601,3 +698,237 @@ def test_beta_invite_concurrent_grants_are_serialized(admin: Harness) -> None:
             )
         )
         assert len(list(rows)) == 1
+
+
+def test_unknown_window_full_budget_resolution_is_mfa_audited_and_idempotent(
+    admin: Harness,
+) -> None:
+    h = admin
+    auth = authorization(h)
+    amount = 1024 * 1024
+    change(h, auth, operation="credit", user_id=str(h.user_id), amount_bytes=amount)
+    with transaction(h.engine) as session:
+        now = database_now(session)
+    node_id, runtime_id, device_id = uuid4(), uuid4(), uuid4()
+    connection_id, window_id = uuid4(), uuid4()
+    public_key = base64.b64encode(secrets.token_bytes(32)).decode()
+    grant = WindowGrant(
+        connection_id=connection_id,
+        window_id=window_id,
+        node_id=node_id,
+        runtime_id=runtime_id,
+        slot_id=1,
+        generation=1,
+        public_key=public_key,
+        issued_at=now,
+        not_after=now + timedelta(seconds=90),
+        budget_bytes=amount,
+    )
+    receipt = ClosedWindow(
+        connection_id=connection_id,
+        window_id=window_id,
+        node_id=node_id,
+        runtime_id=runtime_id,
+        slot_id=1,
+        generation=1,
+        gate_closed=True,
+        observation="unknown",
+        meter="kernel-outer-ip.v1",
+        observed_bytes=None,
+    )
+    with transaction(h.engine) as session:
+        created = database_now(session)
+        session.add(
+            VPNNode(
+                id=node_id,
+                provisioning_key=uuid4(),
+                name="TEST ONLY I-030 resolution node",
+                region="test",
+                secret_digest=secrets.token_hex(32),
+                peer_protocol_version=3,
+            )
+        )
+        session.flush()
+        session.add(
+            PeerRuntimeEpoch(
+                node_id=node_id,
+                runtime_id=runtime_id,
+                previous_runtime_id=None,
+                manifest_digest="0" * 64,
+                created_at=created,
+            )
+        )
+        session.add(
+            Device(
+                id=device_id,
+                user_id=h.user_id,
+                platform="android",
+                key_type="x25519",
+                public_key=public_key,
+                created_at=created,
+            )
+        )
+        session.flush()
+        hold = reserve_window(session, h.user_id, grant)
+        session.add(
+            PeerConnection(
+                id=connection_id,
+                user_id=h.user_id,
+                device_id=device_id,
+                node_id=node_id,
+                runtime_id=runtime_id,
+                slot_id=1,
+                window_id=window_id,
+                generation=1,
+                state="closed",
+                idempotency_key=uuid4(),
+                created_at=created,
+            )
+        )
+        settle_window(session, h.user_id, receipt)
+        assert hold.amount_bytes == amount
+
+    key = uuid4()
+    request = {
+        "operation": "resolve_unknown_window",
+        "idempotency_key": str(key),
+        "reason": "TEST ONLY full budget unknown-window compensation",
+        "user_id": str(h.user_id),
+        "resource_id": str(window_id),
+        "evidence_digest": "a" * 64,
+    }
+    first = h.client.post("/api/admin/v1/actions", headers=auth, json=request)
+    assert first.status_code == 200
+    result = first.json()
+    assert result["status"] == "charged_full_budget"
+    assert result["amount_bytes"] == amount
+    assert h.client.post("/api/admin/v1/actions", headers=auth, json=request).json() == result
+    with transaction(h.engine) as session:
+        saved_receipt = session.get(PeerWindowReceipt, window_id)
+        resolution = session.get(PeerWindowResolution, window_id)
+        assert saved_receipt is not None
+        assert saved_receipt.receipt == receipt.model_dump(mode="json")
+        assert saved_receipt.observation == "unknown" and saved_receipt.operation_id is None
+        assert resolution is not None
+        assert resolution.admin_id == h.identity_id
+        assert resolution.amount_bytes == amount and resolution.kind == "charge_full_budget"
+        assert LedgerService(h.engine).history(session, h.user_id).items[0].source_type == (
+            "peer_window_resolution"
+        )
+        quota = LedgerService(h.engine).quota(session, h.user_id)
+        assert quota.used_bytes == amount and quota.reserved_bytes == 0
+        assert LedgerService(h.engine).reconcile(session, h.user_id).consistent
+    conflict = {
+        **request,
+        "idempotency_key": str(uuid4()),
+    }
+    rejected = h.client.post("/api/admin/v1/actions", headers=auth, json=conflict)
+    assert rejected.status_code == 409
+    assert rejected.json()["error"]["code"] == "window_resolution_already_applied"
+
+
+def test_unknown_window_resolution_refuses_live_connection(admin: Harness) -> None:
+    h = admin
+    auth = authorization(h)
+    amount = 1024 * 1024
+    change(h, auth, operation="credit", user_id=str(h.user_id), amount_bytes=amount)
+    with transaction(h.engine) as session:
+        now = database_now(session)
+    node_id, runtime_id, device_id = uuid4(), uuid4(), uuid4()
+    connection_id, window_id = uuid4(), uuid4()
+    public_key = base64.b64encode(secrets.token_bytes(32)).decode()
+    grant = WindowGrant(
+        connection_id=connection_id,
+        window_id=window_id,
+        node_id=node_id,
+        runtime_id=runtime_id,
+        slot_id=1,
+        generation=1,
+        public_key=public_key,
+        issued_at=now,
+        not_after=now + timedelta(seconds=90),
+        budget_bytes=amount,
+    )
+    with transaction(h.engine) as session:
+        created = database_now(session)
+        session.add(
+            VPNNode(
+                id=node_id,
+                provisioning_key=uuid4(),
+                name="TEST ONLY I-030 live connection node",
+                region="test",
+                secret_digest=secrets.token_hex(32),
+                peer_protocol_version=3,
+            )
+        )
+        session.flush()
+        session.add(
+            PeerRuntimeEpoch(
+                node_id=node_id,
+                runtime_id=runtime_id,
+                previous_runtime_id=None,
+                manifest_digest="0" * 64,
+                created_at=created,
+            )
+        )
+        session.add(
+            Device(
+                id=device_id,
+                user_id=h.user_id,
+                platform="android",
+                key_type="x25519",
+                public_key=public_key,
+                created_at=created,
+            )
+        )
+        session.flush()
+        reserve_window(session, h.user_id, grant)
+        session.add(
+            PeerConnection(
+                id=connection_id,
+                user_id=h.user_id,
+                device_id=device_id,
+                node_id=node_id,
+                runtime_id=runtime_id,
+                slot_id=1,
+                window_id=window_id,
+                generation=1,
+                state="active",
+                idempotency_key=uuid4(),
+                created_at=created,
+            )
+        )
+        settle_window(
+            session,
+            h.user_id,
+            ClosedWindow(
+                connection_id=connection_id,
+                window_id=window_id,
+                node_id=node_id,
+                runtime_id=runtime_id,
+                slot_id=1,
+                generation=1,
+                gate_closed=True,
+                observation="unknown",
+                meter="kernel-outer-ip.v1",
+                observed_bytes=None,
+            ),
+        )
+    response = h.client.post(
+        "/api/admin/v1/actions",
+        headers=auth,
+        json={
+            "operation": "resolve_unknown_window",
+            "idempotency_key": str(uuid4()),
+            "reason": "TEST ONLY must not settle an open connection",
+            "user_id": str(h.user_id),
+            "resource_id": str(window_id),
+            "evidence_digest": "b" * 64,
+        },
+    )
+    assert response.status_code == 409
+    assert response.json()["error"]["code"] == "window_resolution_connection_not_closed"
+    with transaction(h.engine) as session:
+        assert session.get(PeerWindowResolution, window_id) is None
+        quota = LedgerService(h.engine).quota(session, h.user_id)
+        assert quota.used_bytes == 0 and quota.reserved_bytes == amount

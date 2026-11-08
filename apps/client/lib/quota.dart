@@ -54,6 +54,7 @@ class QuotaEntry {
           'usage',
           'tunnel_lease',
           'peer_window',
+          'peer_window_resolution',
           'reward',
         }.contains(source) ||
         (kind != 'credit' && kind != 'debit') ||
@@ -71,6 +72,7 @@ class QuotaEntry {
     'usage' => 'Расход трафика',
     'tunnel_lease' => 'Расчёт подключения',
     'peer_window' => 'Расход VPN-трафика',
+    'peer_window_resolution' => 'Решение по неизвестному окну',
     'reward' => 'Бонусный трафик',
     _ => 'Операция',
   };

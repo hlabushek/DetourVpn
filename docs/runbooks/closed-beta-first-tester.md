@@ -12,14 +12,24 @@ approved APK and invite path.
 - The signed APK receipt, application ID, version, and SHA-256 have been checked.
   The stable package ID is `com.detourvpn.client`. A debug APK is not an update
   target for the beta-signed release.
-- I-027 recovery is available, and the owner has confirmed the required backup
-  run for the test window.
-- The relevant I-028 physical acceptance and the physical ADR-070 status check
-  are accepted for the exact Android build and scenario. Do not infer
+- I-027 recovery is available: a fresh post-fix archive exists on the owner PC
+  and on the node mirror, has been restored in a disposable database, and the
+  owner has confirmed the backup status for the test window.
+- The owner has accepted beta.22 (ADR-084, GoBackend) on their own phone:
+  confirmed handshake, owner-observed egress through the VPN, disconnect,
+  server-side `closed` with zero reserved bytes, and a matching ledger delta.
+  The broad DNS/IPv6 packet audit, Phase 6 measurements and Always-on/Lockdown
+  are deferred under ADR-085 and must not be presented as done. Do not infer
   device-wide leak freedom, Always-on, Lockdown, or kill-switch behavior.
+- The tester has read the ADR-085 warnings (no sensitive traffic, no kill switch,
+  one unmonitored node, brief pauses at window changes) and the owner has
+  granted exactly one 5 GiB credit with a recorded reason, not more.
 - The owner has chosen a private APK delivery route, a support contact, a
   bounded test window and traffic allowance, and a way to revoke the tester's
   access. Do not put invite URLs or one-time codes in a shared document.
+- The selected support contact is `@DetourVpnHelper`; the owner-selected private
+  Telegram channel is the APK delivery route. The owner still publishes the
+  signed APK and SHA-256 there; this repository does not contain an invite link.
 - The admin has verified that `/admin/` is the trusted HTTPS beta origin and
   the deployed build contains the invite section. The owner has selected the
   recipient account out-of-band; never paste the Telegram ID into this receipt.
@@ -48,15 +58,17 @@ acknowledgement/cleanup before any reinvite.
 1. Record the tester's Android model and OS version in the owner's private test
    notes. Do not collect a phone number, Telegram ID, or device identifier in
    the acceptance receipt.
-2. Install the owner-provided signed APK using the private route. Confirm the
-   package is `com.detourvpn.client` and the displayed version matches the
-   release note. Stop if Android reports an incompatible signature or package.
+2. Install the owner-provided signed APK from the private Telegram channel.
+   Confirm the package is `com.detourvpn.client` and the displayed version
+   matches the release note. Stop if Android reports an incompatible signature
+   or package.
 3. Open only the beta bot/Mini App link supplied by the owner. Request the OTP
    and enter it in the Android client. Never paste or forward the OTP into
    Telegram chat, support chat, screenshots, or this repository.
-4. Confirm the client shows the signed-in beta account and available traffic.
-   If permission is requested, review the Android VPN prompt and approve only
-   for this test.
+4. Confirm the client shows the signed-in beta account and available traffic
+   (5 GiB). In the traffic-split screen choose “Через VPN только выбранные” and
+   select one browser; there is no domain routing in this beta. If permission is
+   requested, review the Android VPN prompt and approve only for this test.
 5. Select the owner-approved node, connect, and wait for the client to report
    `Подключено`. The owner then performs only the bounded egress check listed
    in the test plan; the UI status alone is not proof of a working tunnel.
@@ -92,9 +104,18 @@ confirmed. The owner records the fixed failure stage and follows the relevant
 runbook before any retry. Do not leave an active session or invite grant after
 the test window.
 
-## Current gaps
+## Current gaps (updated 2026-11-07)
 
-The owner-only sign-in is accepted; friend onboarding is not yet accepted. The
-physical release update, final key backup, next natural I-027 scheduled run,
-and physical ADR-070 check remain separate gates. No tester has been invited by
-this document.
+Beta.22 uses the GoBackend engine (ADR-084) and a 16 MiB window; neither has been
+signed, installed or accepted yet. ADR-085 defers Phase 6 and the pre-NAT DNS/IPv6
+audit for at most five friends. The backup blocker (oversized nonce table) is fixed
+on the host and an off-PC mirror exists, but a fresh post-fix archive and its restore
+are still pending.
+
+The owner confirms that separate-device sign-in and UI operation passed. The
+support contact and private-channel delivery route are selected; the owner must
+publish the APK and receipt hash before testers can download it. The owner also
+confirms that the BitLocker recovery-key file exists; its contents were not
+inspected. The 2026-11-02 backup archive restore passed, but the natural
+scheduled run and missed-trigger catch-up remain unproven. VPN privacy,
+server-side revoke, and Phase 6 operations gates remain open.

@@ -5,9 +5,12 @@ param(
     [Parameter(Mandatory = $true)]
     [ValidatePattern('^https://[^\s/?#]+/?$')]
     [string]$ApiOrigin,
-    [switch]$WindowTunnels,
+    [ValidateSet('android-arm64', 'android-arm64,android-x64')]
+    [string]$TargetPlatforms = 'android-arm64',
+    [switch]$PhysicalTestBuild,
     [string]$FlutterSdk = (Join-Path $env:LOCALAPPDATA 'ProjectVpn\toolchains\flutter'),
-    [string]$JavaHome = 'C:\Program Files\Android\Android Studio\jbr'
+    [string]$JavaHome = 'C:\Program Files\Android\Android Studio\jbr',
+    [switch]$IsolatedPowerShell
 )
 
 $ErrorActionPreference = 'Stop'
@@ -20,6 +23,49 @@ if (![uri]::TryCreate($ApiOrigin, [UriKind]::Absolute, [ref]$parsedApiOrigin) -o
     ($parsedApiOrigin.AbsolutePath -ne '/' -and $parsedApiOrigin.AbsolutePath -ne '')) {
     throw 'ApiOrigin must be a credential-free HTTPS origin without a path, query, or fragment.'
 }
+if ($PhysicalTestBuild -and $TargetPlatforms -ne 'android-arm64') {
+    throw 'PhysicalTestBuild currently targets the Pixel arm64 ABI only.'
+}
+if (!$IsolatedPowerShell) {
+    # The calling PowerShell runspace may have partially loaded conflicting
+    # Microsoft.PowerShell.Security type data. Start a clean, no-profile child
+    # so the platform ACL cmdlets can load once without passing any secrets.
+    $powerShellExecutableName = if ($PSVersionTable.PSEdition -eq 'Core') { 'pwsh.exe' } else { 'powershell.exe' }
+    $isolatedPowerShellExePath = Join-Path $PSHOME $powerShellExecutableName
+    if (!(Test-Path -LiteralPath $isolatedPowerShellExePath -PathType Leaf)) {
+        throw 'A clean PowerShell executable for the secure build preflight is unavailable.'
+    }
+    $isolatedArguments = @(
+        '-NoLogo', '-NoProfile', '-File', $PSCommandPath,
+        '-KeystorePath', $KeystorePath,
+        '-KeyAlias', $KeyAlias,
+        '-ApiOrigin', $ApiOrigin,
+        '-TargetPlatforms', $TargetPlatforms,
+        '-FlutterSdk', $FlutterSdk,
+        '-JavaHome', $JavaHome,
+        '-IsolatedPowerShell'
+    )
+    if ($PhysicalTestBuild) { $isolatedArguments += '-PhysicalTestBuild' }
+    $priorProcessModulePath = [Environment]::GetEnvironmentVariable('PSModulePath', 'Process')
+    $minimalSystemModulePaths = @(
+        (Join-Path $PSHOME 'Modules'),
+        (Join-Path $env:ProgramFiles 'PowerShell\Modules'),
+        (Join-Path $env:ProgramFiles 'WindowsPowerShell\Modules'),
+        (Join-Path $env:WINDIR 'System32\WindowsPowerShell\v1.0\Modules')
+    ) | Where-Object { Test-Path -LiteralPath $_ -PathType Container } | Select-Object -Unique
+    try {
+        # Do not inherit user/custom module paths, which can make a no-profile
+        # process load duplicate Microsoft.PowerShell.Security type data too.
+        [Environment]::SetEnvironmentVariable('PSModulePath', ($minimalSystemModulePaths -join [IO.Path]::PathSeparator), 'Process')
+        & $isolatedPowerShellExePath @isolatedArguments
+        $isolatedExitCode = $LASTEXITCODE
+    } finally {
+        [Environment]::SetEnvironmentVariable('PSModulePath', $priorProcessModulePath, 'Process')
+    }
+    if ($isolatedExitCode -ne 0) { throw 'The isolated signed-build process did not complete successfully.' }
+    return
+}
+Import-Module Microsoft.PowerShell.Security -ErrorAction Stop
 $flutterExecutable = Join-Path $FlutterSdk 'bin\flutter.bat'
 if (!(Test-Path -LiteralPath $flutterExecutable -PathType Leaf)) {
     throw 'Configured Flutter SDK is unavailable; signing credentials were not requested.'
@@ -161,9 +207,13 @@ try {
     $buildParameters = @{
         JavaHome = $JavaHome
         ApiOrigin = $ApiOrigin
+        TargetPlatforms = $TargetPlatforms
         FlutterSdk = $FlutterSdk
     }
-    if ($WindowTunnels) { $buildParameters.WindowTunnels = $true }
+    # Signed beta uses the current v3 window API; v2 stays in the lower-level
+    # client builder so a beta APK cannot silently target closed v2 admission.
+    $buildParameters.WindowTunnels = $true
+    if ($PhysicalTestBuild) { $buildParameters.PhysicalTestBuild = $true }
     & (Join-Path $PSScriptRoot 'build_flutter_client.ps1') @buildParameters
     if ($LASTEXITCODE -ne 0) { throw 'Signed Android build did not complete successfully.' }
 
@@ -177,6 +227,11 @@ try {
         --sdk-root (Join-Path $env:LOCALAPPDATA 'Android\Sdk') --java-home $JavaHome
     if ($LASTEXITCODE -ne 0) { throw 'APK signing verification failed; do not distribute this artifact.' }
     Write-Host 'beta_apk_application_id=com.detourvpn.client'
+    Write-Host "beta_apk_target_platforms=$TargetPlatforms"
+    Write-Host 'beta_apk_tunnel_api=window-v3'
+    if ($PhysicalTestBuild) {
+        Write-Host 'beta_apk_scope=physical-test-only; automated_test_suites=not_run; distribution=not_accepted'
+    }
     Write-Host "beta_apk_receipt=$receipt"
     Write-Host 'update_install=not_verified; distribution=not_accepted'
 } finally {

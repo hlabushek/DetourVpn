@@ -1,0 +1,10 @@
+{
+  "upstream": "https://github.com/amnezia-vpn/amnezia-box",
+  "version": "v1.260910.0",
+  "peeled_commit": "16724484cfa00d9b2c14d8280dc055564e2e12ba",
+  "archive": "amnezia-box-v1.260910.0-src.zip",
+  "archive_sha256": "2c7563405aa61cd973a7bd43aef0e22e1ed3ee74e6724a18244a641b8bbfe152",
+  "license": "GPL-3.0-or-later; see upstream LICENSE for additional restriction",
+  "android_tags": ["with_awg", "with_gvisor"],
+  "android_abis": ["arm64-v8a", "x86_64"]
+}

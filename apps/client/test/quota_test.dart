@@ -58,6 +58,36 @@ void main() {
     expect(value.label, 'Расход VPN-трафика');
   });
 
+  test(
+    'unknown window resolution debit does not invalidate quota refresh',
+    () async {
+      final api = QuotaApi()
+        ..totals = summary(revision: 1)
+        ..page = {
+          'items': [
+            {
+              ...entry(1),
+              'kind': 'debit',
+              'delta_bytes': -1048576,
+              'source_type': 'peer_window_resolution',
+            },
+          ],
+          'snapshot_revision': 1,
+          'next_before_sequence': null,
+        };
+      final controller = QuotaController(api);
+      addTearDown(controller.dispose);
+
+      await controller.refresh();
+
+      expect(controller.error, isNull);
+      expect(controller.stale, isFalse);
+      expect(controller.snapshot, isNotNull);
+      expect(controller.entries.single.label, 'Решение по неизвестному окну');
+      expect(controller.entries.single.delta, -1048576);
+    },
+  );
+
   test('unavailable funding is exact and separate from measured usage', () {
     final json = summary();
     json['unavailable_bytes'] = 9007199254740000;

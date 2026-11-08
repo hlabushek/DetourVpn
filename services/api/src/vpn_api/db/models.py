@@ -253,7 +253,7 @@ class QuotaOperation(Base):
         CheckConstraint("kind IN ('credit', 'debit')", name="ck_quota_operations_kind"),
         CheckConstraint(
             "source_type IN ('registration', 'internal', 'usage', 'tunnel_lease', "
-            "'reward', 'peer_window')",
+            "'reward', 'peer_window', 'peer_window_resolution')",
             name="ck_quota_operations_source",
         ),
         CheckConstraint(
@@ -280,7 +280,8 @@ class QuotaOperation(Base):
         CheckConstraint("revision_before >= 0", name="ck_quota_operations_revision"),
         CheckConstraint("unavailable_before_bytes >= 0", name="ck_quota_operations_unavailable"),
         CheckConstraint(
-            "source_type NOT IN ('usage', 'tunnel_lease', 'peer_window') OR kind = 'debit'",
+            "source_type NOT IN ('usage', 'tunnel_lease', 'peer_window', "
+            "'peer_window_resolution') OR kind = 'debit'",
             name="ck_quota_operations_usage",
         ),
         Index("ix_quota_operations_created_at", "created_at"),
@@ -322,7 +323,7 @@ class QuotaLedger(Base):
         ),
         CheckConstraint(
             "source_type IN ('registration', 'internal', 'usage', 'tunnel_lease', "
-            "'reward', 'peer_window')",
+            "'reward', 'peer_window', 'peer_window_resolution')",
             name="ck_quota_ledger_source",
         ),
         CheckConstraint(
@@ -339,7 +340,8 @@ class QuotaLedger(Base):
         ),
         CheckConstraint("balance_after_bytes >= 0", name="ck_quota_ledger_balance"),
         CheckConstraint(
-            "source_type NOT IN ('usage', 'tunnel_lease', 'peer_window') OR kind = 'debit'",
+            "source_type NOT IN ('usage', 'tunnel_lease', 'peer_window', "
+            "'peer_window_resolution') OR kind = 'debit'",
             name="ck_quota_ledger_usage",
         ),
         Index("ix_quota_ledger_created_at", "created_at"),
@@ -494,6 +496,51 @@ class PeerWindowReceipt(Base):
     observed_bytes: Mapped[int | None] = mapped_column(BigInteger)
     operation_id: Mapped[UUID | None] = mapped_column()
     receipt: Mapped[dict[str, object]] = mapped_column(JSON)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+
+class PeerWindowResolution(Base):
+    """Append-only adjudication of an immutable unknown receipt; never measured traffic."""
+
+    __tablename__ = "peer_window_resolutions"
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["window_id", "user_id"],
+            ["peer_window_holds.id", "peer_window_holds.user_id"],
+            name="fk_peer_window_resolution_owner",
+            ondelete="RESTRICT",
+        ),
+        ForeignKeyConstraint(
+            ["operation_id", "user_id"],
+            ["quota_operations.id", "quota_operations.user_id"],
+            name="fk_peer_window_resolution_operation_owner",
+            ondelete="RESTRICT",
+        ),
+        UniqueConstraint("operation_id", name="uq_peer_window_resolution_operation"),
+        UniqueConstraint("idempotency_key", name="uq_peer_window_resolution_key"),
+        CheckConstraint("kind = 'charge_full_budget'", name="ck_peer_window_resolution_kind"),
+        CheckConstraint("amount_bytes > 0", name="ck_peer_window_resolution_amount"),
+        CheckConstraint("length(trim(reason)) >= 3", name="ck_peer_window_resolution_reason"),
+        CheckConstraint(
+            "evidence_digest ~ '^[0-9a-f]{64}$'", name="ck_peer_window_resolution_digest"
+        ),
+        Index("ix_peer_window_resolution_admin_created", "admin_id", "created_at"),
+    )
+    window_id: Mapped[UUID] = mapped_column(primary_key=True)
+    user_id: Mapped[UUID] = mapped_column(ForeignKey("users.id", ondelete="RESTRICT"))
+    operation_id: Mapped[UUID] = mapped_column()
+    admin_id: Mapped[UUID] = mapped_column(
+        ForeignKey(
+            "admin_identities.id",
+            name="fk_peer_window_resolution_admin",
+            ondelete="RESTRICT",
+        )
+    )
+    idempotency_key: Mapped[UUID] = mapped_column()
+    kind: Mapped[str] = mapped_column(String(32))
+    reason: Mapped[str] = mapped_column(String(500))
+    evidence_digest: Mapped[str] = mapped_column(String(64))
+    amount_bytes: Mapped[int] = mapped_column(BigInteger)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
 
 

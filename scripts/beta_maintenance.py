@@ -13,6 +13,7 @@ from vpn_api.auth.service import cleanup_retained_auth_rows  # noqa: E402
 from vpn_api.config import Settings  # noqa: E402
 from vpn_api.db.connection import create_database_engine  # noqa: E402
 from vpn_api.maintenance import run_maintenance  # noqa: E402
+from vpn_api.nodes.service import cleanup_agent_request_nonces  # noqa: E402
 from vpn_api.quota.contracts import QuotaError  # noqa: E402
 
 
@@ -24,7 +25,13 @@ def main() -> int:
         return 2
     engine = create_database_engine(settings)
     try:
-        result = run_maintenance(engine, lambda: cleanup_retained_auth_rows(engine))
+        result = run_maintenance(
+            engine,
+            lambda: {
+                **cleanup_retained_auth_rows(engine),
+                **cleanup_agent_request_nonces(engine),
+            },
+        )
         print(json.dumps(result, sort_keys=True))
         if result["status"] == "already_running":
             return 3

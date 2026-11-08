@@ -4,11 +4,11 @@ param([switch]$RunHere)
 $ErrorActionPreference = 'Stop'
 $PSNativeCommandUseErrorActionPreference = $false
 $betaOrigin = 'https://193.68.88.239'
-$expectedGrantedBytes = [long]6291456
-$expectedUsedBytes = [long]5416782
+$expectedGrantedBytes = [long]6815744
+$expectedUsedBytes = [long]6561064
 $expectedReservedBytes = [long]0
-$expectedAvailableBytes = [long]874674
-$windowCreditBytes = [long]262144
+$expectedAvailableBytes = [long]254680
+$windowCreditBytes = [long]67108864
 
 if (-not $RunHere) {
     $windowsPowerShell = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
@@ -40,7 +40,7 @@ $adminToken = $null
 $failureStage = 'input'
 
 try {
-    Write-Host 'Beta-only one-time owner window credit: exactly 256 KiB; no payment.'
+    Write-Host 'Beta-only one-time owner test allowance: exactly 64 MiB; no payment.'
     Write-Host 'Requires the exact current owner ledger snapshot and zero reserved bytes.'
     Write-Host 'B/production are not contacted. ID, password and TOTP stay in this local window.'
     $secureOwnerId = Read-Host 'Owner Telegram numeric ID (hidden)' -AsSecureString
@@ -101,7 +101,7 @@ try {
     $actionBody = @{
         operation = 'credit'
         idempotency_key = $idempotencyKey
-        reason = 'One bounded 256 KiB owner-only beta allowance to run a single 1 MiB window; no payment.'
+        reason = 'One bounded 64 MiB owner-only beta allowance for controlled Android VPN/revoke and phone measurements; no payment.'
         user_id = $userId
         amount_bytes = $windowCreditBytes
     } | ConvertTo-Json -Compress
@@ -128,7 +128,7 @@ try {
         [long]$after.available_bytes -ne $expectedAvailableAfter) {
         throw 'Owner window credit was not confirmed against exact post-action ledger totals.'
     }
-    Write-Host 'beta_owner_window_credit=262144_bytes; granted_total=6553600_bytes; used_bytes=5416782; reserved_bytes=0; available_bytes=1136818'
+    Write-Host 'beta_owner_window_credit=67108864_bytes; granted_total=73924608_bytes; used_bytes=6561064; reserved_bytes=0; available_bytes=67363544'
 } catch {
     $failureType = $_.Exception.GetType().Name
     Write-Host "beta_owner_window_credit=not_confirmed; failure_stage=$failureStage; exception_type=$failureType; no secret or account identifier is shown"

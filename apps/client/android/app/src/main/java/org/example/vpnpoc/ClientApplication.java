@@ -71,7 +71,7 @@ public final class ClientApplication extends Application implements Tunnel {
         }, 250, 250, TimeUnit.MILLISECONDS);
     }
 
-    private void startAlwaysOnRecovery(VpnService service) {
+    void startAlwaysOnRecovery(VpnService service) {
         worker.execute(() -> {
             if (recoveryEngine != null) {
                 if (recoveryService != service && service != null) service.stopSelf();
@@ -181,11 +181,7 @@ public final class ClientApplication extends Application implements Tunnel {
                                 || VpnService.prepare(this) != null)
                             throw new IllegalStateException();
                         long end = submittedAt + duration.longValue();
-                        var selected = selectedPackages();
-                        var mode = routingMode();
-                        if (mode == ClientProfile.RoutingMode.EXCLUDE_SELECTED)
-                            selected.add(getPackageName());
-                        var config = ClientProfile.parse(call.argument("config"), key, selected, mode);
+                        var config = routedConfig(call.argument("config"));
                         window.start(call.argument("connection"), call.argument("runtime"),
                                 ((Number) call.argument("generation")).longValue(), end,
                                 SystemClock.elapsedRealtime());
@@ -209,10 +205,20 @@ public final class ClientApplication extends Application implements Tunnel {
                 Object answer = value;
                 mainThread.post(() -> result.success(answer));
             } catch (Exception | LinkageError failure) {
-                mainThread.post(() -> result.error("native_operation_failed",
-                        "Операция VPN не выполнена", null));
+                String code = call.method.equals("connectWindow")
+                        ? nativeStartFailureCode(failure) : "native_operation_failed";
+                mainThread.post(() -> result.error(code, "Операция VPN не выполнена", null));
             }
         });
+    }
+
+    static String nativeStartFailureCode(Throwable failure) {
+        if (failure instanceof SecurityException) return "native_permission_error";
+        if (failure instanceof IllegalArgumentException) return "native_config_invalid";
+        if (failure instanceof LinkageError) return "native_engine_unavailable";
+        if (failure instanceof java.io.IOException) return "native_io_error";
+        if (failure instanceof IllegalStateException) return "native_service_state_invalid";
+        return "native_start_failed";
     }
 
     private void stopAlwaysOnRecovery() {
@@ -228,7 +234,7 @@ public final class ClientApplication extends Application implements Tunnel {
         if (service != null) service.stopSelf();
     }
 
-    private void stopAlwaysOnService(VpnService service) {
+    void stopAlwaysOnService(VpnService service) {
         worker.execute(() -> {
             if (service == null || recoveryService != service) return;
             generation.incrementAndGet();
@@ -258,13 +264,17 @@ public final class ClientApplication extends Application implements Tunnel {
         return new java.util.ArrayList<>(selected);
     }
 
-    private ClientProfile.RoutingMode routingMode() {
-        return switch (getSharedPreferences("routing", MODE_PRIVATE).getString("mode", "exclude")) {
-            case "exclude" -> ClientProfile.RoutingMode.EXCLUDE_SELECTED;
-            case "include" -> ClientProfile.RoutingMode.INCLUDE_SELECTED;
-            default -> throw new IllegalArgumentException();
-        };
+    /** Package routing for the GoBackend engine. Domain rules are unsupported and fail closed. */
+    org.amnezia.awg.config.Config routedConfig(String text) throws Exception {
+        var preferences = getSharedPreferences("routing", MODE_PRIVATE);
+        if (!preferences.getStringSet("domains", java.util.Collections.emptySet()).isEmpty()
+                && !provider.capabilities().contains("domain-routing.v1"))
+            throw new IllegalStateException();
+        String stored = preferences.getString("mode", "exclude");
+        var packages = ClientProfile.packagesForMode(stored, selectedPackages(), getPackageName());
+        return ClientProfile.parse(text, key, packages, ClientProfile.routingModeFor(stored));
     }
+
     void stop() throws Exception {
         if (provider != null) provider.disconnect();
         deadline = 0;
