@@ -1,0 +1,37 @@
+{
+  "issue": "I-030",
+  "measured_on": "2026-11-08",
+  "performed_by": "Claude Code on the owner's Windows profile, read-only except a disposable local PostgreSQL",
+  "secret_values_recorded": false,
+  "personal_identifiers_recorded": false,
+  "signing_keystore_copy": {
+    "copy_location": "owner-chosen temporary folder (path not recorded)",
+    "sha256_matches_live_keystore": true,
+    "certificate_sha256_matches_apk_receipt": true,
+    "certificate_sha256": "6b99a02bee6dc8dba659af64fcd025782fc3011a41099168e3f3a766b84ef3b8",
+    "entries": 1,
+    "keystore_integrity_verified_with_password": false,
+    "bitlocker_unlock_from_removable_volume_tested": false,
+    "note": "keytool listed the certificate without a password, so integrity was NOT verified; the password and BitLocker recovery remain owner-only checks"
+  },
+  "scheduled_backup": {
+    "task_last_run_local": "2026-11-08T13:07:55",
+    "task_result": 0,
+    "start_when_available": true,
+    "scheduled_trigger_local": "07:00",
+    "run_was_after_trigger_time": true,
+    "natural_trigger_observed": false,
+    "note": "A run at 13:07 with StartWhenAvailable=True is consistent with a catch-up run but this was not confirmed from Task Scheduler history, and no archives exist for 2026-11-03 to 2026-11-07",
+    "newest_archive_utc": "2026-11-08T10:08:02Z",
+    "newest_archive_bytes": 525220,
+    "previous_archive_bytes": 58246116,
+    "size_change_explained": false
+  },
+  "restore_drill": {
+    "archive": "newest local encrypted archive of 2026-11-08",
+    "environment": "disposable local PostgreSQL, code snapshot of the owner's working tree (revision 0018_peer_window_resolution)",
+    "passed": true,
+    "row_data_printed": false,
+    "against_branch_claude_beta_definition": "fails with schema_mismatch by design: its migration 0018_account_deletion collides with the owner's uncommitted 0018_peer_window_resolution"
+  }
+}

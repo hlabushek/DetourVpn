@@ -45,3 +45,14 @@ nothing.
   removal (same as device revoke); a deleted-account drill on a real node was not run.
 - Admin-initiated deletion on a tester's request is not implemented; the owner can revoke the
   invite and devices through the existing admin operations.
+
+## Integration blocker (found 2026-11-08)
+
+The owner's working tree contains an uncommitted migration `0018_peer_window_resolution`
+(revision 0018, parent `0017_login_delivery_receipt`) that is already applied to the beta
+database. This ADR's `0018_account_deletion` has the same number and parent, so both cannot be
+merged as they are: Alembic would see two heads, and the restore drill of the real beta archive
+fails with `schema_mismatch` on this branch. Before any merge, renumber to `0019_account_deletion`
+with `down_revision = "0018_peer_window_resolution"` once that migration is committed, and resolve
+the overlapping edits in `db/models.py`, `tests/test_migrations.py` and the Flutter files
+`window_connection.dart` and `connection_screen.dart`, which are also modified in the working tree.
