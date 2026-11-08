@@ -306,6 +306,25 @@ void main() {
       expect(c.detail, 'Входящий трафик через VPN подтверждён');
     },
   );
+  test(
+    'overdue first handshake asks the user to reconnect, advisory only',
+    () async {
+      final slow = WindowConnectionController(
+        api,
+        native,
+        pollInterval: const Duration(days: 1),
+        renewBeforeMs: 90000,
+        handshakeHintAfter: Duration.zero,
+      )..selectedNode = node;
+      native.age = -1;
+      await slow.connect();
+      await slow.refresh();
+      expect(slow.phase, ConnectionPhase.reconnecting);
+      expect(slow.detail, contains('Нажмите «Отключить»'));
+      expect(native.starts, 1); // No automatic reconnect.
+      slow.dispose();
+    },
+  );
   test('outbound-only traffic does not confirm a stale handshake', () async {
     await c.connect();
     await c.refresh(); // Establish the fresh-handshake barrier first.

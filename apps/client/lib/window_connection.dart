@@ -14,6 +14,7 @@ class WindowConnectionController extends ConnectionController {
     WindowNative super.native, {
     super.pollInterval,
     this.renewBeforeMs = 55000,
+    this.handshakeHintAfter = const Duration(seconds: 25),
   });
   static const root = '/api/v1/window-tunnels';
   static const budgetBytes = int.fromEnvironment(
@@ -21,6 +22,11 @@ class WindowConnectionController extends ConnectionController {
     defaultValue: 1048576,
   );
   final int renewBeforeMs;
+
+  /// After this long without any confirmed handshake, the status asks the user to reconnect.
+  /// Advisory text only: no automatic reconnect, because every new window reserves quota.
+  final Duration handshakeHintAfter;
+  int _connectedAtMs = 0;
   final _clock = Stopwatch()..start();
   Map<String, dynamic>? _createIntent;
   Map<String, dynamic>? _renewIntent;
@@ -261,6 +267,7 @@ class WindowConnectionController extends ConnectionController {
       _renewTrafficAnchor = null;
       _inboundTraffic.reset();
       _hasEstablishedHandshake = false;
+      _connectedAtMs = _clock.elapsedMilliseconds;
       diagnosticStage = null;
       detail = 'Ожидается handshake';
       startPolling();
@@ -440,6 +447,11 @@ class WindowConnectionController extends ConnectionController {
     }
   }
 
+  bool get _handshakeOverdue =>
+      !_hasEstablishedHandshake &&
+      _clock.elapsedMilliseconds - _connectedAtMs >=
+          handshakeHintAfter.inMilliseconds;
+
   Future<void> _refresh(int version) async {
     try {
       await _ensureDevice();
@@ -553,6 +565,9 @@ class WindowConnectionController extends ConnectionController {
           ? 'Свежий handshake подтверждён'
           : confirmed
           ? 'Входящий трафик через VPN подтверждён'
+          : _handshakeOverdue
+          ? 'Handshake не получен более ${handshakeHintAfter.inSeconds} с. '
+                'Нажмите «Отключить» и подключитесь заново.'
           : 'Ожидается сеть и handshake';
     } catch (e) {
       if (_cancelled(version)) return;
