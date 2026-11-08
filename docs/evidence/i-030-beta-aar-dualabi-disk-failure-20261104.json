@@ -1,0 +1,16 @@
+{
+  "issue": "I-030",
+  "observed_at_local": "2026-11-04T02:08:17.4066225+03:00",
+  "scope": "Pinned Amnezia Box dual-ABI AAR build failure",
+  "command": "scripts/build_amnezia_box_android.ps1 (default arm64+amd64)",
+  "failure": "Go compiler reported not enough space on disk while writing package archives under %TEMP%\\go-build*",
+  "exit_code": 1,
+  "temporary_go_build_directories_after_exit": 0,
+  "active_go_processes_after_exit": 0,
+  "free_bytes_before_build": 2556719104,
+  "free_bytes_after_failure": 1140428800,
+  "go_cache_bytes_after_failure": 1401069285.0,
+  "existing_dual_abi_aar_sha256": "8c8bc8cfe93b4e0278f28accc6d141d3d6e4a97b5e79d2c4ddd087a49acdae96",
+  "existing_dual_abi_aar_unchanged": true,
+  "other_paths_deleted": false
+}

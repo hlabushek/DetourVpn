@@ -1,0 +1,128 @@
+{
+  "issue": "I-030",
+  "date_local": "2026-11-04",
+  "scope": "read-only beta receipt timestamp query and local source-path analysis",
+  "beta_database_query": {
+    "target": "isolated beta PostgreSQL on beta API host",
+    "transaction": "BEGIN READ ONLY; SELECT aggregate; ROLLBACK",
+    "unknown_receipt_count": 1,
+    "receipt_created_at_utc": "2026-11-04T12:08:33.404659Z",
+    "funded_hold_created_at_utc": "2026-11-04T12:08:31.794623Z",
+    "hold_to_receipt_delay_ms": 1610,
+    "generation": 2,
+    "slot": 1,
+    "gate_closed": true,
+    "runtime_matches_funded_hold": true,
+    "identifiers_exported": false
+  },
+  "connection_window_chain": {
+    "connection_created_at_utc": "2026-11-04T12:08:05.024923Z",
+    "current_state": "closed",
+    "current_generation": 2,
+    "hold_count": 2,
+    "generation1_hold_created_at_utc": "2026-11-04T12:08:05.026712Z",
+    "generation1_not_after_utc": "2026-11-04T12:09:35.020236Z",
+    "generation1_receipt_observation": "measured",
+    "generation1_receipt_created_at_utc": "2026-11-04T12:08:33.400602Z",
+    "generation1_time_remaining_at_receipt_ms": 61620,
+    "generation1_counter_at_or_above_half_budget": false,
+    "generation1_counter_equal_budget": false,
+    "generation2_hold_created_at_utc": "2026-11-04T12:08:31.794623Z",
+    "generation2_not_after_utc": "2026-11-04T12:10:01.790628Z",
+    "generation2_unknown_receipt_created_at_utc": "2026-11-04T12:08:33.404659Z",
+    "generation2_hold_to_receipt_ms": 1610,
+    "receipt_timestamp_gap_ms": 4,
+    "ids_and_byte_counts_exported": false
+  },
+  "api_ack_timestamp": {
+    "stored_by_schema": false,
+    "node_journal_ack_field": "boolean_only"
+  },
+  "checked_out_source_sha256": {
+    "services/node-agent/window_daemon.py": "dda31d7be8fff44530479db9517c5c805a6f5eed3b7976882f3f914c716594f8",
+    "services/node-agent/window_gate.py": "7f055892a77d47e03c0ea4f1b820ce1ed1399c06a3156e8f9bc70f3594030dd7",
+    "services/api/src/vpn_api/tunnels/window_runtime.py": "a039904113e6e28e55347c5f22cd3f097214ae3fc371661926f2a8c88d4edc3a",
+    "services/api/src/vpn_api/tunnels/window_journal.py": "21aa35fb016dea53860a94a66f340215bc683051be18d93fadd4ef4d21fe2df6"
+  },
+  "code_paths_that_can_produce_unknown": [
+    "grant is closed before it becomes the active journal slot; close_grant intentionally emits unknown when no prior receipt exists",
+    "journal slot is intent rather than active when _finish runs",
+    "closed_bytes raises or returns a counter outside the accepted range; exception is swallowed",
+    "closed counter exceeds the grant budget and is discarded as uncertain",
+    "startup without the prior nft table or recovery of a prior runtime; ruled out for this receipt by uninterrupted daemon start time and hold creation time"
+  ],
+  "missing_node_evidence": [
+    "slot journal state at _finish time; current state cannot reconstruct prior state transitions",
+    "whether close_grant ran before a slot became active or _finish ran on an active slot",
+    "closed_bytes failure category or counter value; the current implementation does not log it",
+    "historical nft passed-counter snapshot at gate close; current kernel state cannot reconstruct it",
+    "exact API ACK time; neither API schema nor node journal stores a timestamp"
+  ],
+  "cause": "not_confirmed; startup counter_exists=false and prior-runtime recovery are strongly ruled out. The adjacent measured-generation-1 then unknown-generation-2 receipts, 4ms apart, strongly indicate they were accepted in one node poll batch. A revoke of pending generation 2 or an apply failure before active journal commit fits the sequence; a later close of active generation 2 with a silent counter failure/over-budget result remains possible because the exact poll batch and command outcome were not recorded.",
+  "beta_node_read_only_collection": {
+    "agent_active": true,
+    "agent_restart_count": 0,
+    "agent_process_started_at_utc": "2026-10-26T10:47:57Z",
+    "deployed_source_matches_checkout": true,
+    "receipt_count": 116,
+    "acknowledged_receipt_count": 116,
+    "target_unknown_receipt_count": 1,
+    "target_unknown_receipt_acknowledged": true,
+    "current_slot_state": "closed",
+    "current_slot_generation": 15,
+    "current_gate_live": false,
+    "current_counter_bytes": 216744,
+    "fixed_agent_or_systemd_events_since_2026_11_04T11_30Z": 0
+  },
+  "interpretation_limits": [
+    "The API stores no node poll request ID, so the 4ms receipt gap strongly suggests a shared poll batch but does not independently prove it.",
+    "The measured prior generation and remaining lease time rule out its wall-clock expiry; they do not establish the generation-2 command outcome.",
+    "A revoke-before-activation, an apply failure while the journal is intent, and a later active-window counter failure can produce the same immutable unknown receipt sequence.",
+    "The missing command outcome, historical counter, and swallowed counter exception cannot be reconstructed from current state."
+  ],
+  "collector": {
+    "path": "scripts/collect_i030_unknown_readonly.sh",
+    "modes": ["--api", "--node"],
+    "executed_on_api": true,
+    "executed_on_node": true,
+    "read_only": true,
+    "raw_logs_or_identifiers_exported": false
+  },
+  "settlement_path_review": {
+    "unknown_receipt_immutable": true,
+    "funding_hold_retained": true,
+    "implemented_admin_unknown_resolution": true,
+    "implemented_locally_only": true,
+    "deployed_or_applied_to_beta": false,
+    "generic_admin_ledger_adjustment_releases_hold": false,
+    "owner_authorized_audited_compensation_selected": true
+  },
+  "physical_connect_allowed": false,
+  "accounting_decision": {
+    "decision": "charge_full_budget",
+    "authorized_by_owner_delegation": true,
+    "scope": "isolated_beta_only",
+    "amount_bytes": 1048576,
+    "classification": "operator_adjudicated_unknown_window_compensation",
+    "measured_traffic_claimed": false,
+    "original_unknown_receipt_mutated": false,
+    "no_debit_release_allowed": false
+  },
+  "local_resolution_implementation": {
+    "mfa_admin_action": true,
+    "pinned_allocation_debit": true,
+    "append_only_audit_record": true,
+    "idempotent_transaction": true,
+    "ledger_reconciliation": true,
+    "migration_revision": "0018_peer_window_resolution",
+    "deployed_to_beta": false,
+    "applied_to_beta": false,
+    "postgres_integration_checks": {
+      "targeted_migration_checks_passed": 4,
+      "admin_and_window_funding_tests_passed": 51,
+      "database": "temporary_local_postgresql_17_loopback",
+      "temporary_cluster_removed": true
+    },
+    "physical_connect_allowed": false
+  }
+}

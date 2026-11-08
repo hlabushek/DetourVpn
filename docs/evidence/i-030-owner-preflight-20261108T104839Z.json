@@ -1,0 +1,33 @@
+{
+  "issue": "I-030",
+  "timestamp_utc": "2026-11-08T10:46:39.423156+00:00",
+  "target": "isolated_beta",
+  "mode": "read_only",
+  "device_preflight": {
+    "authorized_device_count": 1,
+    "expected_device_model": true,
+    "application_id": "com.detourvpn.client",
+    "version_name": "0.1.0-beta.22",
+    "version_code": 23,
+    "signed_apk_receipt": "i-030-beta-apk-20261107T193236845Z-ac838ba7.json",
+    "installed_base_apk_matches_signed_receipt": true,
+    "active_vpn_transport": false,
+    "target_always_on_configured": false,
+    "lockdown": false
+  },
+  "latest_state": "closed",
+  "non_closed_connections": 0,
+  "reserved_bytes": 0,
+  "revoke_gate": "closed",
+  "quota": {
+    "status": "read_only",
+    "granted_bytes": 610795520,
+    "used_bytes": 68227274,
+    "reserved_bytes": 0,
+    "available_bytes": 542568246
+  },
+  "minimum_window_bytes": 16777216,
+  "available_for_one_window": true,
+  "result": "pass",
+  "identifiers_credentials_and_raw_data_exported": false
+}

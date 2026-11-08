@@ -1,0 +1,19 @@
+{
+  "observed_at": "2026-11-04T13:11:25+03:00",
+  "scope": "read-only beta.15 artifact and ADB install preflight",
+  "application_id": "com.detourvpn.client",
+  "version_code": 16,
+  "version_name": "0.1.0-beta.15",
+  "artifact_sha256": "8a9126f14efa0a80dfd8e9fb0064156b80235682f4428f69399243ac335e6c3e",
+  "receipt_hash_match": true,
+  "abi_libraries": [
+    "arm64-v8a/libapp.so",
+    "arm64-v8a/libbox.so",
+    "arm64-v8a/libflutter.so",
+    "arm64-v8a/libwg-go.so"
+  ],
+  "adb_authorized_device_count": 0,
+  "install_attempted": false,
+  "vpn_connect_attempted": false,
+  "distribution": "not_accepted"
+}

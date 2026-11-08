@@ -1,0 +1,17 @@
+{
+  "observed_at": "2026-11-04T13:27:58+03:00",
+  "scope": "allowlisted beta.15 ADB startup diagnostics",
+  "application_id": "com.detourvpn.client",
+  "version_code": 16,
+  "version_name": "0.1.0-beta.15",
+  "start_stage": "libbox_service_start",
+  "failure_type": "proxyerror",
+  "failure_category": "awg_bind_ipv4_open",
+  "raw_native_error_retained": false,
+  "adb_authorized_device_count": 1,
+  "detour_process_running": true,
+  "vpn_transport_present": false,
+  "always_on_vpn_app_configured": false,
+  "server_status_after_attempt": "pending_owner_read_only_check",
+  "further_connect_attempts": 0
+}

@@ -1,0 +1,33 @@
+{
+  "issue": "I-030",
+  "observed_at_local": "2026-11-04T01:26:47.7374759+03:00",
+  "scope": "Read-only Pixel ADB follow-up; no app launch or tunnel attempt",
+  "application_id": "com.detourvpn.client",
+  "version_name": "0.1.0-beta.14",
+  "version_code": 15,
+  "device_model": "Pixel 8 Pro",
+  "android_api": 37,
+  "always_on_enabled": false,
+  "lockdown_enabled": false,
+  "detourvpn_foreground": false,
+  "active_vpn_transport": false,
+  "detour_native_log_entries": 0,
+  "exit_info_contains_sigabrt": false,
+  "persisted_dropbox_native_crash": {
+    "present": true,
+    "signal": "SIGABRT",
+    "signal_code": -6,
+    "fault_pc": "0x92f048",
+    "native_frames": 1,
+    "abort_message_present": false
+  },
+  "further_connect_attempts": "none",
+  "server_revoke_gate": "not_rechecked",
+  "privacy": {
+    "device_serial_recorded": false,
+    "account_identifier_recorded": false,
+    "credentials_recorded": false,
+    "profile_endpoint_or_key_material_recorded": false,
+    "raw_log_or_configuration_recorded": false
+  }
+}

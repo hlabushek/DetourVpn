@@ -1,0 +1,31 @@
+{
+  "issue": "I-030",
+  "observed_at_utc": "2026-11-07T20:42:51Z",
+  "scope": "owner-authorized read-only diagnosis of the beta node and the owner phone after two failed beta.22 attempts and one supervised attempt",
+  "client": { "version": "0.1.0-beta.22 (23)", "engine": "GoBackend", "window_budget_on_node": "16 mbytes" },
+  "node": {
+    "services_active": ["slot-bootstrap", "node-agent", "core@1"],
+    "slot_udp_listener": 51901,
+    "node_to_api": { "https_http": 404, "latency_ms_approx": 40, "icmp_loss_percent": 0 },
+    "control_unavailable_events_total_in_journal": 8,
+    "control_unavailable_events_last_30_min": 0
+  },
+  "wifi_attempt": {
+    "gate_counter_packets": 0,
+    "peer_transfer_observed": false,
+    "result": "no UDP reached the slot"
+  },
+  "mobile_attempt": {
+    "peer_received_bytes": 148,
+    "peer_sent_bytes": 116,
+    "latest_handshake_reported": false,
+    "further_peer_traffic_over_about_4_minutes": false,
+    "header_only_udp_capture_20s": { "public_side_packets": 0, "namespace_side_packets": 0 },
+    "app_state": "waiting for handshake"
+  },
+  "phone": { "vpn_network_state": "CONNECTED", "tun0_tx_packets": 15, "tun0_rx_packets": 0, "always_on": false, "lockdown": false },
+  "interpretation": "The node, window budget and control path are healthy. On Wi-Fi no handshake traffic reached the node. On mobile data one handshake request reached the node and a response was sent, but no handshake completed and no further packets arrived. The phone-side or carrier-side cause is not established. The 20 s capture can miss the 25 s keepalive interval, so it is not proof that the phone is silent.",
+  "not_established": ["whether the node response reaches the phone", "why the phone stops after the first exchange", "whether the Wi-Fi block is the router or the ISP"],
+  "attempts_used_under_adr_084": 3,
+  "identifiers_credentials_ips_and_raw_logs_recorded": false
+}

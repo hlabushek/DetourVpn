@@ -1,0 +1,34 @@
+{
+  "issue": "I-030",
+  "observed_at_utc": "2026-11-06T14:55:46Z",
+  "scope": "beta.21 physical diagnostic outcome, sanitized readback",
+  "trace": {
+    "status": "no_current_beta_trace_markers",
+    "event_count": 0,
+    "raw_log_lines_exported": false,
+    "raw_log_lines_persisted": false
+  },
+  "owner_postflight": {
+    "receipt": "i-030-owner-preflight-20261106T145620Z.json",
+    "result": "pass",
+    "latest_state": "closed",
+    "non_closed_connections": 0,
+    "reserved_bytes": 0,
+    "revoke_gate": "closed",
+    "available_bytes": 35206668
+  },
+  "comparison": {
+    "preflight_receipt": "i-030-owner-preflight-20261106T145418Z.json",
+    "preflight_available_bytes": 35206668,
+    "postflight_available_bytes": 35206668,
+    "available_bytes_delta": 0
+  },
+  "physical_attempt": {
+    "connect_pressed_reported": false,
+    "chrome_result_reported": false,
+    "handshake_result_reported": false,
+    "outcome": "unknown"
+  },
+  "interpretation": "No current trace markers and unchanged available quota do not establish whether Connect was pressed or identify a tunnel failure cause.",
+  "identifiers_credentials_ips_and_raw_logs_collected": false
+}

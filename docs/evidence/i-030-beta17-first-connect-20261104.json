@@ -1,0 +1,32 @@
+{
+  "issue": "I-030",
+  "date_local": "2026-11-04",
+  "scope": "one owner-supervised Pixel beta.17 Connect and immediate Disconnect",
+  "application_id": "com.detourvpn.client",
+  "version_code": 18,
+  "owner_report": {
+    "prior_native_start_error_seen": false,
+    "screen_state": "restoring_connection_waiting_for_network_and_handshake",
+    "android_vpn_icon_seen": true,
+    "disconnect_completed": true
+  },
+  "post_disconnect_adb": {
+    "active_vpn_network_agents": 0,
+    "new_safe_native_start_failure_markers": 0
+  },
+  "post_disconnect_server_status_source": "owner-run read-only status script output",
+  "post_disconnect_server_status": {
+    "latest_state": "closed",
+    "non_closed_connections": 0,
+    "reserved_bytes": 0,
+    "revoke_gate": "closed"
+  },
+  "handshake": "not_confirmed",
+  "egress_split_dns_ipv6": "not_tested",
+  "distribution": "not_accepted",
+  "privacy": {
+    "device_serial_or_account_identifier_recorded": false,
+    "profile_endpoints_or_keys_recorded": false,
+    "raw_native_errors_or_traffic_recorded": false
+  }
+}

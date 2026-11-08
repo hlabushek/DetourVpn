@@ -1,0 +1,24 @@
+{
+  "observed_at": "2026-11-04T13:21:32+03:00",
+  "scope": "owner-reported server gate plus read-only post-install Pixel state",
+  "server_gate": {
+    "source": "owner-run check_beta_owner_window_status.ps1 output",
+    "latest_state": "closed",
+    "non_closed_connections": 0,
+    "reserved_bytes": 0,
+    "revoke_gate": "closed",
+    "independently_requeried_by_codex": false
+  },
+  "device": {
+    "application_id": "com.detourvpn.client",
+    "version_code": 16,
+    "version_name": "0.1.0-beta.15",
+    "detour_process_running": false,
+    "vpn_transport_present": false,
+    "always_on_vpn_app_configured": false,
+    "native_log_markers_present": false,
+    "app_launch_attempted": false,
+    "vpn_connect_attempted": false
+  },
+  "distribution": "not_accepted"
+}

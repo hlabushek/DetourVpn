@@ -1,0 +1,26 @@
+{
+  "issue": "I-030",
+  "observed_at_local": "2026-11-02T17:20:54+03:00",
+  "scope": "owner confirmation of tester support and recovery readiness",
+  "separate_device_test": {
+    "status": "owner_reported_pass",
+    "reported_scope": "application sign-in and normal UI operation",
+    "device_identity_recorded": false
+  },
+  "tester_support": {
+    "telegram_username": "@DetourVpnHelper",
+    "owner_selected": true
+  },
+  "apk_delivery": {
+    "route": "owner's private Telegram channel",
+    "owner_will_publish": true,
+    "published_at_observation": false
+  },
+  "bitlocker_recovery_key_file": {
+    "existence": "owner_confirmed",
+    "path_recorded": false,
+    "contents_inspected": false,
+    "key_value_recorded": false
+  },
+  "secrets_or_tester_identifiers_recorded": false
+}

@@ -1,0 +1,34 @@
+{
+  "issue": "I-030",
+  "observed_at_utc": "2026-11-03T19:17:51Z",
+  "scope": "local patched Amnezia Box Android AAR and Android release Java compile; no APK signing, install, or Connect",
+  "upstream": {
+    "version": "1.260910.0",
+    "source_archive_sha256": "2c7563405aa61cd973a7bd43aef0e22e1ed3ee74e6724a18244a641b8bbfe152",
+    "patch_reverse_check": "passed"
+  },
+  "change": "Pass the endpoint lifecycle context to the AWG bind adapter so bind UDP socket creation does not extend a nil context.",
+  "checks": {
+    "go_test_transport_awg": "passed",
+    "android_aar_build": "passed",
+    "aar_version": "1.260910.0",
+    "aar_abis": ["arm64-v8a", "x86_64"],
+    "aar_bytes": 34182719,
+    "aar_sha256": "8c8bc8cfe93b4e0278f28accc6d141d3d6e4a97b5e79d2c4ddd087a49acdae96",
+    "gradle_task": ":app:compileReleaseJavaWithJavac",
+    "gradle_result": "BUILD SUCCESSFUL"
+  },
+  "warnings": [
+    "Gradle reported embedded Kotlin/Gradle compatibility warnings.",
+    "Gradle reported configured NDK 27 differs from integration_test's NDK 28.2.13676358 requirement."
+  ],
+  "not_performed": [
+    "signed APK build (keystore password requires owner-local entry)",
+    "beta.13 APK installation",
+    "physical connect/handshake/egress/revoke acceptance"
+  ],
+  "privacy": {
+    "signing_secrets_recorded": false,
+    "beta_or_production_host_contacted": false
+  }
+}

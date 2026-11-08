@@ -1,0 +1,16 @@
+{
+  "issue": "I-030",
+  "timestamp_utc": "2026-11-05T19:39:49.499529+00:00",
+  "target": "isolated_beta",
+  "application_id": "com.detourvpn.client",
+  "version_name": "0.1.0-beta.21",
+  "version_code": 22,
+  "signed_build_receipt": "i-030-beta-apk-20261105T193236484Z-35019807.json",
+  "installed_base_apk_matches_signed_receipt": true,
+  "vpn_transport_active_after_install": false,
+  "always_on_configured": false,
+  "lockdown": false,
+  "connect_attempted": false,
+  "distribution": "not_accepted",
+  "identifiers_credentials_and_raw_logs_exported": false
+}

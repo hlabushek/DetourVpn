@@ -1,0 +1,47 @@
+{
+  "issue": "I-027",
+  "observed_at_local": "2026-11-03T09:04:22+03:00",
+  "scope": "read-only verification of the natural daily Windows Task Scheduler backup invocation and local imported archive",
+  "task": {
+    "name": "DetourVpn Beta Backup Daily",
+    "state_after_run": "Ready",
+    "enabled": true,
+    "principal": "JetGame",
+    "logon_type": "Interactive",
+    "run_level": "Limited",
+    "action_runtime": "Windows PowerShell 5.1",
+    "natural_trigger_time_local": "2026-11-03T07:00:01+03:00",
+    "last_task_result": 1,
+    "next_run_local": "2026-11-04T07:00:00+03:00",
+    "missed_runs": 0,
+    "start_when_available": true,
+    "wake_to_run": true
+  },
+  "local_archive": {
+    "new_archive_imported": false,
+    "latest_name": "detourvpn-beta-20261102T120419.115336Z-6a8d23672d954f16b6d0512bbb8a16bf.enc",
+    "bytes": 58246116,
+    "last_write_local": "2026-11-02T15:05:45+03:00",
+    "sha256": "326d156b1e956101ead09319def722e28f25c3c868474fd614a98305f7e8b50a",
+    "matches_prior_restore_receipt": true
+  },
+  "diagnostics": {
+    "task_scheduler_operational_log_enabled": false,
+    "windows_powershell_events_in_run_window": 8,
+    "powershell_process_started_local": "2026-11-03T07:00:01+03:00",
+    "powershell_process_stopped_local": "2026-11-03T07:00:08+03:00",
+    "script_error_or_warning_events_found": false,
+    "failure_stage": "undetermined",
+    "interactive_shell_can_see_backup_key": true,
+    "task_process_key_visibility_confirmed": false
+  },
+  "interpretation": {
+    "natural_trigger_observed": true,
+    "scheduled_backup_acceptance": "failed; task result is nonzero and no new locally authenticated/imported archive appeared",
+    "remote_archive_creation": "unconfirmed; remote host was not queried",
+    "manual_retry_performed": false,
+    "remote_host_contacted": false,
+    "task_configuration_modified": false,
+    "secrets_or_database_contents_recorded": false
+  }
+}

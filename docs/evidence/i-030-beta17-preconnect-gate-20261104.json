@@ -1,0 +1,28 @@
+{
+  "issue": "I-030",
+  "date_local": "2026-11-04",
+  "scope": "owner-reported read-only server status and ADB device preflight before beta.17 Connect",
+  "server_status_source": "owner-run check_beta_owner_window_status.ps1 output supplied in chat",
+  "server_status_independently_requeried_by_codex": false,
+  "latest_state": "closed",
+  "non_closed_connections": 0,
+  "reserved_bytes": 0,
+  "revoke_gate": "closed",
+  "adb_authorized_device_count": 1,
+  "device_model": "Pixel 8 Pro",
+  "application_id": "com.detourvpn.client",
+  "version_code": 18,
+  "version_name": "0.1.0-beta.17",
+  "active_vpn_network_agents": 0,
+  "always_on_configured": false,
+  "app_process_running": false,
+  "vpn_connect_attempted": false,
+  "physical_start_result": "not_tested",
+  "distribution": "not_accepted",
+  "privacy": {
+    "owner_identifier_or_credentials_recorded": false,
+    "device_serial_recorded": false,
+    "profile_endpoints_or_keys_recorded": false,
+    "traffic_or_dns_contents_recorded": false
+  }
+}

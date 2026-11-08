@@ -1,0 +1,13 @@
+{
+  "issue": "I-030",
+  "observed_at_local": "2026-11-04T01:50:56+03:00",
+  "scope": "Owner-authorized removal of exact reproducible Android client build output",
+  "relative_path": "apps/client/build",
+  "cleanup_method": "owner-run PowerShell",
+  "bytes_removed": 1465925353,
+  "free_bytes_before": 1021190144,
+  "free_bytes_after": 2489970688,
+  "target_exists_after": false,
+  "other_paths_touched": false,
+  "source": "owner-provided command result"
+}

@@ -1,0 +1,10 @@
+{
+  "issue": "I-030",
+  "timestamp_utc": "2026-11-07T22:38:37.599810+00:00",
+  "target": "isolated_beta",
+  "mode": "read_only",
+  "result": "not_confirmed",
+  "failure_stage": "android_preflight",
+  "failure_code": "single_authorized_android_device_required",
+  "identifiers_credentials_and_raw_data_exported": false
+}

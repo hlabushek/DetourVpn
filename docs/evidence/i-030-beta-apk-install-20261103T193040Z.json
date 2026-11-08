@@ -1,0 +1,20 @@
+{
+  "observed_at": "2026-11-03T19:30:40+00:00",
+  "scope": "physical Pixel beta APK update only",
+  "application_id": "com.detourvpn.client",
+  "previous_version_name": "0.1.0-beta.12",
+  "previous_version_code": 13,
+  "version_name": "0.1.0-beta.13",
+  "version_code": 14,
+  "artifact_sha256": "cc23b8abdc56b6b029636476adb273967b03b12be8c5d0ea0e91b234ea946620",
+  "signer_certificate_sha256": "6b99a02bee6dc8dba659af64fcd025782fc3011a41099168e3f3a766b84ef3b8",
+  "signed_apk_receipt": "i-030-beta-apk-20261103T192925690Z-7ae1a6db.json",
+  "receipt_signature": "passed",
+  "adb_update_install": "passed",
+  "package_version_query": "passed",
+  "activity_launch": "passed",
+  "vpn_transport_after_install": "none",
+  "beta13_connection_attempt": "performed_failed_native_start; see i-030-beta13-native-start-failure-20261103.json",
+  "vpn_transport_after_failed_start": "none",
+  "distribution": "not_accepted"
+}

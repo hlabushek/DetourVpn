@@ -1,0 +1,25 @@
+{
+  "issue": "I-030",
+  "timestamp_utc": "2026-11-04T16:11:09.505589+00:00",
+  "target": "isolated_beta",
+  "result": "success",
+  "kind": "charge_full_budget",
+  "amount_bytes": 1048576,
+  "measured_traffic_claimed": false,
+  "original_unknown_receipt_preserved": true,
+  "resolution_count": 1,
+  "applied_resolution_debit_count": 1,
+  "ledger_debit_count": 1,
+  "pre_status": {
+    "latest_state": "closed",
+    "non_closed_connections": 0,
+    "reserved_bytes": 1048576
+  },
+  "post_status": {
+    "latest_state": "closed",
+    "non_closed_connections": 0,
+    "reserved_bytes": 0,
+    "revoke_gate": "closed"
+  },
+  "identifiers_credentials_and_raw_data_exported": false
+}

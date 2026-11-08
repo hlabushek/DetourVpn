@@ -1,0 +1,15 @@
+{
+  "issue": "I-030",
+  "timestamp_utc": "2026-11-03T21:16:50.6441321Z",
+  "target": "isolated beta control plane",
+  "hostname": "hiplet-137728",
+  "service": "detourvpn-beta-api.service",
+  "changed_file": "services/api/src/vpn_api/admin.py",
+  "previous_sha256": "28af25563d57fa5d6b6ecc27ea596aab012debf3550567978a93202a294a1919",
+  "deployed_sha256": "5002f9387acc6bd8538741988f6daa3e4997264f64ca4230ecdd1f7d8a19a296",
+  "readiness_http": 200,
+  "unauthenticated_status_route_http": 401,
+  "migrations": "none",
+  "database_changes": "none",
+  "result": "success"
+}

@@ -1,0 +1,18 @@
+{
+  "issue": "I-030",
+  "timestamp_utc": "2026-11-04T16:44:49Z",
+  "target": "owner_supervised_beta_device",
+  "application_version": "0.1.0-beta.18",
+  "version_code": 19,
+  "attempts": 1,
+  "connect_confirmed": false,
+  "system_permission_prompt_observed": false,
+  "active_vpn_transport_after_attempt": false,
+  "retained_allowlisted_native_start_failure_markers": 0,
+  "init_failure_category": "none",
+  "raw_logs_or_device_identifiers_exported": false,
+  "https_egress_test_performed": false,
+  "source_bound_egress_verified": false,
+  "beta_status_after_attempt": "closed/0/0; revoke_gate=closed",
+  "result": "not_confirmed"
+}

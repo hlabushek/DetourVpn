@@ -1,0 +1,37 @@
+{
+  "issue": "I-028",
+  "observed_at_local": "2026-11-02",
+  "scope": "source-bound local Egress runner build and local Flutter checks",
+  "suite": "Egress",
+  "build_passed": true,
+  "checks": {
+    "flutter_analyze": "passed: no issues found",
+    "flutter_tests": "passed: 106 tests",
+    "native_backend_verification": "passed: arm64-v8a and x86_64 library hashes verified",
+    "android_client_and_probe_instrumentation": "passed: Gradle BUILD SUCCESSFUL"
+  },
+  "source_bound_ready_record": {
+    "declared_input_count": 94,
+    "input_hash_mismatches": 0,
+    "client_package": "com.detourvpn.client.i028",
+    "client_apk_sha256": "ff5fd647a9d1e5bbe3b9937e80dcaf235ca3f6d3f0d9ce014b72771c5997bdc5",
+    "probe_base_package": "org.example.vpnpoc",
+    "probe_base_apk_sha256": "06bd724c2bb3cc9facc4480ee4c959a21a40d1a40ced8507bcd29d6758e3bd52",
+    "probe_test_package": "org.example.vpnpoc.test",
+    "probe_test_apk_sha256": "0679ebaa62e5cf10594d180be34633508e70c314caaf111dc0e6c9e1b8226add",
+    "client_native_apk_library_sha256": "7c287ac773c45ec6b12b1a53fd9cd43beb404b430362872f338dad490826fed2",
+    "native_libraries": {
+      "arm64-v8a": "df0a0e3365d5f9b2a857165c4b09a3b7eb1c683c3337821c8107721a77a5893d",
+      "x86_64": "e321d2962e9f7b59c37974a10d21633a247acc01c53f6a6f5797c2c16826660c"
+    }
+  },
+  "runner_fix": "The package identity guard now compares against the existing com.detourvpn.client.i028 package setting instead of an obsolete org.example.vpnclient.i028 value.",
+  "physical_test_pending": true,
+  "adb_device_connected": false,
+  "staging_action_started": false,
+  "beta_or_staging_hosts_contacted": false,
+  "limitations": [
+    "This is local build/test evidence only and does not establish handshake, tunnel egress, revoke acknowledgement, DNS/IPv6 privacy or cleanup on a physical device.",
+    "Gradle/AGP/Kotlin deprecation notices and the Android NDK version recommendation remain unchanged."
+  ]
+}

@@ -1,0 +1,66 @@
+{
+  "issue": "I-028",
+  "recorded_at_utc": "2026-11-02T18:06:34Z",
+  "scope": "bounded cleanup of reproducible Python runtime directories in verified closed archives on staging A only",
+  "host_ipv4_match": true,
+  "server_b_or_production_contacted": false,
+  "baseline": {
+    "before_delete_available_kib": 1358136,
+    "MemAvailable_before_delete_kib": 1517580,
+    "install_disk_threshold_exclusive_kib": 1500000,
+    "install_mem_available_threshold_exclusive_kib": 350000,
+    "i028_units_before_delete": {
+      "detourvpn-i028-agent.service": "inactive",
+      "detourvpn-i028-core1.service": "inactive",
+      "detourvpn-i028-core2.service": "inactive",
+      "detourvpn-i028-timeout.service": "inactive",
+      "detourvpn-i028-timeout.timer": "inactive"
+    },
+    "runtime_root_before_delete": "absent",
+    "archive_root_symlink": false,
+    "closed_archive_count": 100,
+    "eligible_closed_archive_count": 36,
+    "skipped_archive_count": 64,
+    "skipped_reason": "archive.json or required path missing; no deletion attempted"
+  },
+  "deleted_targets": [
+    {
+      "archive": "/opt/detourvpn-i028-archives/closed-yk3u3riq",
+      "archive_mtime_utc": "2026-10-28T12:04:38.340925+00:00",
+      "target": "/opt/detourvpn-i028-archives/closed-yk3u3riq/release/python",
+      "du_kib": 108436,
+      "archive_metadata_valid": true
+    },
+    {
+      "archive": "/opt/detourvpn-i028-archives/closed-7ej373xk",
+      "archive_mtime_utc": "2026-10-28T12:17:56.701638+00:00",
+      "target": "/opt/detourvpn-i028-archives/closed-7ej373xk/release/python",
+      "du_kib": 108436,
+      "archive_metadata_valid": true
+    },
+    {
+      "archive": "/opt/detourvpn-i028-archives/closed-wbacsh0m",
+      "archive_mtime_utc": "2026-10-28T12:39:09.758523+00:00",
+      "target": "/opt/detourvpn-i028-archives/closed-wbacsh0m/release/python",
+      "du_kib": 108436,
+      "archive_metadata_valid": true
+    }
+  ],
+  "expected_freed_kib_by_du": 325308,
+  "postcheck": {
+    "available_kib": 1683428,
+    "MemAvailable_kib": 1502572,
+    "i028_units_inactive_or_not_found": true,
+    "runtime_root_absent": true,
+    "archive_root_size_kib": 14289896,
+    "archive_json_preserved": true,
+    "node_state_run_preserved": true,
+    "only_python_targets_removed": true
+  },
+  "install_thresholds_passed": true,
+  "install_started": false,
+  "test_started": false,
+  "vpn_dataplane_acceptance": false,
+  "owner_quota_changed": false,
+  "passed": true
+}

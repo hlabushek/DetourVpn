@@ -1,0 +1,58 @@
+{
+  "issue": "I-030",
+  "observed_at_utc": "2026-11-02T20:54:37Z",
+  "scope": "owner-only physical v3 VPN connect/probe/disconnect attempt after bounded beta credit",
+  "device": {
+    "model": "Pixel 8 Pro",
+    "application_id": "com.detourvpn.client",
+    "authorized_adb_device_count": 1,
+    "serial_recorded": false
+  },
+  "connection": {
+    "owner_reported_connected": true,
+    "owner_reported_handshake_confirmed": true,
+    "adb_vpn_agent_seen_during_probes": true,
+    "probe_count": 2,
+    "ipv4_echo_replies": 0,
+    "adb_vpn_agent_after_owner_disconnect": false,
+    "owner_reported_disconnect_ui": true,
+    "owner_reported_disconnect_error": false
+  },
+  "ledger": {
+    "granted_bytes_before": 73924608,
+    "used_bytes_before": 6561064,
+    "reserved_bytes_before": 0,
+    "available_bytes_before": 67363544,
+    "granted_bytes_after": 73924608,
+    "used_bytes_after": 18491353,
+    "reserved_bytes_after": 0,
+    "available_bytes_after": 55433255,
+    "used_delta_bytes": 11930289,
+    "newest_five_peer_window_debits_bytes": [854650, 1046420, 1048576, 1047204, 1047708]
+  },
+  "node_status_after_attempt": {
+    "source": "owner-run read-only beta node status helper",
+    "status": "active",
+    "protocol": 3,
+    "last_seen_present": true,
+    "legacy_tunnels": 0,
+    "legacy_unacknowledged_commands": 0,
+    "legacy_stalled_commands": 0,
+    "v3_window_occupancy_exposed": false
+  },
+  "interpretation": {
+    "ipv4_egress_confirmed": false,
+    "control_plane_node_heartbeat_active": true,
+    "client_report_is_consistent_with_api_closed_response": true,
+    "server_side_peer_closed_independently_confirmed": false,
+    "packet_attribution_available": false,
+    "possible_background_traffic_in_full_ipv4_tunnel": true,
+    "observer_initial_vpn_matcher_was_too_strict": true,
+    "do_not_repeat_until_egress_path_and_bounded_probe_timing_are_reviewed": true
+  },
+  "privacy": {
+    "destinations_or_dns_names_recorded": false,
+    "payload_recorded": false,
+    "secrets_or_account_identifiers_recorded": false
+  }
+}

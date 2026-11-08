@@ -1,0 +1,1960 @@
+{
+  "issue": "I-030",
+  "observed_at_utc": "2026-11-02T17:05:24Z",
+  "scope": "OSV severity and configuration triage for the unchanged four Maven lockfiles",
+  "source": {
+    "querybatch": "https://api.osv.dev/v1/querybatch",
+    "advisory_details": "https://api.osv.dev/v1/vulns/{id}"
+  },
+  "lockfiles": {
+    "apps/android/app/gradle.lockfile": "53bee6e5e3d8f449b166267c2d591be96151dba908944be897ac4b21bf6bb21c",
+    "apps/android/tunnel/gradle.lockfile": "8caf9eb655817f58ad8ff937072ebb662595892ec246b05018b192b6ff994068",
+    "apps/client/android/app/gradle.lockfile": "21dee1dad17adbfbf6e00388bba1dd5780a3d6cc90d7ebfbfe1ccaa409987a10",
+    "apps/client/android/tunnel-gradle.lockfile": "8caf9eb655817f58ad8ff937072ebb662595892ec246b05018b192b6ff994068"
+  },
+  "unique_coordinate_versions_queried": 196,
+  "advisory_match_records": 87,
+  "unique_advisory_ids": 45,
+  "advisories_by_database_severity": {
+    "CRITICAL": 1,
+    "HIGH": 18,
+    "unspecified": 0,
+    "MODERATE": 23,
+    "LOW": 3
+  },
+  "beta_release_runtime_file": "apps/client/android/app/gradle.lockfile",
+  "beta_release_runtime_matches": 0,
+  "advisories": [
+    {
+      "id": "GHSA-5mg8-w23w-74h3",
+      "aliases": [
+        "CVE-2020-8908",
+        "SNYK-JAVA-COMGOOGLEGUAVA-1015415"
+      ],
+      "summary": "Information Disclosure in Guava",
+      "database_severity": "LOW",
+      "cvss": [
+        {
+          "type": "CVSS_V3",
+          "score": "CVSS:3.1/AV:L/AC:L/PR:L/UI:N/S:U/C:L/I:N/A:N"
+        }
+      ],
+      "fixed_versions": [
+        "32.0.0-android"
+      ],
+      "matches": [
+        {
+          "coordinate": "com.google.guava:guava:28.1-android",
+          "configurations": [
+            "debugRuntimeClasspath",
+            "debugUnitTestRuntimeClasspath"
+          ],
+          "lockfiles": [
+            "apps/client/android/app/gradle.lockfile"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "GHSA-5x3r-wrvg-rp6q",
+      "aliases": [
+        "CVE-2026-47244"
+      ],
+      "summary": "Netty HTTP/2: Advertised MAX_CONCURRENT_STREAMS are not enforced",
+      "database_severity": "MODERATE",
+      "cvss": [
+        {
+          "type": "CVSS_V3",
+          "score": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:L"
+        }
+      ],
+      "fixed_versions": [
+        "4.1.135.Final",
+        "4.2.15.Final"
+      ],
+      "matches": [
+        {
+          "coordinate": "io.netty:netty-codec-http2:4.1.110.Final",
+          "configurations": [
+            "_internal-unified-test-platform-android-test-plugin-host-emulator-control",
+            "_internal-unified-test-platform-android-test-plugin-result-listener-gradle"
+          ],
+          "lockfiles": [
+            "apps/android/app/gradle.lockfile",
+            "apps/android/tunnel/gradle.lockfile",
+            "apps/client/android/tunnel-gradle.lockfile"
+          ]
+        },
+        {
+          "coordinate": "io.netty:netty-codec-http2:4.1.93.Final",
+          "configurations": [
+            "_internal-unified-test-platform-core"
+          ],
+          "lockfiles": [
+            "apps/android/app/gradle.lockfile",
+            "apps/android/tunnel/gradle.lockfile",
+            "apps/client/android/tunnel-gradle.lockfile"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "GHSA-93wv-jw9v-4972",
+      "aliases": [
+        "CVE-2026-56819"
+      ],
+      "summary": "Netty: HTTP/2 decompression leaks ByteBuf reference count when the decompressor channel is already closed (Direct memory leak / OOM DoS)",
+      "database_severity": "HIGH",
+      "cvss": [
+        {
+          "type": "CVSS_V3",
+          "score": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:H"
+        }
+      ],
+      "fixed_versions": [
+        "4.1.136.Final",
+        "4.2.16.Final"
+      ],
+      "matches": [
+        {
+          "coordinate": "io.netty:netty-codec-http2:4.1.110.Final",
+          "configurations": [
+            "_internal-unified-test-platform-android-test-plugin-host-emulator-control",
+            "_internal-unified-test-platform-android-test-plugin-result-listener-gradle"
+          ],
+          "lockfiles": [
+            "apps/android/app/gradle.lockfile",
+            "apps/android/tunnel/gradle.lockfile",
+            "apps/client/android/tunnel-gradle.lockfile"
+          ]
+        },
+        {
+          "coordinate": "io.netty:netty-codec-http2:4.1.93.Final",
+          "configurations": [
+            "_internal-unified-test-platform-core"
+          ],
+          "lockfiles": [
+            "apps/android/app/gradle.lockfile",
+            "apps/android/tunnel/gradle.lockfile",
+            "apps/client/android/tunnel-gradle.lockfile"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "GHSA-c2gf-v879-257j",
+      "aliases": [
+        "CVE-2026-48043"
+      ],
+      "summary": "netty-codec-http2: ByteBuf Reference-Count Leak in DelegatingDecompressorFrameListener Leads to Memory Exhaustion",
+      "database_severity": "MODERATE",
+      "cvss": [
+        {
+          "type": "CVSS_V3",
+          "score": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:L"
+        }
+      ],
+      "fixed_versions": [
+        "4.1.135.Final",
+        "4.2.15.Final"
+      ],
+      "matches": [
+        {
+          "coordinate": "io.netty:netty-codec-http2:4.1.110.Final",
+          "configurations": [
+            "_internal-unified-test-platform-android-test-plugin-host-emulator-control",
+            "_internal-unified-test-platform-android-test-plugin-result-listener-gradle"
+          ],
+          "lockfiles": [
+            "apps/android/app/gradle.lockfile",
+            "apps/android/tunnel/gradle.lockfile",
+            "apps/client/android/tunnel-gradle.lockfile"
+          ]
+        },
+        {
+          "coordinate": "io.netty:netty-codec-http2:4.1.93.Final",
+          "configurations": [
+            "_internal-unified-test-platform-core"
+          ],
+          "lockfiles": [
+            "apps/android/app/gradle.lockfile",
+            "apps/android/tunnel/gradle.lockfile",
+            "apps/client/android/tunnel-gradle.lockfile"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "GHSA-c69g-56f8-xwqj",
+      "aliases": [
+        "CVE-2026-59900"
+      ],
+      "summary": "Netty: [codec-http2] Lack of Host Header Deduplication in HTTP/2→HTTP/1.x Translation Leads to Request Routing Bypass",
+      "database_severity": "MODERATE",
+      "cvss": [
+        {
+          "type": "CVSS_V4",
+          "score": "CVSS:4.0/AV:N/AC:L/AT:N/PR:N/UI:N/VC:N/VI:N/VA:N/SC:L/SI:L/SA:N"
+        }
+      ],
+      "fixed_versions": [
+        "4.1.136.Final",
+        "4.2.16.Final"
+      ],
+      "matches": [
+        {
+          "coordinate": "io.netty:netty-codec-http2:4.1.110.Final",
+          "configurations": [
+            "_internal-unified-test-platform-android-test-plugin-host-emulator-control",
+            "_internal-unified-test-platform-android-test-plugin-result-listener-gradle"
+          ],
+          "lockfiles": [
+            "apps/android/app/gradle.lockfile",
+            "apps/android/tunnel/gradle.lockfile",
+            "apps/client/android/tunnel-gradle.lockfile"
+          ]
+        },
+        {
+          "coordinate": "io.netty:netty-codec-http2:4.1.93.Final",
+          "configurations": [
+            "_internal-unified-test-platform-core"
+          ],
+          "lockfiles": [
+            "apps/android/app/gradle.lockfile",
+            "apps/android/tunnel/gradle.lockfile",
+            "apps/client/android/tunnel-gradle.lockfile"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "GHSA-prj3-ccx8-p6x4",
+      "aliases": [
+        "CVE-2025-55163"
+      ],
+      "summary": "Netty affected by MadeYouReset HTTP/2 DDoS vulnerability",
+      "database_severity": "HIGH",
+      "cvss": [
+        {
+          "type": "CVSS_V3",
+          "score": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:H"
+        },
+        {
+          "type": "CVSS_V4",
+          "score": "CVSS:4.0/AV:N/AC:L/AT:P/PR:N/UI:N/VC:N/VI:N/VA:H/SC:N/SI:N/SA:N"
+        }
+      ],
+      "fixed_versions": [
+        "1.75.0",
+        "4.1.124.Final",
+        "4.2.4.Final"
+      ],
+      "matches": [
+        {
+          "coordinate": "io.netty:netty-codec-http2:4.1.110.Final",
+          "configurations": [
+            "_internal-unified-test-platform-android-test-plugin-host-emulator-control",
+            "_internal-unified-test-platform-android-test-plugin-result-listener-gradle"
+          ],
+          "lockfiles": [
+            "apps/android/app/gradle.lockfile",
+            "apps/android/tunnel/gradle.lockfile",
+            "apps/client/android/tunnel-gradle.lockfile"
+          ]
+        },
+        {
+          "coordinate": "io.netty:netty-codec-http2:4.1.93.Final",
+          "configurations": [
+            "_internal-unified-test-platform-core"
+          ],
+          "lockfiles": [
+            "apps/android/app/gradle.lockfile",
+            "apps/android/tunnel/gradle.lockfile",
+            "apps/client/android/tunnel-gradle.lockfile"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "GHSA-w9fj-cfpg-grvv",
+      "aliases": [
+        "CVE-2026-33871"
+      ],
+      "summary": "Netty HTTP/2 CONTINUATION Frame Flood DoS via Zero-Byte Frame Bypass",
+      "database_severity": "HIGH",
+      "cvss": [
+        {
+          "type": "CVSS_V4",
+          "score": "CVSS:4.0/AV:N/AC:L/AT:N/PR:N/UI:N/VC:N/VI:N/VA:H/SC:N/SI:N/SA:N"
+        }
+      ],
+      "fixed_versions": [
+        "4.1.132.Final",
+        "4.2.11.Final"
+      ],
+      "matches": [
+        {
+          "coordinate": "io.netty:netty-codec-http2:4.1.110.Final",
+          "configurations": [
+            "_internal-unified-test-platform-android-test-plugin-host-emulator-control",
+            "_internal-unified-test-platform-android-test-plugin-result-listener-gradle"
+          ],
+          "lockfiles": [
+            "apps/android/app/gradle.lockfile",
+            "apps/android/tunnel/gradle.lockfile",
+            "apps/client/android/tunnel-gradle.lockfile"
+          ]
+        },
+        {
+          "coordinate": "io.netty:netty-codec-http2:4.1.93.Final",
+          "configurations": [
+            "_internal-unified-test-platform-core"
+          ],
+          "lockfiles": [
+            "apps/android/app/gradle.lockfile",
+            "apps/android/tunnel/gradle.lockfile",
+            "apps/client/android/tunnel-gradle.lockfile"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "GHSA-xpw8-rcwv-8f8p",
+      "aliases": [],
+      "summary": "io.netty:netty-codec-http2 vulnerable to HTTP/2 Rapid Reset Attack",
+      "database_severity": "HIGH",
+      "cvss": [
+        {
+          "type": "CVSS_V3",
+          "score": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:H"
+        }
+      ],
+      "fixed_versions": [
+        "4.1.100.Final"
+      ],
+      "matches": [
+        {
+          "coordinate": "io.netty:netty-codec-http2:4.1.93.Final",
+          "configurations": [
+            "_internal-unified-test-platform-core"
+          ],
+          "lockfiles": [
+            "apps/android/app/gradle.lockfile",
+            "apps/android/tunnel/gradle.lockfile",
+            "apps/client/android/tunnel-gradle.lockfile"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "GHSA-3p8m-j85q-pgmj",
+      "aliases": [
+        "CVE-2025-58057"
+      ],
+      "summary": "Netty's decoders vulnerable to DoS via zip bomb style attack",
+      "database_severity": "MODERATE",
+      "cvss": [
+        {
+          "type": "CVSS_V4",
+          "score": "CVSS:4.0/AV:N/AC:L/AT:N/PR:N/UI:N/VC:N/VI:N/VA:L/SC:N/SI:N/SA:N"
+        }
+      ],
+      "fixed_versions": [
+        "4.1.125.Final",
+        "4.2.5.Final"
+      ],
+      "matches": [
+        {
+          "coordinate": "io.netty:netty-codec:4.1.110.Final",
+          "configurations": [
+            "_internal-unified-test-platform-android-test-plugin-host-emulator-control",
+            "_internal-unified-test-platform-android-test-plugin-result-listener-gradle"
+          ],
+          "lockfiles": [
+            "apps/android/app/gradle.lockfile",
+            "apps/android/tunnel/gradle.lockfile",
+            "apps/client/android/tunnel-gradle.lockfile"
+          ]
+        },
+        {
+          "coordinate": "io.netty:netty-codec:4.1.93.Final",
+          "configurations": [
+            "_internal-unified-test-platform-core"
+          ],
+          "lockfiles": [
+            "apps/android/app/gradle.lockfile",
+            "apps/android/tunnel/gradle.lockfile",
+            "apps/client/android/tunnel-gradle.lockfile"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "GHSA-558v-64gr-wgg4",
+      "aliases": [
+        "CVE-2026-59901"
+      ],
+      "summary": "Netty: [Bzip2Decoder] Infinite Loop in RLE State Machine Leads to Event-Loop Thread Hang",
+      "database_severity": "HIGH",
+      "cvss": [
+        {
+          "type": "CVSS_V4",
+          "score": "CVSS:4.0/AV:N/AC:L/AT:N/PR:N/UI:N/VC:N/VI:N/VA:H/SC:N/SI:N/SA:N"
+        }
+      ],
+      "fixed_versions": [
+        "4.1.136.Final",
+        "4.2.16.Final"
+      ],
+      "matches": [
+        {
+          "coordinate": "io.netty:netty-codec:4.1.110.Final",
+          "configurations": [
+            "_internal-unified-test-platform-android-test-plugin-host-emulator-control",
+            "_internal-unified-test-platform-android-test-plugin-result-listener-gradle"
+          ],
+          "lockfiles": [
+            "apps/android/app/gradle.lockfile",
+            "apps/android/tunnel/gradle.lockfile",
+            "apps/client/android/tunnel-gradle.lockfile"
+          ]
+        },
+        {
+          "coordinate": "io.netty:netty-codec:4.1.93.Final",
+          "configurations": [
+            "_internal-unified-test-platform-core"
+          ],
+          "lockfiles": [
+            "apps/android/app/gradle.lockfile",
+            "apps/android/tunnel/gradle.lockfile",
+            "apps/client/android/tunnel-gradle.lockfile"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "GHSA-mj4r-2hfc-f8p6",
+      "aliases": [
+        "CVE-2026-42583"
+      ],
+      "summary": "Netty Lz4FrameDecoder is vulnerable to resource exhaustion ",
+      "database_severity": "HIGH",
+      "cvss": [
+        {
+          "type": "CVSS_V3",
+          "score": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:H"
+        }
+      ],
+      "fixed_versions": [
+        "4.1.133.Final",
+        "4.2.13.Final"
+      ],
+      "matches": [
+        {
+          "coordinate": "io.netty:netty-codec:4.1.110.Final",
+          "configurations": [
+            "_internal-unified-test-platform-android-test-plugin-host-emulator-control",
+            "_internal-unified-test-platform-android-test-plugin-result-listener-gradle"
+          ],
+          "lockfiles": [
+            "apps/android/app/gradle.lockfile",
+            "apps/android/tunnel/gradle.lockfile",
+            "apps/client/android/tunnel-gradle.lockfile"
+          ]
+        },
+        {
+          "coordinate": "io.netty:netty-codec:4.1.93.Final",
+          "configurations": [
+            "_internal-unified-test-platform-core"
+          ],
+          "lockfiles": [
+            "apps/android/app/gradle.lockfile",
+            "apps/android/tunnel/gradle.lockfile",
+            "apps/client/android/tunnel-gradle.lockfile"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "GHSA-389x-839f-4rhx",
+      "aliases": [
+        "CVE-2025-25193"
+      ],
+      "summary": "Denial of Service attack on windows app using Netty",
+      "database_severity": "MODERATE",
+      "cvss": [
+        {
+          "type": "CVSS_V3",
+          "score": "CVSS:3.1/AV:L/AC:L/PR:L/UI:N/S:U/C:N/I:N/A:H"
+        }
+      ],
+      "fixed_versions": [
+        "4.1.118.Final"
+      ],
+      "matches": [
+        {
+          "coordinate": "io.netty:netty-common:4.1.110.Final",
+          "configurations": [
+            "_internal-unified-test-platform-android-test-plugin-host-emulator-control",
+            "_internal-unified-test-platform-android-test-plugin-result-listener-gradle"
+          ],
+          "lockfiles": [
+            "apps/android/app/gradle.lockfile",
+            "apps/android/tunnel/gradle.lockfile",
+            "apps/client/android/tunnel-gradle.lockfile"
+          ]
+        },
+        {
+          "coordinate": "io.netty:netty-common:4.1.93.Final",
+          "configurations": [
+            "_internal-unified-test-platform-core"
+          ],
+          "lockfiles": [
+            "apps/android/app/gradle.lockfile",
+            "apps/android/tunnel/gradle.lockfile",
+            "apps/client/android/tunnel-gradle.lockfile"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "GHSA-xq3w-v528-46rv",
+      "aliases": [
+        "CVE-2024-47535"
+      ],
+      "summary": "Denial of Service attack on windows app using netty",
+      "database_severity": "MODERATE",
+      "cvss": [
+        {
+          "type": "CVSS_V3",
+          "score": "CVSS:3.1/AV:L/AC:L/PR:L/UI:N/S:U/C:N/I:N/A:H"
+        },
+        {
+          "type": "CVSS_V4",
+          "score": "CVSS:4.0/AV:L/AC:L/AT:N/PR:L/UI:N/VC:N/VI:N/VA:H/SC:N/SI:N/SA:N/E:P"
+        }
+      ],
+      "fixed_versions": [
+        "4.1.115.Final"
+      ],
+      "matches": [
+        {
+          "coordinate": "io.netty:netty-common:4.1.110.Final",
+          "configurations": [
+            "_internal-unified-test-platform-android-test-plugin-host-emulator-control",
+            "_internal-unified-test-platform-android-test-plugin-result-listener-gradle"
+          ],
+          "lockfiles": [
+            "apps/android/app/gradle.lockfile",
+            "apps/android/tunnel/gradle.lockfile",
+            "apps/client/android/tunnel-gradle.lockfile"
+          ]
+        },
+        {
+          "coordinate": "io.netty:netty-common:4.1.93.Final",
+          "configurations": [
+            "_internal-unified-test-platform-core"
+          ],
+          "lockfiles": [
+            "apps/android/app/gradle.lockfile",
+            "apps/android/tunnel/gradle.lockfile",
+            "apps/client/android/tunnel-gradle.lockfile"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "GHSA-45q3-82m4-75jr",
+      "aliases": [
+        "CVE-2026-42578"
+      ],
+      "summary": "Netty has HTTP Header Injection via HttpProxyHandler Disabled Validation (Incomplete Fix CVE-2025-67735)",
+      "database_severity": "LOW",
+      "cvss": [
+        {
+          "type": "CVSS_V4",
+          "score": "CVSS:4.0/AV:N/AC:L/AT:P/PR:N/UI:N/VC:N/VI:L/VA:N/SC:N/SI:N/SA:N/E:P/CR:X/IR:X/AR:X/MAV:X/MAC:X/MAT:X/MPR:X/MUI:X/MVC:X/MVI:X/MVA:X/MSC:X/MSI:X/MSA:X/S:X/AU:X/R:X/V:X/RE:X/U:X"
+        }
+      ],
+      "fixed_versions": [
+        "4.1.133.Final",
+        "4.2.13.Final"
+      ],
+      "matches": [
+        {
+          "coordinate": "io.netty:netty-handler-proxy:4.1.110.Final",
+          "configurations": [
+            "_internal-unified-test-platform-android-test-plugin-host-emulator-control",
+            "_internal-unified-test-platform-android-test-plugin-result-listener-gradle"
+          ],
+          "lockfiles": [
+            "apps/android/app/gradle.lockfile",
+            "apps/android/tunnel/gradle.lockfile",
+            "apps/client/android/tunnel-gradle.lockfile"
+          ]
+        },
+        {
+          "coordinate": "io.netty:netty-handler-proxy:4.1.93.Final",
+          "configurations": [
+            "_internal-unified-test-platform-core"
+          ],
+          "lockfiles": [
+            "apps/android/app/gradle.lockfile",
+            "apps/android/tunnel/gradle.lockfile",
+            "apps/client/android/tunnel-gradle.lockfile"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "GHSA-3qp7-7mw8-wx86",
+      "aliases": [
+        "CVE-2026-44249"
+      ],
+      "summary": "Netty has an IPv6 Subnet Filter Bypass via Incorrect Comparator Masking",
+      "database_severity": "HIGH",
+      "cvss": [
+        {
+          "type": "CVSS_V3",
+          "score": "CVSS:3.1/AV:N/AC:H/PR:N/UI:N/S:U/C:H/I:H/A:H"
+        }
+      ],
+      "fixed_versions": [
+        "4.1.135.Final",
+        "4.2.15.Final"
+      ],
+      "matches": [
+        {
+          "coordinate": "io.netty:netty-handler:4.1.110.Final",
+          "configurations": [
+            "_internal-unified-test-platform-android-test-plugin-host-emulator-control",
+            "_internal-unified-test-platform-android-test-plugin-result-listener-gradle"
+          ],
+          "lockfiles": [
+            "apps/android/app/gradle.lockfile",
+            "apps/android/tunnel/gradle.lockfile",
+            "apps/client/android/tunnel-gradle.lockfile"
+          ]
+        },
+        {
+          "coordinate": "io.netty:netty-handler:4.1.93.Final",
+          "configurations": [
+            "_internal-unified-test-platform-core"
+          ],
+          "lockfiles": [
+            "apps/android/app/gradle.lockfile",
+            "apps/android/tunnel/gradle.lockfile",
+            "apps/client/android/tunnel-gradle.lockfile"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "GHSA-4g8c-wm8x-jfhw",
+      "aliases": [
+        "CVE-2025-24970"
+      ],
+      "summary": "SslHandler doesn't correctly validate packets which can lead to native crash when using native SSLEngine",
+      "database_severity": "HIGH",
+      "cvss": [
+        {
+          "type": "CVSS_V3",
+          "score": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:H"
+        }
+      ],
+      "fixed_versions": [
+        "4.1.118.Final"
+      ],
+      "matches": [
+        {
+          "coordinate": "io.netty:netty-handler:4.1.110.Final",
+          "configurations": [
+            "_internal-unified-test-platform-android-test-plugin-host-emulator-control",
+            "_internal-unified-test-platform-android-test-plugin-result-listener-gradle"
+          ],
+          "lockfiles": [
+            "apps/android/app/gradle.lockfile",
+            "apps/android/tunnel/gradle.lockfile",
+            "apps/client/android/tunnel-gradle.lockfile"
+          ]
+        },
+        {
+          "coordinate": "io.netty:netty-handler:4.1.93.Final",
+          "configurations": [
+            "_internal-unified-test-platform-core"
+          ],
+          "lockfiles": [
+            "apps/android/app/gradle.lockfile",
+            "apps/android/tunnel/gradle.lockfile",
+            "apps/client/android/tunnel-gradle.lockfile"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "GHSA-c4c3-7fpv-j4q5",
+      "aliases": [
+        "CVE-2026-75595"
+      ],
+      "summary": "Netty: SNI Routing Bypass via Fragmented TLS ClientHello Causing Fallback to Default SslContext",
+      "database_severity": "CRITICAL",
+      "cvss": [
+        {
+          "type": "CVSS_V4",
+          "score": "CVSS:4.0/AV:N/AC:L/AT:P/PR:N/UI:N/VC:H/VI:H/VA:N/SC:N/SI:N/SA:N"
+        }
+      ],
+      "fixed_versions": [
+        "4.1.137.Final",
+        "4.2.17.Final"
+      ],
+      "matches": [
+        {
+          "coordinate": "io.netty:netty-handler:4.1.110.Final",
+          "configurations": [
+            "_internal-unified-test-platform-android-test-plugin-host-emulator-control",
+            "_internal-unified-test-platform-android-test-plugin-result-listener-gradle"
+          ],
+          "lockfiles": [
+            "apps/android/app/gradle.lockfile",
+            "apps/android/tunnel/gradle.lockfile",
+            "apps/client/android/tunnel-gradle.lockfile"
+          ]
+        },
+        {
+          "coordinate": "io.netty:netty-handler:4.1.93.Final",
+          "configurations": [
+            "_internal-unified-test-platform-core"
+          ],
+          "lockfiles": [
+            "apps/android/app/gradle.lockfile",
+            "apps/android/tunnel/gradle.lockfile",
+            "apps/client/android/tunnel-gradle.lockfile"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "GHSA-c653-97m9-rcg9",
+      "aliases": [
+        "CVE-2026-50010"
+      ],
+      "summary": "Netty: Wrapping plain trust manager silently disables hostname verification",
+      "database_severity": "HIGH",
+      "cvss": [
+        {
+          "type": "CVSS_V3",
+          "score": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:N/A:N"
+        }
+      ],
+      "fixed_versions": [
+        "4.1.135.Final",
+        "4.2.15.Final"
+      ],
+      "matches": [
+        {
+          "coordinate": "io.netty:netty-handler:4.1.110.Final",
+          "configurations": [
+            "_internal-unified-test-platform-android-test-plugin-host-emulator-control",
+            "_internal-unified-test-platform-android-test-plugin-result-listener-gradle"
+          ],
+          "lockfiles": [
+            "apps/android/app/gradle.lockfile",
+            "apps/android/tunnel/gradle.lockfile",
+            "apps/client/android/tunnel-gradle.lockfile"
+          ]
+        },
+        {
+          "coordinate": "io.netty:netty-handler:4.1.93.Final",
+          "configurations": [
+            "_internal-unified-test-platform-core"
+          ],
+          "lockfiles": [
+            "apps/android/app/gradle.lockfile",
+            "apps/android/tunnel/gradle.lockfile",
+            "apps/client/android/tunnel-gradle.lockfile"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "GHSA-fccg-mwvh-qqg4",
+      "aliases": [
+        "CVE-2026-75596"
+      ],
+      "summary": "Netty: Fragmented ClientHello records trigger quadratic pre-handshake reassembly in default SNI parsing",
+      "database_severity": "MODERATE",
+      "cvss": [
+        {
+          "type": "CVSS_V4",
+          "score": "CVSS:4.0/AV:N/AC:L/AT:N/PR:N/UI:N/VC:N/VI:N/VA:L/SC:N/SI:N/SA:N"
+        }
+      ],
+      "fixed_versions": [
+        "4.1.137.Final",
+        "4.2.17.Final"
+      ],
+      "matches": [
+        {
+          "coordinate": "io.netty:netty-handler:4.1.110.Final",
+          "configurations": [
+            "_internal-unified-test-platform-android-test-plugin-host-emulator-control",
+            "_internal-unified-test-platform-android-test-plugin-result-listener-gradle"
+          ],
+          "lockfiles": [
+            "apps/android/app/gradle.lockfile",
+            "apps/android/tunnel/gradle.lockfile",
+            "apps/client/android/tunnel-gradle.lockfile"
+          ]
+        },
+        {
+          "coordinate": "io.netty:netty-handler:4.1.93.Final",
+          "configurations": [
+            "_internal-unified-test-platform-core"
+          ],
+          "lockfiles": [
+            "apps/android/app/gradle.lockfile",
+            "apps/android/tunnel/gradle.lockfile",
+            "apps/client/android/tunnel-gradle.lockfile"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "GHSA-x4gw-5cx5-pgmh",
+      "aliases": [
+        "CVE-2026-45416"
+      ],
+      "summary": "Netty: SNI handler pre-allocates up to 16 MiB from nine attacker bytes",
+      "database_severity": "HIGH",
+      "cvss": [
+        {
+          "type": "CVSS_V3",
+          "score": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:H"
+        }
+      ],
+      "fixed_versions": [
+        "4.1.135.Final",
+        "4.2.15.Final"
+      ],
+      "matches": [
+        {
+          "coordinate": "io.netty:netty-handler:4.1.110.Final",
+          "configurations": [
+            "_internal-unified-test-platform-android-test-plugin-host-emulator-control",
+            "_internal-unified-test-platform-android-test-plugin-result-listener-gradle"
+          ],
+          "lockfiles": [
+            "apps/android/app/gradle.lockfile",
+            "apps/android/tunnel/gradle.lockfile",
+            "apps/client/android/tunnel-gradle.lockfile"
+          ]
+        },
+        {
+          "coordinate": "io.netty:netty-handler:4.1.93.Final",
+          "configurations": [
+            "_internal-unified-test-platform-core"
+          ],
+          "lockfiles": [
+            "apps/android/app/gradle.lockfile",
+            "apps/android/tunnel/gradle.lockfile",
+            "apps/client/android/tunnel-gradle.lockfile"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "GHSA-563q-j3cm-6jxm",
+      "aliases": [
+        "CVE-2026-50560"
+      ],
+      "summary": "Netty susceptible to HTTP/2 Reset Attack with different on-the-wire signature",
+      "database_severity": "MODERATE",
+      "cvss": [
+        {
+          "type": "CVSS_V3",
+          "score": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:L"
+        },
+        {
+          "type": "CVSS_V4",
+          "score": "CVSS:4.0/AV:N/AC:L/AT:N/PR:N/UI:N/VC:N/VI:N/VA:L/SC:N/SI:N/SA:N"
+        }
+      ],
+      "fixed_versions": [
+        "4.1.135.Final",
+        "4.2.15.Final"
+      ],
+      "matches": [
+        {
+          "coordinate": "io.netty:netty-codec-http2:4.1.110.Final",
+          "configurations": [
+            "_internal-unified-test-platform-android-test-plugin-host-emulator-control",
+            "_internal-unified-test-platform-android-test-plugin-result-listener-gradle"
+          ],
+          "lockfiles": [
+            "apps/android/app/gradle.lockfile",
+            "apps/android/tunnel/gradle.lockfile",
+            "apps/client/android/tunnel-gradle.lockfile"
+          ]
+        },
+        {
+          "coordinate": "io.netty:netty-codec-http2:4.1.93.Final",
+          "configurations": [
+            "_internal-unified-test-platform-core"
+          ],
+          "lockfiles": [
+            "apps/android/app/gradle.lockfile",
+            "apps/android/tunnel/gradle.lockfile",
+            "apps/client/android/tunnel-gradle.lockfile"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "GHSA-6mjq-h674-j845",
+      "aliases": [
+        "CVE-2023-34462"
+      ],
+      "summary": "netty-handler SniHandler 16MB allocation",
+      "database_severity": "MODERATE",
+      "cvss": [
+        {
+          "type": "CVSS_V3",
+          "score": "CVSS:3.1/AV:N/AC:L/PR:L/UI:N/S:U/C:N/I:N/A:H"
+        }
+      ],
+      "fixed_versions": [
+        "4.1.94.Final"
+      ],
+      "matches": [
+        {
+          "coordinate": "io.netty:netty-handler:4.1.93.Final",
+          "configurations": [
+            "_internal-unified-test-platform-core"
+          ],
+          "lockfiles": [
+            "apps/android/app/gradle.lockfile",
+            "apps/android/tunnel/gradle.lockfile",
+            "apps/client/android/tunnel-gradle.lockfile"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "GHSA-5jpm-x58v-624v",
+      "aliases": [
+        "CVE-2024-29025"
+      ],
+      "summary": "Netty's HttpPostRequestDecoder can OOM",
+      "database_severity": "MODERATE",
+      "cvss": [
+        {
+          "type": "CVSS_V3",
+          "score": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:L"
+        }
+      ],
+      "fixed_versions": [
+        "4.1.108.Final"
+      ],
+      "matches": [
+        {
+          "coordinate": "io.netty:netty-codec-http:4.1.93.Final",
+          "configurations": [
+            "_internal-unified-test-platform-core"
+          ],
+          "lockfiles": [
+            "apps/android/app/gradle.lockfile",
+            "apps/android/tunnel/gradle.lockfile",
+            "apps/client/android/tunnel-gradle.lockfile"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "GHSA-v8h7-rr48-vmmv",
+      "aliases": [
+        "CVE-2026-41417"
+      ],
+      "summary": "Netty: Start-Line Injection in DefaultHttpRequest.setUri() Allows HTTP Request Smuggling and RTSP Request Injection",
+      "database_severity": "MODERATE",
+      "cvss": [
+        {
+          "type": "CVSS_V3",
+          "score": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:L/A:N"
+        }
+      ],
+      "fixed_versions": [
+        "4.1.133.Final",
+        "4.2.13.Final"
+      ],
+      "matches": [
+        {
+          "coordinate": "io.netty:netty-codec-http:4.1.110.Final",
+          "configurations": [
+            "_internal-unified-test-platform-android-test-plugin-host-emulator-control",
+            "_internal-unified-test-platform-android-test-plugin-result-listener-gradle"
+          ],
+          "lockfiles": [
+            "apps/android/app/gradle.lockfile",
+            "apps/android/tunnel/gradle.lockfile",
+            "apps/client/android/tunnel-gradle.lockfile"
+          ]
+        },
+        {
+          "coordinate": "io.netty:netty-codec-http:4.1.93.Final",
+          "configurations": [
+            "_internal-unified-test-platform-core"
+          ],
+          "lockfiles": [
+            "apps/android/app/gradle.lockfile",
+            "apps/android/tunnel/gradle.lockfile",
+            "apps/client/android/tunnel-gradle.lockfile"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "GHSA-7g45-4rm6-3mm3",
+      "aliases": [
+        "CVE-2023-2976"
+      ],
+      "summary": "Guava vulnerable to insecure use of temporary directory",
+      "database_severity": "MODERATE",
+      "cvss": [
+        {
+          "type": "CVSS_V3",
+          "score": "CVSS:3.1/AV:L/AC:L/PR:L/UI:N/S:U/C:H/I:N/A:N"
+        }
+      ],
+      "fixed_versions": [
+        "32.0.0-android"
+      ],
+      "matches": [
+        {
+          "coordinate": "com.google.guava:guava:28.1-android",
+          "configurations": [
+            "debugRuntimeClasspath",
+            "debugUnitTestRuntimeClasspath"
+          ],
+          "lockfiles": [
+            "apps/client/android/app/gradle.lockfile"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "GHSA-xxph-c9ww-hj94",
+      "aliases": [
+        "CVE-2026-102554"
+      ],
+      "summary": "Google Guava: CompactHashMap/CompactHashSet/MapMakerInternalMap deserialization triggers uncontrolled memory allocation",
+      "database_severity": "HIGH",
+      "cvss": [
+        {
+          "type": "CVSS_V3",
+          "score": "CVSS:3.1/AV:N/AC:H/PR:N/UI:N/S:U/C:N/I:N/A:H"
+        },
+        {
+          "type": "CVSS_V4",
+          "score": "CVSS:4.0/AV:N/AC:L/AT:P/PR:N/UI:N/VC:N/VI:N/VA:H/SC:N/SI:N/SA:N"
+        }
+      ],
+      "fixed_versions": [
+        "33.7.2"
+      ],
+      "matches": [
+        {
+          "coordinate": "com.google.guava:guava:28.1-android",
+          "configurations": [
+            "debugRuntimeClasspath",
+            "debugUnitTestRuntimeClasspath"
+          ],
+          "lockfiles": [
+            "apps/client/android/app/gradle.lockfile"
+          ]
+        },
+        {
+          "coordinate": "com.google.guava:guava:32.0.1-jre",
+          "configurations": [
+            "_internal-unified-test-platform-android-driver-instrumentation",
+            "_internal-unified-test-platform-android-test-plugin",
+            "_internal-unified-test-platform-core",
+            "_internal-unified-test-platform-launcher"
+          ],
+          "lockfiles": [
+            "apps/android/app/gradle.lockfile",
+            "apps/android/tunnel/gradle.lockfile",
+            "apps/client/android/tunnel-gradle.lockfile"
+          ]
+        },
+        {
+          "coordinate": "com.google.guava:guava:33.3.1-jre",
+          "configurations": [
+            "_internal-unified-test-platform-android-device-provider-ddmlib",
+            "_internal-unified-test-platform-android-test-plugin-host-additional-test-output",
+            "_internal-unified-test-platform-android-test-plugin-host-apk-installer",
+            "_internal-unified-test-platform-android-test-plugin-host-coverage",
+            "_internal-unified-test-platform-android-test-plugin-host-device-info",
+            "_internal-unified-test-platform-android-test-plugin-host-emulator-control",
+            "_internal-unified-test-platform-android-test-plugin-host-logcat",
+            "_internal-unified-test-platform-android-test-plugin-result-listener-gradle"
+          ],
+          "lockfiles": [
+            "apps/android/app/gradle.lockfile",
+            "apps/android/tunnel/gradle.lockfile",
+            "apps/client/android/tunnel-gradle.lockfile"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "GHSA-735f-pc8j-v9w8",
+      "aliases": [
+        "CVE-2024-7254"
+      ],
+      "summary": "protobuf-java has potential Denial of Service issue",
+      "database_severity": "HIGH",
+      "cvss": [
+        {
+          "type": "CVSS_V3",
+          "score": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:H"
+        },
+        {
+          "type": "CVSS_V4",
+          "score": "CVSS:4.0/AV:N/AC:L/AT:N/PR:N/UI:N/VC:N/VI:N/VA:H/SC:N/SI:N/SA:N"
+        }
+      ],
+      "fixed_versions": [
+        "3.25.5",
+        "4.27.5",
+        "4.28.2"
+      ],
+      "matches": [
+        {
+          "coordinate": "com.google.protobuf:protobuf-java:3.24.4",
+          "configurations": [
+            "_internal-unified-test-platform-android-driver-instrumentation",
+            "_internal-unified-test-platform-android-test-plugin",
+            "_internal-unified-test-platform-core",
+            "_internal-unified-test-platform-launcher"
+          ],
+          "lockfiles": [
+            "apps/android/app/gradle.lockfile",
+            "apps/android/tunnel/gradle.lockfile",
+            "apps/client/android/tunnel-gradle.lockfile"
+          ]
+        },
+        {
+          "coordinate": "com.google.protobuf:protobuf-kotlin:3.24.4",
+          "configurations": [
+            "_internal-unified-test-platform-android-device-provider-ddmlib",
+            "_internal-unified-test-platform-android-driver-instrumentation",
+            "_internal-unified-test-platform-android-test-plugin",
+            "_internal-unified-test-platform-android-test-plugin-host-additional-test-output",
+            "_internal-unified-test-platform-android-test-plugin-host-apk-installer",
+            "_internal-unified-test-platform-android-test-plugin-host-coverage",
+            "_internal-unified-test-platform-android-test-plugin-host-device-info",
+            "_internal-unified-test-platform-android-test-plugin-host-emulator-control",
+            "_internal-unified-test-platform-android-test-plugin-host-logcat",
+            "_internal-unified-test-platform-android-test-plugin-result-listener-gradle",
+            "_internal-unified-test-platform-core",
+            "_internal-unified-test-platform-launcher"
+          ],
+          "lockfiles": [
+            "apps/android/app/gradle.lockfile",
+            "apps/android/tunnel/gradle.lockfile",
+            "apps/client/android/tunnel-gradle.lockfile"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "GHSA-38f8-5428-x5cv",
+      "aliases": [
+        "CVE-2026-42585"
+      ],
+      "summary": "Netty vulnerable to HTTP Request Smuggling due to malformed Transfer-Encoding",
+      "database_severity": "MODERATE",
+      "cvss": [
+        {
+          "type": "CVSS_V3",
+          "score": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:L/I:L/A:N"
+        }
+      ],
+      "fixed_versions": [
+        "4.1.133.Final",
+        "4.2.13.Final"
+      ],
+      "matches": [
+        {
+          "coordinate": "io.netty:netty-codec-http:4.1.110.Final",
+          "configurations": [
+            "_internal-unified-test-platform-android-test-plugin-host-emulator-control",
+            "_internal-unified-test-platform-android-test-plugin-result-listener-gradle"
+          ],
+          "lockfiles": [
+            "apps/android/app/gradle.lockfile",
+            "apps/android/tunnel/gradle.lockfile",
+            "apps/client/android/tunnel-gradle.lockfile"
+          ]
+        },
+        {
+          "coordinate": "io.netty:netty-codec-http:4.1.93.Final",
+          "configurations": [
+            "_internal-unified-test-platform-core"
+          ],
+          "lockfiles": [
+            "apps/android/app/gradle.lockfile",
+            "apps/android/tunnel/gradle.lockfile",
+            "apps/client/android/tunnel-gradle.lockfile"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "GHSA-4mp9-239f-g9hg",
+      "aliases": [
+        "CVE-2026-59898"
+      ],
+      "summary": "Netty: WebSockets V07/V08 handshaker missing Connection/Upgrade validation",
+      "database_severity": "MODERATE",
+      "cvss": [
+        {
+          "type": "CVSS_V4",
+          "score": "CVSS:4.0/AV:N/AC:H/AT:N/PR:N/UI:N/VC:N/VI:N/VA:N/SC:L/SI:L/SA:N"
+        }
+      ],
+      "fixed_versions": [
+        "4.1.136.Final",
+        "4.2.16.Final"
+      ],
+      "matches": [
+        {
+          "coordinate": "io.netty:netty-codec-http:4.1.110.Final",
+          "configurations": [
+            "_internal-unified-test-platform-android-test-plugin-host-emulator-control",
+            "_internal-unified-test-platform-android-test-plugin-result-listener-gradle"
+          ],
+          "lockfiles": [
+            "apps/android/app/gradle.lockfile",
+            "apps/android/tunnel/gradle.lockfile",
+            "apps/client/android/tunnel-gradle.lockfile"
+          ]
+        },
+        {
+          "coordinate": "io.netty:netty-codec-http:4.1.93.Final",
+          "configurations": [
+            "_internal-unified-test-platform-core"
+          ],
+          "lockfiles": [
+            "apps/android/app/gradle.lockfile",
+            "apps/android/tunnel/gradle.lockfile",
+            "apps/client/android/tunnel-gradle.lockfile"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "GHSA-57rv-r2g8-2cj3",
+      "aliases": [
+        "CVE-2026-42584"
+      ],
+      "summary": "Netty has HttpClientCodec response desynchronization",
+      "database_severity": "HIGH",
+      "cvss": [
+        {
+          "type": "CVSS_V3",
+          "score": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:L/I:L/A:L"
+        }
+      ],
+      "fixed_versions": [
+        "4.1.133.Final",
+        "4.2.13.Final"
+      ],
+      "matches": [
+        {
+          "coordinate": "io.netty:netty-codec-http:4.1.110.Final",
+          "configurations": [
+            "_internal-unified-test-platform-android-test-plugin-host-emulator-control",
+            "_internal-unified-test-platform-android-test-plugin-result-listener-gradle"
+          ],
+          "lockfiles": [
+            "apps/android/app/gradle.lockfile",
+            "apps/android/tunnel/gradle.lockfile",
+            "apps/client/android/tunnel-gradle.lockfile"
+          ]
+        },
+        {
+          "coordinate": "io.netty:netty-codec-http:4.1.93.Final",
+          "configurations": [
+            "_internal-unified-test-platform-core"
+          ],
+          "lockfiles": [
+            "apps/android/app/gradle.lockfile",
+            "apps/android/tunnel/gradle.lockfile",
+            "apps/client/android/tunnel-gradle.lockfile"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "GHSA-6cqp-g7gg-8hr5",
+      "aliases": [
+        "CVE-2026-56746"
+      ],
+      "summary": "Netty: Security Control Bypass via CORS Short-Circuit Failure",
+      "database_severity": "MODERATE",
+      "cvss": [
+        {
+          "type": "CVSS_V3",
+          "score": "CVSS:3.1/AV:N/AC:L/PR:N/UI:R/S:U/C:N/I:H/A:N"
+        }
+      ],
+      "fixed_versions": [
+        "4.1.136.Final",
+        "4.2.16.Final"
+      ],
+      "matches": [
+        {
+          "coordinate": "io.netty:netty-codec-http:4.1.110.Final",
+          "configurations": [
+            "_internal-unified-test-platform-android-test-plugin-host-emulator-control",
+            "_internal-unified-test-platform-android-test-plugin-result-listener-gradle"
+          ],
+          "lockfiles": [
+            "apps/android/app/gradle.lockfile",
+            "apps/android/tunnel/gradle.lockfile",
+            "apps/client/android/tunnel-gradle.lockfile"
+          ]
+        },
+        {
+          "coordinate": "io.netty:netty-codec-http:4.1.93.Final",
+          "configurations": [
+            "_internal-unified-test-platform-core"
+          ],
+          "lockfiles": [
+            "apps/android/app/gradle.lockfile",
+            "apps/android/tunnel/gradle.lockfile",
+            "apps/client/android/tunnel-gradle.lockfile"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "GHSA-6jqx-86gh-f27w",
+      "aliases": [
+        "CVE-2026-55831"
+      ],
+      "summary": "Netty SPDY SETTINGS frame count materializes unbounded settings map",
+      "database_severity": "HIGH",
+      "cvss": [
+        {
+          "type": "CVSS_V3",
+          "score": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:H"
+        }
+      ],
+      "fixed_versions": [
+        "4.1.136.Final",
+        "4.2.16.Final"
+      ],
+      "matches": [
+        {
+          "coordinate": "io.netty:netty-codec-http:4.1.110.Final",
+          "configurations": [
+            "_internal-unified-test-platform-android-test-plugin-host-emulator-control",
+            "_internal-unified-test-platform-android-test-plugin-result-listener-gradle"
+          ],
+          "lockfiles": [
+            "apps/android/app/gradle.lockfile",
+            "apps/android/tunnel/gradle.lockfile",
+            "apps/client/android/tunnel-gradle.lockfile"
+          ]
+        },
+        {
+          "coordinate": "io.netty:netty-codec-http:4.1.93.Final",
+          "configurations": [
+            "_internal-unified-test-platform-core"
+          ],
+          "lockfiles": [
+            "apps/android/app/gradle.lockfile",
+            "apps/android/tunnel/gradle.lockfile",
+            "apps/client/android/tunnel-gradle.lockfile"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "GHSA-84h7-rjj3-6jx4",
+      "aliases": [
+        "CVE-2025-67735"
+      ],
+      "summary": "Netty has a CRLF Injection vulnerability in io.netty.handler.codec.http.HttpRequestEncoder",
+      "database_severity": "MODERATE",
+      "cvss": [
+        {
+          "type": "CVSS_V3",
+          "score": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:L/I:L/A:N"
+        }
+      ],
+      "fixed_versions": [
+        "4.1.129.Final",
+        "4.2.8.Final"
+      ],
+      "matches": [
+        {
+          "coordinate": "io.netty:netty-codec-http:4.1.110.Final",
+          "configurations": [
+            "_internal-unified-test-platform-android-test-plugin-host-emulator-control",
+            "_internal-unified-test-platform-android-test-plugin-result-listener-gradle"
+          ],
+          "lockfiles": [
+            "apps/android/app/gradle.lockfile",
+            "apps/android/tunnel/gradle.lockfile",
+            "apps/client/android/tunnel-gradle.lockfile"
+          ]
+        },
+        {
+          "coordinate": "io.netty:netty-codec-http:4.1.93.Final",
+          "configurations": [
+            "_internal-unified-test-platform-core"
+          ],
+          "lockfiles": [
+            "apps/android/app/gradle.lockfile",
+            "apps/android/tunnel/gradle.lockfile",
+            "apps/client/android/tunnel-gradle.lockfile"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "GHSA-8c42-7qj2-3j46",
+      "aliases": [
+        "CVE-2026-59903"
+      ],
+      "summary": "Netty Vulnerable to Cache Poisoning and Information Disclosure via CORS Vary Header Overwrite",
+      "database_severity": "MODERATE",
+      "cvss": [
+        {
+          "type": "CVSS_V3",
+          "score": "CVSS:3.1/AV:N/AC:H/PR:N/UI:N/S:U/C:H/I:L/A:N"
+        }
+      ],
+      "fixed_versions": [
+        "4.1.137.Final",
+        "4.2.17.Final"
+      ],
+      "matches": [
+        {
+          "coordinate": "io.netty:netty-codec-http:4.1.110.Final",
+          "configurations": [
+            "_internal-unified-test-platform-android-test-plugin-host-emulator-control",
+            "_internal-unified-test-platform-android-test-plugin-result-listener-gradle"
+          ],
+          "lockfiles": [
+            "apps/android/app/gradle.lockfile",
+            "apps/android/tunnel/gradle.lockfile",
+            "apps/client/android/tunnel-gradle.lockfile"
+          ]
+        },
+        {
+          "coordinate": "io.netty:netty-codec-http:4.1.93.Final",
+          "configurations": [
+            "_internal-unified-test-platform-core"
+          ],
+          "lockfiles": [
+            "apps/android/app/gradle.lockfile",
+            "apps/android/tunnel/gradle.lockfile",
+            "apps/client/android/tunnel-gradle.lockfile"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "GHSA-f6hv-jmp6-3vwv",
+      "aliases": [
+        "CVE-2026-42587"
+      ],
+      "summary": "Netty: HttpContentDecompressor maxAllocation bypass when Content-Encoding set to br/zstd/snappy leads to decompression bomb DoS",
+      "database_severity": "HIGH",
+      "cvss": [
+        {
+          "type": "CVSS_V3",
+          "score": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:H"
+        }
+      ],
+      "fixed_versions": [
+        "4.1.133.Final",
+        "4.2.13.Final"
+      ],
+      "matches": [
+        {
+          "coordinate": "io.netty:netty-codec-http:4.1.110.Final",
+          "configurations": [
+            "_internal-unified-test-platform-android-test-plugin-host-emulator-control",
+            "_internal-unified-test-platform-android-test-plugin-result-listener-gradle"
+          ],
+          "lockfiles": [
+            "apps/android/app/gradle.lockfile",
+            "apps/android/tunnel/gradle.lockfile",
+            "apps/client/android/tunnel-gradle.lockfile"
+          ]
+        },
+        {
+          "coordinate": "io.netty:netty-codec-http:4.1.93.Final",
+          "configurations": [
+            "_internal-unified-test-platform-core"
+          ],
+          "lockfiles": [
+            "apps/android/app/gradle.lockfile",
+            "apps/android/tunnel/gradle.lockfile",
+            "apps/client/android/tunnel-gradle.lockfile"
+          ]
+        },
+        {
+          "coordinate": "io.netty:netty-codec-http2:4.1.110.Final",
+          "configurations": [
+            "_internal-unified-test-platform-android-test-plugin-host-emulator-control",
+            "_internal-unified-test-platform-android-test-plugin-result-listener-gradle"
+          ],
+          "lockfiles": [
+            "apps/android/app/gradle.lockfile",
+            "apps/android/tunnel/gradle.lockfile",
+            "apps/client/android/tunnel-gradle.lockfile"
+          ]
+        },
+        {
+          "coordinate": "io.netty:netty-codec-http2:4.1.93.Final",
+          "configurations": [
+            "_internal-unified-test-platform-core"
+          ],
+          "lockfiles": [
+            "apps/android/app/gradle.lockfile",
+            "apps/android/tunnel/gradle.lockfile",
+            "apps/client/android/tunnel-gradle.lockfile"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "GHSA-fghv-69vj-qj49",
+      "aliases": [
+        "CVE-2025-58056"
+      ],
+      "summary": "Netty vulnerable to request smuggling due to incorrect parsing of chunk extensions",
+      "database_severity": "LOW",
+      "cvss": [
+        {
+          "type": null,
+          "score": null
+        }
+      ],
+      "fixed_versions": [
+        "4.1.125.Final",
+        "4.2.5.Final"
+      ],
+      "matches": [
+        {
+          "coordinate": "io.netty:netty-codec-http:4.1.110.Final",
+          "configurations": [
+            "_internal-unified-test-platform-android-test-plugin-host-emulator-control",
+            "_internal-unified-test-platform-android-test-plugin-result-listener-gradle"
+          ],
+          "lockfiles": [
+            "apps/android/app/gradle.lockfile",
+            "apps/android/tunnel/gradle.lockfile",
+            "apps/client/android/tunnel-gradle.lockfile"
+          ]
+        },
+        {
+          "coordinate": "io.netty:netty-codec-http:4.1.93.Final",
+          "configurations": [
+            "_internal-unified-test-platform-core"
+          ],
+          "lockfiles": [
+            "apps/android/app/gradle.lockfile",
+            "apps/android/tunnel/gradle.lockfile",
+            "apps/client/android/tunnel-gradle.lockfile"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "GHSA-gcjf-9mgh-3p7g",
+      "aliases": [
+        "CVE-2026-59921"
+      ],
+      "summary": "Netty: CRLF Injection via Multipart Filename in Netty HttpPostRequestEncoder",
+      "database_severity": "MODERATE",
+      "cvss": [
+        {
+          "type": "CVSS_V3",
+          "score": "CVSS:3.1/AV:A/AC:L/PR:L/UI:N/S:U/C:N/I:H/A:N"
+        }
+      ],
+      "fixed_versions": [
+        "4.1.136.Final",
+        "4.2.16.Final"
+      ],
+      "matches": [
+        {
+          "coordinate": "io.netty:netty-codec-http:4.1.110.Final",
+          "configurations": [
+            "_internal-unified-test-platform-android-test-plugin-host-emulator-control",
+            "_internal-unified-test-platform-android-test-plugin-result-listener-gradle"
+          ],
+          "lockfiles": [
+            "apps/android/app/gradle.lockfile",
+            "apps/android/tunnel/gradle.lockfile",
+            "apps/client/android/tunnel-gradle.lockfile"
+          ]
+        },
+        {
+          "coordinate": "io.netty:netty-codec-http:4.1.93.Final",
+          "configurations": [
+            "_internal-unified-test-platform-core"
+          ],
+          "lockfiles": [
+            "apps/android/app/gradle.lockfile",
+            "apps/android/tunnel/gradle.lockfile",
+            "apps/client/android/tunnel-gradle.lockfile"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "GHSA-hvcg-qmg6-jm4c",
+      "aliases": [
+        "CVE-2026-50020"
+      ],
+      "summary": "Netty: HttpObjectDecoder skips arbitrary initial control characters when only initial CRLF characters are permitted",
+      "database_severity": "MODERATE",
+      "cvss": [
+        {
+          "type": "CVSS_V3",
+          "score": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:L/A:N"
+        }
+      ],
+      "fixed_versions": [
+        "4.1.135.Final",
+        "4.2.15.Final"
+      ],
+      "matches": [
+        {
+          "coordinate": "io.netty:netty-codec-http:4.1.110.Final",
+          "configurations": [
+            "_internal-unified-test-platform-android-test-plugin-host-emulator-control",
+            "_internal-unified-test-platform-android-test-plugin-result-listener-gradle"
+          ],
+          "lockfiles": [
+            "apps/android/app/gradle.lockfile",
+            "apps/android/tunnel/gradle.lockfile",
+            "apps/client/android/tunnel-gradle.lockfile"
+          ]
+        },
+        {
+          "coordinate": "io.netty:netty-codec-http:4.1.93.Final",
+          "configurations": [
+            "_internal-unified-test-platform-core"
+          ],
+          "lockfiles": [
+            "apps/android/app/gradle.lockfile",
+            "apps/android/tunnel/gradle.lockfile",
+            "apps/client/android/tunnel-gradle.lockfile"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "GHSA-jppx-w49h-x2qq",
+      "aliases": [
+        "CVE-2026-56745"
+      ],
+      "summary": "Netty: [SpdyHttpDecoder] ByteBuf Reference Leak on RST_STREAM Leads to Native Memory Exhaustion",
+      "database_severity": "HIGH",
+      "cvss": [
+        {
+          "type": "CVSS_V4",
+          "score": "CVSS:4.0/AV:N/AC:L/AT:N/PR:N/UI:N/VC:N/VI:N/VA:H/SC:N/SI:N/SA:N"
+        }
+      ],
+      "fixed_versions": [
+        "4.1.136.Final",
+        "4.2.16.Final"
+      ],
+      "matches": [
+        {
+          "coordinate": "io.netty:netty-codec-http:4.1.110.Final",
+          "configurations": [
+            "_internal-unified-test-platform-android-test-plugin-host-emulator-control",
+            "_internal-unified-test-platform-android-test-plugin-result-listener-gradle"
+          ],
+          "lockfiles": [
+            "apps/android/app/gradle.lockfile",
+            "apps/android/tunnel/gradle.lockfile",
+            "apps/client/android/tunnel-gradle.lockfile"
+          ]
+        },
+        {
+          "coordinate": "io.netty:netty-codec-http:4.1.93.Final",
+          "configurations": [
+            "_internal-unified-test-platform-core"
+          ],
+          "lockfiles": [
+            "apps/android/app/gradle.lockfile",
+            "apps/android/tunnel/gradle.lockfile",
+            "apps/client/android/tunnel-gradle.lockfile"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "GHSA-m4cv-j2px-7723",
+      "aliases": [
+        "CVE-2026-42580"
+      ],
+      "summary": "Netty vulnerable to HTTP Request Smuggling due to incorrect chunk size parsing",
+      "database_severity": "MODERATE",
+      "cvss": [
+        {
+          "type": "CVSS_V3",
+          "score": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:L/A:L"
+        }
+      ],
+      "fixed_versions": [
+        "4.1.133.Final",
+        "4.2.13.Final"
+      ],
+      "matches": [
+        {
+          "coordinate": "io.netty:netty-codec-http:4.1.110.Final",
+          "configurations": [
+            "_internal-unified-test-platform-android-test-plugin-host-emulator-control",
+            "_internal-unified-test-platform-android-test-plugin-result-listener-gradle"
+          ],
+          "lockfiles": [
+            "apps/android/app/gradle.lockfile",
+            "apps/android/tunnel/gradle.lockfile",
+            "apps/client/android/tunnel-gradle.lockfile"
+          ]
+        },
+        {
+          "coordinate": "io.netty:netty-codec-http:4.1.93.Final",
+          "configurations": [
+            "_internal-unified-test-platform-core"
+          ],
+          "lockfiles": [
+            "apps/android/app/gradle.lockfile",
+            "apps/android/tunnel/gradle.lockfile",
+            "apps/client/android/tunnel-gradle.lockfile"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "GHSA-mvh2-crg5-v77c",
+      "aliases": [
+        "CVE-2026-55833"
+      ],
+      "summary": "Netty SPDY zlib header block continues decoded expansion after maxHeaderSize truncation",
+      "database_severity": "HIGH",
+      "cvss": [
+        {
+          "type": "CVSS_V3",
+          "score": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:H"
+        }
+      ],
+      "fixed_versions": [
+        "4.1.136.Final",
+        "4.2.16.Final"
+      ],
+      "matches": [
+        {
+          "coordinate": "io.netty:netty-codec-http:4.1.110.Final",
+          "configurations": [
+            "_internal-unified-test-platform-android-test-plugin-host-emulator-control",
+            "_internal-unified-test-platform-android-test-plugin-result-listener-gradle"
+          ],
+          "lockfiles": [
+            "apps/android/app/gradle.lockfile",
+            "apps/android/tunnel/gradle.lockfile",
+            "apps/client/android/tunnel-gradle.lockfile"
+          ]
+        },
+        {
+          "coordinate": "io.netty:netty-codec-http:4.1.93.Final",
+          "configurations": [
+            "_internal-unified-test-platform-core"
+          ],
+          "lockfiles": [
+            "apps/android/app/gradle.lockfile",
+            "apps/android/tunnel/gradle.lockfile",
+            "apps/client/android/tunnel-gradle.lockfile"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "GHSA-pwqr-wmgm-9rr8",
+      "aliases": [
+        "CVE-2026-33870"
+      ],
+      "summary": "Netty: HTTP Request Smuggling via Chunked Extension Quoted-String Parsing",
+      "database_severity": "HIGH",
+      "cvss": [
+        {
+          "type": "CVSS_V3",
+          "score": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:H/A:N"
+        }
+      ],
+      "fixed_versions": [
+        "4.1.132.Final",
+        "4.2.10.Final"
+      ],
+      "matches": [
+        {
+          "coordinate": "io.netty:netty-codec-http:4.1.110.Final",
+          "configurations": [
+            "_internal-unified-test-platform-android-test-plugin-host-emulator-control",
+            "_internal-unified-test-platform-android-test-plugin-result-listener-gradle"
+          ],
+          "lockfiles": [
+            "apps/android/app/gradle.lockfile",
+            "apps/android/tunnel/gradle.lockfile",
+            "apps/client/android/tunnel-gradle.lockfile"
+          ]
+        },
+        {
+          "coordinate": "io.netty:netty-codec-http:4.1.93.Final",
+          "configurations": [
+            "_internal-unified-test-platform-core"
+          ],
+          "lockfiles": [
+            "apps/android/app/gradle.lockfile",
+            "apps/android/tunnel/gradle.lockfile",
+            "apps/client/android/tunnel-gradle.lockfile"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "GHSA-q4f6-jm68-57ww",
+      "aliases": [
+        "CVE-2026-59899"
+      ],
+      "summary": "Netty: [HttpContentEncoder] Unbounded Per-Connection Queue Growth via HTTP/1.1 Pipelining Leads to Denial of Service",
+      "database_severity": "MODERATE",
+      "cvss": [
+        {
+          "type": "CVSS_V4",
+          "score": "CVSS:4.0/AV:N/AC:L/AT:N/PR:N/UI:N/VC:N/VI:N/VA:L/SC:N/SI:N/SA:N"
+        }
+      ],
+      "fixed_versions": [
+        "4.1.136.Final",
+        "4.2.16.Final"
+      ],
+      "matches": [
+        {
+          "coordinate": "io.netty:netty-codec-http:4.1.110.Final",
+          "configurations": [
+            "_internal-unified-test-platform-android-test-plugin-host-emulator-control",
+            "_internal-unified-test-platform-android-test-plugin-result-listener-gradle"
+          ],
+          "lockfiles": [
+            "apps/android/app/gradle.lockfile",
+            "apps/android/tunnel/gradle.lockfile",
+            "apps/client/android/tunnel-gradle.lockfile"
+          ]
+        },
+        {
+          "coordinate": "io.netty:netty-codec-http:4.1.93.Final",
+          "configurations": [
+            "_internal-unified-test-platform-core"
+          ],
+          "lockfiles": [
+            "apps/android/app/gradle.lockfile",
+            "apps/android/tunnel/gradle.lockfile",
+            "apps/client/android/tunnel-gradle.lockfile"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "GHSA-xxqh-mfjm-7mv9",
+      "aliases": [
+        "CVE-2026-42581"
+      ],
+      "summary": "Netty HTTP/1.0 TE+CL Coexistence Bypasses Smuggling Sanitization",
+      "database_severity": "MODERATE",
+      "cvss": [
+        {
+          "type": "CVSS_V3",
+          "score": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:C/C:N/I:L/A:N"
+        }
+      ],
+      "fixed_versions": [
+        "4.1.133.Final",
+        "4.2.13.Final"
+      ],
+      "matches": [
+        {
+          "coordinate": "io.netty:netty-codec-http:4.1.110.Final",
+          "configurations": [
+            "_internal-unified-test-platform-android-test-plugin-host-emulator-control",
+            "_internal-unified-test-platform-android-test-plugin-result-listener-gradle"
+          ],
+          "lockfiles": [
+            "apps/android/app/gradle.lockfile",
+            "apps/android/tunnel/gradle.lockfile",
+            "apps/client/android/tunnel-gradle.lockfile"
+          ]
+        },
+        {
+          "coordinate": "io.netty:netty-codec-http:4.1.93.Final",
+          "configurations": [
+            "_internal-unified-test-platform-core"
+          ],
+          "lockfiles": [
+            "apps/android/app/gradle.lockfile",
+            "apps/android/tunnel/gradle.lockfile",
+            "apps/client/android/tunnel-gradle.lockfile"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "GHSA-269g-pwp5-87pp",
+      "aliases": [
+        "CVE-2020-15250"
+      ],
+      "summary": "TemporaryFolder on unix-like systems does not limit access to created files",
+      "database_severity": "MODERATE",
+      "cvss": [
+        {
+          "type": "CVSS_V3",
+          "score": "CVSS:3.1/AV:L/AC:H/PR:L/UI:R/S:U/C:H/I:N/A:N"
+        }
+      ],
+      "fixed_versions": [
+        "4.13.1"
+      ],
+      "matches": [
+        {
+          "coordinate": "junit:junit:4.12",
+          "configurations": [
+            "debugAndroidTestCompileClasspath",
+            "debugAndroidTestRuntimeClasspath",
+            "debugCompileClasspath",
+            "debugRuntimeClasspath"
+          ],
+          "lockfiles": [
+            "apps/client/android/app/gradle.lockfile"
+          ]
+        }
+      ]
+    }
+  ],
+  "interpretation": "Matches are limited to Gradle lockfile configurations and do not establish reachability in the shipped app. Release-runtime matching is evaluated only for the beta client app lockfile configuration. Review matching build/test tooling before accepting the full critical-vulnerability gate.",
+  "lockfiles_modified": false,
+  "beta_or_production_hosts_contacted": false
+}

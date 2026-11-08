@@ -1,0 +1,22 @@
+{
+  "issue": "I-027",
+  "observed_at_local": "2026-11-02T17:07:51+03:00",
+  "scope": "restore latest imported beta archive in disposable local PostgreSQL",
+  "archive": {
+    "name": "detourvpn-beta-20261102T120419.115336Z-6a8d23672d954f16b6d0512bbb8a16bf.enc",
+    "bytes": 58246116,
+    "sha256": "326D156B1E956101EAD09319DEF722E28F25C3C868474FD614A98305F7E8B50A",
+    "fernet_authentication": "passed"
+  },
+  "postgresql_version": "18.6",
+  "restore_drill": "passed",
+  "restored_table_manifest_count": 42,
+  "ledger_accounts_reconciled": 2,
+  "archive_sha256_unchanged": true,
+  "temporary_restore_database_removed": true,
+  "temporary_postgresql_cluster_stopped_and_removed": true,
+  "database_contents_or_secret_values_recorded": false,
+  "beta_host_modified": false,
+  "natural_daily_trigger_observed": false,
+  "missed_trigger_catchup": "not_demonstrated"
+}

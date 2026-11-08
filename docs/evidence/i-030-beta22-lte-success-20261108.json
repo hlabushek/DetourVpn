@@ -1,0 +1,26 @@
+{
+  "issue": "I-030",
+  "adr": ["ADR-086", "ADR-087"],
+  "observed_at_utc_approx": "2026-11-07T22:15Z-22:23Z",
+  "scope": "owner-supervised single beta.22 attempt on the owner phone over LTE, read-only node sampling, owner-observed IP check",
+  "client": { "version": "0.1.0-beta.22 (23)", "engine": "GoBackend", "split_mode": "selected apps, Chrome only", "network": "LTE, Wi-Fi off" },
+  "preflight": { "state": "closed", "reserved_bytes": 0, "available_bytes_before": 572069384 },
+  "node_samples_read_only": {
+    "latest_handshake_present": true,
+    "peer_rx_bytes_range": [50500, 65956],
+    "peer_tx_bytes_range": [87508, 109260],
+    "gate_passed_packets_last_sample": 97
+  },
+  "owner_observation": {
+    "chrome_public_ip": "differs from mobile IP; matches the VPS/node location reported by the owner",
+    "yandex_browser_public_ip": "mobile-network IP (not routed through VPN)"
+  },
+  "postflight": { "state": "closed", "non_closed_connections": 0, "reserved_bytes": 0, "revoke_gate": "closed", "available_bytes_after": 571871861, "debited_bytes": 197523 },
+  "earlier_control_runs": {
+    "home_network_wsl": "handshake false, rx 0 B",
+    "datacenter_host": "handshake true, rx 188 B"
+  },
+  "interpretation": "On LTE the beta.22 client completed a handshake, exchanged data, and egressed through the node for the selected app only; the connection closed cleanly and the debit (197523 B) matches the observed transfer scale. This is ONE successful physical attempt. The cause of the three earlier failed attempts (Wi-Fi: no UDP reached the node; one LTE attempt: 148 B in, 116 B out, then silence) is not established. Not shown: repeatability, other networks or carriers, long sessions, window renewal, DNS/IPv6 behavior.",
+  "not_established": ["why earlier LTE and Wi-Fi attempts failed", "repeatability across attempts and networks", "window renewal during a longer session"],
+  "identifiers_credentials_ips_and_raw_logs_recorded": false
+}

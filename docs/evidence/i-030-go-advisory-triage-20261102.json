@@ -1,0 +1,74 @@
+{
+  "issue": "I-030",
+  "observed_at_utc": "2026-11-02T17:24:32Z",
+  "scope": "OSV module-level triage and source reachability attempt for the pinned native Go tunnel dependency snapshot",
+  "source": {
+    "osv_query": "https://api.osv.dev/v1/querybatch",
+    "osv_advisory_details": "https://api.osv.dev/v1/vulns/{id}",
+    "govulncheck_database": "https://vuln.go.dev"
+  },
+  "module": {
+    "path": ".cache/i-029-final3/sdk-go-only/tunnel/tools/libwg-go",
+    "go_mod_sha256": "cde303cebd847b122373b4d714645b8480d48283570ab9b0bc6540c364724a16",
+    "go_sum_sha256": "f8de8667720b798be4a9f2db1dd5eff0cbf09d05409fa80bec8abc6049c79e3d",
+    "go_version": "1.25.14",
+    "direct_require": [
+      "golang.org/x/sys v0.36.0"
+    ],
+    "other_pinned_modules": [
+      "github.com/amnezia-vpn/amneziawg-go/v3 v3.1.20260814",
+      "golang.org/x/crypto v0.42.0",
+      "golang.org/x/net v0.44.0",
+      "golang.zx2c4.com/wintun v0.0.0-20230126152724-0fa3db229ce2"
+    ]
+  },
+  "osv_module_level_results": {
+    "advisory_match_records": 54,
+    "unique_advisory_ids": 54,
+    "by_database_severity": {
+      "CRITICAL": 7,
+      "HIGH": 2,
+      "MODERATE": 7,
+      "LOW": 0,
+      "unspecified": 38
+    },
+    "critical_and_high_module": "golang.org/x/crypto v0.42.0",
+    "critical_and_high_fixed_version_reported_by_osv": "v0.52.0",
+    "critical_and_high_advisories": [
+      "GHSA-5cgq-3rg8-m6cv",
+      "GHSA-89gr-r52h-f8rx",
+      "GHSA-f5wc-c3c7-36mc",
+      "GHSA-jppx-rxg9-jmrx",
+      "GHSA-rm3j-f69w-wqmq",
+      "GHSA-vgwf-h737-ff37",
+      "GHSA-x527-x647-q7gg",
+      "GHSA-q4h4-gmj2-qvw2",
+      "GHSA-w879-237q-wc7r"
+    ],
+    "advisory_records_include_ssh_related_descriptions": true,
+    "osv_affected_symbol_metadata_present_for_these_records": false
+  },
+  "reachability": {
+    "scanner": "govulncheck v1.7.0",
+    "database_last_modified_utc": "2026-10-27T21:16:18Z",
+    "source_scan_status": "incomplete",
+    "attempted_package_pattern": "./...",
+    "host_go_list_packages": [
+      "github.com/amnezia-vpn/amneziawg-android"
+    ],
+    "observed_host_imports_from_x_crypto": [
+      "golang.org/x/crypto/blake2s",
+      "golang.org/x/crypto/chacha20",
+      "golang.org/x/crypto/chacha20poly1305",
+      "golang.org/x/crypto/curve25519",
+      "golang.org/x/crypto/poly1305"
+    ],
+    "ssh_package_observed_in_host_import_graph": false,
+    "blocker": "The Android-target cgo source requires Android NDK headers/compiler. A Linux host source scan fails at android/log.h; disabling cgo for GOOS=android excludes the package entirely. No Android-target govulncheck result was produced.",
+    "interpretation": "Module-level matches are not evidence that affected code is reachable. The observed host import graph does not include golang.org/x/crypto/ssh, but the Android-target symbol reachability check remains incomplete. Do not mark the Go critical-vulnerability gate passed from this receipt."
+  },
+  "project_files_modified": false,
+  "dependency_files_modified": false,
+  "hosts_contacted": false,
+  "secrets_recorded": false
+}

@@ -1,0 +1,13 @@
+{
+  "issue": "I-030",
+  "observed_at_local": "2026-11-04T02:08:20.2742515+03:00",
+  "scope": "Previously owner-authorized exact Go build cache only",
+  "cache_path": "%LOCALAPPDATA%/go-build",
+  "go_env_gocache_matched_approved_path": true,
+  "active_go_processes_before_cleanup": 0,
+  "cache_bytes_before": 1401069285.0,
+  "cache_bytes_after": 228.0,
+  "free_bytes_before": 1140428800,
+  "free_bytes_after": 2549035008,
+  "other_paths_touched": false
+}

@@ -1,0 +1,21 @@
+{
+  "issue": "I-030",
+  "timestamp_utc": "2026-11-04T15:24:45.8424188Z",
+  "target": "isolated_beta_control_plane",
+  "revision_before": "0018_peer_window_resolution",
+  "revision_after": "0018_peer_window_resolution",
+  "source_files": {
+    "quota_service.py": "3b7cc3bacb599fbd3ad4c1f133fe642fde7537c24b0dd36e7711a8ee4a827d82",
+    "window_resolution.py": "a5e4c194642c914bf8e58835dde65b99fbb8ea06a59e28a0c8561fbce6c0711d",
+    "window_funding.py": "39de7b1484472abeec75f7dbc0cba192df2412719d9cac5c7f55adbe950c7f54",
+    "0018_peer_window_resolution.py": "a9eab068b279379ef01870f98a40b46c3ff2204e50d4ff1adad3b616aa2e4e48",
+    "models.py": "bf8689eb4fe05f9aa6bf64881e2c9cb6209bafd0b288878190bed6e29e4fe70d",
+    "contracts.py": "4e272533ce6da4bffff27a865f3ffeff46daa30fa4fd030f394c1b9a64d60556",
+    "admin.py": "24d1322c2e9d59edfca7cfa250c932d3be39864fc7caf2991ec62cbf57735495"
+  },
+  "api_ready_http": 200,
+  "unauthenticated_admin_action_http": 401,
+  "result": "success",
+  "migration_already_applied": true,
+  "database_dump_created_and_validated": false
+}

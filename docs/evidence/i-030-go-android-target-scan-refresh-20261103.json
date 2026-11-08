@@ -1,0 +1,58 @@
+{
+  "issue": "I-030",
+  "observed_at_utc": "2026-11-03T19:17:51Z",
+  "scope": "read-only Android arm64/amd64 govulncheck rerun after the official Go vulnerability database advanced",
+  "source": {
+    "module_path": ".cache/i-029-final3/sdk-go-only/tunnel/tools/libwg-go",
+    "go_mod_sha256": "cde303cebd847b122373b4d714645b8480d48283570ab9b0bc6540c364724a16",
+    "go_sum_sha256": "f8de8667720b798be4a9f2db1dd5eff0cbf09d05409fa80bec8abc6049c79e3d",
+    "dependency_files_modified": false
+  },
+  "toolchain": {
+    "go": "go1.25.14 windows/amd64",
+    "govulncheck": "v1.7.0",
+    "android_ndk": "27.0.12077973",
+    "goos": "android",
+    "cgo_enabled": true,
+    "build_tags": ["linux"],
+    "go_mod_mode": "readonly",
+    "database": "https://vuln.go.dev",
+    "database_last_modified_utc": "2026-11-02T22:01:43Z",
+    "command": "govulncheck -db https://vuln.go.dev -format=json -tags linux ./..."
+  },
+  "targets": [
+    {
+      "goarch": "arm64",
+      "scan_exit_code": 0,
+      "json_stream_sha256": "d5a2b85ccce3e64385f8bdb570920775c7569a25aa8510b22712d197a4064b5c",
+      "finding_records": 58,
+      "unique_osv_ids": 47,
+      "module_level_records": 57,
+      "package_level_records": 1,
+      "symbol_level_records": 0
+    },
+    {
+      "goarch": "amd64",
+      "scan_exit_code": 0,
+      "json_stream_sha256": "6ba794d148254ed246a084c1487d53f094eca0853d18166148b8562407b093c0",
+      "finding_records": 58,
+      "unique_osv_ids": 47,
+      "module_level_records": 57,
+      "package_level_records": 1,
+      "symbol_level_records": 0
+    }
+  ],
+  "triage": {
+    "module_level_ids_with_database_severity": 0,
+    "windows_only_package_finding": "GO-2026-6604 stdlib/os; not applicable to Android target",
+    "reachable_vulnerable_symbols": 0,
+    "new_or_removed_ids_vs_previous_scan": 0,
+    "critical_vulnerability_gate_passed": false
+  },
+  "privacy": {
+    "project_source_modified": false,
+    "dependency_files_modified": false,
+    "beta_or_production_hosts_contacted": false,
+    "secrets_recorded": false
+  }
+}

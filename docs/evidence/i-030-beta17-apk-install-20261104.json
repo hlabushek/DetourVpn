@@ -1,0 +1,32 @@
+{
+  "issue": "I-030",
+  "date_local": "2026-11-04",
+  "scope": "physical Pixel update install only",
+  "application_id": "com.detourvpn.client",
+  "version_code": 18,
+  "version_name": "0.1.0-beta.17",
+  "apk_sha256": "5b2c81a72d856d5d41e25ad067de35f6244a7ad42f8d08429eb9add09b37a8e5",
+  "build_receipt": "i-030-beta-apk-20261104T111855890Z-c26b8877.json",
+  "adb_authorized_device_count": 1,
+  "device_model": "Pixel 8 Pro",
+  "previous_version_code": 17,
+  "pre_install_active_vpn_network_agents": 0,
+  "pre_install_always_on_configured": false,
+  "install_command": "adb install -r",
+  "install_result": "passed",
+  "app_data_cleared": false,
+  "post_install_version_verified": true,
+  "post_install_active_vpn_network_agents": 0,
+  "post_install_always_on_configured": false,
+  "post_install_app_process_running": false,
+  "app_launch_attempted": false,
+  "vpn_connect_attempted": false,
+  "server_status_after_beta16_attempt": "unknown",
+  "distribution": "not_accepted",
+  "privacy": {
+    "device_serial_recorded": false,
+    "account_identifier_recorded": false,
+    "profile_endpoints_or_keys_recorded": false,
+    "traffic_or_dns_contents_recorded": false
+  }
+}

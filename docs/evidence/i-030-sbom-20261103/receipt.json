@@ -1,0 +1,102 @@
+{
+  "issue": "I-030",
+  "observed_at_utc": "2026-11-02T22:06:01Z",
+  "scope": "partial local CycloneDX inventories and OSV audit views for locked Python and npm components",
+  "tooling": {
+    "uv": "0.11.17",
+    "npm": "11.12.1",
+    "cyclonedx_python": "7.3.1",
+    "pip_audit": "2.10.1",
+    "cyclonedx_python_official_release": "https://github.com/CycloneDX/cyclonedx-python/releases/tag/v7.3.1",
+    "cyclonedx_python_usage": "https://github.com/CycloneDX/cyclonedx-python/blob/main/docs/usage.rst"
+  },
+  "source_hashes": {
+    "uv.lock": "4f09ce7b2c004c89147ac037ad979874fc2d036fed38e0af34cb27c048962716",
+    "apps/telegram-mini-app/package-lock.json": "2aa1d51faa551485055101b1ab1141eccc993a4af55fb2f3317016dd59973037",
+    "apps/telegram-bot/package-lock.json": "a96b270634ba0e98cc05ec8dbf5e3961421f6f155afcfcb958bfec214b306a5c",
+    "python_all_groups_export_sha256": "48da07916657970ff6b05c8d5dd576ad4e3a48254454d6f3b57678d582dcc577"
+  },
+  "artifacts": [
+    {
+      "file": "telegram-mini-app.cdx.json",
+      "format": "CycloneDX",
+      "spec_version": "1.5",
+      "generator": "npm 11.12.1 sbom --package-lock-only",
+      "subject": "telegram-mini-app@0.1.0",
+      "component_count": 67,
+      "components_with_license_metadata": 67,
+      "unknown_license_metadata_count": 0,
+      "source": "apps/telegram-mini-app/package-lock.json",
+      "sha256": "0a2ae87d51a0062ab45d4e8a29b347faba75c40802bcc8c47a5b465e9e98dd86"
+    },
+    {
+      "file": "telegram-bot.cdx.json",
+      "format": "CycloneDX",
+      "spec_version": "1.5",
+      "generator": "npm 11.12.1 sbom --package-lock-only",
+      "subject": "telegram-bot@0.1.0",
+      "component_count": 22,
+      "components_with_license_metadata": 22,
+      "unknown_license_metadata_count": 0,
+      "source": "apps/telegram-bot/package-lock.json",
+      "sha256": "57386073c0dbf5e50ff53e6bd7cbb9f146facb8c7591f6cb0b204a345881ef5e"
+    },
+    {
+      "file": "python-locked-all-groups.cdx.json",
+      "format": "CycloneDX",
+      "spec_version": "1.6",
+      "generator": "cyclonedx-py requirements 7.3.1",
+      "subject": "project-vpn-foundation@0.1.0",
+      "component_count": 75,
+      "components_with_license_metadata": 0,
+      "source": "python-all-groups-requirements.txt, exported from uv.lock with --locked --all-groups",
+      "generator_warning": "The flattened requirements export does not provide a complete dependency graph; license metadata is absent in this BOM. 75 package components are an inventory view, not license acceptance.",
+      "sha256": "b6c8e6a6f99ad7196630601f56aac83336d72ef231debd109620abbd93d52644"
+    },
+    {
+      "file": "python-installed-env.cdx.json",
+      "format": "CycloneDX",
+      "spec_version": "1.6",
+      "generator": "cyclonedx-py environment 7.3.1 with license text collection",
+      "subject": "project-vpn-foundation@0.1.0",
+      "component_count": 74,
+      "components_with_license_metadata": 74,
+      "unknown_or_empty_license_metadata_count": 0,
+      "dependency_nodes": 75,
+      "python": "3.13.1",
+      "environment_scope": "current Windows .venv; component versions match corresponding lock pins",
+      "marker_exclusion": "httpx2-jsfetch is restricted by the lock marker to sys_platform == emscripten and is not present in this Windows environment",
+      "sha256": "fb411063ce96f0492e3c21a7991903529d6d89f3debaed04dc243a2392cefcf0"
+    },
+    {
+      "file": "python-pip-audit-windows.cdx.json",
+      "format": "CycloneDX",
+      "spec_version": "1.4",
+      "generator": "pip-audit 2.10.1 with OSV service",
+      "component_count": 73,
+      "result": "No known vulnerabilities found",
+      "environment_scope": "resolved Windows requirements view; scanner report is not the complete lockfile SBOM",
+      "scanner_warning": "pip-audit --require-hashes with OSV verifies that hashes are present, not that package bytes match those hashes; lock integrity is represented separately by the uv.lock SHA-256.",
+      "sha256": "5a483267a38bb8c196d2c75f178b04f1d6a7dd77a8faea1df7d19eb58db8873e"
+    }
+  ],
+  "validation": {
+    "all_cyclonedx_json_parsed": true,
+    "python_lock_export_has_75_package_pins_plus_project_root": true,
+    "python_installed_component_versions_match_lock": true,
+    "npm_license_metadata_present_for_all_components": true,
+    "npm_lockfiles_modified": false,
+    "uv_lock_modified": false,
+    "absolute_workspace_paths_or_secret_like_strings_found": false,
+    "beta_or_production_hosts_contacted": false
+  },
+  "not_covered": [
+    "signed Android APK and embedded Go artifacts",
+    "Gradle/AGP/KGP, Flutter SDK, Android SDK and NDK",
+    "backend release runtime image and OS/container packages",
+    "VPN node image digest and OS packages",
+    "full license text/legal compatibility review",
+    "independent supply-chain review"
+  ],
+  "interpretation": "These artifacts materially prepare Python/npm inventory and license review. They do not constitute a complete product SBOM, release security acceptance, or beta-readiness pass."
+}

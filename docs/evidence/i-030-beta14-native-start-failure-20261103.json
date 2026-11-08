@@ -1,0 +1,22 @@
+{
+  "issue": "I-030",
+  "observed_at_local": "2026-11-03T22:45:24.380+03:00",
+  "scope": "Pixel beta.14 native startup diagnostic after engine subcause classifier update",
+  "application_id": "com.detourvpn.client",
+  "version_name": "0.1.0-beta.14",
+  "version_code": 15,
+  "attempt": {
+    "start_stage": "libbox_service_start",
+    "failure_types": ["proxyerror"],
+    "failure_category": "awg_device_up",
+    "specific_allowlisted_subcause": "none_matched",
+    "vpn_transport_after_failure": "none"
+  },
+  "engine": "LibboxProviderV1 / Amnezia Box AWG endpoint",
+  "interpretation": "The failure persists on the newly selected engine and remains too broad to distinguish an engine defect from its Android adapter/configuration. The prior AmneziaWG GoBackend path is a viable comparison for app-based split routing; it does not implement hostname rules.",
+  "privacy": {
+    "raw_exception_or_error_text_recorded": false,
+    "profile_endpoint_or_key_material_recorded": false,
+    "device_serial_recorded": false
+  }
+}

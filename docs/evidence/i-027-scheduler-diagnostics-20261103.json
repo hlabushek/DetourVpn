@@ -1,0 +1,43 @@
+{
+  "issue": "I-027",
+  "observed_at_local": "2026-11-03T09:10:51+03:00",
+  "scope": "local scheduled-task diagnostics hardening; no beta host contact",
+  "implementation": {
+    "script": "scripts/pull_beta_backup.ps1",
+    "fixed_stage_status": true,
+    "status_fields": [
+      "recorded_at_utc",
+      "result",
+      "stage",
+      "failure_code"
+    ],
+    "raw_errors_paths_key_material_and_backup_contents_logged": false,
+    "preflight_only_mode_contacts_network": false,
+    "daily_task_action_or_schedule_modified": false
+  },
+  "verification": {
+    "windows_powershell_5_1_parse": "passed",
+    "windows_powershell_5_1_local_preflight": "passed",
+    "local_preflight_network_contact": false,
+    "temporary_scheduler_probe": {
+      "principal": "same interactive limited user as daily task",
+      "last_task_result": 0,
+      "preflight_status_refreshed": true,
+      "network_contact": false,
+      "temporary_task_removed": true
+    },
+    "git_diff_check": "passed"
+  },
+  "daily_task": {
+    "natural_run_2026_11_03_result": 1,
+    "natural_run_failure_stage": "undetermined; diagnostics were not installed for that invocation",
+    "next_natural_run_local": "2026-11-04T07:00:00+03:00",
+    "scheduled_backup_acceptance": "open"
+  },
+  "remote_backup": {
+    "host_contacted": false,
+    "backup_service_started": false,
+    "new_archive_created_or_imported": false
+  },
+  "runtime_status_note": "An early local preflight check hit a diagnostic parameter-binding error and created last-run-status.json at 2026-11-03T06:08:34Z. This was a local test artifact, not the 07:00 scheduled backup result. The file is now labeled result=not_a_backup_run, stage=local_preflight_self_test, failure_code=diagnostic_test_only. The corrected diagnostic overwrite path was subsequently verified; the next full backup invocation will replace this marker."
+}

@@ -1,0 +1,56 @@
+{
+  "issue": "I-030",
+  "observed_on": "2026-11-02",
+  "scope": "current locked application dependency advisory queries",
+  "python": {
+    "uv_version": "0.11.17",
+    "pip_audit_version": "2.10.1",
+    "uv_lock_sha256": "4f09ce7b2c004c89147ac037ad979874fc2d036fed38e0af34cb27c048962716",
+    "runtime_groups": "no known vulnerabilities found",
+    "all_locked_groups": "no known vulnerabilities found",
+    "launcher_diagnostic": "pip-audit.exe failed with uv trampoline path error; python -m pip_audit succeeded"
+  },
+  "node": {
+    "npm_version": "11.12.1",
+    "mini_app": {
+      "lockfile_sha256": "2aa1d51faa551485055101b1ab1141eccc993a4af55fb2f3317016dd59973037",
+      "vulnerabilities": 0
+    },
+    "telegram_bot": {
+      "lockfile_sha256": "a96b270634ba0e98cc05ec8dbf5e3961421f6f155afcfcb958bfec214b306a5c",
+      "vulnerabilities": 0
+    }
+  },
+  "pub": {
+    "lockfile_sha256": "c994a810e14314cf7cae00fc8da3819b0a2c6ddd39580c997eabbf78593b3465",
+    "hosted_packages_queried": 27,
+    "osv_matches": 0
+  },
+  "maven": {
+    "source": "OSV querybatch API",
+    "lockfiles": {
+      "apps/android/tunnel/gradle.lockfile": "8caf9eb655817f58ad8ff937072ebb662595892ec246b05018b192b6ff994068",
+      "apps/android/app/gradle.lockfile": "53bee6e5e3d8f449b166267c2d591be96151dba908944be897ac4b21bf6bb21c",
+      "apps/client/android/app/gradle.lockfile": "21dee1dad17adbfbf6e00388bba1dd5780a3d6cc90d7ebfbfe1ccaa409987a10",
+      "apps/client/android/tunnel-gradle.lockfile": "8caf9eb655817f58ad8ff937072ebb662595892ec246b05018b192b6ff994068"
+    },
+    "unique_coordinate_versions_queried": 196,
+    "coordinate_versions_with_matches": 18,
+    "advisory_match_records": 87,
+    "beta_release_runtime_coordinates_queried": 49,
+    "beta_release_runtime_matches": 0,
+    "severity_metadata": "not supplied for the 87 OSV advisory-match records",
+    "matches_scope": "outside the beta app releaseRuntimeClasspath"
+  },
+  "lockfiles_modified": false,
+  "not_covered": [
+    "Gradle wrapper and build plugins",
+    "Android SDK and NDK",
+    "native Go and other vendored dependencies",
+    "OS packages and container base images",
+    "complete SBOM and license review",
+    "independent security review"
+  ],
+  "beta_or_production_hosts_contacted": false,
+  "critical_vulnerability_assessment_complete": false
+}

@@ -1,0 +1,80 @@
+{
+  "issue": "I-030",
+  "observed_at_utc": "2026-11-05T17:32:26Z",
+  "scope": "one owner-authorized beta.19 diagnostic start; sanitized read-only follow-up",
+  "preflight_receipt": "i-030-owner-preflight-20261105T172143Z.json",
+  "post_attempt_preflight_receipt": "i-030-owner-preflight-20261105T175537Z.json",
+  "owner_report": {
+    "direct_baseline_recorded_locally": true,
+    "chrome_unreachable_after_connect": true,
+    "ip_or_screenshot_received": false
+  },
+  "device": {
+    "application_id": "com.detourvpn.client",
+    "version_code": 20,
+    "version_name": "0.1.0-beta.19",
+    "installed_apk_matches_signed_receipt": true,
+    "native_start_trace": "no_beta19_trace_markers",
+    "trace_marker_strings_compiled_in_installed_apk": true,
+    "active_vpn_transport_at_followup": false,
+    "vpn_service_foreground_initially": true,
+    "vpn_service_foreground_later": false
+  },
+  "crash_buffer": {
+    "package_uid_filter_applied": true,
+    "sigabrt_observed": true,
+    "signal_time_utc": "2026-11-05T17:32:16.341Z",
+    "pc_matches_prior_beta18_observation": true,
+    "beta19_artifact_symbolization_completed": true,
+    "beta19_symbolized_function": "github.com/amnezia-vpn/amneziawg-go/v3/device.(*Device).BindUpdate",
+    "beta19_symbolized_source": "sync/atomic/type.go:94",
+    "stack_pc_frame_count": 2,
+    "stack_pc_frames_symbolized_in_go_pclntab": 1,
+    "inline_call_chain_resolved": false,
+    "abort_message_observed": false,
+    "raw_logs_exported": false,
+    "raw_logs_persisted": false
+  },
+  "android_application_exit_info": {
+    "target_record_found": true,
+    "reason_code": 5,
+    "reason_name": "REASON_CRASH_NATIVE",
+    "status_code": 6,
+    "timestamp_local": "2026-11-05T20:32:16.378+03:00",
+    "timestamp_utc": "2026-11-05T17:32:16.378Z",
+    "trace_reference_available_in_read_only_dump": false,
+    "raw_dump_exported": false
+  },
+  "acceptance": {
+    "fresh_handshake_confirmed": false,
+    "source_bound_egress_confirmed": false,
+    "vpn_transport_inactive_observed": true,
+    "explicit_disconnect_action_confirmed": false,
+    "post_attempt_server_reconciliation": "pass; latest_state=closed; non_closed_connections=0; reserved_bytes=0; revoke_gate=closed",
+    "connect_retries_performed": 0
+  },
+  "instrumentation_review": {
+    "fixed_trace_strings_present_in_installed_dex": true,
+    "fixed_trace_tag_lines_found_in_package_uid_filtered_logcat": false,
+    "reason_trace_tag_lines_are_absent": "not established"
+  },
+  "quota_comparison": {
+    "granted_bytes_before": 73924608,
+    "used_bytes_before": 38705639,
+    "available_bytes_before": 35218969,
+    "granted_bytes_after": 73924608,
+    "used_bytes_after": 38707538,
+    "available_bytes_after": 35217070,
+    "used_delta_bytes": 1899,
+    "delta_attribution": "correlates_with_attempt_window; no connection id linkage; not confirmed"
+  },
+  "privacy": {
+    "device_identifier_exported": false,
+    "account_identifier_exported": false,
+    "ip_address_exported": false,
+    "profile_or_endpoint_exported": false,
+    "secrets_exported": false,
+    "traffic_exported": false
+  },
+  "conclusion": "diagnostic_start_failed_or_aborted; exact beta19 PC maps to BindUpdate but inline trigger remains unresolved; no repeat authorized"
+}

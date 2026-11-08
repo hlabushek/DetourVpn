@@ -1,0 +1,25 @@
+{
+  "issue": "I-027",
+  "observed_at_utc": "2026-11-07",
+  "scope": "read-only status and journal of the beta backup unit, owner-authorized; no state changed",
+  "backup_unit": {
+    "active_state": "failed",
+    "result": "exit-code",
+    "exit_status": 2,
+    "last_attempt_utc": "2026-11-07T08:52:16Z",
+    "reported_reason": "backup_size_limit",
+    "repeated_in_recent_journal_entries": true
+  },
+  "host": {
+    "root_filesystem_used_percent": 14,
+    "latest_archive_on_host": "2026-11-02T12:04Z",
+    "latest_archive_bytes": 58246116
+  },
+  "limits_in_code": {
+    "max_dump_bytes": 33554432,
+    "max_encrypted_archive_bytes": 67108864,
+    "files": ["services/api/src/vpn_api/operations.py", "scripts/pull_beta_backup.ps1", "infra/beta/install-local-backup.sh"]
+  },
+  "interpretation": "The beta database dump now exceeds the fixed backup limit, so no archive has been produced since 2026-11-02. The largest table was not identified; no database query was run. The cause is a size cap, not disk space, key availability or the local task.",
+  "identifiers_credentials_ips_and_raw_logs_recorded": false
+}

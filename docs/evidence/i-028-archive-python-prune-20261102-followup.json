@@ -1,0 +1,30 @@
+{
+  "observed_on": "2026-11-02",
+  "scope": "staging A 45.10.166.106 only",
+  "operation": "remove only validated release/python subtrees from old closed archives",
+  "targets": [
+    {
+      "archive": "/opt/detourvpn-i028-archives/closed-0kmq53n_",
+      "target": "/opt/detourvpn-i028-archives/closed-0kmq53n_/release/python",
+      "validated_closed_archive_metadata": true,
+      "du_kib": 108436
+    },
+    {
+      "archive": "/opt/detourvpn-i028-archives/closed-l0vi8oxt",
+      "target": "/opt/detourvpn-i028-archives/closed-l0vi8oxt/release/python",
+      "validated_closed_archive_metadata": true,
+      "du_kib": 108436
+    }
+  ],
+  "result": {
+    "passed": true,
+    "expected_freed_kib": 216872,
+    "df_available_before_kib": 1579748,
+    "df_available_after_kib": 1796620,
+    "mem_available_before_kib": 1514336,
+    "mem_available_after_kib": 1537332,
+    "i028_services_and_timer_inactive_before_and_after": true,
+    "archive_metadata_and_node_state_run_preserved": true,
+    "server_b_or_production_contacted": false
+  }
+}

@@ -1,0 +1,86 @@
+{
+  "issue": "I-030",
+  "observed_at_utc": "2026-11-02T22:26:17Z",
+  "scope": "read-only current-database source reachability scan for the pinned Android native Go tunnel dependency on both release ABIs",
+  "source": {
+    "module_path": ".cache/i-029-final3/sdk-go-only/tunnel/tools/libwg-go",
+    "go_mod_sha256_before_and_after": "cde303cebd847b122373b4d714645b8480d48283570ab9b0bc6540c364724a16",
+    "go_sum_sha256_before_and_after": "f8de8667720b798be4a9f2db1dd5eff0cbf09d05409fa80bec8abc6049c79e3d",
+    "go_mod_modified": false,
+    "go_sum_modified": false
+  },
+  "toolchain": {
+    "go_version": "go1.25.14 windows/amd64",
+    "go_archive_url": "https://go.dev/dl/go1.25.14.windows-amd64.zip",
+    "go_archive_sha256": "119044a92b3987c341cd6aebb256676dd4780d292f7b4e72a3e9976677841697",
+    "govulncheck_version": "v1.7.0",
+    "govulncheck_sha256": "08462c60919c3ab7b28d61251291a274b5f43bf7cccd1b7db3af67d69aad7c81",
+    "android_ndk_revision": "27.0.12077973",
+    "build_tags": [
+      "linux"
+    ],
+    "goos": "android",
+    "cgo_enabled": true,
+    "go_mod_mode": "readonly",
+    "scan_command": "govulncheck -db https://vuln.go.dev -format=json -tags linux ./..."
+  },
+  "database": {
+    "url": "https://vuln.go.dev",
+    "last_modified_utc": "2026-10-27T21:16:18Z",
+    "result": "The current published database snapshot has not advanced since the 2026-11-02 scan."
+  },
+  "targets": [
+    {
+      "goarch": "arm64",
+      "cc": "aarch64-linux-android23-clang.cmd",
+      "go_list_dependency_lines": 139,
+      "import_graph_sha256": "a6f5e0a8646b02e25254f3dacb1a6a7377e009ac82e42f0380067386027f218e",
+      "x_crypto_ssh_imported": false,
+      "scan_exit_code": 0,
+      "json_stream_bytes": 831125,
+      "json_stream_sha256": "e01c83b47f9026c55c2422a6d082780bedda45e6864398409d64d035a7dbf962",
+      "finding_records": 58,
+      "unique_osv_ids": 47,
+      "module_level_records": 57,
+      "package_level_records": 1,
+      "symbol_level_records": 0,
+      "package_level_finding": {
+        "osv_id": "GO-2026-6604",
+        "package": "stdlib/os",
+        "fixed_version": "v1.26.9",
+        "affected_platform": "windows",
+        "android_target_applicable": false
+      }
+    },
+    {
+      "goarch": "amd64",
+      "cc": "x86_64-linux-android23-clang.cmd",
+      "go_list_dependency_lines": 140,
+      "import_graph_sha256": "0eda810bed1080b575f0b636132902f76a1bdd34b778b166d6d74f9ec59184a3",
+      "x_crypto_ssh_imported": false,
+      "scan_exit_code": 0,
+      "json_stream_bytes": 831125,
+      "json_stream_sha256": "b22fca58efb8507c3d6c1a46d8fd977a62c2b2442a66d8a86724c96378c6b075",
+      "finding_records": 58,
+      "unique_osv_ids": 47,
+      "module_level_records": 57,
+      "package_level_records": 1,
+      "symbol_level_records": 0,
+      "package_level_finding": {
+        "osv_id": "GO-2026-6604",
+        "package": "stdlib/os",
+        "fixed_version": "v1.26.9",
+        "affected_platform": "windows",
+        "android_target_applicable": false
+      }
+    }
+  ],
+  "interpretation": {
+    "reachable_vulnerable_symbols": 0,
+    "critical_vulnerability_gate_passed": false,
+    "reason": "No new public database snapshot was available. Module-level matches remain for reachability and toolchain review; zero symbol traces is not runtime proof and does not close the full dependency/security gate.",
+    "project_sources_or_dependency_files_modified": false,
+    "beta_or_production_hosts_contacted": false,
+    "secrets_recorded": false
+  }
+}

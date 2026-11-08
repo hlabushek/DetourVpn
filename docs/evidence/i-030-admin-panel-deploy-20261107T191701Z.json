@@ -1,0 +1,18 @@
+{
+    "issue":  "I-030",
+    "timestamp_utc":  "2026-11-07T19:17:01.3097718Z",
+    "target":  "isolated beta control plane",
+    "hostname":  "hiplet-137728",
+    "changed_files":  [
+                          "apps/admin/static/admin.js",
+                          "apps/admin/static/index.html",
+                          "apps/admin/static/style.css"
+                      ],
+    "admin_route_http":  200,
+    "beta_invite_section_present":  true,
+    "readiness_http":  200,
+    "api_restart":  "none",
+    "migrations":  "none",
+    "database_changes":  "none",
+    "result":  "success"
+}

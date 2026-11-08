@@ -1,0 +1,44 @@
+{
+  "issue": "I-030",
+  "target": "isolated_beta",
+  "mode": "read_only",
+  "observed_on": "2026-11-08",
+  "source": "beta PostgreSQL via BEGIN READ ONLY / ROLLBACK, runtime role, approved beta SSH identity",
+  "context": "ADR-088 attempt 1 (beta.22, owner phone, LTE); first connection hung, owner reconnected",
+  "owner_preflight_before": {
+    "latest_state": "closed",
+    "non_closed_connections": 0,
+    "reserved_bytes": 16777216,
+    "revoke_gate": "open",
+    "receipt": "i-030-owner-preflight-20261108T101756Z.json"
+  },
+  "target_hold": {
+    "generation": 2,
+    "slot": 1,
+    "amount_bytes": 16777216,
+    "created_utc": "2026-11-07T22:26:46",
+    "not_after_utc": "2026-11-07T22:28:16",
+    "receipt_observation": "unknown",
+    "receipt_observed_bytes": null,
+    "receipt_created_utc": "2026-11-07T22:26:48",
+    "resolution_present": false,
+    "connection_state": "closed"
+  },
+  "same_connection_generation_1": {
+    "generation": 1,
+    "receipt_observation": "measured",
+    "observed_bytes": 789,
+    "receipt_created_utc": "2026-11-07T22:26:48"
+  },
+  "later_connection_holds": [
+    {"generation": 1, "observation": "measured", "observed_bytes": 58903},
+    {"generation": 2, "observation": "measured", "observed_bytes": 1444},
+    {"generation": 3, "observation": "measured", "observed_bytes": 100},
+    {"generation": 4, "observation": "measured", "observed_bytes": 37596}
+  ],
+  "holds_without_receipt": 0,
+  "unresolved_unknown_count": 1,
+  "unresolved_unknown_bytes": 16777216,
+  "assessment": "unknown receipt accepted 2 seconds after hold, in the same node poll as generation 1; same pattern as ADR-082. No measured counter and no independent proof of zero traffic, so a no-debit release is not justified.",
+  "identifiers_credentials_and_raw_data_exported": false
+}

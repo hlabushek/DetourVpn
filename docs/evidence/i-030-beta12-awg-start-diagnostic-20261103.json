@@ -1,0 +1,41 @@
+{
+  "issue": "I-030",
+  "observed_at_local": "2026-11-03T22:04:40.817+03:00",
+  "scope": "read-only Pixel beta.12 native start diagnostic and pinned-source review",
+  "device": {
+    "model": "Pixel 8 Pro",
+    "application_id": "com.detourvpn.client",
+    "version_name": "0.1.0-beta.12",
+    "version_code": 13
+  },
+  "latest_attempt": {
+    "observed_at_local": "2026-11-03T22:21:03+03:00",
+    "attempt_count_in_fresh_log_window": 2,
+    "start_stage": "libbox_service_start",
+    "failure_types": ["proxyerror"],
+    "failure_category": "awg_device_up",
+    "operation": "connectWindow",
+    "vpn_transport_after_failure": "none"
+  },
+  "owner_ui_report": {
+    "reported_at_local": "2026-11-03T22:21:00+03:00",
+    "displayed_diagnostic_code": "Native Start Failed",
+    "displayed_stage": "Native Tunnel Start",
+    "revoke_unconfirmed_banner_reported": false,
+    "server_peer_closure": "not_independently_verified"
+  },
+  "source_diagnosis": {
+    "pinned_amnezia_box": "v1.260910.0",
+    "upstream_awg_bind_context_was_nil": true,
+    "awg_device_up_propagates_bind_update_error": true,
+    "direct_listen_packet_extends_context": true,
+    "nil_parent_panics_at_context_with_value": true,
+    "source_hypothesis": "The AWG bind adapter retained a nil context; AWG Up opens the bind, and the direct outbound calls adapter.ExtendContext on that nil context before creating UDP packet sockets. The beta.13 physical retest still failed with the same outer category while the patch was present, so this is not established as the complete cause of the observed failure.",
+    "server_peer_closure": "not_independently_verified"
+  },
+  "privacy": {
+    "raw_exception_or_error_text_recorded": false,
+    "profile_endpoint_or_key_material_recorded": false,
+    "device_serial_recorded": false
+  }
+}

@@ -1,0 +1,18 @@
+{
+  "observed_at": "2026-11-03T19:58:55+03:00",
+  "scope": "physical Pixel update installation only",
+  "application_id": "com.detourvpn.client",
+  "previous_version_name": "0.1.0-beta.3",
+  "previous_version_code": 4,
+  "version_name": "0.1.0-beta.4",
+  "version_code": 5,
+  "artifact_sha256": "7dfbb23bb7636e1b5a467f358a2b4d778fe9f43025cbbc219e6fcd523f13eedc",
+  "receipt_signature": "passed",
+  "adb_update_install": "passed",
+  "package_version_query": "passed",
+  "activity_launch": "passed",
+  "vpn_transport_after_install": "none",
+  "connection_attempt": "not_performed",
+  "revoke_closure": "not_independently_verified",
+  "distribution": "not_accepted"
+}

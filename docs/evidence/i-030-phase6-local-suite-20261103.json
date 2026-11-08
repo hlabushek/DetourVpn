@@ -1,0 +1,51 @@
+{
+  "issue": "I-030",
+  "observed_at_utc": "2026-11-02T21:59:10Z",
+  "scope": "full repository Python test suite against a temporary local PostgreSQL cluster",
+  "command": "uv run --frozen python scripts/test_with_postgres.py --postgres-bin .cache/i-004/portable/pgsql/bin",
+  "environment": {
+    "platform": "Windows",
+    "python": "3.13.1",
+    "pytest": "9.1.1",
+    "collected": 1040,
+    "duration_seconds": 491,
+    "database": "temporary cluster; listener restricted to 127.0.0.1",
+    "database_logs_statement": false
+  },
+  "result": {
+    "passed": 1024,
+    "failed": 3,
+    "skipped": 13,
+    "exit_code": 1
+  },
+  "failures": [
+    {
+      "test": "services/api/tests/test_i028_diagnostics.py::test_egress_acceptance_requires_same_port_baseline_and_connect_attempt",
+      "observed": "The integration test source does not contain the expected ipv6_literal_egress_port_control_connected baseline assertion."
+    },
+    {
+      "test": "services/api/tests/test_i028_two_device_driver.py::test_flutter_test_arguments_avoid_build_only_gradle_flags",
+      "observed": "The test passes org.example.vpnclient.i028; the current driver requires com.detourvpn.client.i028 and raises isolated_i028_package_required."
+    },
+    {
+      "test": "services/api/tests/test_i028_two_device_driver.py::test_flutter_seed_can_collect_verbose_output_without_persisting_it",
+      "observed": "The test passes org.example.vpnclient.i028; the current driver requires com.detourvpn.client.i028 and raises isolated_i028_package_required."
+    }
+  ],
+  "skips": {
+    "count": 13,
+    "includes": [
+      "physical/staging tests without explicit opt-in",
+      "owner archive inputs absent",
+      "POSIX-only checks on Windows"
+    ]
+  },
+  "cleanup": {
+    "temporary_postgres_stopped": true,
+    "generated_cluster_removed": true,
+    "external_hosts_contacted": false,
+    "production_data_used": false,
+    "owner_or_payment_data_used": false
+  },
+  "interpretation": "Local DB-backed suite is not fully green. The three failures are in I-028 tests and were not changed in this I-030 Phase 6 task. Passed tests do not establish physical VPN, DNS/IPv6, staging load, or release acceptance."
+}

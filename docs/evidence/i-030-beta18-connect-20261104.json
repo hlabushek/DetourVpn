@@ -1,0 +1,23 @@
+{
+  "issue": "I-030",
+  "date_local": "2026-11-04",
+  "scope": "one owner-supervised beta.18 Connect and Disconnect",
+  "application_id": "com.detourvpn.client",
+  "version_code": 19,
+  "version_name": "0.1.0-beta.18",
+  "preconnect_owner_status": "closed/0/0; revoke_gate=closed",
+  "owner_reported_client_state": "connected",
+  "owner_reported_disconnect": true,
+  "post_disconnect_adb_active_vpn_network_agents": 0,
+  "post_disconnect_native_start_failure_markers": 0,
+  "post_disconnect_owner_status": "closed/0/0; revoke_gate=closed",
+  "fresh_handshake_independently_verified": false,
+  "egress_split_dns_ipv6_tested": false,
+  "distribution": "not_accepted",
+  "privacy": {
+    "owner_identifier_or_credentials_recorded": false,
+    "device_serial_recorded": false,
+    "profile_endpoints_or_keys_recorded": false,
+    "traffic_or_dns_contents_recorded": false
+  }
+}

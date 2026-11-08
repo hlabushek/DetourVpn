@@ -1,0 +1,37 @@
+{
+  "issue": "I-030",
+  "observed_at_utc": "2026-11-02T20:45:37Z",
+  "scope": "bounded owner-only beta allowance for continued physical VPN/revoke testing",
+  "operation": {
+    "kind": "quota_credit",
+    "amount_bytes": 67108864,
+    "payment": false,
+    "target": "beta owner account only",
+    "server_scope": "beta API only; B and production not contacted",
+    "result": "confirmed by exact post-action ledger totals"
+  },
+  "ledger": {
+    "granted_bytes_before": 6815744,
+    "used_bytes_before": 6561064,
+    "reserved_bytes_before": 0,
+    "available_bytes_before": 254680,
+    "granted_bytes_after": 73924608,
+    "used_bytes_after": 6561064,
+    "reserved_bytes_after": 0,
+    "available_bytes_after": 67363544,
+    "minimum_window_bytes": 1048576
+  },
+  "prior_window_attempt": {
+    "newest_peer_window_debit_bytes": 1047601,
+    "reserved_bytes_after": 0,
+    "adb_active_vpn_agent_after_probe": false,
+    "probe_counted_as_vpn_egress": false
+  },
+  "device_preflight": {
+    "authorized_device_count": 1,
+    "application_id": "com.detourvpn.client",
+    "active_vpn_agent_count": 0,
+    "test_started_after_credit": false
+  },
+  "secrets_or_personal_identifiers_recorded": false
+}

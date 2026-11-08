@@ -1,0 +1,34 @@
+{
+  "issue": "I-030",
+  "observed_at_utc": "2026-11-03T20:39:07Z",
+  "scope": "read-only Pixel VPN-off confirmation after owner disabled another VPN app",
+  "device": {
+    "authorized_adb_device_count": 1,
+    "model": "Pixel 8 Pro",
+    "serial_recorded": false,
+    "application_id": "com.detourvpn.client",
+    "version_name": "0.1.0-beta.14",
+    "version_code": 15,
+    "process_present": true
+  },
+  "vpn_state": {
+    "active_vpn_transport": false,
+    "lockdown": false,
+    "owner_disabled_other_vpn": true
+  },
+  "diagnostics": {
+    "filtered_tags": ["DetourVpnNativeCall", "DetourVpnNativeInit"],
+    "matching_logcat_entries": 0,
+    "raw_logcat_saved": false
+  },
+  "actions": {
+    "connect_attempted_by_agent": false,
+    "server_revoke_status_checked": false
+  },
+  "limitations": [
+    "This confirms only local Android VPN transport state.",
+    "No fresh native failure record was available in the current log buffer.",
+    "Server-side peer state remains unverified."
+  ],
+  "secrets_or_network_addresses_recorded": false
+}

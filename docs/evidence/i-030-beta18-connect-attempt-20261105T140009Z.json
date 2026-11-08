@@ -1,0 +1,114 @@
+{
+  "issue": "I-030",
+  "timestamp_utc": "2026-11-05T14:00:09Z",
+  "target": "owner_supervised_isolated_beta",
+  "client": {
+    "application_id": "com.detourvpn.client",
+    "version_name": "0.1.0-beta.18",
+    "version_code": 19,
+    "attempts": 1,
+    "connect_confirmed": false,
+    "active_vpn_transport_after_attempt": false,
+    "native_start_failure_marker_count": 0,
+    "crash_buffer_marker": "SIGABRT",
+    "crash_marker_time_local": "2026-11-05 16:51:45.849",
+    "crash_context_time_correlated": true
+  },
+  "accounting": {
+    "pre_attempt": {
+      "state": "closed",
+      "non_closed_connections": 0,
+      "reserved_bytes": 0,
+      "revoke_gate": "closed",
+      "used_bytes": 38704768,
+      "available_bytes": 35219840
+    },
+    "post_attempt": {
+      "non_closed_connections": 0,
+      "reserved_bytes": 0,
+      "used_bytes": 38705639,
+      "available_bytes": 35218969,
+      "used_delta_bytes": 871,
+      "recent_peer_window_debit_count": 19,
+      "newest_peer_window_debit_bytes": 871,
+      "attempt_attribution": "time_and_delta_correlated; no connection identifier exported"
+    },
+    "beta_readonly_aggregate": {
+      "schema_revision": "0018_peer_window_resolution",
+      "resolution_count": 1,
+      "applied_full_debits": 1,
+      "unknown_receipts": 1,
+      "non_closed_connections": 0,
+      "unresolved_unknown_bytes": 0
+    }
+  },
+  "egress": {
+    "https_through_attempted_tunnel": false,
+    "source_bound_egress_verified": false,
+    "direct_baseline_after_other_vpn_was_disabled": false,
+    "pre_disable_baseline_used": false
+  },
+  "privacy": {
+    "device_identifiers_or_owner_id_exported": false,
+    "ip_addresses_or_raw_logs_exported": false,
+    "keys_tokens_or_endpoint_config_exported": false
+  },
+  "result": "connect_not_confirmed; server_closed; no_egress_test",
+  "native_crash_analysis": {
+    "source": "owner_device_dropbox_native_crash_metadata; locally_filtered",
+    "matching_beta_app_events": [
+      {
+        "timestamp_device_local": "2026-11-04 19:41:00",
+        "signal": "SIGABRT",
+        "frame_count": 1,
+        "pc": "0x92f128",
+        "module": "base.apk",
+        "connect_attribution": "not_persisted"
+      },
+      {
+        "timestamp_device_local": "2026-11-04 19:48:04",
+        "signal": "SIGABRT",
+        "frame_count": 1,
+        "pc": "0x92f128",
+        "module": "base.apk",
+        "connect_attribution": "not_persisted"
+      },
+      {
+        "timestamp_device_local": "2026-11-05 16:51:45",
+        "signal": "SIGABRT",
+        "frame_count": 1,
+        "pc": "0x92f128",
+        "module": "base.apk",
+        "abort_message_present": false,
+        "connect_attribution": "correlated_to_recorded_attempt"
+      }
+    ],
+    "symbolization": {
+      "artifact": "installed_beta18_base_APK",
+      "artifact_sha256": "019306c82b748bb8df8d196b6d048bfb1c8f551b25a682fbe9a0180d44b3f3d3",
+      "matches_beta18_source_build_receipt": true,
+      "installed_apk_native_library_hash_verified": true,
+      "pc": "0x92f128",
+      "function": "github.com/amnezia-vpn/amneziawg-go/v3/device.(*Device).BindUpdate",
+      "source_location": "sync/atomic/type.go:94",
+      "mapping_scope": "pclntab_function_and_line_only; inline_call_chain_not_resolved",
+      "interpretation": "exact installed APK library maps PC to native AWG bind-update path; exact abort trigger and inlined caller unavailable",
+      "artifact_matches_beta18_install_receipt": true,
+      "embedded_arm64_libbox_sha256": "c284f1f6d5e41b9714ad5a4a2742613b9fc9fe7a703c5473cfee9fe4ec739df3",
+      "embedded_library_matches_current_local_AAR": false,
+      "current_local_AAR_embedded_library_sha256": "586ce3df5940901d06c2ebb3a2d43a63bf6e6d0adfa649b6364cc14792ecedae"
+    },
+    "bounded_logcat_scan": {
+      "scope": "last_5000_lines",
+      "raw_exported": false,
+      "specific_runtime_or_bind_error_matches": 0
+    },
+    "network_change_review": {
+      "pinned_engine": "amnezia-box v1.260910.0; source commit 16724484cfa00d9b2c14d8280dc055564e2e12ba",
+      "path": "Android default NetworkCallback -> PlatformInterface.updateDefaultInterface -> NetworkManager.UpdateInterfaces -> AWG Endpoint.InterfaceUpdated -> Device.BindUpdate",
+      "bind_update_close_serialized_by_transport_mutex": true,
+      "owner_reported_separate_vpn_disabled_before_attempt": true,
+      "network_change_as_trigger": "plausible_unconfirmed; callback timestamps were not retained"
+    }
+  }
+}

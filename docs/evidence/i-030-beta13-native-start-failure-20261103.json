@@ -1,0 +1,34 @@
+{
+  "issue": "I-030",
+  "observed_at_local": "2026-11-03T22:36:13.456+03:00",
+  "scope": "Pixel beta.13 native startup diagnostic after signed update",
+  "application_id": "com.detourvpn.client",
+  "version_name": "0.1.0-beta.13",
+  "version_code": 14,
+  "attempts": [
+    {
+      "observed_at_local": "2026-11-03T22:35:39.645+03:00",
+      "start_stage": "libbox_service_start",
+      "failure_types": ["proxyerror"],
+      "failure_category": "awg_device_up"
+    },
+    {
+      "observed_at_local": "2026-11-03T22:36:13.451+03:00",
+      "start_stage": "libbox_service_start",
+      "failure_types": ["proxyerror"],
+      "failure_category": "awg_device_up"
+    }
+  ],
+  "vpn_transport_after_failure": "none",
+  "patched_binary_review": {
+    "aar_sha256": "8c8bc8cfe93b4e0278f28accc6d141d3d6e4a97b5e79d2c4ddd087a49acdae96",
+    "expected_patch_markers_present_in_signed_apk_libbox": true,
+    "interpretation": "The context propagation patch was included, but the physical failure persisted. It is not established as the complete root cause of the observed beta startup failure."
+  },
+  "next_step": "Beta.14 adds allowlisted subcause categories for common UDP socket and context errors without logging raw exception text.",
+  "privacy": {
+    "raw_exception_or_error_text_recorded": false,
+    "profile_endpoint_or_key_material_recorded": false,
+    "device_serial_recorded": false
+  }
+}

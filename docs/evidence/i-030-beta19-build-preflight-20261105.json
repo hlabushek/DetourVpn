@@ -1,0 +1,34 @@
+{
+  "issue": "I-030",
+  "date_utc": "2026-11-05",
+  "scope": "physical-test-only beta.19 signed-build launcher preflight",
+  "owner_attempt": {
+    "result": "stopped_before_credentials_on_three_attempts",
+    "failure_categories": [
+      "duplicate_PowerShell_Security_type_data_on_reimport",
+      "Microsoft_PowerShell_Security_autoload_failed_in_existing_runspace",
+      "Microsoft_PowerShell_Security_autoload_failed_in_no_profile_child"
+    ],
+    "keystore_password_or_key_password_requested": false,
+    "signing_key_changed": false,
+    "api_origin_exported": false
+  },
+  "fix": {
+    "file": "scripts/build_beta_apk.ps1",
+    "change": "the launcher now reruns itself in a no-profile PowerShell process with only standard system module paths, explicitly imports Microsoft.PowerShell.Security once in that process, and then uses platform Get-Acl/Set-Acl; only non-secret build parameters are passed on the re-execution command line, and signing credentials are still prompted locally after ACL validation"
+  },
+  "validation": {
+    "PowerShell_5_1_parse": "passed",
+    "automatic_clean_process_after_simulated_contaminated_parent_module_path": "passed; system ACL module loaded and intentionally missing Flutter SDK stopped before signing prompts",
+    "clean_process_owner_only_signing_ACL_check": "passed for directory and keystore; verification stopped at an intercepted password prompt before reading input",
+    "stop_point": "before credential input",
+    "signed_apk_built": false,
+    "tests_run": false
+  },
+  "privacy": {
+    "credentials_exported": false,
+    "endpoint_exported": false,
+    "raw_logs_exported": false
+  },
+  "next_action": "owner reruns local physical-test build; enter keystore passwords only in hidden prompts"
+}

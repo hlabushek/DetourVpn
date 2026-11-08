@@ -1,0 +1,3194 @@
+{
+  "components": [
+    {
+      "bom-ref": "requirements-L3",
+      "description": "requirements line 3: alembic==1.20.0     --hash=sha256:77eb101048d95f982c0353e9233404889dcd7a6fc244c107836c0e2fc9cf7d9d     --hash=sha256:db505480647bc60386c5369402f4a57a506b7539c9e9ef5e270d45cbbe4939bf",
+      "externalReferences": [
+        {
+          "comment": "implicit dist url",
+          "hashes": [
+            {
+              "alg": "SHA-256",
+              "content": "77eb101048d95f982c0353e9233404889dcd7a6fc244c107836c0e2fc9cf7d9d"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "db505480647bc60386c5369402f4a57a506b7539c9e9ef5e270d45cbbe4939bf"
+            }
+          ],
+          "type": "distribution",
+          "url": "https://pypi.org/simple/alembic/"
+        }
+      ],
+      "name": "alembic",
+      "purl": "pkg:pypi/alembic@1.20.0",
+      "type": "library",
+      "version": "1.20.0"
+    },
+    {
+      "bom-ref": "requirements-L7",
+      "description": "requirements line 7: annotated-doc==0.0.5     --hash=sha256:117bac03a25ede5df5440e855b32d556049ca169ead221505badf432fed4b101     --hash=sha256:c7e58ce09192557605d8bbd92836d7e1d520ac9580096042c0bfd197efacf1bb",
+      "externalReferences": [
+        {
+          "comment": "implicit dist url",
+          "hashes": [
+            {
+              "alg": "SHA-256",
+              "content": "117bac03a25ede5df5440e855b32d556049ca169ead221505badf432fed4b101"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "c7e58ce09192557605d8bbd92836d7e1d520ac9580096042c0bfd197efacf1bb"
+            }
+          ],
+          "type": "distribution",
+          "url": "https://pypi.org/simple/annotated-doc/"
+        }
+      ],
+      "name": "annotated-doc",
+      "purl": "pkg:pypi/annotated-doc@0.0.5",
+      "type": "library",
+      "version": "0.0.5"
+    },
+    {
+      "bom-ref": "requirements-L11",
+      "description": "requirements line 11: annotated-types==0.8.0     --hash=sha256:13b2beaad985e05e2d6407ee4c4f35590b11f8d693a258a561055cac8f64cab7     --hash=sha256:f072f4d804ea359e4eaf198b1af7a8b0943881a87f31bb764f8bf219bb9419e0",
+      "externalReferences": [
+        {
+          "comment": "implicit dist url",
+          "hashes": [
+            {
+              "alg": "SHA-256",
+              "content": "13b2beaad985e05e2d6407ee4c4f35590b11f8d693a258a561055cac8f64cab7"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "f072f4d804ea359e4eaf198b1af7a8b0943881a87f31bb764f8bf219bb9419e0"
+            }
+          ],
+          "type": "distribution",
+          "url": "https://pypi.org/simple/annotated-types/"
+        }
+      ],
+      "name": "annotated-types",
+      "purl": "pkg:pypi/annotated-types@0.8.0",
+      "type": "library",
+      "version": "0.8.0"
+    },
+    {
+      "bom-ref": "requirements-L15",
+      "description": "requirements line 15: anyio==4.15.1     --hash=sha256:6152fdbbf9a77fdec97731721bebf7c4c44f7c29b424b0065826173efc7ed101     --hash=sha256:9f28306018cbd6d329e64a36d58256edff76dd996fe423bc957326e578b82a94",
+      "externalReferences": [
+        {
+          "comment": "implicit dist url",
+          "hashes": [
+            {
+              "alg": "SHA-256",
+              "content": "6152fdbbf9a77fdec97731721bebf7c4c44f7c29b424b0065826173efc7ed101"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "9f28306018cbd6d329e64a36d58256edff76dd996fe423bc957326e578b82a94"
+            }
+          ],
+          "type": "distribution",
+          "url": "https://pypi.org/simple/anyio/"
+        }
+      ],
+      "name": "anyio",
+      "purl": "pkg:pypi/anyio@4.15.1",
+      "type": "library",
+      "version": "4.15.1"
+    },
+    {
+      "bom-ref": "requirements-L21",
+      "description": "requirements line 21: ast-serialize==0.13.0     --hash=sha256:017ddd4f22e727ef93e66df2d53340a6ff809b7e34cc2218f67918ae6239aad0     --hash=sha256:192aed400b2b92ebe41da17e856b9b6e17dbcebe0011ce4c6370d4a8a0486233     --hash=sha256:19b1e8f4c088ce91053df310b444fceeddb39f728ca7d04272c983646e36314b     --hash=sha256:359fcebc49f855bd189cf568235dc84eabf521e00d03fce43135cad6484906bc     --hash=sha256:3a9469e4b93d87e4ee8f5c7e9462f973032793a24b9ae37ffee860220f17586a     --hash=sha256:3bb8dd779c0a25478fe1db1a8b06dd4dd5e66077d6d0afe354acadb6d9aee7d0     --hash=sha256:3e20e9ca3952196b91798f77ef267c36c7b3470021f950aa361d9be003fb655f     --hash=sha256:3f5d4a7fcc916026010bae2a154e5be2c05040e67ef5c494c66a5cf315c41e30     --hash=sha256:4b2ee61692de03009e6a8f372f24fbc2d4b768a2f51ecd426bb84acdfd6da3d1     --hash=sha256:4f55668338bcb871e83ee21ba865fb08b7b4b13af9312742f9878c39f9d84ee3     --hash=sha256:5e88733df5ffff9062b5ff2779cf402e0aa1a61ca3f7f84b577a1af2b7e09676     --hash=sha256:684e191dd41b08b0b92692a181380a70cd76e3b6469606a40aae1ca6dab39e7d     --hash=sha256:6a406251363eeb5c7b85a405eddd123e627a531bd150dc673a7f5dd087743b5c     --hash=sha256:6a49f2a01a6df3150e022087cec0bf0ad580fec8f38a17f124d07dbb115106d1     --hash=sha256:6cbfa6dae34d5686056ef7c40ce1d3e7e1de48555e3a2fed985aef2d1f869d9a     --hash=sha256:7d7376c611055f5ee44e5e13a2620dbc6846f47c583952c1704c8805154c2d2f     --hash=sha256:807875ed8c5de739c8c55a45944336fcb9b8601d77fcee384a743cd0497211d6     --hash=sha256:841262622499585f0610a927434db526578553d8dae270b90d4c419a385e46b7     --hash=sha256:8aff1682f9fa3e119a1cf8ef47504d38f7019b22b79e0f2b5c2135b9532d14db     --hash=sha256:8f672c8e6d3b9ef6e365a5543aee2012247d1d58d948ceddb75b33a6679609ca     --hash=sha256:98edcd24240fa217d903c8f221bc05575baf38a87a207264ee7c800d21eef5a4     --hash=sha256:9eaa20714acf43ef0a0c82850a2ec8097f834648f527c38f1483e2fd9a52cd3e     --hash=sha256:a0bdcef01e643e0810d2dedfb64d924bcfe079a15dc20d1c067870cc01d5c5e6     --hash=sha256:a918572608ceb20fba8c2b83560f3d20be90effa4614589477b46d81672f0c3d     --hash=sha256:b004c3bdab0beb45194cd66c0b8feea40d676e461d26296f9c791c8e3e1b7061     --hash=sha256:bd89da715b857a27c33fad713ea0561912c56f773ebd0fed2760cedd99724dc6     --hash=sha256:be6b1a4ee49866c77eb8a50e9cbc845370e6c15230a126d0a71aeab35f31c78c     --hash=sha256:c51c855d8b7d5403925599acd3c6fc91b321eba3bf46dcc9fe88fd2d6619dac7     --hash=sha256:cdd8fd066858b57ea2761b3d3989c90ea23913825bbb5453cc684c28bba3fb19     --hash=sha256:d47c8f0eedf0a41681c10a7c497fef3691c4a6b4af4de6c93a4916bb29712554     --hash=sha256:dffcffa543c8fcfb1ca941038eeae23e7f97ad8994e4d6f81fbd658cfa8cb440     --hash=sha256:e241f68cf5060bff9b161b202b60d6d52161ff3777fe56eb6a9a6764fdb7fdd9     --hash=sha256:e611937e6e77448496489627ae2558b6f6143449b1fb33f8a495665212eee58a     --hash=sha256:ee58f0db40f121ff0820242b286702700bc0ec58a53b6ac43ce4f43714d42e0d     --hash=sha256:f30f0e59be30c0c9540e8908b14874bc8d3c1d52a4562a4cfb426b003bd6c28b     --hash=sha256:f8da1a31e941adbea886a85fb25efc6f09353d58c665fdbc523a914e3d2e49fe     --hash=sha256:fe2a3c8480e8e5eb41eaa958279b8c530b77b45065423f4ebd5223e118293055",
+      "externalReferences": [
+        {
+          "comment": "implicit dist url",
+          "hashes": [
+            {
+              "alg": "SHA-256",
+              "content": "017ddd4f22e727ef93e66df2d53340a6ff809b7e34cc2218f67918ae6239aad0"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "192aed400b2b92ebe41da17e856b9b6e17dbcebe0011ce4c6370d4a8a0486233"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "19b1e8f4c088ce91053df310b444fceeddb39f728ca7d04272c983646e36314b"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "359fcebc49f855bd189cf568235dc84eabf521e00d03fce43135cad6484906bc"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "3a9469e4b93d87e4ee8f5c7e9462f973032793a24b9ae37ffee860220f17586a"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "3bb8dd779c0a25478fe1db1a8b06dd4dd5e66077d6d0afe354acadb6d9aee7d0"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "3e20e9ca3952196b91798f77ef267c36c7b3470021f950aa361d9be003fb655f"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "3f5d4a7fcc916026010bae2a154e5be2c05040e67ef5c494c66a5cf315c41e30"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "4b2ee61692de03009e6a8f372f24fbc2d4b768a2f51ecd426bb84acdfd6da3d1"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "4f55668338bcb871e83ee21ba865fb08b7b4b13af9312742f9878c39f9d84ee3"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "5e88733df5ffff9062b5ff2779cf402e0aa1a61ca3f7f84b577a1af2b7e09676"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "684e191dd41b08b0b92692a181380a70cd76e3b6469606a40aae1ca6dab39e7d"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "6a406251363eeb5c7b85a405eddd123e627a531bd150dc673a7f5dd087743b5c"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "6a49f2a01a6df3150e022087cec0bf0ad580fec8f38a17f124d07dbb115106d1"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "6cbfa6dae34d5686056ef7c40ce1d3e7e1de48555e3a2fed985aef2d1f869d9a"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "7d7376c611055f5ee44e5e13a2620dbc6846f47c583952c1704c8805154c2d2f"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "807875ed8c5de739c8c55a45944336fcb9b8601d77fcee384a743cd0497211d6"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "841262622499585f0610a927434db526578553d8dae270b90d4c419a385e46b7"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "8aff1682f9fa3e119a1cf8ef47504d38f7019b22b79e0f2b5c2135b9532d14db"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "8f672c8e6d3b9ef6e365a5543aee2012247d1d58d948ceddb75b33a6679609ca"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "98edcd24240fa217d903c8f221bc05575baf38a87a207264ee7c800d21eef5a4"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "9eaa20714acf43ef0a0c82850a2ec8097f834648f527c38f1483e2fd9a52cd3e"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "a0bdcef01e643e0810d2dedfb64d924bcfe079a15dc20d1c067870cc01d5c5e6"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "a918572608ceb20fba8c2b83560f3d20be90effa4614589477b46d81672f0c3d"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "b004c3bdab0beb45194cd66c0b8feea40d676e461d26296f9c791c8e3e1b7061"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "bd89da715b857a27c33fad713ea0561912c56f773ebd0fed2760cedd99724dc6"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "be6b1a4ee49866c77eb8a50e9cbc845370e6c15230a126d0a71aeab35f31c78c"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "c51c855d8b7d5403925599acd3c6fc91b321eba3bf46dcc9fe88fd2d6619dac7"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "cdd8fd066858b57ea2761b3d3989c90ea23913825bbb5453cc684c28bba3fb19"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "d47c8f0eedf0a41681c10a7c497fef3691c4a6b4af4de6c93a4916bb29712554"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "dffcffa543c8fcfb1ca941038eeae23e7f97ad8994e4d6f81fbd658cfa8cb440"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "e241f68cf5060bff9b161b202b60d6d52161ff3777fe56eb6a9a6764fdb7fdd9"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "e611937e6e77448496489627ae2558b6f6143449b1fb33f8a495665212eee58a"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "ee58f0db40f121ff0820242b286702700bc0ec58a53b6ac43ce4f43714d42e0d"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "f30f0e59be30c0c9540e8908b14874bc8d3c1d52a4562a4cfb426b003bd6c28b"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "f8da1a31e941adbea886a85fb25efc6f09353d58c665fdbc523a914e3d2e49fe"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "fe2a3c8480e8e5eb41eaa958279b8c530b77b45065423f4ebd5223e118293055"
+            }
+          ],
+          "type": "distribution",
+          "url": "https://pypi.org/simple/ast-serialize/"
+        }
+      ],
+      "name": "ast-serialize",
+      "purl": "pkg:pypi/ast-serialize@0.13.0",
+      "type": "library",
+      "version": "0.13.0"
+    },
+    {
+      "bom-ref": "requirements-L60",
+      "description": "requirements line 60: boolean-py==5.0     --hash=sha256:60cbc4bad079753721d32649545505362c754e121570ada4658b852a3a318d95     --hash=sha256:ef28a70bd43115208441b53a045d1549e2f0ec6e3d08a9d142cbc41c1938e8d9",
+      "externalReferences": [
+        {
+          "comment": "implicit dist url",
+          "hashes": [
+            {
+              "alg": "SHA-256",
+              "content": "60cbc4bad079753721d32649545505362c754e121570ada4658b852a3a318d95"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "ef28a70bd43115208441b53a045d1549e2f0ec6e3d08a9d142cbc41c1938e8d9"
+            }
+          ],
+          "type": "distribution",
+          "url": "https://pypi.org/simple/boolean-py/"
+        }
+      ],
+      "name": "boolean-py",
+      "purl": "pkg:pypi/boolean-py@5.0",
+      "type": "library",
+      "version": "5.0"
+    },
+    {
+      "bom-ref": "requirements-L64",
+      "description": "requirements line 64: cachecontrol==0.14.4     --hash=sha256:b7ac014ff72ee199b5f8af1de29d60239954f223e948196fa3d84adaffc71d2b     --hash=sha256:e6220afafa4c22a47dd0badb319f84475d79108100d04e26e8542ef7d3ab05a1",
+      "externalReferences": [
+        {
+          "comment": "implicit dist url",
+          "hashes": [
+            {
+              "alg": "SHA-256",
+              "content": "b7ac014ff72ee199b5f8af1de29d60239954f223e948196fa3d84adaffc71d2b"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "e6220afafa4c22a47dd0badb319f84475d79108100d04e26e8542ef7d3ab05a1"
+            }
+          ],
+          "type": "distribution",
+          "url": "https://pypi.org/simple/cachecontrol/"
+        }
+      ],
+      "name": "cachecontrol",
+      "purl": "pkg:pypi/cachecontrol@0.14.4",
+      "type": "library",
+      "version": "0.14.4"
+    },
+    {
+      "bom-ref": "requirements-L68",
+      "description": "requirements line 68: certifi==2026.10.23     --hash=sha256:a9895e6e2758b371e0545e321a3a8fd1fcfd9829ada8824a936dfb16aaaf36cd     --hash=sha256:e9b54de76e530bb6cf0ccd036787103acb58fd42ba930ea8bf948ddbaa2f61d1",
+      "externalReferences": [
+        {
+          "comment": "implicit dist url",
+          "hashes": [
+            {
+              "alg": "SHA-256",
+              "content": "a9895e6e2758b371e0545e321a3a8fd1fcfd9829ada8824a936dfb16aaaf36cd"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "e9b54de76e530bb6cf0ccd036787103acb58fd42ba930ea8bf948ddbaa2f61d1"
+            }
+          ],
+          "type": "distribution",
+          "url": "https://pypi.org/simple/certifi/"
+        }
+      ],
+      "name": "certifi",
+      "purl": "pkg:pypi/certifi@2026.10.23",
+      "type": "library",
+      "version": "2026.10.23"
+    },
+    {
+      "bom-ref": "requirements-L72",
+      "description": "requirements line 72: cffi==2.1.1 ; platform_python_implementation != 'PyPy'     --hash=sha256:19ee6127ee34de7d83ce3d371ebc5ed91addbdcc39f9ab15ce4eb35a4e534971     --hash=sha256:1aa5645c30469b09530c4ebca77ebf8f17618293c58f8549cb1a543a50236e7d     --hash=sha256:31348097ff5bbe827ccc41795d4dd099d9f0625e7def00ee653c137a490c2a6c     --hash=sha256:334644fbac4eff73d985a17a91226df55d0f394160c4cfb880e084c8f7161cac     --hash=sha256:63bbfd5ded17c4840ac07cd8f1c21ba9d9708141f840b324f422f41b207e3973     --hash=sha256:6a8dddef476fab96d066d578fc88526767b836ab5ab21754e1d5bf3879c31c7c     --hash=sha256:9d2055050ea716bd38b7f7f1579c275386646b4894c155a3e2f3cd62ed41b7c6     --hash=sha256:a2d7755bef5a12ed488f4ef1f1b69ee9191d7396083b755a5d2295f6edb4768b     --hash=sha256:a931079504ecc49efed7744c476a5c343a92fabf66dec2db95edb1b2fdc770e2     --hash=sha256:aa9511c62d14da7aacc9b4bf51f3f697a621e83b2d6919008243c3aad168eea3     --hash=sha256:b5bdfd1c873d4e093aabc0ca84c4ca6dbc4f752afb5c86f146d9742580c9da2e     --hash=sha256:dd31f52ea1086513bb9df30f8fcee9b8918323ae067a3d5b78bc826a000712be     --hash=sha256:e0bcb7e0f677f543555d2adff3bf19c05f66cdb4796e5ff602442ab2fe3c4ef7     --hash=sha256:f16c709686a78c727bbbf059f92b0bf41c6fc60deec706d2dc19f529175a6125     --hash=sha256:fcd22650c908d7b7da162bbfaab594a1227a15d1643a98c68b122ac642fa2264",
+      "externalReferences": [
+        {
+          "comment": "implicit dist url",
+          "hashes": [
+            {
+              "alg": "SHA-256",
+              "content": "19ee6127ee34de7d83ce3d371ebc5ed91addbdcc39f9ab15ce4eb35a4e534971"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "1aa5645c30469b09530c4ebca77ebf8f17618293c58f8549cb1a543a50236e7d"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "31348097ff5bbe827ccc41795d4dd099d9f0625e7def00ee653c137a490c2a6c"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "334644fbac4eff73d985a17a91226df55d0f394160c4cfb880e084c8f7161cac"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "63bbfd5ded17c4840ac07cd8f1c21ba9d9708141f840b324f422f41b207e3973"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "6a8dddef476fab96d066d578fc88526767b836ab5ab21754e1d5bf3879c31c7c"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "9d2055050ea716bd38b7f7f1579c275386646b4894c155a3e2f3cd62ed41b7c6"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "a2d7755bef5a12ed488f4ef1f1b69ee9191d7396083b755a5d2295f6edb4768b"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "a931079504ecc49efed7744c476a5c343a92fabf66dec2db95edb1b2fdc770e2"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "aa9511c62d14da7aacc9b4bf51f3f697a621e83b2d6919008243c3aad168eea3"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "b5bdfd1c873d4e093aabc0ca84c4ca6dbc4f752afb5c86f146d9742580c9da2e"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "dd31f52ea1086513bb9df30f8fcee9b8918323ae067a3d5b78bc826a000712be"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "e0bcb7e0f677f543555d2adff3bf19c05f66cdb4796e5ff602442ab2fe3c4ef7"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "f16c709686a78c727bbbf059f92b0bf41c6fc60deec706d2dc19f529175a6125"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "fcd22650c908d7b7da162bbfaab594a1227a15d1643a98c68b122ac642fa2264"
+            }
+          ],
+          "type": "distribution",
+          "url": "https://pypi.org/simple/cffi/"
+        }
+      ],
+      "name": "cffi",
+      "purl": "pkg:pypi/cffi@2.1.1",
+      "type": "library",
+      "version": "2.1.1"
+    },
+    {
+      "bom-ref": "requirements-L89",
+      "description": "requirements line 89: cfgv==3.5.0     --hash=sha256:a8dc6b26ad22ff227d2634a65cb388215ce6cc96bbcc5cfde7641ae87e8dacc0     --hash=sha256:d5b1034354820651caa73ede66a6294d6e95c1b00acc5e9b098e917404669132",
+      "externalReferences": [
+        {
+          "comment": "implicit dist url",
+          "hashes": [
+            {
+              "alg": "SHA-256",
+              "content": "a8dc6b26ad22ff227d2634a65cb388215ce6cc96bbcc5cfde7641ae87e8dacc0"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "d5b1034354820651caa73ede66a6294d6e95c1b00acc5e9b098e917404669132"
+            }
+          ],
+          "type": "distribution",
+          "url": "https://pypi.org/simple/cfgv/"
+        }
+      ],
+      "name": "cfgv",
+      "purl": "pkg:pypi/cfgv@3.5.0",
+      "type": "library",
+      "version": "3.5.0"
+    },
+    {
+      "bom-ref": "requirements-L93",
+      "description": "requirements line 93: charset-normalizer==3.5.2     --hash=sha256:01077390b03f7988f11d700a2194e69b119741a86b1a638b1db88891e3eced8e     --hash=sha256:01b0c0d2262a9e28e8484a278c7e1b5d650e3ac8cf2683d2967e25899f208bdf     --hash=sha256:0774bf9bf620249fee3e0b8b9fd3065de213be30f3aa94ce2494b3b638949e26     --hash=sha256:0c951d5e6dd9c2ff60609476752bee49da4206adde960ebc247766937f72e718     --hash=sha256:0fed1d06615f022ee3b13caf5e8b180cfea32bb2c5aded8a9d44277afc040f93     --hash=sha256:11912e4bb14baae7c5d8791aa55ba0a3a03ec6729073307b0f57270abaa713d3     --hash=sha256:15c44f7edfd477b06f517a5cc317fc1707edb9de2c865f43d4b6513907473234     --hash=sha256:1bc0baf5ef96b6ede57d47f4b8fe4d9d84019c3bfcbeb20a41edc6a6ee341f1f     --hash=sha256:1c50fe28bbc2ced33386f298650d91218076c05420e6cbd790b913adc41659e7     --hash=sha256:1db38f4c5496827c1a501846d64d14c3b80c7e6714e406cd7dc36a9899fa1011     --hash=sha256:2b7b3bbfb4fe8ef40600792d762fbaa9057559f9d3fad209525b7a22b99e91fd     --hash=sha256:2c9ad19a6cfcd5ea5c0d41161d22f9df1dcc277e9bef2751391334546a314c00     --hash=sha256:2ce45c6627b22c47e390bc91a41c3d13032192e699fa0bea96e9671b373d69b0     --hash=sha256:304d8e4d493af723536393eee0c689eb7813f4a474c8b479dee63f1fdd98f621     --hash=sha256:39de2a259fc954455c57274dc94c79d5842774e1247a016aff30bc0efed0f4ef     --hash=sha256:40ab6bffa02ae10a0581e6c198be7d2d8ca5c2a0c64e4ed3465d766df457573e     --hash=sha256:4275811936e2f06feff5e598fb42a1b7ae852da8e39605211892b56b81a34efd     --hash=sha256:56bc200a365efb37383b7852e4cc5898d3b2da5987289b543956cf8cad71018a     --hash=sha256:6045373d5a89a5ec71afde535db987ca28e76dfa276c2d4c818265b375d4b055     --hash=sha256:62603db9a7caa0802eaa28c1c46fecd7b3a263a774069c24c3c28c302448721c     --hash=sha256:7218e8f32b0956cfcd048fd42d9d5779809745ca1d86113ca56f66e7ae1549c4     --hash=sha256:78456a747de8dc58360ffa581f30a002baf5aa28cb262536545e91f113ed7639     --hash=sha256:7e841fb9010836c992c9f12fcbd43a831de93a5f726fc1ccd8ca1d0268c5014c     --hash=sha256:838dcc90063569a0448120554591a1d6c4a4ffe11babf048908793154ab86ade     --hash=sha256:849df64e889b2e17230d58410a03dba311a65b163508fd33679b2b737d4b7858     --hash=sha256:9b7f416ff0978e2f2249330527f0ad6fa02f4932e6199692d3b52da2048c19e4     --hash=sha256:9cae88599c7219005d879f98e5ed53341e9a122af585e1091200358a3003d2a0     --hash=sha256:9f56f72050826f63dcee7a7f55b0a77168cb3bfc553fd405e7f8f9ece75a4036     --hash=sha256:a090bb2c68df85450502e3e20d665e3a5af9c65a84d6508ed477badd49166fd3     --hash=sha256:a19a731138fc27d5682277d3b9df22855cea1239bce7fcec5f78f42ef2d1f3c3     --hash=sha256:a66c3bc5ab1f0ff2164fc9965ddd611ff0802173f4b9d24554c563f6ab7e1d6e     --hash=sha256:a89012d6d5476ee112d20d998570ed58df2260a852afb1758809cd6900411d21     --hash=sha256:b6856554c4f44d79fc2307d5768854310a8f0096e501c75637542c82292b0429     --hash=sha256:b6b751274acb69d77b3323d6b7dbaa3c7fdfc1eb829b7eb61d262f32e1af9685     --hash=sha256:d19fbd981a488e22cd04883659ca6b08f50b5974f9fd7c95655ef6a043e5893f     --hash=sha256:d2374b62878abb00cd8309b32af6c0b715cd02dec0ca74ef12e5069bdc64144a     --hash=sha256:d376bbd28b3a8999db1a103b3b388aee6f1ddeb3e51bc2172993efdcd86e064d     --hash=sha256:e243bd13217235fc7290c621941c3f5cc8b66e4872495be821d7436ba2fb838d     --hash=sha256:ed905975ab14056a2e5eb1c376cb2e1ebc5396baf84163939c518556fccde9f5",
+      "externalReferences": [
+        {
+          "comment": "implicit dist url",
+          "hashes": [
+            {
+              "alg": "SHA-256",
+              "content": "01077390b03f7988f11d700a2194e69b119741a86b1a638b1db88891e3eced8e"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "01b0c0d2262a9e28e8484a278c7e1b5d650e3ac8cf2683d2967e25899f208bdf"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "0774bf9bf620249fee3e0b8b9fd3065de213be30f3aa94ce2494b3b638949e26"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "0c951d5e6dd9c2ff60609476752bee49da4206adde960ebc247766937f72e718"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "0fed1d06615f022ee3b13caf5e8b180cfea32bb2c5aded8a9d44277afc040f93"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "11912e4bb14baae7c5d8791aa55ba0a3a03ec6729073307b0f57270abaa713d3"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "15c44f7edfd477b06f517a5cc317fc1707edb9de2c865f43d4b6513907473234"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "1bc0baf5ef96b6ede57d47f4b8fe4d9d84019c3bfcbeb20a41edc6a6ee341f1f"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "1c50fe28bbc2ced33386f298650d91218076c05420e6cbd790b913adc41659e7"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "1db38f4c5496827c1a501846d64d14c3b80c7e6714e406cd7dc36a9899fa1011"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "2b7b3bbfb4fe8ef40600792d762fbaa9057559f9d3fad209525b7a22b99e91fd"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "2c9ad19a6cfcd5ea5c0d41161d22f9df1dcc277e9bef2751391334546a314c00"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "2ce45c6627b22c47e390bc91a41c3d13032192e699fa0bea96e9671b373d69b0"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "304d8e4d493af723536393eee0c689eb7813f4a474c8b479dee63f1fdd98f621"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "39de2a259fc954455c57274dc94c79d5842774e1247a016aff30bc0efed0f4ef"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "40ab6bffa02ae10a0581e6c198be7d2d8ca5c2a0c64e4ed3465d766df457573e"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "4275811936e2f06feff5e598fb42a1b7ae852da8e39605211892b56b81a34efd"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "56bc200a365efb37383b7852e4cc5898d3b2da5987289b543956cf8cad71018a"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "6045373d5a89a5ec71afde535db987ca28e76dfa276c2d4c818265b375d4b055"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "62603db9a7caa0802eaa28c1c46fecd7b3a263a774069c24c3c28c302448721c"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "7218e8f32b0956cfcd048fd42d9d5779809745ca1d86113ca56f66e7ae1549c4"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "78456a747de8dc58360ffa581f30a002baf5aa28cb262536545e91f113ed7639"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "7e841fb9010836c992c9f12fcbd43a831de93a5f726fc1ccd8ca1d0268c5014c"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "838dcc90063569a0448120554591a1d6c4a4ffe11babf048908793154ab86ade"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "849df64e889b2e17230d58410a03dba311a65b163508fd33679b2b737d4b7858"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "9b7f416ff0978e2f2249330527f0ad6fa02f4932e6199692d3b52da2048c19e4"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "9cae88599c7219005d879f98e5ed53341e9a122af585e1091200358a3003d2a0"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "9f56f72050826f63dcee7a7f55b0a77168cb3bfc553fd405e7f8f9ece75a4036"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "a090bb2c68df85450502e3e20d665e3a5af9c65a84d6508ed477badd49166fd3"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "a19a731138fc27d5682277d3b9df22855cea1239bce7fcec5f78f42ef2d1f3c3"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "a66c3bc5ab1f0ff2164fc9965ddd611ff0802173f4b9d24554c563f6ab7e1d6e"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "a89012d6d5476ee112d20d998570ed58df2260a852afb1758809cd6900411d21"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "b6856554c4f44d79fc2307d5768854310a8f0096e501c75637542c82292b0429"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "b6b751274acb69d77b3323d6b7dbaa3c7fdfc1eb829b7eb61d262f32e1af9685"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "d19fbd981a488e22cd04883659ca6b08f50b5974f9fd7c95655ef6a043e5893f"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "d2374b62878abb00cd8309b32af6c0b715cd02dec0ca74ef12e5069bdc64144a"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "d376bbd28b3a8999db1a103b3b388aee6f1ddeb3e51bc2172993efdcd86e064d"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "e243bd13217235fc7290c621941c3f5cc8b66e4872495be821d7436ba2fb838d"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "ed905975ab14056a2e5eb1c376cb2e1ebc5396baf84163939c518556fccde9f5"
+            }
+          ],
+          "type": "distribution",
+          "url": "https://pypi.org/simple/charset-normalizer/"
+        }
+      ],
+      "name": "charset-normalizer",
+      "purl": "pkg:pypi/charset-normalizer@3.5.2",
+      "type": "library",
+      "version": "3.5.2"
+    },
+    {
+      "bom-ref": "requirements-L134",
+      "description": "requirements line 134: click==8.5.0     --hash=sha256:255bc9599cf7748b4b1a446ccc735421bd08a2ae529a8b88597d3de5664ee360     --hash=sha256:ba0d2089de75ea0310e2dde03160e6ca10009947fb95a182f9b54021bb272e34",
+      "externalReferences": [
+        {
+          "comment": "implicit dist url",
+          "hashes": [
+            {
+              "alg": "SHA-256",
+              "content": "255bc9599cf7748b4b1a446ccc735421bd08a2ae529a8b88597d3de5664ee360"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "ba0d2089de75ea0310e2dde03160e6ca10009947fb95a182f9b54021bb272e34"
+            }
+          ],
+          "type": "distribution",
+          "url": "https://pypi.org/simple/click/"
+        }
+      ],
+      "name": "click",
+      "purl": "pkg:pypi/click@8.5.0",
+      "type": "library",
+      "version": "8.5.0"
+    },
+    {
+      "bom-ref": "requirements-L138",
+      "description": "requirements line 138: colorama==0.4.6 ; sys_platform == 'win32'     --hash=sha256:08695f5cb7ed6e0531a20572697297273c47b8cae5a63ffc6d6ed5c201be6e44     --hash=sha256:4f1d9991f5acc0ca119f9d443620b77f9d6b33703e51011c16baf57afb285fc6",
+      "externalReferences": [
+        {
+          "comment": "implicit dist url",
+          "hashes": [
+            {
+              "alg": "SHA-256",
+              "content": "08695f5cb7ed6e0531a20572697297273c47b8cae5a63ffc6d6ed5c201be6e44"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "4f1d9991f5acc0ca119f9d443620b77f9d6b33703e51011c16baf57afb285fc6"
+            }
+          ],
+          "type": "distribution",
+          "url": "https://pypi.org/simple/colorama/"
+        }
+      ],
+      "name": "colorama",
+      "purl": "pkg:pypi/colorama@0.4.6",
+      "type": "library",
+      "version": "0.4.6"
+    },
+    {
+      "bom-ref": "requirements-L142",
+      "description": "requirements line 142: cryptography==50.0.2     --hash=sha256:0ddc924c04591c2811ca024d62ecad4f7f6f08af8939c211438f48a16bd23602     --hash=sha256:0ec5f09541743261e66e291b4a0cbf0fb2997aeaab6d9e9c740b9dba1b58d1c2     --hash=sha256:1981f1db4630889b9ef7803fadef12b056f428cb6b85c27ba57b774793b6093c     --hash=sha256:25784ce8b9621c90c643efb9e1e2162ab3b0224cae446ad5e70e7fcb1ce18b51     --hash=sha256:4061c0079120205fb760c58acab6443e217307dcf05e3702cf970e0689972856     --hash=sha256:4e81d95e5bafc2d6e34e4bed780e53e4d5b9a2f928573428aa4d35fbec1eb0de     --hash=sha256:58a0c478eeca76fe5e07993c5a0703def34a6dc6a0cda4f5564639b33112ffe7     --hash=sha256:58ddb5a8e3179d12f19e4ea34d2d32e9d63a4baa142c875c1eb59f41b7243acd     --hash=sha256:630ebfea3bf689d075f82316324ff7433dc447fe6bc1bfc76524b74b4a9567d2     --hash=sha256:6f8700550aa1474a91e5dc07049c46f98b423b5b1ddd0483e0b51362eeeaf5be     --hash=sha256:79def8d059362e7831389ed3be0ecdf58a89386e1271e35dd9f5af84e81bffd0     --hash=sha256:7a8701d6b584d76e909e3d305b7d126b41439876a5aaf76cddc67fc230eafa2e     --hash=sha256:7afa5a6602a9f29af1f3a2965f831bae7c9d5d597b7cbb716d41ab3b7d89879c     --hash=sha256:7b46165bb56eb4704e2eaaf86f3c940d19154535d9b0ca7d6d590b04060e00d5     --hash=sha256:85d0d9a31b9098e98534226d5686b47264b95e62ce459dc2e62fdfc809f9fe93     --hash=sha256:87e9ce85beb6b328ba370cc6e6aea483c92617b4c95b1d33a49297eb662bfb04     --hash=sha256:9c8402a82ea0dc4ceeab793db05f0fafa8ca139ca34fcde5df0f596103c74107     --hash=sha256:9dab55f57c74c3cad24c323bacbbd04be4705ba6eb0d92e920b1fc4837ed5079     --hash=sha256:a582ab2ae1d34f67112cadc86702774c9ea4374df6bca6afe672817203c99134     --hash=sha256:a6557e5f38e065ca9fbdaf7cfc7435ecb1d113aa81a022d1b51921ee7432e227     --hash=sha256:ac9ed99d81760c62fe89d5f0815cdfa1ba9a35141cf30f1c2d044f04b4803d2e     --hash=sha256:b13478603dcd0a2479ff8e87e2c19a7d525734686fe3c49542472293a204212d     --hash=sha256:c423ab384a46c4dff7217b2ea5ba2e11cffdeab6441acd04cf65a369caf0366c     --hash=sha256:c5e67125c7dca78d199ec4e116aa93dbb83494808ecbb8211a2cb09b1bf41dbd     --hash=sha256:c71be1cbfa5cd9a41ee452acf1eccd82b2c05950358b106ec8ceb83411d1a020     --hash=sha256:cbc8738fd8526d80f35cb3a40d41f41a2e7030bb3b18b09a6778ef63d291c2fd     --hash=sha256:ce47f66801c20ec6c6632453bb5960fe38939e9306970b48b3a5a26de7745d94     --hash=sha256:d370b8d1dfcdf7130178137f6fbee6140774a1acc6cacefc4b42643ec11d0a3a     --hash=sha256:d38cdff612d06fa6a32840d5e1b1f7a27cee4a349aa9085d94a67789d6bfd408     --hash=sha256:dfe9763530994147d9af1def057a5b9658b00e8f8fe8743d144d1e0911c2e454     --hash=sha256:e105ab60406787da31fccc883fc0f733af1efd78f0136a4599692c4083a73d0c     --hash=sha256:e275096ea1e60cc595cda2836fd4a6c725d1125108b868be17f53684d164e2cc     --hash=sha256:edc3342adf8f697fc5f59c887a304356f147b397809440ed64e2fa6af2f50f37     --hash=sha256:ee247f5c245c9a2fe7c8e2214e295918838e44e00a45a6718451e4004219e767     --hash=sha256:f21e8a22c8605750c7af886bab299a363721264061b4ac0a30efb73cfd58efc5     --hash=sha256:f265528741e048bce55c3463ed721fb0aa45a5888d8add8cfeccb3035451bbdc     --hash=sha256:f2f9bd7f90c64fe89253f0a2c05e3c4856072660429ce8831b4235bf29403a67     --hash=sha256:f9f6143a8c75945eb960d9eb98905a441394abfa24afaae239d514ffb2586480     --hash=sha256:fa8f5efb344d6908a1ce62f4a24e2e5780f825d6f53f5f50ec5ffacac72936cb     --hash=sha256:fdd28f912fccfec1846a94e2e1e8f9b0012f557f0c46fe4f3eb0d7a87afcf90b",
+      "externalReferences": [
+        {
+          "comment": "implicit dist url",
+          "hashes": [
+            {
+              "alg": "SHA-256",
+              "content": "0ddc924c04591c2811ca024d62ecad4f7f6f08af8939c211438f48a16bd23602"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "0ec5f09541743261e66e291b4a0cbf0fb2997aeaab6d9e9c740b9dba1b58d1c2"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "1981f1db4630889b9ef7803fadef12b056f428cb6b85c27ba57b774793b6093c"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "25784ce8b9621c90c643efb9e1e2162ab3b0224cae446ad5e70e7fcb1ce18b51"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "4061c0079120205fb760c58acab6443e217307dcf05e3702cf970e0689972856"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "4e81d95e5bafc2d6e34e4bed780e53e4d5b9a2f928573428aa4d35fbec1eb0de"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "58a0c478eeca76fe5e07993c5a0703def34a6dc6a0cda4f5564639b33112ffe7"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "58ddb5a8e3179d12f19e4ea34d2d32e9d63a4baa142c875c1eb59f41b7243acd"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "630ebfea3bf689d075f82316324ff7433dc447fe6bc1bfc76524b74b4a9567d2"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "6f8700550aa1474a91e5dc07049c46f98b423b5b1ddd0483e0b51362eeeaf5be"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "79def8d059362e7831389ed3be0ecdf58a89386e1271e35dd9f5af84e81bffd0"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "7a8701d6b584d76e909e3d305b7d126b41439876a5aaf76cddc67fc230eafa2e"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "7afa5a6602a9f29af1f3a2965f831bae7c9d5d597b7cbb716d41ab3b7d89879c"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "7b46165bb56eb4704e2eaaf86f3c940d19154535d9b0ca7d6d590b04060e00d5"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "85d0d9a31b9098e98534226d5686b47264b95e62ce459dc2e62fdfc809f9fe93"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "87e9ce85beb6b328ba370cc6e6aea483c92617b4c95b1d33a49297eb662bfb04"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "9c8402a82ea0dc4ceeab793db05f0fafa8ca139ca34fcde5df0f596103c74107"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "9dab55f57c74c3cad24c323bacbbd04be4705ba6eb0d92e920b1fc4837ed5079"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "a582ab2ae1d34f67112cadc86702774c9ea4374df6bca6afe672817203c99134"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "a6557e5f38e065ca9fbdaf7cfc7435ecb1d113aa81a022d1b51921ee7432e227"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "ac9ed99d81760c62fe89d5f0815cdfa1ba9a35141cf30f1c2d044f04b4803d2e"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "b13478603dcd0a2479ff8e87e2c19a7d525734686fe3c49542472293a204212d"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "c423ab384a46c4dff7217b2ea5ba2e11cffdeab6441acd04cf65a369caf0366c"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "c5e67125c7dca78d199ec4e116aa93dbb83494808ecbb8211a2cb09b1bf41dbd"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "c71be1cbfa5cd9a41ee452acf1eccd82b2c05950358b106ec8ceb83411d1a020"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "cbc8738fd8526d80f35cb3a40d41f41a2e7030bb3b18b09a6778ef63d291c2fd"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "ce47f66801c20ec6c6632453bb5960fe38939e9306970b48b3a5a26de7745d94"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "d370b8d1dfcdf7130178137f6fbee6140774a1acc6cacefc4b42643ec11d0a3a"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "d38cdff612d06fa6a32840d5e1b1f7a27cee4a349aa9085d94a67789d6bfd408"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "dfe9763530994147d9af1def057a5b9658b00e8f8fe8743d144d1e0911c2e454"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "e105ab60406787da31fccc883fc0f733af1efd78f0136a4599692c4083a73d0c"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "e275096ea1e60cc595cda2836fd4a6c725d1125108b868be17f53684d164e2cc"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "edc3342adf8f697fc5f59c887a304356f147b397809440ed64e2fa6af2f50f37"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "ee247f5c245c9a2fe7c8e2214e295918838e44e00a45a6718451e4004219e767"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "f21e8a22c8605750c7af886bab299a363721264061b4ac0a30efb73cfd58efc5"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "f265528741e048bce55c3463ed721fb0aa45a5888d8add8cfeccb3035451bbdc"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "f2f9bd7f90c64fe89253f0a2c05e3c4856072660429ce8831b4235bf29403a67"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "f9f6143a8c75945eb960d9eb98905a441394abfa24afaae239d514ffb2586480"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "fa8f5efb344d6908a1ce62f4a24e2e5780f825d6f53f5f50ec5ffacac72936cb"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "fdd28f912fccfec1846a94e2e1e8f9b0012f557f0c46fe4f3eb0d7a87afcf90b"
+            }
+          ],
+          "type": "distribution",
+          "url": "https://pypi.org/simple/cryptography/"
+        }
+      ],
+      "name": "cryptography",
+      "purl": "pkg:pypi/cryptography@50.0.2",
+      "type": "library",
+      "version": "50.0.2"
+    },
+    {
+      "bom-ref": "requirements-L184",
+      "description": "requirements line 184: cyclonedx-python-lib==11.12.0     --hash=sha256:0e807521a921a5c3cb8ce1153f8a61d29eedfe76a46aac2796b7c6b573391a54     --hash=sha256:16767c4039de90c04e9f03348f8f0ed4b8ff842eaa7eefcad3a95685f970dacf",
+      "externalReferences": [
+        {
+          "comment": "implicit dist url",
+          "hashes": [
+            {
+              "alg": "SHA-256",
+              "content": "0e807521a921a5c3cb8ce1153f8a61d29eedfe76a46aac2796b7c6b573391a54"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "16767c4039de90c04e9f03348f8f0ed4b8ff842eaa7eefcad3a95685f970dacf"
+            }
+          ],
+          "type": "distribution",
+          "url": "https://pypi.org/simple/cyclonedx-python-lib/"
+        }
+      ],
+      "name": "cyclonedx-python-lib",
+      "purl": "pkg:pypi/cyclonedx-python-lib@11.12.0",
+      "type": "library",
+      "version": "11.12.0"
+    },
+    {
+      "bom-ref": "requirements-L188",
+      "description": "requirements line 188: defusedxml==0.7.1     --hash=sha256:1bb3032db185915b62d7c6209c5a8792be6a32ab2fedacc84e01b52c51aa3e69     --hash=sha256:a352e7e428770286cc899e2542b6cdaedb2b4953ff269a210103ec58f6198a61",
+      "externalReferences": [
+        {
+          "comment": "implicit dist url",
+          "hashes": [
+            {
+              "alg": "SHA-256",
+              "content": "1bb3032db185915b62d7c6209c5a8792be6a32ab2fedacc84e01b52c51aa3e69"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "a352e7e428770286cc899e2542b6cdaedb2b4953ff269a210103ec58f6198a61"
+            }
+          ],
+          "type": "distribution",
+          "url": "https://pypi.org/simple/defusedxml/"
+        }
+      ],
+      "name": "defusedxml",
+      "purl": "pkg:pypi/defusedxml@0.7.1",
+      "type": "library",
+      "version": "0.7.1"
+    },
+    {
+      "bom-ref": "requirements-L192",
+      "description": "requirements line 192: distlib==0.4.3     --hash=sha256:4b0ce306c966eb73bc3a7b6abad017c556dadd92c44701562cd528ac7fde4d5b     --hash=sha256:f152097224a0ae24be5a0f6bae1b9359af82133bce63f98a95f86cae1aede9ed",
+      "externalReferences": [
+        {
+          "comment": "implicit dist url",
+          "hashes": [
+            {
+              "alg": "SHA-256",
+              "content": "4b0ce306c966eb73bc3a7b6abad017c556dadd92c44701562cd528ac7fde4d5b"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "f152097224a0ae24be5a0f6bae1b9359af82133bce63f98a95f86cae1aede9ed"
+            }
+          ],
+          "type": "distribution",
+          "url": "https://pypi.org/simple/distlib/"
+        }
+      ],
+      "name": "distlib",
+      "purl": "pkg:pypi/distlib@0.4.3",
+      "type": "library",
+      "version": "0.4.3"
+    },
+    {
+      "bom-ref": "requirements-L196",
+      "description": "requirements line 196: fastapi==0.143.2     --hash=sha256:da2fe9893b7392ebce76d8c8511e3fa43e5a25f5852103aa2eee7cff3ab80b75     --hash=sha256:e9e6d97018dcfd748da7d9e7c61cedefbe9eb91b1a3288e45b13fbae76df2d54",
+      "externalReferences": [
+        {
+          "comment": "implicit dist url",
+          "hashes": [
+            {
+              "alg": "SHA-256",
+              "content": "da2fe9893b7392ebce76d8c8511e3fa43e5a25f5852103aa2eee7cff3ab80b75"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "e9e6d97018dcfd748da7d9e7c61cedefbe9eb91b1a3288e45b13fbae76df2d54"
+            }
+          ],
+          "type": "distribution",
+          "url": "https://pypi.org/simple/fastapi/"
+        }
+      ],
+      "name": "fastapi",
+      "purl": "pkg:pypi/fastapi@0.143.2",
+      "type": "library",
+      "version": "0.143.2"
+    },
+    {
+      "bom-ref": "requirements-L200",
+      "description": "requirements line 200: filelock==4.2.4     --hash=sha256:301241438c57936ef93f4243a94f2559022268bfcf9b375a9a72eb0f8db8358e     --hash=sha256:c6d8663535e1650ee430507b4ffbac7b464dd64b7647ea0112a9f406499d163d",
+      "externalReferences": [
+        {
+          "comment": "implicit dist url",
+          "hashes": [
+            {
+              "alg": "SHA-256",
+              "content": "301241438c57936ef93f4243a94f2559022268bfcf9b375a9a72eb0f8db8358e"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "c6d8663535e1650ee430507b4ffbac7b464dd64b7647ea0112a9f406499d163d"
+            }
+          ],
+          "type": "distribution",
+          "url": "https://pypi.org/simple/filelock/"
+        }
+      ],
+      "name": "filelock",
+      "purl": "pkg:pypi/filelock@4.2.4",
+      "type": "library",
+      "version": "4.2.4"
+    },
+    {
+      "bom-ref": "requirements-L207",
+      "description": "requirements line 207: h11==0.16.0     --hash=sha256:4e35b956cf45792e4caa5885e69fba00bdbc6ffafbfa020300e549b208ee5ff1     --hash=sha256:63cf8bbe7522de3bf65932fda1d9c2772064ffb3dae62d55932da54b31cb6c86",
+      "externalReferences": [
+        {
+          "comment": "implicit dist url",
+          "hashes": [
+            {
+              "alg": "SHA-256",
+              "content": "4e35b956cf45792e4caa5885e69fba00bdbc6ffafbfa020300e549b208ee5ff1"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "63cf8bbe7522de3bf65932fda1d9c2772064ffb3dae62d55932da54b31cb6c86"
+            }
+          ],
+          "type": "distribution",
+          "url": "https://pypi.org/simple/h11/"
+        }
+      ],
+      "name": "h11",
+      "purl": "pkg:pypi/h11@0.16.0",
+      "type": "library",
+      "version": "0.16.0"
+    },
+    {
+      "bom-ref": "requirements-L213",
+      "description": "requirements line 213: httpcore2==2.13.1 ; sys_platform != 'emscripten'     --hash=sha256:e0aa977abe17e69a3b820a24542a6fa88702676d83880b8d194dcd18408e5103     --hash=sha256:e1e05d4f25f7d7d496bfb96748f6f4b67657b03da069b3a68c36069f3db73d0a",
+      "externalReferences": [
+        {
+          "comment": "implicit dist url",
+          "hashes": [
+            {
+              "alg": "SHA-256",
+              "content": "e0aa977abe17e69a3b820a24542a6fa88702676d83880b8d194dcd18408e5103"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "e1e05d4f25f7d7d496bfb96748f6f4b67657b03da069b3a68c36069f3db73d0a"
+            }
+          ],
+          "type": "distribution",
+          "url": "https://pypi.org/simple/httpcore2/"
+        }
+      ],
+      "name": "httpcore2",
+      "purl": "pkg:pypi/httpcore2@2.13.1",
+      "type": "library",
+      "version": "2.13.1"
+    },
+    {
+      "bom-ref": "requirements-L217",
+      "description": "requirements line 217: httpx2==2.13.1     --hash=sha256:6dff50fabc270ee5fd25d845d0b078ed20564579744d6d962850975996d2f9a4     --hash=sha256:e48744a19e3af5ee48313d0ce5fe941d5422fae5705ea922a4aabf94d7800dfa",
+      "externalReferences": [
+        {
+          "comment": "implicit dist url",
+          "hashes": [
+            {
+              "alg": "SHA-256",
+              "content": "6dff50fabc270ee5fd25d845d0b078ed20564579744d6d962850975996d2f9a4"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "e48744a19e3af5ee48313d0ce5fe941d5422fae5705ea922a4aabf94d7800dfa"
+            }
+          ],
+          "type": "distribution",
+          "url": "https://pypi.org/simple/httpx2/"
+        }
+      ],
+      "name": "httpx2",
+      "purl": "pkg:pypi/httpx2@2.13.1",
+      "type": "library",
+      "version": "2.13.1"
+    },
+    {
+      "bom-ref": "requirements-L220",
+      "description": "requirements line 220: httpx2-jsfetch==1.0 ; sys_platform == 'emscripten'     --hash=sha256:70a0e3eabfef7cce5ad9c629f7d01ca05e418f586646f4ddf14782e4c1454c60     --hash=sha256:cb916b707601e69a07721aabc8f3f6659be3a6893bc1ff5c6f9e02241df2da32",
+      "externalReferences": [
+        {
+          "comment": "implicit dist url",
+          "hashes": [
+            {
+              "alg": "SHA-256",
+              "content": "70a0e3eabfef7cce5ad9c629f7d01ca05e418f586646f4ddf14782e4c1454c60"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "cb916b707601e69a07721aabc8f3f6659be3a6893bc1ff5c6f9e02241df2da32"
+            }
+          ],
+          "type": "distribution",
+          "url": "https://pypi.org/simple/httpx2-jsfetch/"
+        }
+      ],
+      "name": "httpx2-jsfetch",
+      "purl": "pkg:pypi/httpx2-jsfetch@1.0",
+      "type": "library",
+      "version": "1.0"
+    },
+    {
+      "bom-ref": "requirements-L224",
+      "description": "requirements line 224: identify==2.6.20     --hash=sha256:6a16b69b93187244e0548cbfd25b3e4a6f9a7a2ad784625c3bec2b8d27b81aaa     --hash=sha256:ad729860a923858d26917c2f4fb0a1d83d27a75b1e090c06440c573f048f3285",
+      "externalReferences": [
+        {
+          "comment": "implicit dist url",
+          "hashes": [
+            {
+              "alg": "SHA-256",
+              "content": "6a16b69b93187244e0548cbfd25b3e4a6f9a7a2ad784625c3bec2b8d27b81aaa"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "ad729860a923858d26917c2f4fb0a1d83d27a75b1e090c06440c573f048f3285"
+            }
+          ],
+          "type": "distribution",
+          "url": "https://pypi.org/simple/identify/"
+        }
+      ],
+      "name": "identify",
+      "purl": "pkg:pypi/identify@2.6.20",
+      "type": "library",
+      "version": "2.6.20"
+    },
+    {
+      "bom-ref": "requirements-L228",
+      "description": "requirements line 228: idna==3.20     --hash=sha256:a7db850025b95ded1eae8a46181a1a6c56c92c96f0e2b005d9ff8dc0210cab44     --hash=sha256:ab7ae7122974553370f0bdb919e1a960b2cd1bc1ef0276416d896db81c14582c",
+      "externalReferences": [
+        {
+          "comment": "implicit dist url",
+          "hashes": [
+            {
+              "alg": "SHA-256",
+              "content": "a7db850025b95ded1eae8a46181a1a6c56c92c96f0e2b005d9ff8dc0210cab44"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "ab7ae7122974553370f0bdb919e1a960b2cd1bc1ef0276416d896db81c14582c"
+            }
+          ],
+          "type": "distribution",
+          "url": "https://pypi.org/simple/idna/"
+        }
+      ],
+      "name": "idna",
+      "purl": "pkg:pypi/idna@3.20",
+      "type": "library",
+      "version": "3.20"
+    },
+    {
+      "bom-ref": "requirements-L235",
+      "description": "requirements line 235: iniconfig==2.3.1     --hash=sha256:67f4b9c50da0dedf52af349e7749a80a9057a5031199791b906c3bb3ae878960     --hash=sha256:9121e2c1fdb355232495be3194c8dfe87ccc2d5dee45947b78e68f499790d7a7",
+      "externalReferences": [
+        {
+          "comment": "implicit dist url",
+          "hashes": [
+            {
+              "alg": "SHA-256",
+              "content": "67f4b9c50da0dedf52af349e7749a80a9057a5031199791b906c3bb3ae878960"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "9121e2c1fdb355232495be3194c8dfe87ccc2d5dee45947b78e68f499790d7a7"
+            }
+          ],
+          "type": "distribution",
+          "url": "https://pypi.org/simple/iniconfig/"
+        }
+      ],
+      "name": "iniconfig",
+      "purl": "pkg:pypi/iniconfig@2.3.1",
+      "type": "library",
+      "version": "2.3.1"
+    },
+    {
+      "bom-ref": "requirements-L239",
+      "description": "requirements line 239: librt==0.16.0 ; platform_python_implementation != 'PyPy'     --hash=sha256:0058f9d68721094105917254c72ac0569117bb7b13b9769cf45d26d89f9d21cd     --hash=sha256:02d89c813d5ff74b17df72d3a34819d132cd168e56b81bf755b809bd9e46b8c4     --hash=sha256:14ed6ebe3e4f85f326d7920011ad30ff49ed9334e62cf88caef9ba973d9e3a92     --hash=sha256:17bac7f7a16b328fff77e440287693eb017abde913595b5827ebccbc21ecd8a6     --hash=sha256:30b7beaf3f4487b7d8adef1f158b49067cb4d5a19fa7a3bf31a4e7a820e435c5     --hash=sha256:33f41443a1f4e1f099331b3d8120e409fbff84b9760bc1cc9ea496f37ddaa5cc     --hash=sha256:468df902df016a06eb0e40b0747dc8d14e47d7a38b18b63b1fb167d85cb94d63     --hash=sha256:5b976054553670829985ed767feb78fb6bcede0175327c4844dd5c281c1be659     --hash=sha256:77c7a2b4fe2c1369e0d5aa1cade26740a7b14be32fbc9a5535d617d20065c39d     --hash=sha256:7e510b7770bee609617a3374a96548eb114cae048023e3f049ee449e7ff2db32     --hash=sha256:83d4041a3d9b2fd053a8a4e1f22878b3e5833e2712956382d5c048d791454e91     --hash=sha256:92caf82ebef5e12d21c72242b70d1e92536f1711cf2a727a4c276de4b4469087     --hash=sha256:a8afb6557920860b7a3a596eb804cf37e09e7cf8a803db2478c202acc72d8c2e     --hash=sha256:ac38d6d8d66bf3d744148dbbc0b8e193e195a51e364ed55e224631f5721891fc     --hash=sha256:aea7b1f2b125dad5de85f049136651bff256c883c65e6b9209b2da0a1ac3cdef     --hash=sha256:c5e6144e68b577f157519f2ba88ca20e3ed61c29b00e5cdfa76cd2d45acf059a     --hash=sha256:efc49c462d4516b8a58b00b490078fa64689fd1fe66970cc190131d7afb8027e",
+      "externalReferences": [
+        {
+          "comment": "implicit dist url",
+          "hashes": [
+            {
+              "alg": "SHA-256",
+              "content": "0058f9d68721094105917254c72ac0569117bb7b13b9769cf45d26d89f9d21cd"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "02d89c813d5ff74b17df72d3a34819d132cd168e56b81bf755b809bd9e46b8c4"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "14ed6ebe3e4f85f326d7920011ad30ff49ed9334e62cf88caef9ba973d9e3a92"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "17bac7f7a16b328fff77e440287693eb017abde913595b5827ebccbc21ecd8a6"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "30b7beaf3f4487b7d8adef1f158b49067cb4d5a19fa7a3bf31a4e7a820e435c5"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "33f41443a1f4e1f099331b3d8120e409fbff84b9760bc1cc9ea496f37ddaa5cc"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "468df902df016a06eb0e40b0747dc8d14e47d7a38b18b63b1fb167d85cb94d63"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "5b976054553670829985ed767feb78fb6bcede0175327c4844dd5c281c1be659"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "77c7a2b4fe2c1369e0d5aa1cade26740a7b14be32fbc9a5535d617d20065c39d"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "7e510b7770bee609617a3374a96548eb114cae048023e3f049ee449e7ff2db32"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "83d4041a3d9b2fd053a8a4e1f22878b3e5833e2712956382d5c048d791454e91"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "92caf82ebef5e12d21c72242b70d1e92536f1711cf2a727a4c276de4b4469087"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "a8afb6557920860b7a3a596eb804cf37e09e7cf8a803db2478c202acc72d8c2e"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "ac38d6d8d66bf3d744148dbbc0b8e193e195a51e364ed55e224631f5721891fc"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "aea7b1f2b125dad5de85f049136651bff256c883c65e6b9209b2da0a1ac3cdef"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "c5e6144e68b577f157519f2ba88ca20e3ed61c29b00e5cdfa76cd2d45acf059a"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "efc49c462d4516b8a58b00b490078fa64689fd1fe66970cc190131d7afb8027e"
+            }
+          ],
+          "type": "distribution",
+          "url": "https://pypi.org/simple/librt/"
+        }
+      ],
+      "name": "librt",
+      "purl": "pkg:pypi/librt@0.16.0",
+      "type": "library",
+      "version": "0.16.0"
+    },
+    {
+      "bom-ref": "requirements-L258",
+      "description": "requirements line 258: license-expression==30.4.4     --hash=sha256:421788fdcadb41f049d2dc934ce666626265aeccefddd25e162a26f23bcbf8a4     --hash=sha256:73448f0aacd8d0808895bdc4b2c8e01a8d67646e4188f887375398c761f340fd",
+      "externalReferences": [
+        {
+          "comment": "implicit dist url",
+          "hashes": [
+            {
+              "alg": "SHA-256",
+              "content": "421788fdcadb41f049d2dc934ce666626265aeccefddd25e162a26f23bcbf8a4"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "73448f0aacd8d0808895bdc4b2c8e01a8d67646e4188f887375398c761f340fd"
+            }
+          ],
+          "type": "distribution",
+          "url": "https://pypi.org/simple/license-expression/"
+        }
+      ],
+      "name": "license-expression",
+      "purl": "pkg:pypi/license-expression@30.4.4",
+      "type": "library",
+      "version": "30.4.4"
+    },
+    {
+      "bom-ref": "requirements-L262",
+      "description": "requirements line 262: mako==1.4.3     --hash=sha256:723296007c870bfd6b3f0c3230dba7198096e5269297ebf5e4eff9e7ffa39d4f     --hash=sha256:cd6537fe88d5fec315c55c2f8529bc4ce7a9a352ad7db3eeaa6a66e2dd4ec37a",
+      "externalReferences": [
+        {
+          "comment": "implicit dist url",
+          "hashes": [
+            {
+              "alg": "SHA-256",
+              "content": "723296007c870bfd6b3f0c3230dba7198096e5269297ebf5e4eff9e7ffa39d4f"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "cd6537fe88d5fec315c55c2f8529bc4ce7a9a352ad7db3eeaa6a66e2dd4ec37a"
+            }
+          ],
+          "type": "distribution",
+          "url": "https://pypi.org/simple/mako/"
+        }
+      ],
+      "name": "mako",
+      "purl": "pkg:pypi/mako@1.4.3",
+      "type": "library",
+      "version": "1.4.3"
+    },
+    {
+      "bom-ref": "requirements-L266",
+      "description": "requirements line 266: markdown-it-py==4.2.0     --hash=sha256:04a21681d6fbb623de53f6f364d352309d4094dd4194040a10fd51833e418d49     --hash=sha256:9f7ebbcd14fe59494226453aed97c1070d83f8d24b6fc3a3bcf9a38092641c4a",
+      "externalReferences": [
+        {
+          "comment": "implicit dist url",
+          "hashes": [
+            {
+              "alg": "SHA-256",
+              "content": "04a21681d6fbb623de53f6f364d352309d4094dd4194040a10fd51833e418d49"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "9f7ebbcd14fe59494226453aed97c1070d83f8d24b6fc3a3bcf9a38092641c4a"
+            }
+          ],
+          "type": "distribution",
+          "url": "https://pypi.org/simple/markdown-it-py/"
+        }
+      ],
+      "name": "markdown-it-py",
+      "purl": "pkg:pypi/markdown-it-py@4.2.0",
+      "type": "library",
+      "version": "4.2.0"
+    },
+    {
+      "bom-ref": "requirements-L270",
+      "description": "requirements line 270: markupsafe==3.0.4     --hash=sha256:06de8ef6331f6e822c28d577dc8bf43fe398800477c49498f38fc38b67ff33fc     --hash=sha256:18a801868a884f216e784d7d14db2a4077143ce7610440aee2ce8f734e7cfcde     --hash=sha256:1f1f9477e174582b0a1b583d60b66e1f2cf5d3fe12cee985e4aedf44766600e5     --hash=sha256:2628d3a8cb648ecebb3c5d6b0a1052d400e4d8b7ac0fb786be8d285b50040d17     --hash=sha256:2d1b7d9308288661f56672b1b157d75fc536714d3638487bbea17b6318a78248     --hash=sha256:2e9ad7dd851bf45fab9f75cbff4cb493fee9979e8d8c7c9c3ee119022518edd6     --hash=sha256:34bdde374c5932765d7dc685c4a1d191a3207852d67e8e0a9eb6ea85156181f1     --hash=sha256:434139499bb20b502ed3baa1f169e618f924a97e7a777fea1a49446d80106cf6     --hash=sha256:5066b244f576f91afc8ee3ba029a89f99d39c79b1853fe9d39bea9f0afbec148     --hash=sha256:5989cb26b2e1efc6a42216a9f6b5ee495ce5ace2e5b352a9af489976b32d1ee2     --hash=sha256:672d207103e6b16ca098611b0f9efad6bc00afd47c03d6ef62186495ca677dc0     --hash=sha256:6bd9e1788e15bfcf6a9082de42e30387e7b85d211ab21e57a939bb8cfaaf8d96     --hash=sha256:7018d4af1cd272e847aa5917983ab5e83e4f6579f9dbfecd4a79c0ca80b144c2     --hash=sha256:73e77980c7207854f00fc4e71fb1626868d5740ab4012623d55c7a99ad122a72     --hash=sha256:7a83aa6e4805df46fed18e989d3d16f86ef60cb50bbc8d9ce3a6be89165fbf6e     --hash=sha256:9e227f3dbe6bde7491cf0a9965d00b88c6b1a4a95d11480ddf88bb96d397c19f     --hash=sha256:a5fcffb37e602b0b3c1638a97746b9b96125caa9bcf6fa41d337a9261de231ee     --hash=sha256:add96447a86d205ab616665d53b2950ee81083757f56e6ea833c8b2917646b46     --hash=sha256:b8cd1f918b26fd7b1832ece557cc18f2d8747309ff8b3f0ef9d4250c5ad67a39     --hash=sha256:c90d5b3d4e944e065a301d741b3c1d784f6bd1f503aa68b4967e32b2ba313d85     --hash=sha256:de8b364c423ef0a4bad9069657d617f9a5d2b2062457a89b1fa16ee199c399c1",
+      "externalReferences": [
+        {
+          "comment": "implicit dist url",
+          "hashes": [
+            {
+              "alg": "SHA-256",
+              "content": "06de8ef6331f6e822c28d577dc8bf43fe398800477c49498f38fc38b67ff33fc"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "18a801868a884f216e784d7d14db2a4077143ce7610440aee2ce8f734e7cfcde"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "1f1f9477e174582b0a1b583d60b66e1f2cf5d3fe12cee985e4aedf44766600e5"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "2628d3a8cb648ecebb3c5d6b0a1052d400e4d8b7ac0fb786be8d285b50040d17"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "2d1b7d9308288661f56672b1b157d75fc536714d3638487bbea17b6318a78248"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "2e9ad7dd851bf45fab9f75cbff4cb493fee9979e8d8c7c9c3ee119022518edd6"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "34bdde374c5932765d7dc685c4a1d191a3207852d67e8e0a9eb6ea85156181f1"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "434139499bb20b502ed3baa1f169e618f924a97e7a777fea1a49446d80106cf6"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "5066b244f576f91afc8ee3ba029a89f99d39c79b1853fe9d39bea9f0afbec148"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "5989cb26b2e1efc6a42216a9f6b5ee495ce5ace2e5b352a9af489976b32d1ee2"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "672d207103e6b16ca098611b0f9efad6bc00afd47c03d6ef62186495ca677dc0"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "6bd9e1788e15bfcf6a9082de42e30387e7b85d211ab21e57a939bb8cfaaf8d96"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "7018d4af1cd272e847aa5917983ab5e83e4f6579f9dbfecd4a79c0ca80b144c2"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "73e77980c7207854f00fc4e71fb1626868d5740ab4012623d55c7a99ad122a72"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "7a83aa6e4805df46fed18e989d3d16f86ef60cb50bbc8d9ce3a6be89165fbf6e"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "9e227f3dbe6bde7491cf0a9965d00b88c6b1a4a95d11480ddf88bb96d397c19f"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "a5fcffb37e602b0b3c1638a97746b9b96125caa9bcf6fa41d337a9261de231ee"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "add96447a86d205ab616665d53b2950ee81083757f56e6ea833c8b2917646b46"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "b8cd1f918b26fd7b1832ece557cc18f2d8747309ff8b3f0ef9d4250c5ad67a39"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "c90d5b3d4e944e065a301d741b3c1d784f6bd1f503aa68b4967e32b2ba313d85"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "de8b364c423ef0a4bad9069657d617f9a5d2b2062457a89b1fa16ee199c399c1"
+            }
+          ],
+          "type": "distribution",
+          "url": "https://pypi.org/simple/markupsafe/"
+        }
+      ],
+      "name": "markupsafe",
+      "purl": "pkg:pypi/markupsafe@3.0.4",
+      "type": "library",
+      "version": "3.0.4"
+    },
+    {
+      "bom-ref": "requirements-L293",
+      "description": "requirements line 293: mdurl==0.1.2     --hash=sha256:84008a41e51615a49fc9966191ff91509e3c40b939176e643fd50a5c2196b8f8     --hash=sha256:bb413d29f5eea38f31dd4754dd7377d4465116fb207585f97bf925588687c1ba",
+      "externalReferences": [
+        {
+          "comment": "implicit dist url",
+          "hashes": [
+            {
+              "alg": "SHA-256",
+              "content": "84008a41e51615a49fc9966191ff91509e3c40b939176e643fd50a5c2196b8f8"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "bb413d29f5eea38f31dd4754dd7377d4465116fb207585f97bf925588687c1ba"
+            }
+          ],
+          "type": "distribution",
+          "url": "https://pypi.org/simple/mdurl/"
+        }
+      ],
+      "name": "mdurl",
+      "purl": "pkg:pypi/mdurl@0.1.2",
+      "type": "library",
+      "version": "0.1.2"
+    },
+    {
+      "bom-ref": "requirements-L297",
+      "description": "requirements line 297: msgpack==1.2.3     --hash=sha256:07c9733089d1b176c3dd2f7fa268452f9d5d784d076473499d754a58e8d1fbbb     --hash=sha256:21bfa4d2aa0b04c1806ef778a1199e9e53ea2441bcbf284420a32083896320b8     --hash=sha256:32edb81a2b5eb7cd7c9d941b2bfbbb082fd2cd09e0e725930316af6b708db186     --hash=sha256:471e12a6a42498a31490c206e0069e343b6a7c35db540be73a879eb06f5be047     --hash=sha256:5e0d7950ca3c1bbae291d0552dd3bb2792fc680629c4c0d44e47e5bab969f3ca     --hash=sha256:62cc1a4ef0e553bac32c8342e1f04834aca7de276b92744eb7307db77759b890     --hash=sha256:6576f348ed6cc4f31db6fd915a8e94245f042f50eae08d48732425e70638ea37     --hash=sha256:bb89b5dc30469c84bbf8684826eb851d82412ca95690e111b9ac5e8fb343961a     --hash=sha256:cd5a9f9f86a52c24713679aa2631956835f3842512964ff93f736ff76f1f530d     --hash=sha256:d2f9c4f85e47a44d26d5baf3b041eef23436e224d44eed273f01bd8a12048d9f     --hash=sha256:db84203b13aecc222f465061397fdd5b53b7ae73d2c95ffc1c8dc5be0153a709     --hash=sha256:f24a43b3560e20f825b807fe1e874bd73d53abaf8bbdcf258a6eb152cddbc1f5     --hash=sha256:f9ddd28d3e9bbc602a9dced1591882c7fb9ab776eef8837da2c326fde19e2853",
+      "externalReferences": [
+        {
+          "comment": "implicit dist url",
+          "hashes": [
+            {
+              "alg": "SHA-256",
+              "content": "07c9733089d1b176c3dd2f7fa268452f9d5d784d076473499d754a58e8d1fbbb"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "21bfa4d2aa0b04c1806ef778a1199e9e53ea2441bcbf284420a32083896320b8"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "32edb81a2b5eb7cd7c9d941b2bfbbb082fd2cd09e0e725930316af6b708db186"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "471e12a6a42498a31490c206e0069e343b6a7c35db540be73a879eb06f5be047"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "5e0d7950ca3c1bbae291d0552dd3bb2792fc680629c4c0d44e47e5bab969f3ca"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "62cc1a4ef0e553bac32c8342e1f04834aca7de276b92744eb7307db77759b890"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "6576f348ed6cc4f31db6fd915a8e94245f042f50eae08d48732425e70638ea37"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "bb89b5dc30469c84bbf8684826eb851d82412ca95690e111b9ac5e8fb343961a"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "cd5a9f9f86a52c24713679aa2631956835f3842512964ff93f736ff76f1f530d"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "d2f9c4f85e47a44d26d5baf3b041eef23436e224d44eed273f01bd8a12048d9f"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "db84203b13aecc222f465061397fdd5b53b7ae73d2c95ffc1c8dc5be0153a709"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "f24a43b3560e20f825b807fe1e874bd73d53abaf8bbdcf258a6eb152cddbc1f5"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "f9ddd28d3e9bbc602a9dced1591882c7fb9ab776eef8837da2c326fde19e2853"
+            }
+          ],
+          "type": "distribution",
+          "url": "https://pypi.org/simple/msgpack/"
+        }
+      ],
+      "name": "msgpack",
+      "purl": "pkg:pypi/msgpack@1.2.3",
+      "type": "library",
+      "version": "1.2.3"
+    },
+    {
+      "bom-ref": "requirements-L312",
+      "description": "requirements line 312: mypy==2.4.0     --hash=sha256:295ecf2e57542cd836ca537486951289678c8c7d1ee6ad74ebe29b2168a003cf     --hash=sha256:4209da39d85cf240f762af622d8180fcdfcb4727d021f44ade62d613a1a43324     --hash=sha256:6be721bd4bd57576193653b75b4af3461c9d0bf7dd8b528f782e9be210dc75bb     --hash=sha256:77bdaebd452f43fcfc4cc3ba94352a3ea537cd01e3f2d0879f48673d2ec00d6e     --hash=sha256:7da85fbcff6dac1abcc636707bed38b45598131fb7a605d9719c70b5cc733af8     --hash=sha256:bc378bdad4e9f12b5bd96466083d1e71acf00594ec9c7b2bdb5e02816f77f303     --hash=sha256:d01c5d26a352acc6d5cf3128225477e1e8465e8d3029d4c345807fbf7f3cf093     --hash=sha256:e1fde197ae65be856a034a91b70ed747a16562ca69577785f06c661548424bf1",
+      "externalReferences": [
+        {
+          "comment": "implicit dist url",
+          "hashes": [
+            {
+              "alg": "SHA-256",
+              "content": "295ecf2e57542cd836ca537486951289678c8c7d1ee6ad74ebe29b2168a003cf"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "4209da39d85cf240f762af622d8180fcdfcb4727d021f44ade62d613a1a43324"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "6be721bd4bd57576193653b75b4af3461c9d0bf7dd8b528f782e9be210dc75bb"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "77bdaebd452f43fcfc4cc3ba94352a3ea537cd01e3f2d0879f48673d2ec00d6e"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "7da85fbcff6dac1abcc636707bed38b45598131fb7a605d9719c70b5cc733af8"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "bc378bdad4e9f12b5bd96466083d1e71acf00594ec9c7b2bdb5e02816f77f303"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "d01c5d26a352acc6d5cf3128225477e1e8465e8d3029d4c345807fbf7f3cf093"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "e1fde197ae65be856a034a91b70ed747a16562ca69577785f06c661548424bf1"
+            }
+          ],
+          "type": "distribution",
+          "url": "https://pypi.org/simple/mypy/"
+        }
+      ],
+      "name": "mypy",
+      "purl": "pkg:pypi/mypy@2.4.0",
+      "type": "library",
+      "version": "2.4.0"
+    },
+    {
+      "bom-ref": "requirements-L321",
+      "description": "requirements line 321: mypy-extensions==1.1.0     --hash=sha256:1be4cccdb0f2482337c4743e60421de3a356cd97508abadd57d47403e94f5505     --hash=sha256:52e68efc3284861e772bbcd66823fde5ae21fd2fdb51c62a211403730b916558",
+      "externalReferences": [
+        {
+          "comment": "implicit dist url",
+          "hashes": [
+            {
+              "alg": "SHA-256",
+              "content": "1be4cccdb0f2482337c4743e60421de3a356cd97508abadd57d47403e94f5505"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "52e68efc3284861e772bbcd66823fde5ae21fd2fdb51c62a211403730b916558"
+            }
+          ],
+          "type": "distribution",
+          "url": "https://pypi.org/simple/mypy-extensions/"
+        }
+      ],
+      "name": "mypy-extensions",
+      "purl": "pkg:pypi/mypy-extensions@1.1.0",
+      "type": "library",
+      "version": "1.1.0"
+    },
+    {
+      "bom-ref": "requirements-L325",
+      "description": "requirements line 325: nodeenv==1.11.0     --hash=sha256:3ce8fe5b71d16e8af7039ca65257354100bc772965d6bc549070649e53b1b146     --hash=sha256:edaa16e6c14d7cf395d75d4bbd5a26390f4dc06501a33b4e76282b02cc688a25",
+      "externalReferences": [
+        {
+          "comment": "implicit dist url",
+          "hashes": [
+            {
+              "alg": "SHA-256",
+              "content": "3ce8fe5b71d16e8af7039ca65257354100bc772965d6bc549070649e53b1b146"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "edaa16e6c14d7cf395d75d4bbd5a26390f4dc06501a33b4e76282b02cc688a25"
+            }
+          ],
+          "type": "distribution",
+          "url": "https://pypi.org/simple/nodeenv/"
+        }
+      ],
+      "name": "nodeenv",
+      "purl": "pkg:pypi/nodeenv@1.11.0",
+      "type": "library",
+      "version": "1.11.0"
+    },
+    {
+      "bom-ref": "requirements-L329",
+      "description": "requirements line 329: opentelemetry-api==1.45.1     --hash=sha256:aa38ed19bcc084ba42782a73255b3582283eced7ad6dddbd6695189e69adfb75     --hash=sha256:b31553efa588ae44bc306f863c785c5333a9ecc091248c6ee68b4b6c87fdedfb",
+      "externalReferences": [
+        {
+          "comment": "implicit dist url",
+          "hashes": [
+            {
+              "alg": "SHA-256",
+              "content": "aa38ed19bcc084ba42782a73255b3582283eced7ad6dddbd6695189e69adfb75"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "b31553efa588ae44bc306f863c785c5333a9ecc091248c6ee68b4b6c87fdedfb"
+            }
+          ],
+          "type": "distribution",
+          "url": "https://pypi.org/simple/opentelemetry-api/"
+        }
+      ],
+      "name": "opentelemetry-api",
+      "purl": "pkg:pypi/opentelemetry-api@1.45.1",
+      "type": "library",
+      "version": "1.45.1"
+    },
+    {
+      "bom-ref": "requirements-L333",
+      "description": "requirements line 333: packageurl-python==0.17.6     --hash=sha256:1252ce3a102372ca6f86eb968e16f9014c4ba511c5c37d95a7f023e2ca6e5c25     --hash=sha256:31a85c2717bc41dd818f3c62908685ff9eebcb68588213745b14a6ee9e7df7c9",
+      "externalReferences": [
+        {
+          "comment": "implicit dist url",
+          "hashes": [
+            {
+              "alg": "SHA-256",
+              "content": "1252ce3a102372ca6f86eb968e16f9014c4ba511c5c37d95a7f023e2ca6e5c25"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "31a85c2717bc41dd818f3c62908685ff9eebcb68588213745b14a6ee9e7df7c9"
+            }
+          ],
+          "type": "distribution",
+          "url": "https://pypi.org/simple/packageurl-python/"
+        }
+      ],
+      "name": "packageurl-python",
+      "purl": "pkg:pypi/packageurl-python@0.17.6",
+      "type": "library",
+      "version": "0.17.6"
+    },
+    {
+      "bom-ref": "requirements-L337",
+      "description": "requirements line 337: packaging==26.3     --hash=sha256:94edc256424af38762eb31306eed28beb9f0efc50a8837492c9d6fd6004aed79     --hash=sha256:d7193f7c8e4e93f444fde0262bf90af30e16fa0ad0ad44cb553c87339b23cd1c",
+      "externalReferences": [
+        {
+          "comment": "implicit dist url",
+          "hashes": [
+            {
+              "alg": "SHA-256",
+              "content": "94edc256424af38762eb31306eed28beb9f0efc50a8837492c9d6fd6004aed79"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "d7193f7c8e4e93f444fde0262bf90af30e16fa0ad0ad44cb553c87339b23cd1c"
+            }
+          ],
+          "type": "distribution",
+          "url": "https://pypi.org/simple/packaging/"
+        }
+      ],
+      "name": "packaging",
+      "purl": "pkg:pypi/packaging@26.3",
+      "type": "library",
+      "version": "26.3"
+    },
+    {
+      "bom-ref": "requirements-L345",
+      "description": "requirements line 345: pathspec==1.1.1     --hash=sha256:17db5ecd524104a120e173814c90367a96a98d07c45b2e10c2f3919fff91bf5a     --hash=sha256:a00ce642f577bf7f473932318056212bc4f8bfdf53128c78bbd5af0b9b20b189",
+      "externalReferences": [
+        {
+          "comment": "implicit dist url",
+          "hashes": [
+            {
+              "alg": "SHA-256",
+              "content": "17db5ecd524104a120e173814c90367a96a98d07c45b2e10c2f3919fff91bf5a"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "a00ce642f577bf7f473932318056212bc4f8bfdf53128c78bbd5af0b9b20b189"
+            }
+          ],
+          "type": "distribution",
+          "url": "https://pypi.org/simple/pathspec/"
+        }
+      ],
+      "name": "pathspec",
+      "purl": "pkg:pypi/pathspec@1.1.1",
+      "type": "library",
+      "version": "1.1.1"
+    },
+    {
+      "bom-ref": "requirements-L349",
+      "description": "requirements line 349: pip==26.2.1     --hash=sha256:71138adf1f4ca900cdb7d289c21b7494329f2332b6d85f0e1c42108c0384ed3e     --hash=sha256:f6ad667e89a1fe78046c8f13232b247200f5258d7828f3f7883d660878e0813f",
+      "externalReferences": [
+        {
+          "comment": "implicit dist url",
+          "hashes": [
+            {
+              "alg": "SHA-256",
+              "content": "71138adf1f4ca900cdb7d289c21b7494329f2332b6d85f0e1c42108c0384ed3e"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "f6ad667e89a1fe78046c8f13232b247200f5258d7828f3f7883d660878e0813f"
+            }
+          ],
+          "type": "distribution",
+          "url": "https://pypi.org/simple/pip/"
+        }
+      ],
+      "name": "pip",
+      "purl": "pkg:pypi/pip@26.2.1",
+      "type": "library",
+      "version": "26.2.1"
+    },
+    {
+      "bom-ref": "requirements-L353",
+      "description": "requirements line 353: pip-api==0.0.35     --hash=sha256:14dea05d7b3b68f4c7582213e3ae8932bbba8e1f754bf06b95263d5fa6ab4363     --hash=sha256:66990d0da25378555cbb538db79384bab92d4617c6350dfd7a2126ba2a3a9894",
+      "externalReferences": [
+        {
+          "comment": "implicit dist url",
+          "hashes": [
+            {
+              "alg": "SHA-256",
+              "content": "14dea05d7b3b68f4c7582213e3ae8932bbba8e1f754bf06b95263d5fa6ab4363"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "66990d0da25378555cbb538db79384bab92d4617c6350dfd7a2126ba2a3a9894"
+            }
+          ],
+          "type": "distribution",
+          "url": "https://pypi.org/simple/pip-api/"
+        }
+      ],
+      "name": "pip-api",
+      "purl": "pkg:pypi/pip-api@0.0.35",
+      "type": "library",
+      "version": "0.0.35"
+    },
+    {
+      "bom-ref": "requirements-L357",
+      "description": "requirements line 357: pip-audit==2.10.1     --hash=sha256:1eb4565d19ebe5d48996f4b770b4d2b32887e12cb12cfa637f1a064011b55ffc     --hash=sha256:99ef3f600a317c1945f1e89e227ef26e1c2d618429b8bd3fa6f4f7c440c4611a",
+      "externalReferences": [
+        {
+          "comment": "implicit dist url",
+          "hashes": [
+            {
+              "alg": "SHA-256",
+              "content": "1eb4565d19ebe5d48996f4b770b4d2b32887e12cb12cfa637f1a064011b55ffc"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "99ef3f600a317c1945f1e89e227ef26e1c2d618429b8bd3fa6f4f7c440c4611a"
+            }
+          ],
+          "type": "distribution",
+          "url": "https://pypi.org/simple/pip-audit/"
+        }
+      ],
+      "name": "pip-audit",
+      "purl": "pkg:pypi/pip-audit@2.10.1",
+      "type": "library",
+      "version": "2.10.1"
+    },
+    {
+      "bom-ref": "requirements-L360",
+      "description": "requirements line 360: pip-requirements-parser==32.0.1     --hash=sha256:4659bc2a667783e7a15d190f6fccf8b2486685b6dba4c19c3876314769c57526     --hash=sha256:b4fa3a7a0be38243123cf9d1f3518da10c51bdb165a2b2985566247f9155a7d3",
+      "externalReferences": [
+        {
+          "comment": "implicit dist url",
+          "hashes": [
+            {
+              "alg": "SHA-256",
+              "content": "4659bc2a667783e7a15d190f6fccf8b2486685b6dba4c19c3876314769c57526"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "b4fa3a7a0be38243123cf9d1f3518da10c51bdb165a2b2985566247f9155a7d3"
+            }
+          ],
+          "type": "distribution",
+          "url": "https://pypi.org/simple/pip-requirements-parser/"
+        }
+      ],
+      "name": "pip-requirements-parser",
+      "purl": "pkg:pypi/pip-requirements-parser@32.0.1",
+      "type": "library",
+      "version": "32.0.1"
+    },
+    {
+      "bom-ref": "requirements-L364",
+      "description": "requirements line 364: platformdirs==4.13.0     --hash=sha256:1aa0b0d3f224c1f07c295121e312a5a24a180d6ae5a8425ea1784b3e3863e9c0     --hash=sha256:3dbcf4cd708f21cf876c4eaa90e58412bc4f033d87143f41b1493ff77c25b7e1",
+      "externalReferences": [
+        {
+          "comment": "implicit dist url",
+          "hashes": [
+            {
+              "alg": "SHA-256",
+              "content": "1aa0b0d3f224c1f07c295121e312a5a24a180d6ae5a8425ea1784b3e3863e9c0"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "3dbcf4cd708f21cf876c4eaa90e58412bc4f033d87143f41b1493ff77c25b7e1"
+            }
+          ],
+          "type": "distribution",
+          "url": "https://pypi.org/simple/platformdirs/"
+        }
+      ],
+      "name": "platformdirs",
+      "purl": "pkg:pypi/platformdirs@4.13.0",
+      "type": "library",
+      "version": "4.13.0"
+    },
+    {
+      "bom-ref": "requirements-L370",
+      "description": "requirements line 370: pluggy==1.7.0     --hash=sha256:7dd7b0d8832ba3cb632c306926ded123429211b83641b35dc5c41ad2d34f9bec     --hash=sha256:d1eaa46ebb595891b860ab086b4d09c8588af65ebd4361b8e8f4bb8920b90ba8",
+      "externalReferences": [
+        {
+          "comment": "implicit dist url",
+          "hashes": [
+            {
+              "alg": "SHA-256",
+              "content": "7dd7b0d8832ba3cb632c306926ded123429211b83641b35dc5c41ad2d34f9bec"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "d1eaa46ebb595891b860ab086b4d09c8588af65ebd4361b8e8f4bb8920b90ba8"
+            }
+          ],
+          "type": "distribution",
+          "url": "https://pypi.org/simple/pluggy/"
+        }
+      ],
+      "name": "pluggy",
+      "purl": "pkg:pypi/pluggy@1.7.0",
+      "type": "library",
+      "version": "1.7.0"
+    },
+    {
+      "bom-ref": "requirements-L374",
+      "description": "requirements line 374: pre-commit==4.7.0     --hash=sha256:1f3deee12b914c8fa184bd2b5953391c2e4f36763e403d4a23dc9983fa7c6e86     --hash=sha256:2e229038ad3656081b70c27913157e4b636ef306f643f024a8a8e3f0f7b2f877",
+      "externalReferences": [
+        {
+          "comment": "implicit dist url",
+          "hashes": [
+            {
+              "alg": "SHA-256",
+              "content": "1f3deee12b914c8fa184bd2b5953391c2e4f36763e403d4a23dc9983fa7c6e86"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "2e229038ad3656081b70c27913157e4b636ef306f643f024a8a8e3f0f7b2f877"
+            }
+          ],
+          "type": "distribution",
+          "url": "https://pypi.org/simple/pre-commit/"
+        }
+      ],
+      "name": "pre-commit",
+      "purl": "pkg:pypi/pre-commit@4.7.0",
+      "type": "library",
+      "version": "4.7.0"
+    },
+    {
+      "bom-ref": "requirements-L377",
+      "description": "requirements line 377: psycopg==3.3.6     --hash=sha256:a1db9f7148b06a28606767efaca51fa6f9398c5c0a3810519be69d7000bdb631     --hash=sha256:c081f2250df751a943036e42db6df4571c66cd0aabe8291a7a506512b12007d2",
+      "externalReferences": [
+        {
+          "comment": "implicit dist url",
+          "hashes": [
+            {
+              "alg": "SHA-256",
+              "content": "a1db9f7148b06a28606767efaca51fa6f9398c5c0a3810519be69d7000bdb631"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "c081f2250df751a943036e42db6df4571c66cd0aabe8291a7a506512b12007d2"
+            }
+          ],
+          "type": "distribution",
+          "url": "https://pypi.org/simple/psycopg/"
+        }
+      ],
+      "name": "psycopg",
+      "purl": "pkg:pypi/psycopg@3.3.6",
+      "type": "library",
+      "version": "3.3.6"
+    },
+    {
+      "bom-ref": "requirements-L381",
+      "description": "requirements line 381: psycopg-binary==3.3.6 ; implementation_name != 'pypy'     --hash=sha256:0ebfad5d131de9f892ae9e70cc7616207768b6714b66a52d4612b8ceaf78b372     --hash=sha256:373704aea331d3f3e3402c125a1543f5875e2986ebb54f97d1647942161f803f     --hash=sha256:3af90f92769d8cc10f94515ee7a0aef36ea85ca733a0ce22858f6e0953f41138     --hash=sha256:5ad8f35e67cc16d1fad1fa8c88972dc9b3a3141ea67897399904edab96a301b6     --hash=sha256:9892188bb15e5803beb51afe8a25add6b56be391a53058e8bca03b74e1e6bf22     --hash=sha256:98c02090d88f2ebc0ec1e8da538f77d225ce0fffecf372aa39262e62a1b054ef     --hash=sha256:b82491019b884d62318b5f30706c3d7e6d4e5a6cb7eabcb3edc0c1b0fdaceae9     --hash=sha256:cec5ea900390897d0b46130f60bc2883bf19c314f9044235217c8be88b0ef269     --hash=sha256:ee2c4728c691245e24501fcd7a97b5b381236b9985bc445bba88cdce7d1b5784     --hash=sha256:f19cc87343eaa55255e76b31259a570072ac95d6ae82c92dd34b97691f5e49dc     --hash=sha256:fdccb3a0e184b03e9baa673b15a809cf36c339c85dbda0ebc25a698846dfbee8",
+      "externalReferences": [
+        {
+          "comment": "implicit dist url",
+          "hashes": [
+            {
+              "alg": "SHA-256",
+              "content": "0ebfad5d131de9f892ae9e70cc7616207768b6714b66a52d4612b8ceaf78b372"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "373704aea331d3f3e3402c125a1543f5875e2986ebb54f97d1647942161f803f"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "3af90f92769d8cc10f94515ee7a0aef36ea85ca733a0ce22858f6e0953f41138"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "5ad8f35e67cc16d1fad1fa8c88972dc9b3a3141ea67897399904edab96a301b6"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "9892188bb15e5803beb51afe8a25add6b56be391a53058e8bca03b74e1e6bf22"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "98c02090d88f2ebc0ec1e8da538f77d225ce0fffecf372aa39262e62a1b054ef"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "b82491019b884d62318b5f30706c3d7e6d4e5a6cb7eabcb3edc0c1b0fdaceae9"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "cec5ea900390897d0b46130f60bc2883bf19c314f9044235217c8be88b0ef269"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "ee2c4728c691245e24501fcd7a97b5b381236b9985bc445bba88cdce7d1b5784"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "f19cc87343eaa55255e76b31259a570072ac95d6ae82c92dd34b97691f5e49dc"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "fdccb3a0e184b03e9baa673b15a809cf36c339c85dbda0ebc25a698846dfbee8"
+            }
+          ],
+          "type": "distribution",
+          "url": "https://pypi.org/simple/psycopg-binary/"
+        }
+      ],
+      "name": "psycopg-binary",
+      "purl": "pkg:pypi/psycopg-binary@3.3.6",
+      "type": "library",
+      "version": "3.3.6"
+    },
+    {
+      "bom-ref": "requirements-L394",
+      "description": "requirements line 394: py-serializable==2.1.0     --hash=sha256:9d5db56154a867a9b897c0163b33a793c804c80cee984116d02d49e4578fc103     --hash=sha256:b56d5d686b5a03ba4f4db5e769dc32336e142fc3bd4d68a8c25579ebb0a67304",
+      "externalReferences": [
+        {
+          "comment": "implicit dist url",
+          "hashes": [
+            {
+              "alg": "SHA-256",
+              "content": "9d5db56154a867a9b897c0163b33a793c804c80cee984116d02d49e4578fc103"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "b56d5d686b5a03ba4f4db5e769dc32336e142fc3bd4d68a8c25579ebb0a67304"
+            }
+          ],
+          "type": "distribution",
+          "url": "https://pypi.org/simple/py-serializable/"
+        }
+      ],
+      "name": "py-serializable",
+      "purl": "pkg:pypi/py-serializable@2.1.0",
+      "type": "library",
+      "version": "2.1.0"
+    },
+    {
+      "bom-ref": "requirements-L398",
+      "description": "requirements line 398: pycparser==3.11 ; implementation_name != 'PyPy' and platform_python_implementation != 'PyPy'     --hash=sha256:51d5a8ba2be0bbe440b99d2112604c95bbbc3c2748a64260186c541e1729cd80     --hash=sha256:d875f09c3507d00e1aba0eecc6dcadc1352f30fff09dc6bff2f1c2935e97c2bc",
+      "externalReferences": [
+        {
+          "comment": "implicit dist url",
+          "hashes": [
+            {
+              "alg": "SHA-256",
+              "content": "51d5a8ba2be0bbe440b99d2112604c95bbbc3c2748a64260186c541e1729cd80"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "d875f09c3507d00e1aba0eecc6dcadc1352f30fff09dc6bff2f1c2935e97c2bc"
+            }
+          ],
+          "type": "distribution",
+          "url": "https://pypi.org/simple/pycparser/"
+        }
+      ],
+      "name": "pycparser",
+      "purl": "pkg:pypi/pycparser@3.11",
+      "type": "library",
+      "version": "3.11"
+    },
+    {
+      "bom-ref": "requirements-L402",
+      "description": "requirements line 402: pydantic==2.14.1     --hash=sha256:9195d967ec791692a04438115466764fb8b9a27b31f14a760437694f40d6b454     --hash=sha256:94f478203dd03404682a1ada216965651dd74b1d2d5ffd62e00e0837caab5c26",
+      "externalReferences": [
+        {
+          "comment": "implicit dist url",
+          "hashes": [
+            {
+              "alg": "SHA-256",
+              "content": "9195d967ec791692a04438115466764fb8b9a27b31f14a760437694f40d6b454"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "94f478203dd03404682a1ada216965651dd74b1d2d5ffd62e00e0837caab5c26"
+            }
+          ],
+          "type": "distribution",
+          "url": "https://pypi.org/simple/pydantic/"
+        }
+      ],
+      "name": "pydantic",
+      "purl": "pkg:pypi/pydantic@2.14.1",
+      "type": "library",
+      "version": "2.14.1"
+    },
+    {
+      "bom-ref": "requirements-L409",
+      "description": "requirements line 409: pydantic-core==2.50.1     --hash=sha256:06ead20d39ffd6f2f6f2a8f8a6de67ff8bb1b4f14a8a30e058502514ee2ac685     --hash=sha256:0c003c3b7f49debb893d2d85ae099ac5959c9839e2f330fadb1fcdf7a6594482     --hash=sha256:131059670f1d2444269b8585cb888963994871932447c08b39ac6a51fcfef658     --hash=sha256:17e722e156d0444ecaefbe640bdb60928752bf2013e2b7a11cdb099aaae19bec     --hash=sha256:1c96fd793b73d1b92e65570132505498fe7b21eaef73cdf74e67e5dfba7ac9e4     --hash=sha256:1deeacb112d14d3f4fcb16b165f7dbaf76c70ba6e82f37ba042bdab51970a0b8     --hash=sha256:325c23f3e35cfbf0fe3486fa5f7260d1e45885173002d30a28ca019994124255     --hash=sha256:409e0ea40ec30d9158f33574fd758e689f6045a0f2596701828c27816ca9687d     --hash=sha256:41bc8237121bd8dc8d888dfd6279fc166ffc88c1f1bf3a8bf00869680533ca4c     --hash=sha256:45c6266d071c241f2a168d45bf8c54344f0effce35e7e6b73afdec11f3687568     --hash=sha256:6dbcbee53bf17196a7f745aa9bf5a9603953a1e365b1f020be3207c676a3e7c4     --hash=sha256:7816e98acc08119dc0f340ab167048ecc54126316330c1f0caf7c6756c88e28f     --hash=sha256:aa8224f10880d9bf1b5993988ba153d42a8b4f3f4f511f93b1f09c93ff613c72     --hash=sha256:c17799a62c142d61b8a3c51752a7cbc87fe2ad4ccfab10e628a77b405075c662     --hash=sha256:d5e062c01286d861fd6a1c4ff6e063547b3e713067f2df033c0ff97ac2ca006b     --hash=sha256:e50d7b94baac6c7d09927fa5ca5800a0c7ee5015c7fcff65beb3a1931b5a6e09",
+      "externalReferences": [
+        {
+          "comment": "implicit dist url",
+          "hashes": [
+            {
+              "alg": "SHA-256",
+              "content": "06ead20d39ffd6f2f6f2a8f8a6de67ff8bb1b4f14a8a30e058502514ee2ac685"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "0c003c3b7f49debb893d2d85ae099ac5959c9839e2f330fadb1fcdf7a6594482"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "131059670f1d2444269b8585cb888963994871932447c08b39ac6a51fcfef658"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "17e722e156d0444ecaefbe640bdb60928752bf2013e2b7a11cdb099aaae19bec"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "1c96fd793b73d1b92e65570132505498fe7b21eaef73cdf74e67e5dfba7ac9e4"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "1deeacb112d14d3f4fcb16b165f7dbaf76c70ba6e82f37ba042bdab51970a0b8"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "325c23f3e35cfbf0fe3486fa5f7260d1e45885173002d30a28ca019994124255"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "409e0ea40ec30d9158f33574fd758e689f6045a0f2596701828c27816ca9687d"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "41bc8237121bd8dc8d888dfd6279fc166ffc88c1f1bf3a8bf00869680533ca4c"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "45c6266d071c241f2a168d45bf8c54344f0effce35e7e6b73afdec11f3687568"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "6dbcbee53bf17196a7f745aa9bf5a9603953a1e365b1f020be3207c676a3e7c4"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "7816e98acc08119dc0f340ab167048ecc54126316330c1f0caf7c6756c88e28f"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "aa8224f10880d9bf1b5993988ba153d42a8b4f3f4f511f93b1f09c93ff613c72"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "c17799a62c142d61b8a3c51752a7cbc87fe2ad4ccfab10e628a77b405075c662"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "d5e062c01286d861fd6a1c4ff6e063547b3e713067f2df033c0ff97ac2ca006b"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "e50d7b94baac6c7d09927fa5ca5800a0c7ee5015c7fcff65beb3a1931b5a6e09"
+            }
+          ],
+          "type": "distribution",
+          "url": "https://pypi.org/simple/pydantic-core/"
+        }
+      ],
+      "name": "pydantic-core",
+      "purl": "pkg:pypi/pydantic-core@2.50.1",
+      "type": "library",
+      "version": "2.50.1"
+    },
+    {
+      "bom-ref": "requirements-L427",
+      "description": "requirements line 427: pydantic-settings==2.16.0     --hash=sha256:5b6c578049ede4db0e2ef3b4eaa4ad4069cfa9211f83fb38df899dfade50a614     --hash=sha256:7e73acf7f61936a15e5a3b6eedaea29f133357faf7272f2607ba479b049dd7f2",
+      "externalReferences": [
+        {
+          "comment": "implicit dist url",
+          "hashes": [
+            {
+              "alg": "SHA-256",
+              "content": "5b6c578049ede4db0e2ef3b4eaa4ad4069cfa9211f83fb38df899dfade50a614"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "7e73acf7f61936a15e5a3b6eedaea29f133357faf7272f2607ba479b049dd7f2"
+            }
+          ],
+          "type": "distribution",
+          "url": "https://pypi.org/simple/pydantic-settings/"
+        }
+      ],
+      "name": "pydantic-settings",
+      "purl": "pkg:pypi/pydantic-settings@2.16.0",
+      "type": "library",
+      "version": "2.16.0"
+    },
+    {
+      "bom-ref": "requirements-L431",
+      "description": "requirements line 431: pygments==2.21.0     --hash=sha256:2363c69b61c4a97c838da3b130dcd6468f4848992b21a82f2a63ec34377137d9     --hash=sha256:610ca751c9bc2492b38eb9a38a7fbc93edbbb2d7182edaf34e66ae493dee5c8c",
+      "externalReferences": [
+        {
+          "comment": "implicit dist url",
+          "hashes": [
+            {
+              "alg": "SHA-256",
+              "content": "2363c69b61c4a97c838da3b130dcd6468f4848992b21a82f2a63ec34377137d9"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "610ca751c9bc2492b38eb9a38a7fbc93edbbb2d7182edaf34e66ae493dee5c8c"
+            }
+          ],
+          "type": "distribution",
+          "url": "https://pypi.org/simple/pygments/"
+        }
+      ],
+      "name": "pygments",
+      "purl": "pkg:pypi/pygments@2.21.0",
+      "type": "library",
+      "version": "2.21.0"
+    },
+    {
+      "bom-ref": "requirements-L437",
+      "description": "requirements line 437: pyparsing==3.3.3     --hash=sha256:928ae7e20211f3b6f3915a72f06a0cfd29ab9d24279dd6346b6b1a7146397d36     --hash=sha256:ece8c00a69cf01b45d0b1dedabb469c90d8caf996d4fda40f147627a122849a4",
+      "externalReferences": [
+        {
+          "comment": "implicit dist url",
+          "hashes": [
+            {
+              "alg": "SHA-256",
+              "content": "928ae7e20211f3b6f3915a72f06a0cfd29ab9d24279dd6346b6b1a7146397d36"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "ece8c00a69cf01b45d0b1dedabb469c90d8caf996d4fda40f147627a122849a4"
+            }
+          ],
+          "type": "distribution",
+          "url": "https://pypi.org/simple/pyparsing/"
+        }
+      ],
+      "name": "pyparsing",
+      "purl": "pkg:pypi/pyparsing@3.3.3",
+      "type": "library",
+      "version": "3.3.3"
+    },
+    {
+      "bom-ref": "requirements-L441",
+      "description": "requirements line 441: pytest==9.1.1     --hash=sha256:1088fbde8f2b49d95a549a195707afa7a76a3ce9bcadc26b6d71f0ffda5fe313     --hash=sha256:37a86b45efb9a47a61a36449063e8e18d0cab3161329fc099eb21783169c4f0c",
+      "externalReferences": [
+        {
+          "comment": "implicit dist url",
+          "hashes": [
+            {
+              "alg": "SHA-256",
+              "content": "1088fbde8f2b49d95a549a195707afa7a76a3ce9bcadc26b6d71f0ffda5fe313"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "37a86b45efb9a47a61a36449063e8e18d0cab3161329fc099eb21783169c4f0c"
+            }
+          ],
+          "type": "distribution",
+          "url": "https://pypi.org/simple/pytest/"
+        }
+      ],
+      "name": "pytest",
+      "purl": "pkg:pypi/pytest@9.1.1",
+      "type": "library",
+      "version": "9.1.1"
+    },
+    {
+      "bom-ref": "requirements-L444",
+      "description": "requirements line 444: python-discovery==1.6.2     --hash=sha256:cd1738ca1d37c86ef9d0b654dd46fcee1e41c97c6add12575e8501ced39afdb4     --hash=sha256:f0c697f95a3aaec4174a6e5e58f5885e25768684bafc76f1afde384709ebdcf2",
+      "externalReferences": [
+        {
+          "comment": "implicit dist url",
+          "hashes": [
+            {
+              "alg": "SHA-256",
+              "content": "cd1738ca1d37c86ef9d0b654dd46fcee1e41c97c6add12575e8501ced39afdb4"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "f0c697f95a3aaec4174a6e5e58f5885e25768684bafc76f1afde384709ebdcf2"
+            }
+          ],
+          "type": "distribution",
+          "url": "https://pypi.org/simple/python-discovery/"
+        }
+      ],
+      "name": "python-discovery",
+      "purl": "pkg:pypi/python-discovery@1.6.2",
+      "type": "library",
+      "version": "1.6.2"
+    },
+    {
+      "bom-ref": "requirements-L448",
+      "description": "requirements line 448: python-dotenv==1.2.4     --hash=sha256:42269a8a5b3fd54ffa6f3d84b18abed50064717576b4ecf03dc4a55d8aa04fdc     --hash=sha256:f0d53e69935a851c0dcc78f3ab7aaccd8cabef0b92382b576b824212902873c0",
+      "externalReferences": [
+        {
+          "comment": "implicit dist url",
+          "hashes": [
+            {
+              "alg": "SHA-256",
+              "content": "42269a8a5b3fd54ffa6f3d84b18abed50064717576b4ecf03dc4a55d8aa04fdc"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "f0d53e69935a851c0dcc78f3ab7aaccd8cabef0b92382b576b824212902873c0"
+            }
+          ],
+          "type": "distribution",
+          "url": "https://pypi.org/simple/python-dotenv/"
+        }
+      ],
+      "name": "python-dotenv",
+      "purl": "pkg:pypi/python-dotenv@1.2.4",
+      "type": "library",
+      "version": "1.2.4"
+    },
+    {
+      "bom-ref": "requirements-L452",
+      "description": "requirements line 452: pyyaml==6.0.3     --hash=sha256:0f29edc409a6392443abf94b9cf89ce99889a1dd5376d94316ae5145dfedd5d6     --hash=sha256:2283a07e2c21a2aa78d9c4442724ec1eb15f5e42a723b99cb3d822d48f5f7ad1     --hash=sha256:5498cd1645aa724a7c71c8f378eb29ebe23da2fc0d7a08071d89469bf1d2defb     --hash=sha256:79005a0d97d5ddabfeeea4cf676af11e647e41d81c9a7722a193022accdb6b7c     --hash=sha256:8da9669d359f02c0b91ccc01cac4a67f16afec0dac22c2ad09f46bee0697eba8     --hash=sha256:a33284e20b78bd4a18c8c2282d549d10bc8408a2a7ff57653c0cf0b9be0afce5     --hash=sha256:d0eae10f8159e8fdad514efdc92d74fd8d682c933a6dd088030f3834bc8e6b26     --hash=sha256:d76623373421df22fb4cf8817020cbb7ef15c725b9d5e45f17e189bfc384190f     --hash=sha256:eda16858a3cab07b80edaf74336ece1f986ba330fdb8ee0d6c0d68fe82bc96be     --hash=sha256:ee2922902c45ae8ccada2c5b501ab86c36525b883eff4255313a253a3160861c     --hash=sha256:f7057c9a337546edc7973c0d3ba84ddcdf0daa14533c2065749c9075001090e6",
+      "externalReferences": [
+        {
+          "comment": "implicit dist url",
+          "hashes": [
+            {
+              "alg": "SHA-256",
+              "content": "0f29edc409a6392443abf94b9cf89ce99889a1dd5376d94316ae5145dfedd5d6"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "2283a07e2c21a2aa78d9c4442724ec1eb15f5e42a723b99cb3d822d48f5f7ad1"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "5498cd1645aa724a7c71c8f378eb29ebe23da2fc0d7a08071d89469bf1d2defb"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "79005a0d97d5ddabfeeea4cf676af11e647e41d81c9a7722a193022accdb6b7c"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "8da9669d359f02c0b91ccc01cac4a67f16afec0dac22c2ad09f46bee0697eba8"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "a33284e20b78bd4a18c8c2282d549d10bc8408a2a7ff57653c0cf0b9be0afce5"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "d0eae10f8159e8fdad514efdc92d74fd8d682c933a6dd088030f3834bc8e6b26"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "d76623373421df22fb4cf8817020cbb7ef15c725b9d5e45f17e189bfc384190f"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "eda16858a3cab07b80edaf74336ece1f986ba330fdb8ee0d6c0d68fe82bc96be"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "ee2922902c45ae8ccada2c5b501ab86c36525b883eff4255313a253a3160861c"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "f7057c9a337546edc7973c0d3ba84ddcdf0daa14533c2065749c9075001090e6"
+            }
+          ],
+          "type": "distribution",
+          "url": "https://pypi.org/simple/pyyaml/"
+        }
+      ],
+      "name": "pyyaml",
+      "purl": "pkg:pypi/pyyaml@6.0.3",
+      "type": "library",
+      "version": "6.0.3"
+    },
+    {
+      "bom-ref": "requirements-L465",
+      "description": "requirements line 465: requests==2.34.2     --hash=sha256:2a0d60c172f83ac6ab31e4554906c0f3b3588d37b5cb939b1c061f4907e278e0     --hash=sha256:f288924cae4e29463698d6d60bc6a4da69c89185ad1e0bcc4104f584e960b9ed",
+      "externalReferences": [
+        {
+          "comment": "implicit dist url",
+          "hashes": [
+            {
+              "alg": "SHA-256",
+              "content": "2a0d60c172f83ac6ab31e4554906c0f3b3588d37b5cb939b1c061f4907e278e0"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "f288924cae4e29463698d6d60bc6a4da69c89185ad1e0bcc4104f584e960b9ed"
+            }
+          ],
+          "type": "distribution",
+          "url": "https://pypi.org/simple/requests/"
+        }
+      ],
+      "name": "requests",
+      "purl": "pkg:pypi/requests@2.34.2",
+      "type": "library",
+      "version": "2.34.2"
+    },
+    {
+      "bom-ref": "requirements-L471",
+      "description": "requirements line 471: rich==15.0.0     --hash=sha256:33bd4ef74232fb73fe9279a257718407f169c09b78a87ad3d296f548e27de0bb     --hash=sha256:edd07a4824c6b40189fb7ac9bc4c52536e9780fbbfbddf6f1e2502c31b068c36",
+      "externalReferences": [
+        {
+          "comment": "implicit dist url",
+          "hashes": [
+            {
+              "alg": "SHA-256",
+              "content": "33bd4ef74232fb73fe9279a257718407f169c09b78a87ad3d296f548e27de0bb"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "edd07a4824c6b40189fb7ac9bc4c52536e9780fbbfbddf6f1e2502c31b068c36"
+            }
+          ],
+          "type": "distribution",
+          "url": "https://pypi.org/simple/rich/"
+        }
+      ],
+      "name": "rich",
+      "purl": "pkg:pypi/rich@15.0.0",
+      "type": "library",
+      "version": "15.0.0"
+    },
+    {
+      "bom-ref": "requirements-L475",
+      "description": "requirements line 475: ruff==0.17.0     --hash=sha256:0e271826af9a20d18c6cfae8c51e82959167c24859686ddd3eb9a7f0842ce81e     --hash=sha256:13ee90156522998c3037059d8f66885c8adeeaf7643bdce2caceee196ecd23e0     --hash=sha256:3d8cc360e666d1914e47b0777c6906d70cf18891a55532bd0a16844195d70859     --hash=sha256:3d8e4a002a94cd9d0dc48b51dc69d807a172b5b9bf2b668e656424dc5b55ead1     --hash=sha256:5cd03240d8208a557c2a9655a5cb07ebe36aa6bb35065f97d48c1f6adef5a322     --hash=sha256:5e50aa5b84decd9fe5b0bb0e6f71c3b592f1767ed09faa4b7207d933961e35cd     --hash=sha256:5f0ca4a40f81403689c04f12966e22f44e329ae362072d8f1587b7bda87f603b     --hash=sha256:7bb08489e234876fa2da67ae3ea938e9a2156da80293e0e4365abd6973d98329     --hash=sha256:864b6c1acb6b0bccf94b5a3938a1531fd09aaca5e5659a2e7bf0f3cf2a685540     --hash=sha256:8ab76bcda86dfd28e13776cb5de3c7bcdcf1ae3d37ed761113d1a5a415dc134c     --hash=sha256:a330178bdffc4205dbf3bda11d93e059e388fd6546f8cdd304501a9160363c0d     --hash=sha256:bc73e7c133e82d55b5f15897b2a442d72c0cb4a0c886c46801ce3c247150b60c     --hash=sha256:c0b8a60c06a218c337e1161638d34757f83449243e2db161483ddf948e53ad14     --hash=sha256:c154c73ff43f9854395e24cac507af13078962e53d2b511605058d22af1fdb88     --hash=sha256:c3f268baf004aea944f040623327119527ea231af15f7fb7890e82cea0679589     --hash=sha256:cbf7149e0927dc3295d5d64679a4765576eef71b00782b2ae969ef82274d6bb9     --hash=sha256:d66de796b726c4801e05fa99a2a8d7a780e107be222486c304ab61765561e866     --hash=sha256:db4f74c533403ab70fe4007873f6ae0c9f94a8b03158cf48d78788e47cdbe399",
+      "externalReferences": [
+        {
+          "comment": "implicit dist url",
+          "hashes": [
+            {
+              "alg": "SHA-256",
+              "content": "0e271826af9a20d18c6cfae8c51e82959167c24859686ddd3eb9a7f0842ce81e"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "13ee90156522998c3037059d8f66885c8adeeaf7643bdce2caceee196ecd23e0"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "3d8cc360e666d1914e47b0777c6906d70cf18891a55532bd0a16844195d70859"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "3d8e4a002a94cd9d0dc48b51dc69d807a172b5b9bf2b668e656424dc5b55ead1"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "5cd03240d8208a557c2a9655a5cb07ebe36aa6bb35065f97d48c1f6adef5a322"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "5e50aa5b84decd9fe5b0bb0e6f71c3b592f1767ed09faa4b7207d933961e35cd"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "5f0ca4a40f81403689c04f12966e22f44e329ae362072d8f1587b7bda87f603b"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "7bb08489e234876fa2da67ae3ea938e9a2156da80293e0e4365abd6973d98329"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "864b6c1acb6b0bccf94b5a3938a1531fd09aaca5e5659a2e7bf0f3cf2a685540"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "8ab76bcda86dfd28e13776cb5de3c7bcdcf1ae3d37ed761113d1a5a415dc134c"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "a330178bdffc4205dbf3bda11d93e059e388fd6546f8cdd304501a9160363c0d"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "bc73e7c133e82d55b5f15897b2a442d72c0cb4a0c886c46801ce3c247150b60c"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "c0b8a60c06a218c337e1161638d34757f83449243e2db161483ddf948e53ad14"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "c154c73ff43f9854395e24cac507af13078962e53d2b511605058d22af1fdb88"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "c3f268baf004aea944f040623327119527ea231af15f7fb7890e82cea0679589"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "cbf7149e0927dc3295d5d64679a4765576eef71b00782b2ae969ef82274d6bb9"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "d66de796b726c4801e05fa99a2a8d7a780e107be222486c304ab61765561e866"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "db4f74c533403ab70fe4007873f6ae0c9f94a8b03158cf48d78788e47cdbe399"
+            }
+          ],
+          "type": "distribution",
+          "url": "https://pypi.org/simple/ruff/"
+        }
+      ],
+      "name": "ruff",
+      "purl": "pkg:pypi/ruff@0.17.0",
+      "type": "library",
+      "version": "0.17.0"
+    },
+    {
+      "bom-ref": "requirements-L494",
+      "description": "requirements line 494: sortedcontainers==2.4.0     --hash=sha256:25caa5a06cc30b6b83d11423433f65d1f9d76c4c6a0c90e3379eaa43b9bfdb88     --hash=sha256:a163dcaede0f1c021485e957a39245190e74249897e2ae4b2aa38595db237ee0",
+      "externalReferences": [
+        {
+          "comment": "implicit dist url",
+          "hashes": [
+            {
+              "alg": "SHA-256",
+              "content": "25caa5a06cc30b6b83d11423433f65d1f9d76c4c6a0c90e3379eaa43b9bfdb88"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "a163dcaede0f1c021485e957a39245190e74249897e2ae4b2aa38595db237ee0"
+            }
+          ],
+          "type": "distribution",
+          "url": "https://pypi.org/simple/sortedcontainers/"
+        }
+      ],
+      "name": "sortedcontainers",
+      "purl": "pkg:pypi/sortedcontainers@2.4.0",
+      "type": "library",
+      "version": "2.4.0"
+    },
+    {
+      "bom-ref": "requirements-L498",
+      "description": "requirements line 498: sqlalchemy==2.1.5     --hash=sha256:0df76cf1ca680ad745bd378a6299a058611a8a784eeaeb4ed78ad4a0b7ce2003     --hash=sha256:17f8c68bd35bb76b2d9ef1097941fb783ef9ef6604c1d2a72c2e276430aeffca     --hash=sha256:1cf433bcb77696cc915552d7f1e8d9117a5dae5aff9fceb06a69d74b3b3c2bd1     --hash=sha256:2f77b77b716f005b2dc3cc059d56df6a919bfb5b439e4149890a9df6c36be9e3     --hash=sha256:399d3e212cb557d5bd1ca6f79981e8c3f45c0f6be60b63a9ded790396a81af08     --hash=sha256:3f566787cb3a6a25ad8c5170e90167d4e8ea103d412aa4ea95021a6df0b95964     --hash=sha256:59dbd7412531da0124df8667a244b5155773632e9bd79a5c2ead393b11b59de5     --hash=sha256:65eece9d9494e46de1eb3d49eb438acfcecf059e7a92a2f3daf72ec26d371757     --hash=sha256:6a51c56afdb880e9f83736a2e81c02dd002fe1c5ad68346a35d97a2e135b1568     --hash=sha256:6c229afac414d691d2f69a6f4e294ac5b5fd334c49da1f4fb86ab7f2a466271d     --hash=sha256:dc1c86db97372e6bba18a7bcf0f6150dbdd808237f0f52802ef0bec676a94642     --hash=sha256:fb8dcd5e1cc12fdd4d490819ec7a56e8c02e86ca9087a472e28b422ff932bae0",
+      "externalReferences": [
+        {
+          "comment": "implicit dist url",
+          "hashes": [
+            {
+              "alg": "SHA-256",
+              "content": "0df76cf1ca680ad745bd378a6299a058611a8a784eeaeb4ed78ad4a0b7ce2003"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "17f8c68bd35bb76b2d9ef1097941fb783ef9ef6604c1d2a72c2e276430aeffca"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "1cf433bcb77696cc915552d7f1e8d9117a5dae5aff9fceb06a69d74b3b3c2bd1"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "2f77b77b716f005b2dc3cc059d56df6a919bfb5b439e4149890a9df6c36be9e3"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "399d3e212cb557d5bd1ca6f79981e8c3f45c0f6be60b63a9ded790396a81af08"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "3f566787cb3a6a25ad8c5170e90167d4e8ea103d412aa4ea95021a6df0b95964"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "59dbd7412531da0124df8667a244b5155773632e9bd79a5c2ead393b11b59de5"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "65eece9d9494e46de1eb3d49eb438acfcecf059e7a92a2f3daf72ec26d371757"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "6a51c56afdb880e9f83736a2e81c02dd002fe1c5ad68346a35d97a2e135b1568"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "6c229afac414d691d2f69a6f4e294ac5b5fd334c49da1f4fb86ab7f2a466271d"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "dc1c86db97372e6bba18a7bcf0f6150dbdd808237f0f52802ef0bec676a94642"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "fb8dcd5e1cc12fdd4d490819ec7a56e8c02e86ca9087a472e28b422ff932bae0"
+            }
+          ],
+          "type": "distribution",
+          "url": "https://pypi.org/simple/sqlalchemy/"
+        }
+      ],
+      "name": "sqlalchemy",
+      "purl": "pkg:pypi/sqlalchemy@2.1.5",
+      "type": "library",
+      "version": "2.1.5"
+    },
+    {
+      "bom-ref": "requirements-L514",
+      "description": "requirements line 514: starlette==1.8.0     --hash=sha256:1565dc0b35d5737a271ed1e0e04e949f4e81198799f216d2667b0a0fb9cf9522     --hash=sha256:dfdd6b29c26483288088d990eee59631dedadd66ce20d203402a7ca8e3c4656f",
+      "externalReferences": [
+        {
+          "comment": "implicit dist url",
+          "hashes": [
+            {
+              "alg": "SHA-256",
+              "content": "1565dc0b35d5737a271ed1e0e04e949f4e81198799f216d2667b0a0fb9cf9522"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "dfdd6b29c26483288088d990eee59631dedadd66ce20d203402a7ca8e3c4656f"
+            }
+          ],
+          "type": "distribution",
+          "url": "https://pypi.org/simple/starlette/"
+        }
+      ],
+      "name": "starlette",
+      "purl": "pkg:pypi/starlette@1.8.0",
+      "type": "library",
+      "version": "1.8.0"
+    },
+    {
+      "bom-ref": "requirements-L518",
+      "description": "requirements line 518: tomli==2.5.0     --hash=sha256:1245a6638fc4bb0a60af38a7d45413db34a13842027c77597c712c998c62fdf0     --hash=sha256:21e4cae4114aba25aa0d4f85cdf486d290fb35c0954d7bba536248da64d43066     --hash=sha256:264507556cd8b8c8e7c6ee037cdf443a463f03f4c958e57195e3d369711b8ff6     --hash=sha256:32a7b79ac57a2e83670ce329ccf675798bc5a2094783a63676866b70503f2e2b     --hash=sha256:463b16086865b97facd8d0b3fb4cb7c544e3f58d2a69dc3113d6db9653fdb043     --hash=sha256:5d8bac3d603c97e6854424e5b2b5b741bdbde387e09f162fb0446812b4a8362b     --hash=sha256:69491c143d2fe063046e0301e62a810bed338fa4d1ce0fd870c27dc1e09b0d84     --hash=sha256:943276cf269e0071948d9ff697159c1735e623c1151d88abb09b74659ef0cbea     --hash=sha256:abdbf6313b8d9efe157edeb7ab6eae4de064b1300ad31abf73755154b30abe68     --hash=sha256:bbaefc84548d754be821bba7c4141c4787dda182f9e77f2f87b71213529efa7b     --hash=sha256:fd4dc129784e0c5335bd4e61dfcc4487499a013419e655cf2da1d091b7e0efdc",
+      "externalReferences": [
+        {
+          "comment": "implicit dist url",
+          "hashes": [
+            {
+              "alg": "SHA-256",
+              "content": "1245a6638fc4bb0a60af38a7d45413db34a13842027c77597c712c998c62fdf0"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "21e4cae4114aba25aa0d4f85cdf486d290fb35c0954d7bba536248da64d43066"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "264507556cd8b8c8e7c6ee037cdf443a463f03f4c958e57195e3d369711b8ff6"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "32a7b79ac57a2e83670ce329ccf675798bc5a2094783a63676866b70503f2e2b"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "463b16086865b97facd8d0b3fb4cb7c544e3f58d2a69dc3113d6db9653fdb043"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "5d8bac3d603c97e6854424e5b2b5b741bdbde387e09f162fb0446812b4a8362b"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "69491c143d2fe063046e0301e62a810bed338fa4d1ce0fd870c27dc1e09b0d84"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "943276cf269e0071948d9ff697159c1735e623c1151d88abb09b74659ef0cbea"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "abdbf6313b8d9efe157edeb7ab6eae4de064b1300ad31abf73755154b30abe68"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "bbaefc84548d754be821bba7c4141c4787dda182f9e77f2f87b71213529efa7b"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "fd4dc129784e0c5335bd4e61dfcc4487499a013419e655cf2da1d091b7e0efdc"
+            }
+          ],
+          "type": "distribution",
+          "url": "https://pypi.org/simple/tomli/"
+        }
+      ],
+      "name": "tomli",
+      "purl": "pkg:pypi/tomli@2.5.0",
+      "type": "library",
+      "version": "2.5.0"
+    },
+    {
+      "bom-ref": "requirements-L531",
+      "description": "requirements line 531: tomli-w==1.2.0     --hash=sha256:188306098d013b691fcadc011abd66727d3c414c571bb01b1a174ba8c983cf90     --hash=sha256:2dd14fac5a47c27be9cd4c976af5a12d87fb1f0b4512f81d69cce3b35ae25021",
+      "externalReferences": [
+        {
+          "comment": "implicit dist url",
+          "hashes": [
+            {
+              "alg": "SHA-256",
+              "content": "188306098d013b691fcadc011abd66727d3c414c571bb01b1a174ba8c983cf90"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "2dd14fac5a47c27be9cd4c976af5a12d87fb1f0b4512f81d69cce3b35ae25021"
+            }
+          ],
+          "type": "distribution",
+          "url": "https://pypi.org/simple/tomli-w/"
+        }
+      ],
+      "name": "tomli-w",
+      "purl": "pkg:pypi/tomli-w@1.2.0",
+      "type": "library",
+      "version": "1.2.0"
+    },
+    {
+      "bom-ref": "requirements-L535",
+      "description": "requirements line 535: truststore==0.10.5 ; sys_platform != 'emscripten'     --hash=sha256:30d36967ccaded5cbb38d602c433f53600036c79d502f4533a49b60a03bbefcd     --hash=sha256:9aaaedaefaf06d8b206278cf8b5012bc897f485a874503501e12d776df78951c",
+      "externalReferences": [
+        {
+          "comment": "implicit dist url",
+          "hashes": [
+            {
+              "alg": "SHA-256",
+              "content": "30d36967ccaded5cbb38d602c433f53600036c79d502f4533a49b60a03bbefcd"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "9aaaedaefaf06d8b206278cf8b5012bc897f485a874503501e12d776df78951c"
+            }
+          ],
+          "type": "distribution",
+          "url": "https://pypi.org/simple/truststore/"
+        }
+      ],
+      "name": "truststore",
+      "purl": "pkg:pypi/truststore@0.10.5",
+      "type": "library",
+      "version": "0.10.5"
+    },
+    {
+      "bom-ref": "requirements-L541",
+      "description": "requirements line 541: typing-extensions==4.16.0     --hash=sha256:481caa481374e813c1b176ada14e97f1f67a4539ce9cfeb3f350d78d6370c2e8     --hash=sha256:dc983d19a509c94dba722ee6abd33940f7c05a89e243c47e907eb4db6f1a43e5",
+      "externalReferences": [
+        {
+          "comment": "implicit dist url",
+          "hashes": [
+            {
+              "alg": "SHA-256",
+              "content": "481caa481374e813c1b176ada14e97f1f67a4539ce9cfeb3f350d78d6370c2e8"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "dc983d19a509c94dba722ee6abd33940f7c05a89e243c47e907eb4db6f1a43e5"
+            }
+          ],
+          "type": "distribution",
+          "url": "https://pypi.org/simple/typing-extensions/"
+        }
+      ],
+      "name": "typing-extensions",
+      "purl": "pkg:pypi/typing-extensions@4.16.0",
+      "type": "library",
+      "version": "4.16.0"
+    },
+    {
+      "bom-ref": "requirements-L555",
+      "description": "requirements line 555: typing-inspection==0.4.4     --hash=sha256:547274fa6b0a561ccf549cc9524b999a578e737d015d8709d021f9d0d13bea47     --hash=sha256:65b8397ba37ccbce054456aaccddfc91e6e3083c92824df348d96ca832f3f147",
+      "externalReferences": [
+        {
+          "comment": "implicit dist url",
+          "hashes": [
+            {
+              "alg": "SHA-256",
+              "content": "547274fa6b0a561ccf549cc9524b999a578e737d015d8709d021f9d0d13bea47"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "65b8397ba37ccbce054456aaccddfc91e6e3083c92824df348d96ca832f3f147"
+            }
+          ],
+          "type": "distribution",
+          "url": "https://pypi.org/simple/typing-inspection/"
+        }
+      ],
+      "name": "typing-inspection",
+      "purl": "pkg:pypi/typing-inspection@0.4.4",
+      "type": "library",
+      "version": "0.4.4"
+    },
+    {
+      "bom-ref": "requirements-L562",
+      "description": "requirements line 562: tzdata==2026.5 ; sys_platform == 'win32'     --hash=sha256:8cc73c0a0bfca7dbfa59235d60b2eff82231dee33f53d206db1acd9173cfc0a7     --hash=sha256:b683bd1b6659ddcd810ff02ad09ba821d4bf1065072805063eb35c49617905ac",
+      "externalReferences": [
+        {
+          "comment": "implicit dist url",
+          "hashes": [
+            {
+              "alg": "SHA-256",
+              "content": "8cc73c0a0bfca7dbfa59235d60b2eff82231dee33f53d206db1acd9173cfc0a7"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "b683bd1b6659ddcd810ff02ad09ba821d4bf1065072805063eb35c49617905ac"
+            }
+          ],
+          "type": "distribution",
+          "url": "https://pypi.org/simple/tzdata/"
+        }
+      ],
+      "name": "tzdata",
+      "purl": "pkg:pypi/tzdata@2026.5",
+      "type": "library",
+      "version": "2026.5"
+    },
+    {
+      "bom-ref": "requirements-L566",
+      "description": "requirements line 566: urllib3==2.8.0     --hash=sha256:0cf3cae568d36aa9576b28dfb35f11328f1cb974ca7647d9475ebb86c75ac6e3     --hash=sha256:63bf2ead4c879426ebf22ef2a781eeb4aa3b4ae798a0435506f8687fd5bb9b63",
+      "externalReferences": [
+        {
+          "comment": "implicit dist url",
+          "hashes": [
+            {
+              "alg": "SHA-256",
+              "content": "0cf3cae568d36aa9576b28dfb35f11328f1cb974ca7647d9475ebb86c75ac6e3"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "63bf2ead4c879426ebf22ef2a781eeb4aa3b4ae798a0435506f8687fd5bb9b63"
+            }
+          ],
+          "type": "distribution",
+          "url": "https://pypi.org/simple/urllib3/"
+        }
+      ],
+      "name": "urllib3",
+      "purl": "pkg:pypi/urllib3@2.8.0",
+      "type": "library",
+      "version": "2.8.0"
+    },
+    {
+      "bom-ref": "requirements-L570",
+      "description": "requirements line 570: uvicorn==0.54.0     --hash=sha256:505bdb0f318731d45f1f712071fc781a8981f6847a31c902c9f5e652d4f67faf     --hash=sha256:a2e33cbfaa0306f8e6b0c13e0cb89d7d7a2da3e62b90c66e18c33d9807b28620",
+      "externalReferences": [
+        {
+          "comment": "implicit dist url",
+          "hashes": [
+            {
+              "alg": "SHA-256",
+              "content": "505bdb0f318731d45f1f712071fc781a8981f6847a31c902c9f5e652d4f67faf"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "a2e33cbfaa0306f8e6b0c13e0cb89d7d7a2da3e62b90c66e18c33d9807b28620"
+            }
+          ],
+          "type": "distribution",
+          "url": "https://pypi.org/simple/uvicorn/"
+        }
+      ],
+      "name": "uvicorn",
+      "purl": "pkg:pypi/uvicorn@0.54.0",
+      "type": "library",
+      "version": "0.54.0"
+    },
+    {
+      "bom-ref": "requirements-L574",
+      "description": "requirements line 574: virtualenv==21.15.1     --hash=sha256:0d14a991689c67600316880eadc0a37b7690cb632e3b4ac67e2bc05b2b2e24a4     --hash=sha256:e79c90b8f601701599c25905e02839924fede2c798d52325670d24fbdaab74ee",
+      "externalReferences": [
+        {
+          "comment": "implicit dist url",
+          "hashes": [
+            {
+              "alg": "SHA-256",
+              "content": "0d14a991689c67600316880eadc0a37b7690cb632e3b4ac67e2bc05b2b2e24a4"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "e79c90b8f601701599c25905e02839924fede2c798d52325670d24fbdaab74ee"
+            }
+          ],
+          "type": "distribution",
+          "url": "https://pypi.org/simple/virtualenv/"
+        }
+      ],
+      "name": "virtualenv",
+      "purl": "pkg:pypi/virtualenv@21.15.1",
+      "type": "library",
+      "version": "21.15.1"
+    }
+  ],
+  "dependencies": [
+    {
+      "ref": "requirements-L11"
+    },
+    {
+      "ref": "requirements-L134"
+    },
+    {
+      "ref": "requirements-L138"
+    },
+    {
+      "ref": "requirements-L142"
+    },
+    {
+      "ref": "requirements-L15"
+    },
+    {
+      "ref": "requirements-L184"
+    },
+    {
+      "ref": "requirements-L188"
+    },
+    {
+      "ref": "requirements-L192"
+    },
+    {
+      "ref": "requirements-L196"
+    },
+    {
+      "ref": "requirements-L200"
+    },
+    {
+      "ref": "requirements-L207"
+    },
+    {
+      "ref": "requirements-L21"
+    },
+    {
+      "ref": "requirements-L213"
+    },
+    {
+      "ref": "requirements-L217"
+    },
+    {
+      "ref": "requirements-L220"
+    },
+    {
+      "ref": "requirements-L224"
+    },
+    {
+      "ref": "requirements-L228"
+    },
+    {
+      "ref": "requirements-L235"
+    },
+    {
+      "ref": "requirements-L239"
+    },
+    {
+      "ref": "requirements-L258"
+    },
+    {
+      "ref": "requirements-L262"
+    },
+    {
+      "ref": "requirements-L266"
+    },
+    {
+      "ref": "requirements-L270"
+    },
+    {
+      "ref": "requirements-L293"
+    },
+    {
+      "ref": "requirements-L297"
+    },
+    {
+      "ref": "requirements-L3"
+    },
+    {
+      "ref": "requirements-L312"
+    },
+    {
+      "ref": "requirements-L321"
+    },
+    {
+      "ref": "requirements-L325"
+    },
+    {
+      "ref": "requirements-L329"
+    },
+    {
+      "ref": "requirements-L333"
+    },
+    {
+      "ref": "requirements-L337"
+    },
+    {
+      "ref": "requirements-L345"
+    },
+    {
+      "ref": "requirements-L349"
+    },
+    {
+      "ref": "requirements-L353"
+    },
+    {
+      "ref": "requirements-L357"
+    },
+    {
+      "ref": "requirements-L360"
+    },
+    {
+      "ref": "requirements-L364"
+    },
+    {
+      "ref": "requirements-L370"
+    },
+    {
+      "ref": "requirements-L374"
+    },
+    {
+      "ref": "requirements-L377"
+    },
+    {
+      "ref": "requirements-L381"
+    },
+    {
+      "ref": "requirements-L394"
+    },
+    {
+      "ref": "requirements-L398"
+    },
+    {
+      "ref": "requirements-L402"
+    },
+    {
+      "ref": "requirements-L409"
+    },
+    {
+      "ref": "requirements-L427"
+    },
+    {
+      "ref": "requirements-L431"
+    },
+    {
+      "ref": "requirements-L437"
+    },
+    {
+      "ref": "requirements-L441"
+    },
+    {
+      "ref": "requirements-L444"
+    },
+    {
+      "ref": "requirements-L448"
+    },
+    {
+      "ref": "requirements-L452"
+    },
+    {
+      "ref": "requirements-L465"
+    },
+    {
+      "ref": "requirements-L471"
+    },
+    {
+      "ref": "requirements-L475"
+    },
+    {
+      "ref": "requirements-L494"
+    },
+    {
+      "ref": "requirements-L498"
+    },
+    {
+      "ref": "requirements-L514"
+    },
+    {
+      "ref": "requirements-L518"
+    },
+    {
+      "ref": "requirements-L531"
+    },
+    {
+      "ref": "requirements-L535"
+    },
+    {
+      "ref": "requirements-L541"
+    },
+    {
+      "ref": "requirements-L555"
+    },
+    {
+      "ref": "requirements-L562"
+    },
+    {
+      "ref": "requirements-L566"
+    },
+    {
+      "ref": "requirements-L570"
+    },
+    {
+      "ref": "requirements-L574"
+    },
+    {
+      "ref": "requirements-L60"
+    },
+    {
+      "ref": "requirements-L64"
+    },
+    {
+      "ref": "requirements-L68"
+    },
+    {
+      "ref": "requirements-L7"
+    },
+    {
+      "ref": "requirements-L72"
+    },
+    {
+      "ref": "requirements-L89"
+    },
+    {
+      "ref": "requirements-L93"
+    },
+    {
+      "ref": "root-component"
+    }
+  ],
+  "metadata": {
+    "component": {
+      "bom-ref": "root-component",
+      "description": "Local control-plane foundation; no VPN data plane",
+      "name": "project-vpn-foundation",
+      "type": "application",
+      "version": "0.1.0"
+    },
+    "properties": [
+      {
+        "name": "cdx:reproducible",
+        "value": "true"
+      }
+    ],
+    "tools": {
+      "components": [
+        {
+          "description": "CycloneDX Software Bill of Materials (SBOM) generator for Python projects and environments",
+          "externalReferences": [
+            {
+              "type": "build-system",
+              "url": "https://github.com/CycloneDX/cyclonedx-python/actions"
+            },
+            {
+              "type": "distribution",
+              "url": "https://pypi.org/project/cyclonedx-bom/"
+            },
+            {
+              "type": "documentation",
+              "url": "https://cyclonedx-bom-tool.readthedocs.io/"
+            },
+            {
+              "type": "issue-tracker",
+              "url": "https://github.com/CycloneDX/cyclonedx-python/issues"
+            },
+            {
+              "type": "license",
+              "url": "https://github.com/CycloneDX/cyclonedx-python/blob/main/LICENSE"
+            },
+            {
+              "type": "release-notes",
+              "url": "https://github.com/CycloneDX/cyclonedx-python/blob/main/CHANGELOG.md"
+            },
+            {
+              "type": "vcs",
+              "url": "https://github.com/CycloneDX/cyclonedx-python/"
+            },
+            {
+              "type": "website",
+              "url": "https://github.com/CycloneDX/cyclonedx-python/#readme"
+            }
+          ],
+          "group": "CycloneDX",
+          "licenses": [
+            {
+              "license": {
+                "acknowledgement": "declared",
+                "id": "Apache-2.0"
+              }
+            }
+          ],
+          "name": "cyclonedx-py",
+          "type": "application",
+          "version": "7.3.1"
+        },
+        {
+          "description": "Python library for CycloneDX",
+          "externalReferences": [
+            {
+              "type": "build-system",
+              "url": "https://github.com/CycloneDX/cyclonedx-python-lib/actions"
+            },
+            {
+              "type": "distribution",
+              "url": "https://pypi.org/project/cyclonedx-python-lib/"
+            },
+            {
+              "type": "documentation",
+              "url": "https://cyclonedx-python-library.readthedocs.io/"
+            },
+            {
+              "type": "issue-tracker",
+              "url": "https://github.com/CycloneDX/cyclonedx-python-lib/issues"
+            },
+            {
+              "type": "license",
+              "url": "https://github.com/CycloneDX/cyclonedx-python-lib/blob/main/LICENSE"
+            },
+            {
+              "type": "release-notes",
+              "url": "https://github.com/CycloneDX/cyclonedx-python-lib/blob/main/CHANGELOG.md"
+            },
+            {
+              "type": "vcs",
+              "url": "https://github.com/CycloneDX/cyclonedx-python-lib"
+            },
+            {
+              "type": "website",
+              "url": "https://github.com/CycloneDX/cyclonedx-python-lib/#readme"
+            }
+          ],
+          "group": "CycloneDX",
+          "licenses": [
+            {
+              "license": {
+                "acknowledgement": "declared",
+                "id": "Apache-2.0"
+              }
+            }
+          ],
+          "name": "cyclonedx-python-lib",
+          "type": "library",
+          "version": "11.12.0"
+        }
+      ]
+    }
+  },
+  "version": 1,
+  "$schema": "http://cyclonedx.org/schema/bom-1.6.schema.json",
+  "bomFormat": "CycloneDX",
+  "specVersion": "1.6"
+}

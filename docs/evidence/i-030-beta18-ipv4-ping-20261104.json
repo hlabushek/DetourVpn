@@ -1,0 +1,43 @@
+{
+  "issue": "I-030",
+  "date_local": "2026-11-04",
+  "scope": "owner-reported single adb shell IPv4 ICMP probe during beta.18 physical window",
+  "application_id": "com.detourvpn.client",
+  "version_code_after_probe": 19,
+  "probe": {
+    "command": "adb shell ping -c 1 -W 3 8.8.8.8",
+    "packets_transmitted": 1,
+    "packets_received": 1,
+    "packet_loss_percent": 0,
+    "rtt_ms": 8.12
+  },
+  "post_probe_adb_active_vpn_network_agents": 0,
+  "owner_disconnect_confirmation_after_probe": true,
+  "post_probe_owner_server_status": {
+    "mode": "read_only",
+    "latest_state": "closed",
+    "non_closed_connections": 0,
+    "reserved_bytes": 1048576,
+    "revoke_gate": "open"
+  },
+  "vpn_tunnel_egress_verified": false,
+  "readonly_beta_database_followup": {
+    "target": "isolated beta PostgreSQL",
+    "transaction": "read_only",
+    "unreceipted_window_count": 0,
+    "unknown_receipt_count": 1,
+    "unknown_receipt_reserved_bytes": 1048576,
+    "distinct_affected_owner_count": 1,
+    "distinct_affected_connection_count": 1,
+    "owner_identifier_or_window_id_exported": false
+  },
+  "reason": "adb shell traffic origin and the VPN state at the exact probe time were not independently verified; no exit-IP or server-side packet attribution was captured",
+  "fresh_handshake_independently_verified": false,
+  "distribution": "not_accepted",
+  "privacy": {
+    "owner_identifier_or_credentials_recorded": false,
+    "device_serial_recorded": false,
+    "profile_endpoints_or_keys_recorded": false,
+    "traffic_or_dns_contents_recorded": false
+  }
+}

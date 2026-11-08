@@ -1,0 +1,24 @@
+{
+  "observed_at_utc": "2026-11-05T18:44:20Z",
+  "issue": "I-030",
+  "scope": "owner-authorized signed beta.20 update installation; read-only post-install checks",
+  "build_receipt": "i-030-beta-apk-20261105T183748528Z-9625edcf.json",
+  "application_id": "com.detourvpn.client",
+  "version_name": "0.1.0-beta.20",
+  "version_code": 21,
+  "installed_base_apk_matches_signed_receipt": true,
+  "active_vpn_transport": false,
+  "always_on_configured": false,
+  "lockdown": false,
+  "connect_attempted": false,
+  "egress_probe_attempted": false,
+  "distribution": "not_accepted",
+  "privacy": {
+    "device_identifier_exported": false,
+    "account_identifier_exported": false,
+    "ip_exported": false,
+    "secrets_exported": false,
+    "raw_logs_exported": false,
+    "traffic_exported": false
+  }
+}

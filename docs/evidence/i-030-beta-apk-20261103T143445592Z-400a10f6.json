@@ -1,0 +1,17 @@
+{
+  "observed_at": "2026-11-03T14:34:46+00:00",
+  "scope": "local signed APK metadata and signature verification",
+  "application_id": "com.detourvpn.client",
+  "version_code": 2,
+  "version_name": "0.1.0-beta.1",
+  "artifact_sha256": "6c70fe1b5ab442df29d18e8a4b3db25e736e1414b712afdc0054cf71cb804966",
+  "signer_certificate_sha256": [
+    "6b99a02bee6dc8dba659af64fcd025782fc3011a41099168e3f3a766b84ef3b8"
+  ],
+  "verification": {
+    "aapt_metadata": "passed",
+    "apksigner_signature": "passed"
+  },
+  "update_install": "not_verified",
+  "distribution": "not_accepted"
+}

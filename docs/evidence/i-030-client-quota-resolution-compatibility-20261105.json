@@ -1,0 +1,30 @@
+{
+  "issue": "I-030",
+  "timestamp_utc": "2026-11-05T19:08:58Z",
+  "scope": "isolated_beta_client_and_read_only_ingress",
+  "quota_history": {
+    "beta_has_peer_window_resolution_ledger_source": true,
+    "audited_resolution_debit_count": 1,
+    "previous_client_accepted_source": false,
+    "effect": "history_parse_failure_prevented_atomic_quota_snapshot_publish_when_present_in_loaded_page",
+    "client_source_updated": true,
+    "focused_test_passed": true
+  },
+  "unauthenticated_read_only_ingress_probe": {
+    "nodes_status": 401,
+    "quota_status": 401,
+    "health_status": 404,
+    "ready_status": 404,
+    "interpretation": "API_routes_responded; unauthenticated_rejection_expected; public_health_and_readiness_are_not_exposed",
+    "credentials_or_response_bodies_saved": false
+  },
+  "device_api_reachability": "not_verified",
+  "owner_observation": {
+    "chrome_probe_during_vpn": "failed_to_load",
+    "after_automatic_vpn_shutdown": "chrome_reloaded_on_direct_connection",
+    "ip_or_browsing_content_collected": false,
+    "server_side_telegram_or_chrome_attribution_claimed": false
+  },
+  "physical_retest_authorized": false,
+  "identifiers_credentials_tokens_and_raw_logs_exported": false
+}

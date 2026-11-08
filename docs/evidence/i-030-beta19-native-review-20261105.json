@@ -1,0 +1,49 @@
+{
+  "observed_at_utc": "2026-11-05T17:07:51Z",
+  "issue": "I-030",
+  "scope": "beta.19 read-only native-start trace and pinned-source review",
+  "device_check": {
+    "application_id": "com.detourvpn.client",
+    "version_code": 20,
+    "version_name": "0.1.0-beta.19",
+    "installed_artifact_sha256": "fc1cc4941030acf4b527de2ca971df19c58055d944aca19e14f4123f9962be71",
+    "collector_status": "no_beta19_trace_markers",
+    "source_uid_filter_applied": true,
+    "raw_logs_exported": false,
+    "raw_logs_persisted": false,
+    "connect_attempted": false,
+    "egress_probe_sent": false
+  },
+  "source_review": {
+    "amnezia_box_version": "1.260910.0",
+    "amnezia_box_source_archive_sha256": "2c7563405aa61cd973a7bd43aef0e22e1ed3ee74e6724a18244a641b8bbfe152",
+    "amneziawg_go_module": "github.com/amnezia-vpn/amneziawg-go/v3 v3.1.20260828",
+    "files": [
+      { "path": "apps/android/app/src/main/java/org/example/vpnpoc/LibboxVpnService.java", "sha256": "2ee292dc13ec3e8f66c37841872d7f80725d7f64792b6acb876e217272e7b1aa" },
+      { "path": ".cache/upstream/amnezia-box-v1.260910.0-src/amnezia-box-1.260910.0/transport/awg/device.go", "sha256": "a0fe902e2127100ae03f0c9b57e54a352efe5f7a529385a8003aca04a8511c44" },
+      { "path": ".cache/upstream/amnezia-box-v1.260910.0-src/amnezia-box-1.260910.0/experimental/libbox/monitor.go", "sha256": "ce37d77e0fe7e031ce03bca1e05d09aa1320a284ef3f119351546006a143ce56" },
+      { "path": ".cache/toolchains/go1.25.5/gopath/pkg/mod/github.com/amnezia-vpn/amneziawg-go/v3@v3.1.20260828/device/device.go", "sha256": "6d013e27d6b33c1ecaae1a1fbc4999e15a3a11252e302c580ea0f9027fa3ec21" }
+    ],
+    "findings": [
+      "Android emits fixed markers around libbox service start and default-network callback updates; installed beta.19 emitted none because the service was not started after installation.",
+      "Amnezia Box serializes wrapper Start, BindUpdate, and Close with its access mutex; AmneziaWG serializes BindUpdate and Close with its network mutex.",
+      "A default-interface callback can reach BindUpdate when the selected interface changes. The beta.18 crash-PC symbolization is consistent with this path, but does not identify the trigger or prove a source defect.",
+      "The monitor source writes isExpensive and isConstrained outside defaultInterfaceAccess; this is a concurrency-review concern, but no evidence ties it to the observed SIGABRT, so it was not changed or promoted to a root cause."
+    ],
+    "root_cause": "not_established",
+    "behavior_patch_justified": false
+  },
+  "remaining_evidence_needed": [
+    "fixed beta.19 service-start and callback trace from a bounded physical diagnostic start",
+    "if SIGABRT recurs, sanitized crash signal with abort message and additional native frames/register context where available",
+    "fresh owner quota and revoke-gate preflight immediately before any authorized physical diagnostic start"
+  ],
+  "privacy": {
+    "device_identifier_exported": false,
+    "uid_exported": false,
+    "secrets_exported": false,
+    "endpoint_or_profile_exported": false,
+    "raw_logs_exported": false,
+    "traffic_exported": false
+  }
+}

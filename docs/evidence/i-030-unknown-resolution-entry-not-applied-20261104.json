@@ -1,0 +1,20 @@
+{
+  "issue": "I-030",
+  "timestamp_utc": "2026-11-04T16:02:36Z",
+  "target": "isolated_beta_control_plane",
+  "owner_entered_local_mfa": true,
+  "resolution_committed": false,
+  "local_runner_exit_status": "0x40000015",
+  "failure_cause": "not_confirmed; no sanitized script result was produced",
+  "post_attempt_read_only_beta": {
+    "database_revision": "0018_peer_window_resolution",
+    "resolution_count": 0,
+    "applied_full_budget_resolution_debits": 0,
+    "unknown_receipt_count": 1,
+    "unresolved_unknown_reserved_bytes": 1048576,
+    "non_closed_connections": 0
+  },
+  "identifiers_credentials_and_raw_data_exported": false,
+  "physical_connect_allowed": false,
+  "result": "not_resolved"
+}

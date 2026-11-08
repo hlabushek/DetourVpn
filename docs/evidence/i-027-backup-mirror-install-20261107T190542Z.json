@@ -1,0 +1,13 @@
+{
+    "issue":  "I-030",
+    "related":  "I-027",
+    "timestamp_utc":  "2026-11-07T19:05:42.8362373Z",
+    "target":  "isolated beta API host and beta node",
+    "node_unit":  "detourvpn-backup-mirror.timer",
+    "api_unit":  "detourvpn-beta-backup.timer",
+    "retention_copies":  14,
+    "decryption_key_on_node":  false,
+    "ssh_key_restricted_to_single_cat":  true,
+    "first_pull":  "success",
+    "result":  "success"
+}

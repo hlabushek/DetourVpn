@@ -1,0 +1,30 @@
+{
+  "observed_at": "2026-11-05T15:56:19Z",
+  "issue": "I-030",
+  "scope": "local read-only pre-install device gate",
+  "adb": {
+    "authorized_device_count": 1,
+    "device_identifier_recorded": false
+  },
+  "installed_package": {
+    "application_id": "com.detourvpn.client",
+    "version_code": 19,
+    "version_name": "0.1.0-beta.18"
+  },
+  "vpn_service": {
+    "service_record_present": true,
+    "foreground": true,
+    "start_requested": true
+  },
+  "actions": {
+    "beta19_installed": false,
+    "connect_attempted": false,
+    "egress_probe_sent": false
+  },
+  "decision": "defer_install_until_owner_disconnects_VPN_in_app",
+  "privacy": {
+    "device_identifier_exported": false,
+    "raw_logs_exported": false,
+    "traffic_or_endpoint_data_exported": false
+  }
+}

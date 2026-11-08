@@ -1,0 +1,27 @@
+{
+  "issue": "I-030",
+  "date_local": "2026-11-04",
+  "scope": "signed beta.17 APK and native-library provenance before device install",
+  "application_id": "com.detourvpn.client",
+  "version_code": 18,
+  "version_name": "0.1.0-beta.17",
+  "apk_sha256": "5b2c81a72d856d5d41e25ad067de35f6244a7ad42f8d08429eb9add09b37a8e5",
+  "build_receipt": "i-030-beta-apk-20261104T111855890Z-c26b8877.json",
+  "build_receipt_signature_verification": "passed",
+  "signer_matches_beta16_receipt": true,
+  "native_abi": "arm64-v8a",
+  "libbox_sha256": {
+    "rebuilt_aar_and_merged_native_libs": "52c93f25d2cc399074cd76180ff839a208b60eb02b8300cc4ed2742c0442f8f4",
+    "stripped_native_libs_and_apk": "8371e5f696c10c4041fdd4ba514ed0ccb9d37959ba135173d5c44809aa57cd94"
+  },
+  "adb_authorized_device_count": 0,
+  "install_attempted": false,
+  "vpn_connect_attempted": false,
+  "server_status_after_beta16_attempt": "unknown",
+  "distribution": "not_accepted",
+  "privacy": {
+    "profile_endpoints_or_keys_recorded": false,
+    "raw_native_errors_recorded": false,
+    "traffic_or_dns_contents_recorded": false
+  }
+}

@@ -1,0 +1,30 @@
+{
+  "issue": "I-030",
+  "date_local": "2026-11-04",
+  "scope": "local Amnezia Box interface-initialization patch and safe Android diagnostics",
+  "source_version": "amnezia-box v1.260910.0",
+  "aar": {
+    "target": "android/arm64",
+    "relative_path": ".cache/amnezia-box-build/libbox-1.260910-arm64.aar",
+    "sha256": "7c739939952c45274b0e4e60eb3555f7f89be6eb1e4088afb9cc374b161d6118",
+    "bytes": 16568374,
+    "contains": "jni/arm64-v8a/libbox.so"
+  },
+  "checks": {
+    "patch_against_pristine_index": "passed",
+    "patch_against_patched_build_tree": "passed",
+    "go_test_with_awg_with_gvisor_route_and_transport_awg": "passed",
+    "gradle_release_unit_test_against_rebuilt_arm64_aar": "passed",
+    "release_java_compilation_against_rebuilt_arm64_aar": "passed"
+  },
+  "physical_vpn_start": "not_tested",
+  "handshake_egress_split_dns_ipv6_revoke": "not_tested",
+  "apk_built_or_installed": false,
+  "server_status_after_beta16_attempt": "unknown",
+  "distribution": "not_accepted",
+  "privacy": {
+    "raw_native_errors_recorded": false,
+    "profile_endpoints_or_keys_recorded": false,
+    "traffic_or_dns_contents_recorded": false
+  }
+}

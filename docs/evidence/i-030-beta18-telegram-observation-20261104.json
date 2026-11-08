@@ -1,0 +1,37 @@
+{
+  "issue": "I-030",
+  "date_local": "2026-11-04",
+  "scope": "unscheduled owner-reported beta.18 physical observation after open reservation was identified",
+  "application_id": "com.detourvpn.client",
+  "version_code": 19,
+  "preconnect_owner_status": "closed/0/1048576; revoke_gate=open",
+  "owner_reported_client_state": "vpn_started",
+  "owner_reported_application_reachability": "Telegram opened and worked",
+  "owner_reported_baseline": "Telegram normally unavailable on this Russian network without VPN",
+  "adb_active_vpn_network_agent_during_report": true,
+  "adb_active_vpn_network_agent_on_followup": false,
+  "post_attempt_server_status": {
+    "mode": "owner_authenticated_read_only",
+    "latest_state": "closed",
+    "non_closed_connections": 0,
+    "reserved_bytes": 1048576,
+    "revoke_gate": "open"
+  },
+  "readonly_beta_database_followup": {
+    "all_connection_states": "closed",
+    "unreceipted_window_count": 0,
+    "unknown_receipt_count": 1,
+    "unknown_receipt_reserved_bytes": 1048576,
+    "identifiers_exported": false
+  },
+  "fresh_handshake_independently_verified": false,
+  "telegram_traffic_attributed_to_vpn": false,
+  "vpn_egress_verified": false,
+  "distribution": "not_accepted",
+  "privacy": {
+    "owner_identifier_or_credentials_recorded": false,
+    "device_serial_recorded": false,
+    "profile_endpoints_or_keys_recorded": false,
+    "traffic_or_dns_contents_recorded": false
+  }
+}

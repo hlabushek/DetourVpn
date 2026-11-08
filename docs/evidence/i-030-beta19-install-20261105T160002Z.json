@@ -1,0 +1,33 @@
+{
+  "observed_at": "2026-11-05T16:00:02Z",
+  "issue": "I-030",
+  "scope": "physical-test-only beta.19 package installation",
+  "build_receipt": "i-030-beta-apk-20261105T153957760Z-6c8d4904.json",
+  "artifact_sha256": "fc1cc4941030acf4b527de2ca971df19c58055d944aca19e14f4123f9962be71",
+  "install": {
+    "command_result": "adb_install_r_success",
+    "application_id": "com.detourvpn.client",
+    "version_code": 20,
+    "version_name": "0.1.0-beta.19",
+    "post_install_package_inspection": "passed",
+    "device_identifier_recorded": false
+  },
+  "post_install_state": {
+    "vpn_service_foreground": false,
+    "always_on_vpn_configured": false,
+    "lockdown": false
+  },
+  "physical_validation": {
+    "app_opened": false,
+    "native_start_trace_collected": false,
+    "connect_attempted": false,
+    "egress_probe_sent": false,
+    "distribution_accepted": false
+  },
+  "privacy": {
+    "device_identifier_exported": false,
+    "credentials_exported": false,
+    "raw_logs_exported": false,
+    "traffic_or_endpoint_data_exported": false
+  }
+}

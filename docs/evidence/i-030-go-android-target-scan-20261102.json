@@ -1,0 +1,108 @@
+{
+  "issue": "I-030",
+  "observed_at_utc": "2026-11-02T19:29:16Z",
+  "scope": "govulncheck source symbol scan and Go import graph for the pinned Android native tunnel module on both release ABIs",
+  "source": {
+    "module_path": ".cache/i-029-final3/sdk-go-only/tunnel/tools/libwg-go",
+    "go_mod_sha256": "cde303cebd847b122373b4d714645b8480d48283570ab9b0bc6540c364724a16",
+    "go_sum_sha256": "f8de8667720b798be4a9f2db1dd5eff0cbf09d05409fa80bec8abc6049c79e3d"
+  },
+  "toolchain": {
+    "govulncheck_version": "v1.7.0",
+    "govulncheck_sha256": "c9204cf3880601632817552bdc7676bd3b43e27660e350406d7e1ad5fd6379c1",
+    "go_version": "go1.25.14",
+    "android_ndk_revision": "26.1.10909125",
+    "build_tags": ["linux"],
+    "goos": "android",
+    "cgo_enabled": true,
+    "scan_command": "govulncheck -db https://vuln.go.dev -format=json -tags linux ./...",
+    "database": "https://vuln.go.dev",
+    "database_last_modified_utc": "2026-10-27T21:16:18Z",
+    "database_index_checked_utc": "2026-11-02T19:29:16Z",
+    "database_index_check": "Fetched https://vuln.go.dev/index/db.json.gz on the observation date; its payload reported modified=2026-10-27T21:16:18Z, matching both target scan configs. No newer published index was available at check time."
+  },
+  "targets": [
+    {
+      "goarch": "arm64",
+      "cc": "aarch64-linux-android23-clang",
+      "go_list_dependency_lines": 139,
+      "x_crypto_ssh_imported": false,
+      "scan_exit_code": 0,
+      "json_stream_bytes": 831125,
+      "json_stream_sha256": "dcb3e6e7a381a75567384ff4dbe1811ab9903e97f55260e6af249a1741f46e50",
+      "finding_messages": 58,
+      "unique_osv_ids": 47,
+      "finding_levels": {
+        "module_level": 57,
+        "package_level": 1,
+        "symbol_level": 0
+      },
+      "findings_by_module": {
+        "stdlib": 20,
+        "golang.org/x/crypto": 20,
+        "golang.org/x/net": 17,
+        "golang.org/x/sys": 1
+      },
+      "reachable_symbol_findings": 0,
+      "package_level_findings": [
+        {
+          "osv_id": "GO-2026-6604",
+          "source_url": "https://vuln.go.dev/ID/GO-2026-6604.json",
+          "package": "stdlib/os",
+          "affected_platform": "windows",
+          "android_target_applicable": false,
+          "rationale": "The advisory affects Windows-only os.Root junction operations; the Android target is not a Windows build."
+        }
+      ],
+      "import_graph_sha256": "b5fcc6ce425424fe504f376e71485c5d2df0209ebfb0e999c596102bf8e77597"
+    },
+    {
+      "goarch": "amd64",
+      "cc": "x86_64-linux-android23-clang",
+      "go_list_dependency_lines": 140,
+      "x_crypto_ssh_imported": false,
+      "scan_exit_code": 0,
+      "json_stream_bytes": 831125,
+      "json_stream_sha256": "9389baf48021399fd30bf073dca4dd6a8b6688de466cbfdf902f52355d4abb29",
+      "finding_messages": 58,
+      "unique_osv_ids": 47,
+      "finding_levels": {
+        "module_level": 57,
+        "package_level": 1,
+        "symbol_level": 0
+      },
+      "findings_by_module": {
+        "stdlib": 20,
+        "golang.org/x/crypto": 20,
+        "golang.org/x/net": 17,
+        "golang.org/x/sys": 1
+      },
+      "reachable_symbol_findings": 0,
+      "package_level_findings": [
+        {
+          "osv_id": "GO-2026-6604",
+          "source_url": "https://vuln.go.dev/ID/GO-2026-6604.json",
+          "package": "stdlib/os",
+          "affected_platform": "windows",
+          "android_target_applicable": false,
+          "rationale": "The advisory affects Windows-only os.Root junction operations; the Android target is not a Windows build."
+        }
+      ],
+      "import_graph_sha256": "7b918f68de3b5c3a187ac9557cf9bb9f74724be2e68d05611780c83973bc3233"
+    }
+  ],
+  "interpretation": {
+    "result": "No vulnerable symbol was reported as reachable for either Android target in this scan. Each target also has one package-level stdlib/os match, GO-2026-6604, whose affected functions are Windows-only and do not apply to Android.",
+    "finding_semantics": "Each JSON stream contains 57 module-level matches emitted before reachability analysis, one package-level Windows-only os match, and zero symbol-level vulnerable function traces. Module-level matches do not prove affected code is called.",
+    "limitations": [
+      "The latest official Go vulnerability database index checked on 2026-11-02 reports a content modification date of 2026-10-27; scans use that current published snapshot. Check the index again before the next release decision in case it has advanced.",
+      "This static source reachability result does not prove runtime safety or cover non-Go dependencies, Gradle tooling, SDK/NDK, OS/container packages, SBOM, or license review.",
+      "No dependency upgrades or source changes were made; compatibility and remediation review remain open for any finding that becomes reachable in a refreshed scan."
+    ],
+    "critical_vulnerability_gate_passed": false
+  },
+  "project_source_modified": false,
+  "dependency_files_modified": false,
+  "beta_or_production_hosts_contacted": false,
+  "secrets_recorded": false
+}

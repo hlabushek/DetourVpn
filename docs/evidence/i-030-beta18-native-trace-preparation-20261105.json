@@ -1,0 +1,46 @@
+{
+  "issue": "I-030",
+  "date_utc": "2026-11-05",
+  "scope": "local Android native startup and default-network trace preparation",
+  "changes": {
+    "source": "apps/android/app/src/main/java/org/example/vpnpoc/LibboxVpnService.java",
+    "fixed_events": [
+      "libbox_new_service_begin",
+      "libbox_new_service_returned",
+      "libbox_service_start_begin",
+      "libbox_service_start_returned",
+      "network_callback_*"
+    ],
+    "dynamic_network_identifiers_logged": false,
+    "raw_exception_messages_logged": false,
+    "user_traffic_or_dns_logged": false,
+    "network_callback_sequence_is_local_monotonic_counter": true,
+    "source_sha256": "2ee292dc13ec3e8f66c37841872d7f80725d7f64792b6acb876e217272e7b1aa"
+  },
+  "validation": {
+    "task": ":app:compileReleaseJavaWithJavac",
+    "result": "passed",
+    "jdk": "17.0.21",
+    "gradle": "8.14.3",
+    "tests_run": false
+  },
+  "distribution": {
+    "signed_apk_built": false,
+    "installed": false,
+    "physical_connect_attempted": false,
+    "beta_acceptance_claimed": false,
+    "signing_inputs_read_or_requested": false,
+    "signed_build_blocker": "local_beta_api_origin_and_hidden_keystore_prompts_required_by_existing_secure_build_script"
+  },
+  "privacy": {
+    "secrets_exported": false,
+    "endpoint_config_exported": false,
+    "raw_logs_exported": false
+  },
+  "target_build": {
+    "version_name": "0.1.0-beta.19",
+    "version_code": 20,
+    "abi": "arm64-v8a",
+    "physical_test_only": true
+  }
+}

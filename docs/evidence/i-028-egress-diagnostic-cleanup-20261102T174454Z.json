@@ -1,0 +1,45 @@
+{
+  "issue": "I-028",
+  "measured_at": "2026-11-02T17:44:54Z",
+  "evidence_kind": "cleanup_followup_only",
+  "suite": "Egress",
+  "original_physical_receipt": "i-028-egress-diagnostic-20261102T174038Z-34b16d11.json",
+  "original_test_passed": false,
+  "original_failure": "seed_package_installed=false because the Python harness checked org.example.vpnclient.i028 while the built Android package is com.detourvpn.client.i028; automatic cleanup checked the same stale package identities.",
+  "cleanup_followup": {
+    "app_private_cleanup_phase": "passed",
+    "session_vault_absent_before_uninstall": true,
+    "isolated_test_package_uninstalled": true,
+    "owner_app_com_detourvpn_client_present": true,
+    "legacy_probe_org_example_vpnpoc_preserved": true,
+    "probe_instrumentation_absent": true,
+    "always_on_vpn_app": null,
+    "adb_reverse_empty": true,
+    "remote_postcheck_absent_test_namespaces_links_ports": true,
+    "timeout_timer_active_state": "inactive",
+    "staging_source_directory_owned_and_not_symlink": true,
+    "original_root_cleanup": {
+      "cleanup_complete": true,
+      "journal_preserved": true,
+      "temporary_grant_removed": true,
+      "gate_close_errors_before_core_stop": 0,
+      "timeout_timer_disarmed": true
+    },
+    "original_cleanup_steps": {
+      "agent_revoke_and_stop": true,
+      "isolated_i028_app_absent_after_manual_followup": true,
+      "local_api_stopped": true,
+      "owner_app_untouched_after_manual_followup": true,
+      "phone_restored_after_manual_followup": true,
+      "phone_session_absent": true,
+      "ssh_transport": true
+    }
+  },
+  "independent_unprivileged_remote_postcheck": true,
+  "temporary_staging_transport_and_phone_cleanup": true,
+  "passed": false,
+  "diagnostic_only": true,
+  "vpn_dataplane_acceptance": false,
+  "secrets_or_session_contents_read": false,
+  "owner_quota_changed": false
+}

@@ -1,0 +1,11 @@
+{
+  "observed_at": "2026-11-04T13:35:15+03:00",
+  "scope": "owner-reported read-only beta v3 status after beta.15 bind failure",
+  "source": "owner-run check_beta_owner_window_status.ps1 output",
+  "latest_state": "closed",
+  "non_closed_connections": 0,
+  "reserved_bytes": 0,
+  "revoke_gate": "closed",
+  "independently_requeried_by_codex": false,
+  "further_connect_attempts": 0
+}

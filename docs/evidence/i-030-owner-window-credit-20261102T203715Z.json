@@ -1,0 +1,35 @@
+{
+  "issue": "I-030",
+  "observed_at_utc": "2026-11-02T20:37:15Z",
+  "scope": "single owner-only beta window allowance, explicitly authorized by the owner",
+  "operation": {
+    "kind": "quota_credit",
+    "amount_bytes": 262144,
+    "payment": false,
+    "target": "beta owner account only",
+    "server_scope": "beta API only; B and production not contacted",
+    "result": "confirmed by exact post-action ledger totals"
+  },
+  "ledger": {
+    "granted_bytes_before": 6553600,
+    "used_bytes_before": 5513463,
+    "reserved_bytes_before": 0,
+    "available_bytes_before": 1040137,
+    "granted_bytes_after": 6815744,
+    "used_bytes_after": 5513463,
+    "reserved_bytes_after": 0,
+    "available_bytes_after": 1302281,
+    "minimum_window_bytes": 1048576
+  },
+  "device_preflight": {
+    "adb_device_count": 1,
+    "authorized": true,
+    "model": "Pixel 8 Pro",
+    "application_id": "com.detourvpn.client",
+    "vpn_transport_active": false,
+    "test_started": false,
+    "serial_recorded": false
+  },
+  "secrets_or_personal_identifiers_recorded": false,
+  "additional_credit_or_test_window_used": false
+}

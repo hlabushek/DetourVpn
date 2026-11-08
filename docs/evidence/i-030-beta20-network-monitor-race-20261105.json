@@ -1,0 +1,44 @@
+{
+  "observed_at_utc": "2026-11-05T18:29:43Z",
+  "issue": "I-030",
+  "scope": "Pinned Android libbox source review and targeted concurrency fix; physical retry not yet performed",
+  "upstream": {
+    "version": "1.260910.0",
+    "commit": "16724484cfa00d9b2c14d8280dc055564e2e12ba",
+    "awg": "v3.1.20260828",
+    "go": "1.25.5"
+  },
+  "source": {
+    "patch": "third_party/amnezia-box/i030-network-monitor-race.patch",
+    "patch_sha256": "7a729a140dd83bd072a4da2384626f7c2b9b4b2bbb03b03ffec16e88ff19b9f6",
+    "monitor_go_sha256": "f6b1f0aa61105ec04ea92c85ef7fafe0036bb0afd9b11648953296df49ddd82e",
+    "service_go_sha256": "718fc2f445be4f4d532913869ebb97517dcbb8b576e371a94e52b293924f806b",
+    "finding": "Concurrent Android default-interface callbacks wrote network-cost booleans without synchronization while interface enumeration read them; callback updates are now serialized and reads/writes share the existing mutex.",
+    "scope": "fixes a confirmed source-level race in the BindUpdate-reachable network-update path; does not establish that it caused the prior SIGABRT"
+  },
+  "build": {
+    "aar": "libbox-1.260910-arm64.aar",
+    "aar_sha256": "fb882286999e466fe1d6ea94a9e5778bb749efa1a98aa92f7861ac89a81079ba",
+    "aar_bytes": 16572910,
+    "previous_aar_preserved_sha256": "ebe86db3e0c3f88064049011df82503ba2f56a1dce9b6ab5748f00284e7a3f20",
+    "previous_aar_matches_beta19_receipt": true
+  },
+  "verification": {
+    "go_test": "go test -race ./experimental/libbox",
+    "go_test_result": "pass",
+    "patch_applies_to_pristine_pinned_source_with_existing_patch": true,
+    "aar_build": "pass; arm64-v8a",
+  "owner_preflight_updated_for_beta20_same_signer": true,
+    "beta20_apk": "not_built; owner-local signing credentials required",
+    "physical_connect": "not_attempted",
+    "source_bound_egress": "not_attempted"
+  },
+  "conclusion": "A confirmed concurrent-state race was corrected and checked; exact beta.19 SIGABRT cause remains unproven pending a full native tombstone or a successful bounded beta.20 retest.",
+  "privacy": {
+    "secrets_exported": false,
+    "raw_logs_exported": false,
+    "device_or_account_identifiers_exported": false,
+    "endpoint_or_profile_exported": false,
+    "traffic_exported": false
+  }
+}

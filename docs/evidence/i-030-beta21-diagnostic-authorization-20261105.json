@@ -1,0 +1,22 @@
+{
+  "issue": "I-030",
+  "timestamp_utc": "2026-11-05T20:06:00Z",
+  "scope": "one supervised isolated-beta diagnostic attempt",
+  "beta21_installed_and_owner_api_quota_smoke": true,
+  "beta20_native_service_start_returned": true,
+  "beta20_network_callback_updates_returned": 7,
+  "beta20_android_tun_open_marker_available": false,
+  "shutdown_cause": "not_established",
+  "tunnel_code_changed_in_beta21": false,
+  "authorization": {
+    "diagnostic_connect_attempts": 1,
+    "window_budget_bytes_max": 1048576,
+    "fresh_owner_preflight_required": true,
+    "chrome_only_required": true,
+    "other_vpn_must_be_off": true,
+    "automatic_retry": false,
+    "quota_or_server_mutation": false,
+    "distribution": false
+  },
+  "raw_logs_or_network_content_exported": false
+}

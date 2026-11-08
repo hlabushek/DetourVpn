@@ -1,0 +1,21 @@
+{
+  "observed_at": "2026-11-04T13:42:20+03:00",
+  "scope": "physical Pixel owner update install only",
+  "application_id": "com.detourvpn.client",
+  "version_code": 17,
+  "version_name": "0.1.0-beta.16",
+  "artifact_sha256": "5c52d3a453fa7b8989c88c61bb5b1bc218d54bda2f065d0be4564b7c862c075c",
+  "build_receipt": "i-030-beta-apk-20261104T104033188Z-658cbc91.json",
+  "build_receipt_signature_verification": "passed",
+  "adb_authorized_device_count": 1,
+  "install_command": "adb install -r",
+  "install_result": "passed",
+  "app_data_cleared": false,
+  "post_install_package_version_verified": true,
+  "vpn_transport_present_before_install": false,
+  "vpn_transport_present_after_install": false,
+  "always_on_vpn_app_configured": false,
+  "app_launch_attempted": false,
+  "vpn_connect_attempted": false,
+  "distribution": "not_accepted"
+}

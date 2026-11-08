@@ -1,0 +1,22 @@
+{
+  "issue": "I-030",
+  "timestamp_utc": "2026-11-05T19:51:10Z",
+  "target": "isolated_beta_android_owner_device",
+  "build": {
+    "version_name": "0.1.0-beta.21",
+    "version_code": 22,
+    "installed_apk_matches_signed_receipt": true
+  },
+  "mode": "vpn_off",
+  "owner_reported": {
+    "quota_display_visible": true,
+    "node_catalog_visible": true,
+    "api_warning_not_present": true
+  },
+  "independent_ui_capture": false,
+  "vpn_transport_readback_after_report": true,
+  "vpn_transport_active_readback": false,
+  "server_side_tunnel_or_traffic_attribution_claimed": false,
+  "connect_attempted": false,
+  "identifiers_credentials_tokens_and_browsing_content_collected": false
+}

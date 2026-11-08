@@ -1,0 +1,100 @@
+{
+  "issue": "I-030",
+  "observed_at_utc": "2026-11-02T21:40:25Z",
+  "observed_on_local_date": "2026-11-03",
+  "scope": "Read-only advisory recheck against exact current lockfiles; no staging, beta, or production host contact",
+  "tools": {
+    "uv": "0.11.17",
+    "pip_audit": "2.10.1",
+    "npm": "11.12.1",
+    "osv_api": "https://api.osv.dev/v1/querybatch",
+    "go_vulnerability_index": "https://vuln.go.dev/index/db.json"
+  },
+  "lockfiles": {
+    "uv.lock": "4f09ce7b2c004c89147ac037ad979874fc2d036fed38e0af34cb27c048962716",
+    "apps/telegram-mini-app/package-lock.json": "2aa1d51faa551485055101b1ab1141eccc993a4af55fb2f3317016dd59973037",
+    "apps/telegram-bot/package-lock.json": "a96b270634ba0e98cc05ec8dbf5e3961421f6f155afcfcb958bfec214b306a5c",
+    "apps/client/pubspec.lock": "c994a810e14314cf7cae00fc8da3819b0a2c6ddd39580c997eabbf78593b3465",
+    "apps/android/tunnel/gradle.lockfile": "8caf9eb655817f58ad8ff937072ebb662595892ec246b05018b192b6ff994068",
+    "apps/android/app/gradle.lockfile": "53bee6e5e3d8f449b166267c2d591be96151dba908944be897ac4b21bf6bb21c",
+    "apps/client/android/app/gradle.lockfile": "21dee1dad17adbfbf6e00388bba1dd5780a3d6cc90d7ebfbfe1ccaa409987a10",
+    "apps/client/android/tunnel-gradle.lockfile": "8caf9eb655817f58ad8ff937072ebb662595892ec246b05018b192b6ff994068"
+  },
+  "scans": {
+    "python": {
+      "command": "uv export --locked --all-groups --format requirements.txt; pip-audit -r <temporary-export> --strict -s osv",
+      "locked_packages_exported": 76,
+      "result": "no_known_vulnerabilities",
+      "temporary_requirements_removed": true
+    },
+    "npm": {
+      "mini_app": {
+        "command": "npm audit --package-lock-only",
+        "exit_code": 0,
+        "vulnerabilities": 0
+      },
+      "telegram_bot": {
+        "command": "npm audit --package-lock-only",
+        "exit_code": 0,
+        "vulnerabilities": 0
+      }
+    },
+    "pub": {
+      "query": "OSV querybatch for hosted packages in apps/client/pubspec.lock",
+      "hosted_packages": 27,
+      "matched_packages": 0,
+      "advisory_records": 0
+    },
+    "maven": {
+      "query": "OSV querybatch for versions in four Gradle lockfiles",
+      "coordinate_versions": 196,
+      "matched_versions": 18,
+      "advisory_records": 87,
+      "unique_advisory_ids": 45,
+      "severity_ids": {
+        "CRITICAL": 1,
+        "HIGH": 18,
+        "MODERATE": 23,
+        "LOW": 3
+      },
+      "release_runtime_coordinates": 49,
+      "release_runtime_matches": 0
+    },
+    "go_android": {
+      "current_go_mod_sha256": "cde303cebd847b122373b4d714645b8480d48283570ab9b0bc6540c364724a16",
+      "current_go_sum_sha256": "f8de8667720b798be4a9f2db1dd5eff0cbf09d05409fa80bec8abc6049c79e3d",
+      "source_hashes_match": "docs/evidence/i-030-go-android-target-scan-20261102.json",
+      "govulncheck_version": "v1.7.0",
+      "previous_scan_database_modified_utc": "2026-10-27T21:16:18Z",
+      "current_database_index_modified_utc": "2026-10-27T21:16:18Z",
+      "previous_android_targets": [
+        {
+          "goarch": "arm64",
+          "scan_exit_code": 0,
+          "reachable_symbol_findings": 0,
+          "windows_only_package_findings": 1
+        },
+        {
+          "goarch": "amd64",
+          "scan_exit_code": 0,
+          "reachable_symbol_findings": 0,
+          "windows_only_package_findings": 1
+        }
+      ],
+      "scan_reused_because": "Pinned Go sources and published vulnerability index are unchanged since the source-bound scan."
+    }
+  },
+  "not_covered": [
+    "Gradle wrapper, AGP and the full Flutter SDK embedded build plugin inventory",
+    "Android SDK, NDK, Java toolchain and native build tools",
+    "OS and container base-image packages",
+    "complete CycloneDX/SPDX SBOM for the signed APK and server images",
+    "licence and provenance review",
+    "independent security review",
+    "runtime, physical-device, load, and operational SLO acceptance"
+  ],
+  "lockfiles_modified": false,
+  "beta_or_production_hosts_contacted": false,
+  "secrets_recorded": false,
+  "critical_vulnerability_assessment_complete": false
+}

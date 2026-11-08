@@ -1,0 +1,53 @@
+{
+  "issue": "I-030",
+  "observed_at_utc": "2026-11-02T22:20:56Z",
+  "scope": "full repository Python test suite against a temporary local PostgreSQL cluster after I-028 test expectation corrections",
+  "command": "uv run --frozen python scripts/test_with_postgres.py --postgres-bin .cache/i-004/portable/pgsql/bin",
+  "targeted_command": "uv run --frozen python -m pytest services/api/tests/test_i028_diagnostics.py::test_egress_acceptance_requires_same_port_baseline_and_connect_attempt services/api/tests/test_i028_two_device_driver.py::test_flutter_test_arguments_avoid_build_only_gradle_flags services/api/tests/test_i028_two_device_driver.py::test_flutter_seed_can_collect_verbose_output_without_persisting_it -q",
+  "targeted_result": {
+    "passed": 3,
+    "failed": 0,
+    "duration_seconds": 0.92
+  },
+  "environment": {
+    "platform": "Windows",
+    "python": "3.13.1",
+    "pytest": "9.1.1",
+    "collected": 1040,
+    "duration_seconds": 486.53,
+    "database": "temporary cluster; listener restricted to 127.0.0.1",
+    "database_logs_statement": false
+  },
+  "result": {
+    "passed": 1027,
+    "failed": 0,
+    "skipped": 13,
+    "exit_code": 0
+  },
+  "test_only_corrections": [
+    {
+      "file": "services/api/tests/test_i028_diagnostics.py",
+      "change": "Normalize whitespace before checking the IPv6 baseline assertion so Dart formatting changes do not produce a false failure."
+    },
+    {
+      "file": "services/api/tests/test_i028_two_device_driver.py",
+      "change": "Use the driver-required isolated package ID com.detourvpn.client.i028 in three driver argument test inputs. Other synthetic package-classification fixtures were not changed."
+    }
+  ],
+  "skips": {
+    "count": 13,
+    "includes": [
+      "physical/staging tests without explicit opt-in",
+      "owner archive inputs absent",
+      "POSIX-only checks on Windows"
+    ]
+  },
+  "cleanup": {
+    "temporary_postgres_stopped": true,
+    "generated_cluster_removed": true,
+    "external_hosts_contacted": false,
+    "production_data_used": false,
+    "owner_or_payment_data_used": false
+  },
+  "interpretation": "The full local DB-backed Python and infrastructure suite is green after test-only expectation corrections. Skipped physical/staging tests remain unverified. This result does not establish VPN egress, DNS/IPv6 privacy, load SLO, or release acceptance."
+}

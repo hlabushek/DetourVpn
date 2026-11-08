@@ -1,0 +1,10 @@
+{
+  "issue": "I-030",
+  "timestamp_utc": "2026-11-08T10:26:13.080762+00:00",
+  "target": "isolated_beta",
+  "result": "not_confirmed",
+  "failure_stage": "unique_incident_readonly_match",
+  "failure_code": "beta_readonly_query_unavailable",
+  "action_response_received": false,
+  "identifiers_credentials_and_raw_data_exported": false
+}

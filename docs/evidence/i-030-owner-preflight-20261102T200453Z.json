@@ -1,0 +1,40 @@
+{
+  "issue": "I-030",
+  "observed_at_utc": "2026-11-02T20:04:53Z",
+  "scope": "read-only owner Android VPN/revoke preflight; no tunnel was started",
+  "source": [
+    "owner-run start_beta_owner_acceptance_credit.ps1 -VerifyOnly output",
+    "local ADB read-only package and base APK hash query"
+  ],
+  "device": {
+    "connected_and_authorized": true,
+    "model": "Pixel 8 Pro",
+    "adb_serial_recorded": false,
+    "package": "com.detourvpn.client",
+    "version_name": "0.1.0-beta.1",
+    "version_code": 2,
+    "installed_base_apk_sha256": "b6c1d1988279c5ca02b46fb7952f58f84870152d7fe18f912410264618bca746",
+    "matches_signed_build_receipt": "i-030-beta-apk-20261101T212446474Z-d70a1207.json",
+    "vpn_started_by_this_run": false
+  },
+  "quota": {
+    "query_mode": "read_only",
+    "active_account_count": 1,
+    "account_id_recorded": false,
+    "granted_bytes": 6553600,
+    "used_bytes": 5513463,
+    "reserved_bytes": 0,
+    "available_bytes": 1040137,
+    "minimum_client_window_bytes": 1048576,
+    "deficit_bytes": 8439,
+    "recent_peer_window_debits": 18
+  },
+  "decision": {
+    "physical_vpn_revoke_test_started": false,
+    "reason": "Available quota is below the documented minimum one-window requirement. Stop condition honored; no test credit issued.",
+    "server_side_revoke_confirmation": "still_open"
+  },
+  "secrets_recorded": false,
+  "identifier_or_device_serial_recorded": false,
+  "beta_or_production_configuration_changed": false
+}

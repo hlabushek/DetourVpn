@@ -1,0 +1,62 @@
+{
+  "issue": "I-030",
+  "observed_at_utc": "2026-11-02T20:13:32Z",
+  "scope": "OSV read-only query for Android Gradle build plugins and validation of the app-level Kotlin Gradle Plugin remediation",
+  "source": {
+    "osv_query": "https://api.osv.dev/v1/query",
+    "osv_advisory": "https://api.osv.dev/v1/vulns/GHSA-r937-wjx7-w2jp",
+    "kotlin_compatibility": "https://kotlinlang.org/docs/gradle-configure-project.html",
+    "kotlin_release": "https://kotlinlang.org/docs/releases.html"
+  },
+  "project_before_change": {
+    "kotlin_gradle_plugin": "2.2.20",
+    "android_gradle_plugin": "8.13.0",
+    "gradle": "8.14.3",
+    "declaration": "apps/client/android/settings.gradle.kts"
+  },
+  "osv_triage": {
+    "affected_coordinate": "org.jetbrains.kotlin:kotlin-gradle-plugin:2.2.20",
+    "advisory_id": "GHSA-r937-wjx7-w2jp",
+    "alias": "CVE-2026-53914",
+    "summary": "Unsafe deserialization in Kotlin build cache metadata can enable code execution",
+    "affected_range_from_osv": "before 2.4.20-Beta1",
+    "cvss_v3_vector": "CVSS:3.1/AV:L/AC:H/PR:H/UI:N/S:C/C:H/I:L/A:L",
+    "database_severity_label": null,
+    "query_results": {
+      "org.jetbrains.kotlin:kotlin-gradle-plugin:2.2.20": ["GHSA-r937-wjx7-w2jp"],
+      "org.jetbrains.kotlin:kotlin-gradle-plugin:2.4.21": [],
+      "com.android.tools.build:gradle:8.13.0": [],
+      "com.android.tools.build:gradle-api:8.13.0": [],
+      "org.jetbrains.kotlin.android:org.jetbrains.kotlin.android.gradle.plugin:2.2.20": []
+    }
+  },
+  "remediation": {
+    "app_level_kotlin_gradle_plugin_before": "2.2.20",
+    "app_level_kotlin_gradle_plugin_after": "2.4.21",
+    "kotlin_stdlib_runtime": "2.2.20 (unchanged; advisory targets the Gradle build plugin)",
+    "compatibility_basis": "Kotlin 2.4.21 supports Gradle 7.6.3-9.7.0 and AGP 8.5.2-9.3.1; project pins Gradle 8.14.3 and AGP 8.13.0.",
+    "lockfiles_changed": false
+  },
+  "validation": {
+    "command": "scripts/build_flutter_client.ps1",
+    "dart_format": "passed; 0 files changed",
+    "flutter_analyze": "passed",
+    "flutter_test": "passed; 106 tests",
+    "android_debug_apk": "passed",
+    "android_testDebugUnitTest": "passed",
+    "android_lintDebug": "passed",
+    "android_release_apk": "passed",
+    "installed_on_device": false,
+    "exit_code": 0
+  },
+  "remaining_toolchain_finding": {
+    "component": "Pinned Flutter 3.47.7 SDK included Gradle build",
+    "path_in_sdk": "packages/flutter_tools/gradle/build.gradle.kts",
+    "kotlin_gradle_plugin": "2.2.20",
+    "advisory_id": "GHSA-r937-wjx7-w2jp",
+    "handling": "Not patched in the vendor SDK. The Flutter revision/archive SHA is pinned; resolve through a reviewed upstream stable SDK update, not an in-place local edit.",
+    "dependency_security_gate_passed": false
+  },
+  "beta_or_production_hosts_contacted": false,
+  "secrets_recorded": false
+}

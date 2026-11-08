@@ -1,0 +1,26 @@
+{
+  "recorded_at_utc": "2026-11-04T10:04:09Z",
+  "issue": "I-030",
+  "action": "arm64_native_dependency_build",
+  "result": "passed",
+  "engine_version": "1.260910.0",
+  "android_platforms": "android/arm64",
+  "build_tags": [
+    "with_awg",
+    "with_gvisor"
+  ],
+  "artifact": {
+    "path": ".cache/amnezia-box-build/libbox-1.260910-arm64.aar",
+    "bytes": 16573411,
+    "sha256": "b4b931a9950f2dfac875909b28964a15b84084969e9b05e988b23c892ea156d7",
+    "arm64_library_present": true,
+    "x86_64_library_present": false
+  },
+  "toolchain": {
+    "go": "1.25.5",
+    "java": "17.0.21",
+    "shell": "Windows PowerShell 5.1"
+  },
+  "scope": "Native AAR only; APK build, signing, installation, and physical tunnel verification were not performed.",
+  "go_build_cache_bytes_after": 890282821
+}

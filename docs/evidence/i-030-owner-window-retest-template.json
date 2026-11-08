@@ -1,0 +1,61 @@
+{
+  "issue": "I-030",
+  "status": "template_not_evidence",
+  "scope": "owner-only bounded beta v3 IPv4 HTTPS egress and revoke",
+  "device": {
+    "model": "Pixel 8 Pro",
+    "authorized_adb_device_count": null,
+    "serial_recorded": false,
+    "application_id": "com.detourvpn.client",
+    "version_name": null,
+    "version_code": null,
+    "signed_base_apk_match": null
+  },
+  "preflight": {
+    "vpn_off_before_test": null,
+    "quota_snapshot_read_only": true,
+    "available_bytes_before": null,
+    "reserved_bytes_before": null,
+    "minimum_window_bytes": 1048576,
+    "direct_https_baseline_reachable": null,
+    "background_apps_excluded": null,
+    "single_probe_app_selected": null,
+    "prior_split_settings_restored": null
+  },
+  "connection": {
+    "owner_reported_handshake_confirmed": null,
+    "adb_vpn_transport_during_probe": null,
+    "probe_kind": "fixed_https_ipv4_oracle",
+    "probe_result": null,
+    "raw_ip_recorded": false,
+    "dns_names_or_history_recorded": false,
+    "payload_recorded": false
+  },
+  "revoke": {
+    "disconnect_pressed": null,
+    "server_pending_banner_cleared": null,
+    "revoke_unconfirmed": null,
+    "adb_vpn_transport_after_disconnect": null
+  },
+  "ledger": {
+    "granted_bytes_before": null,
+    "used_bytes_before": null,
+    "reserved_bytes_before": null,
+    "available_bytes_before": null,
+    "recent_peer_window_debits_before_bytes": [],
+    "granted_bytes_after": null,
+    "used_bytes_after": null,
+    "reserved_bytes_after": null,
+    "available_bytes_after": null,
+    "recent_peer_window_debits_after_bytes": [],
+    "used_delta_bytes": null,
+    "peer_window_debit_delta_matches_used_delta": null
+  },
+  "acceptance": {
+    "ipv4_egress_confirmed": null,
+    "server_close_ack_confirmed": null,
+    "ledger_reconciled": null,
+    "passed": false
+  },
+  "limitations": []
+}

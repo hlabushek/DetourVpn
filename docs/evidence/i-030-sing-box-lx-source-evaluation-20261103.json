@@ -1,0 +1,64 @@
+{
+  "issue": "I-030",
+  "observed_at_local": "2026-11-03",
+  "scope": "bounded source, Go test, and exploratory Android AAR compatibility evaluation",
+  "candidate": {
+    "repository": "https://github.com/Leadaxe/sing-box-lx",
+    "commit": "a3bb4a0418c70ae1db650e4fbd06def1ddb5bc70",
+    "upstream_version": "1.14.4",
+    "go_toolchain": "go1.26.10",
+    "license": "GPL-3.0-or-later",
+    "awg_runtime_submodule": {
+      "path": "submodules/wireguard-go",
+      "commit": "7188e1516995adbb116e7dbe343b9eb1c2159c82"
+    },
+    "documented_features": [
+      "Android libbox.aar build",
+      "with_awg build tag and AWG 3.x fields",
+      "sing-box package_name route rules",
+      "sing-box domain and domain_suffix route rules"
+    ],
+    "documentation_mismatch": "the pinned tree documents AWG 3.x/3.1, while the 2026-11-01 Android AAR release notes describe AWG 2.0; exact support for DetourVpn's exported AWG 3.1 profile is unverified"
+  },
+  "compatibility_findings": {
+    "java_binding_package_matches_current_client": true,
+    "service_api_drop_in_compatible": false,
+    "current_service_api": "Libbox.newService -> BoxService.start/close/peerStats",
+    "candidate_service_api": "Libbox.newCommandServer -> CommandServer.start/startOrReloadService/close; status is exposed through CommandClient.GetWireGuardStatus when that extension is built",
+    "platform_interface_drop_in_compatible": false,
+    "platform_interface_mismatches": [
+      "candidate requires additional PlatformInterface methods for shell/user/SFTP/system SSH/Tailscale/bridge capabilities that the Android adapter does not implement",
+      "candidate connection-owner API returns ConnectionOwner; current adapter's helper contract is UID plus package lookup methods"
+    ],
+    "awg_endpoint_schema_drop_in_compatible": false,
+    "current_type": "awg",
+    "candidate_type": "wireguard",
+    "detourvpn_peer_stats_binding_present_in_candidate": false,
+    "endpoint_start_still_calls_wireguard_device_up": true,
+    "assessment": "candidate runtime is different, but the failure can still originate in the shared Android service/platform-adapter contract, socket protection, route setup, or profile values"
+  },
+  "local_verification": {
+    "source_checkout_location": ".cache/upstream/sing-box-lx-a3bb4a0418c70ae1db650e4fbd06def1ddb5bc70",
+    "command": "go test -tags with_awg ./transport/wireguard",
+    "result": "passed",
+    "test_output": "ok github.com/sagernet/sing-box/transport/wireguard 3.243s",
+    "resource_recovery": "user authorized cleanup of only %LOCALAPPDATA%\\go-build; go clean -cache was run after confirming the exact Go cache path and no active Go process",
+    "full_upstream_android_aar_build": "failed: insufficient temporary disk space while compiling optional upstream components; no application build was attempted",
+    "exploratory_minimal_android_aar": {
+      "result": "built",
+      "artifact": ".cache/lx-candidate-build/libbox-minimal-arm64.aar",
+      "size_bytes": 19655618,
+      "sha256": "62ff2aec004bae2131ca739cd24b63e88abb25bbf57b8fcc3c27f0f9e79874d5",
+      "target": "android/arm64",
+      "tags": ["with_gvisor", "with_wireguard", "with_awg", "badlinkname", "tfogo_checklinkname0"],
+      "scope": "exploratory core artifact only; not the complete upstream AAR build, not integrated with DetourVpn, not an APK or release artifact"
+    },
+    "config_check": "not_run; the DetourVpn profile/configuration has not been validated against this AAR"
+  },
+  "physical_device": {
+    "adb_authorized_device_available": false,
+    "connect_attempted": false,
+    "vpn_transport_status": "not_observed_in_this_review; no Connect attempted"
+  },
+  "decision": "candidate_only; compatibility spike shows a substantial service/platform adapter port is required. No engine switch, APK build, distribution, or physical acceptance"
+}

@@ -1,0 +1,893 @@
+{
+  "$schema": "http://cyclonedx.org/schema/bom-1.5.schema.json",
+  "bomFormat": "CycloneDX",
+  "specVersion": "1.5",
+  "serialNumber": "urn:uuid:f6279baf-fc91-4d96-8b0a-4386817d557e",
+  "version": 1,
+  "metadata": {
+    "timestamp": "2026-11-02T22:01:25.330Z",
+    "lifecycles": [
+      {
+        "phase": "pre-build"
+      }
+    ],
+    "tools": [
+      {
+        "vendor": "npm",
+        "name": "cli",
+        "version": "11.12.1"
+      }
+    ],
+    "component": {
+      "bom-ref": "detourvpn-telegram-bot@0.1.0",
+      "type": "application",
+      "name": "telegram-bot",
+      "version": "0.1.0",
+      "scope": "required",
+      "purl": "pkg:npm/detourvpn-telegram-bot@0.1.0",
+      "properties": [
+        {
+          "name": "cdx:npm:package:private",
+          "value": "true"
+        }
+      ],
+      "externalReferences": []
+    }
+  },
+  "components": [
+    {
+      "bom-ref": "@tgcloud/cli@0.2.0",
+      "type": "library",
+      "name": "@tgcloud/cli",
+      "version": "0.2.0",
+      "scope": "optional",
+      "purl": "pkg:npm/%40tgcloud/cli@0.2.0",
+      "properties": [
+        {
+          "name": "cdx:npm:package:development",
+          "value": "true"
+        }
+      ],
+      "externalReferences": [
+        {
+          "type": "distribution",
+          "url": "https://registry.npmjs.org/@tgcloud/cli/-/cli-0.2.0.tgz"
+        }
+      ],
+      "hashes": [
+        {
+          "alg": "SHA-512",
+          "content": "601966398f2187e994d1eb7eca861c506d4fdda43aa9b7df8b5f493b39ff0eef076b49c734693949c6afc29075c49eee6dc315d1474e3c666c7cf93c943b753b"
+        }
+      ],
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "bom-ref": "ansi-regex@6.4.0",
+      "type": "library",
+      "name": "ansi-regex",
+      "version": "6.4.0",
+      "scope": "optional",
+      "purl": "pkg:npm/ansi-regex@6.4.0",
+      "properties": [
+        {
+          "name": "cdx:npm:package:development",
+          "value": "true"
+        }
+      ],
+      "externalReferences": [
+        {
+          "type": "distribution",
+          "url": "https://registry.npmjs.org/ansi-regex/-/ansi-regex-6.4.0.tgz"
+        }
+      ],
+      "hashes": [
+        {
+          "alg": "SHA-512",
+          "content": "2b34d5936b425801ed62bbefbda3fc6c9289ab6a558a784b70611076d2c860f6e634637261ef10c0d693518429d89effbc8b142ade500aa01f5246321bd0e43b"
+        }
+      ],
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "bom-ref": "chalk@5.6.2",
+      "type": "library",
+      "name": "chalk",
+      "version": "5.6.2",
+      "scope": "optional",
+      "purl": "pkg:npm/chalk@5.6.2",
+      "properties": [
+        {
+          "name": "cdx:npm:package:development",
+          "value": "true"
+        }
+      ],
+      "externalReferences": [
+        {
+          "type": "distribution",
+          "url": "https://registry.npmjs.org/chalk/-/chalk-5.6.2.tgz"
+        }
+      ],
+      "hashes": [
+        {
+          "alg": "SHA-512",
+          "content": "ecdcc12f4acde9f3145be7fb03a228e21e34a90946fb11a6b4cc5f6e71ff2bb4c0b6df094165502beea0d145ca31e549a3257912490db04ad0f29543ddb2c76c"
+        }
+      ],
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "bom-ref": "cli-cursor@5.0.0",
+      "type": "library",
+      "name": "cli-cursor",
+      "version": "5.0.0",
+      "scope": "optional",
+      "purl": "pkg:npm/cli-cursor@5.0.0",
+      "properties": [
+        {
+          "name": "cdx:npm:package:development",
+          "value": "true"
+        }
+      ],
+      "externalReferences": [
+        {
+          "type": "distribution",
+          "url": "https://registry.npmjs.org/cli-cursor/-/cli-cursor-5.0.0.tgz"
+        }
+      ],
+      "hashes": [
+        {
+          "alg": "SHA-512",
+          "content": "6828f83b9c0acacce33260d3e2d663f77931cb274dfcae733d64827baff4015fc0035a6a7b9641230d1ad997cf415ee52f9ff26f91ec52b789e94140175b4443"
+        }
+      ],
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "bom-ref": "cli-spinners@2.9.2",
+      "type": "library",
+      "name": "cli-spinners",
+      "version": "2.9.2",
+      "scope": "optional",
+      "purl": "pkg:npm/cli-spinners@2.9.2",
+      "properties": [
+        {
+          "name": "cdx:npm:package:development",
+          "value": "true"
+        }
+      ],
+      "externalReferences": [
+        {
+          "type": "distribution",
+          "url": "https://registry.npmjs.org/cli-spinners/-/cli-spinners-2.9.2.tgz"
+        }
+      ],
+      "hashes": [
+        {
+          "alg": "SHA-512",
+          "content": "cb0a95fb9326c8be04ef26d780acace03ba065b5f4142e8b9f0ae18eeca42239caf64f0e41a710edac462a78c35d63619ecd31a2dddb648e61e791fcca8f5c26"
+        }
+      ],
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "bom-ref": "commander@12.1.0",
+      "type": "library",
+      "name": "commander",
+      "version": "12.1.0",
+      "scope": "optional",
+      "purl": "pkg:npm/commander@12.1.0",
+      "properties": [
+        {
+          "name": "cdx:npm:package:development",
+          "value": "true"
+        }
+      ],
+      "externalReferences": [
+        {
+          "type": "distribution",
+          "url": "https://registry.npmjs.org/commander/-/commander-12.1.0.tgz"
+        }
+      ],
+      "hashes": [
+        {
+          "alg": "SHA-512",
+          "content": "570f2a1caddb64cf72fcfd74bb75626fca3f0dd92f0363ad3ed66f0fcef540a8f2ef85a3d5648a1482cc3d13d27544b1e5114ad5aae527312d0383e41609dbb8"
+        }
+      ],
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "bom-ref": "diff@9.0.0",
+      "type": "library",
+      "name": "diff",
+      "version": "9.0.0",
+      "scope": "optional",
+      "purl": "pkg:npm/diff@9.0.0",
+      "properties": [
+        {
+          "name": "cdx:npm:package:development",
+          "value": "true"
+        }
+      ],
+      "externalReferences": [
+        {
+          "type": "distribution",
+          "url": "https://registry.npmjs.org/diff/-/diff-9.0.0.tgz"
+        }
+      ],
+      "hashes": [
+        {
+          "alg": "SHA-512",
+          "content": "b2fb5c7694bc0a0272a808c44085dd6f73a3845555623cc600f3bc5860a645bae697ae123f0fe3243e06a04f7c691eebdb90345dc82b2b7174db2c3d47fbe143"
+        }
+      ],
+      "licenses": [
+        {
+          "license": {
+            "id": "BSD-3-Clause"
+          }
+        }
+      ]
+    },
+    {
+      "bom-ref": "emoji-regex@10.6.0",
+      "type": "library",
+      "name": "emoji-regex",
+      "version": "10.6.0",
+      "scope": "optional",
+      "purl": "pkg:npm/emoji-regex@10.6.0",
+      "properties": [
+        {
+          "name": "cdx:npm:package:development",
+          "value": "true"
+        }
+      ],
+      "externalReferences": [
+        {
+          "type": "distribution",
+          "url": "https://registry.npmjs.org/emoji-regex/-/emoji-regex-10.6.0.tgz"
+        }
+      ],
+      "hashes": [
+        {
+          "alg": "SHA-512",
+          "content": "b68508f38612e589b15b6d7d7ab9e2583d022153a8e3ac46282a2578d41180ecc3a2b8018b5bf80fbd7f385ce00fd18ed9418a22fd42dd2a7c0c09f4fa3e70ec"
+        }
+      ],
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "bom-ref": "get-east-asian-width@1.7.0",
+      "type": "library",
+      "name": "get-east-asian-width",
+      "version": "1.7.0",
+      "scope": "optional",
+      "purl": "pkg:npm/get-east-asian-width@1.7.0",
+      "properties": [
+        {
+          "name": "cdx:npm:package:development",
+          "value": "true"
+        }
+      ],
+      "externalReferences": [
+        {
+          "type": "distribution",
+          "url": "https://registry.npmjs.org/get-east-asian-width/-/get-east-asian-width-1.7.0.tgz"
+        }
+      ],
+      "hashes": [
+        {
+          "alg": "SHA-512",
+          "content": "5e31f50040b17f48222f6575694f2f2b2451da9a5151be5cd04bd3ef3b894e8910ef86cda39db33ad821a9d588aab8540fbf5fa37c7459f29974eab117a2c6d5"
+        }
+      ],
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "bom-ref": "is-interactive@2.0.0",
+      "type": "library",
+      "name": "is-interactive",
+      "version": "2.0.0",
+      "scope": "optional",
+      "purl": "pkg:npm/is-interactive@2.0.0",
+      "properties": [
+        {
+          "name": "cdx:npm:package:development",
+          "value": "true"
+        }
+      ],
+      "externalReferences": [
+        {
+          "type": "distribution",
+          "url": "https://registry.npmjs.org/is-interactive/-/is-interactive-2.0.0.tgz"
+        }
+      ],
+      "hashes": [
+        {
+          "alg": "SHA-512",
+          "content": "a8fd6fa3341123e04c38f723173ae35ee42f75a936a47354319a1e1b67916e24aacaf6c47ffc10b44393397d60ba4e84deddfa4646aa892b7c03fe981253712d"
+        }
+      ],
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "bom-ref": "is-unicode-supported@2.1.0",
+      "type": "library",
+      "name": "is-unicode-supported",
+      "version": "2.1.0",
+      "scope": "optional",
+      "purl": "pkg:npm/is-unicode-supported@2.1.0",
+      "properties": [
+        {
+          "name": "cdx:npm:package:development",
+          "value": "true"
+        }
+      ],
+      "externalReferences": [
+        {
+          "type": "distribution",
+          "url": "https://registry.npmjs.org/is-unicode-supported/-/is-unicode-supported-2.1.0.tgz"
+        }
+      ],
+      "hashes": [
+        {
+          "alg": "SHA-512",
+          "content": "984d341a7cdae44101dc3b341df3329656736c1ae62ce5f7bdf5a88fd03d3c49d37eb6ad43f05c6893ae3219e48635ef6f6f85918dd5b87aad006a533e682515"
+        }
+      ],
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "bom-ref": "json5@2.2.3",
+      "type": "library",
+      "name": "json5",
+      "version": "2.2.3",
+      "scope": "optional",
+      "purl": "pkg:npm/json5@2.2.3",
+      "properties": [
+        {
+          "name": "cdx:npm:package:development",
+          "value": "true"
+        }
+      ],
+      "externalReferences": [
+        {
+          "type": "distribution",
+          "url": "https://registry.npmjs.org/json5/-/json5-2.2.3.tgz"
+        }
+      ],
+      "hashes": [
+        {
+          "alg": "SHA-512",
+          "content": "5e63967bb7b21d81f5e1c2dd54fa3283e18e1f7ad85fef8aa73af2949c125bdf2ddcd93e53c5ce97c15628e830b7375bf255c67facd8c035337873167f16acca"
+        }
+      ],
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "bom-ref": "log-symbols@6.0.0",
+      "type": "library",
+      "name": "log-symbols",
+      "version": "6.0.0",
+      "scope": "optional",
+      "purl": "pkg:npm/log-symbols@6.0.0",
+      "properties": [
+        {
+          "name": "cdx:npm:package:development",
+          "value": "true"
+        }
+      ],
+      "externalReferences": [
+        {
+          "type": "distribution",
+          "url": "https://registry.npmjs.org/log-symbols/-/log-symbols-6.0.0.tgz"
+        }
+      ],
+      "hashes": [
+        {
+          "alg": "SHA-512",
+          "content": "8b6e26f2ba708663c84b8cec70dccae8c484864d035166bff226105b185f7d5f23908e0f86fb3717eaae2f9c6f4b481d411d05c9308c307df763bf1d0d3cf323"
+        }
+      ],
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "bom-ref": "is-unicode-supported@1.3.0",
+      "type": "library",
+      "name": "is-unicode-supported",
+      "version": "1.3.0",
+      "scope": "optional",
+      "purl": "pkg:npm/is-unicode-supported@1.3.0",
+      "properties": [
+        {
+          "name": "cdx:npm:package:development",
+          "value": "true"
+        }
+      ],
+      "externalReferences": [
+        {
+          "type": "distribution",
+          "url": "https://registry.npmjs.org/is-unicode-supported/-/is-unicode-supported-1.3.0.tgz"
+        }
+      ],
+      "hashes": [
+        {
+          "alg": "SHA-512",
+          "content": "e37af6991bf3fbc25120a9d627ede3f09b6344a67a1a68f37da13faa20499e290d9d8bffe9b6a0449d64521364f11e445ff1a4a1b0feafeb1fc423c9b222812d"
+        }
+      ],
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "bom-ref": "mimic-function@5.0.1",
+      "type": "library",
+      "name": "mimic-function",
+      "version": "5.0.1",
+      "scope": "optional",
+      "purl": "pkg:npm/mimic-function@5.0.1",
+      "properties": [
+        {
+          "name": "cdx:npm:package:development",
+          "value": "true"
+        }
+      ],
+      "externalReferences": [
+        {
+          "type": "distribution",
+          "url": "https://registry.npmjs.org/mimic-function/-/mimic-function-5.0.1.tgz"
+        }
+      ],
+      "hashes": [
+        {
+          "alg": "SHA-512",
+          "content": "54fefd5d43f15760a28183f78d6c005054a4bb668aa811fbb9301aa4558206abadb1b983a3de8a639a3cba1e94fbf612227e4ec499d7a7bddb795929a8c20684"
+        }
+      ],
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "bom-ref": "onetime@7.0.0",
+      "type": "library",
+      "name": "onetime",
+      "version": "7.0.0",
+      "scope": "optional",
+      "purl": "pkg:npm/onetime@7.0.0",
+      "properties": [
+        {
+          "name": "cdx:npm:package:development",
+          "value": "true"
+        }
+      ],
+      "externalReferences": [
+        {
+          "type": "distribution",
+          "url": "https://registry.npmjs.org/onetime/-/onetime-7.0.0.tgz"
+        }
+      ],
+      "hashes": [
+        {
+          "alg": "SHA-512",
+          "content": "55726373cec549c17cf2e69f4b726594382f026f9cfd295fcf4ea5a2b8f6b80637e2b954bb436dfaff30ade88899cae00238c81e9d6b5e94c394b386c36f56c1"
+        }
+      ],
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "bom-ref": "ora@8.2.0",
+      "type": "library",
+      "name": "ora",
+      "version": "8.2.0",
+      "scope": "optional",
+      "purl": "pkg:npm/ora@8.2.0",
+      "properties": [
+        {
+          "name": "cdx:npm:package:development",
+          "value": "true"
+        }
+      ],
+      "externalReferences": [
+        {
+          "type": "distribution",
+          "url": "https://registry.npmjs.org/ora/-/ora-8.2.0.tgz"
+        }
+      ],
+      "hashes": [
+        {
+          "alg": "SHA-512",
+          "content": "c1e3fe059f0c54d9e50a6f1cd1075cd56496ab8427ec8fbd0891a6ed06a58ba838e1efcf5336e336a257e4d27d96394d328b1f26f8357ca10620b9252bd7309f"
+        }
+      ],
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "bom-ref": "restore-cursor@5.1.0",
+      "type": "library",
+      "name": "restore-cursor",
+      "version": "5.1.0",
+      "scope": "optional",
+      "purl": "pkg:npm/restore-cursor@5.1.0",
+      "properties": [
+        {
+          "name": "cdx:npm:package:development",
+          "value": "true"
+        }
+      ],
+      "externalReferences": [
+        {
+          "type": "distribution",
+          "url": "https://registry.npmjs.org/restore-cursor/-/restore-cursor-5.1.0.tgz"
+        }
+      ],
+      "hashes": [
+        {
+          "alg": "SHA-512",
+          "content": "a0c03675caf0eaed187f12505e6df8d9b14a5ff138b06f6b6d3ccef69b54711fdef00df7707baf4ad8983b01fb7ecce4665675cffb5af400283e4d85e2a20e1c"
+        }
+      ],
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "bom-ref": "signal-exit@4.1.0",
+      "type": "library",
+      "name": "signal-exit",
+      "version": "4.1.0",
+      "scope": "optional",
+      "purl": "pkg:npm/signal-exit@4.1.0",
+      "properties": [
+        {
+          "name": "cdx:npm:package:development",
+          "value": "true"
+        }
+      ],
+      "externalReferences": [
+        {
+          "type": "distribution",
+          "url": "https://registry.npmjs.org/signal-exit/-/signal-exit-4.1.0.tgz"
+        }
+      ],
+      "hashes": [
+        {
+          "alg": "SHA-512",
+          "content": "6f3c99d5ef3cc3d3b588d25b2a73a5bd84eb58f0e5e3a3b56c6d03dd7227bfef6d90faf1acdf235144e21650e4926296827d4ce827c8035dd2b86a8e6bd2a8af"
+        }
+      ],
+      "licenses": [
+        {
+          "license": {
+            "id": "ISC"
+          }
+        }
+      ]
+    },
+    {
+      "bom-ref": "stdin-discarder@0.2.2",
+      "type": "library",
+      "name": "stdin-discarder",
+      "version": "0.2.2",
+      "scope": "optional",
+      "purl": "pkg:npm/stdin-discarder@0.2.2",
+      "properties": [
+        {
+          "name": "cdx:npm:package:development",
+          "value": "true"
+        }
+      ],
+      "externalReferences": [
+        {
+          "type": "distribution",
+          "url": "https://registry.npmjs.org/stdin-discarder/-/stdin-discarder-0.2.2.tgz"
+        }
+      ],
+      "hashes": [
+        {
+          "alg": "SHA-512",
+          "content": "5210df1e603dd9802536709f866ab455e34be5b0db8991a0eec67622f3ec5ee6c692235af440beb544ec8c146c614033f3b6ed23aff5c1fe17a15bd0dee46799"
+        }
+      ],
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "bom-ref": "string-width@7.2.0",
+      "type": "library",
+      "name": "string-width",
+      "version": "7.2.0",
+      "scope": "optional",
+      "purl": "pkg:npm/string-width@7.2.0",
+      "properties": [
+        {
+          "name": "cdx:npm:package:development",
+          "value": "true"
+        }
+      ],
+      "externalReferences": [
+        {
+          "type": "distribution",
+          "url": "https://registry.npmjs.org/string-width/-/string-width-7.2.0.tgz"
+        }
+      ],
+      "hashes": [
+        {
+          "alg": "SHA-512",
+          "content": "b6c693224296f5be0df80123f92540f96849cd5effccc85c4aeefc98b2964a4edc5cc3921ec04a15652cd1f5b0abc4322b73202414115fa19b8b89186ddbc691"
+        }
+      ],
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "bom-ref": "strip-ansi@7.2.0",
+      "type": "library",
+      "name": "strip-ansi",
+      "version": "7.2.0",
+      "scope": "optional",
+      "purl": "pkg:npm/strip-ansi@7.2.0",
+      "properties": [
+        {
+          "name": "cdx:npm:package:development",
+          "value": "true"
+        }
+      ],
+      "externalReferences": [
+        {
+          "type": "distribution",
+          "url": "https://registry.npmjs.org/strip-ansi/-/strip-ansi-7.2.0.tgz"
+        }
+      ],
+      "hashes": [
+        {
+          "alg": "SHA-512",
+          "content": "c833cc363a785b27d80641e78c844b7dc6b58ba28cc860adb1582829eff3d7eeafba481a10d76018166df9998a3dce206afbc46793a01df1ddadace180dc86ef"
+        }
+      ],
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    }
+  ],
+  "dependencies": [
+    {
+      "ref": "detourvpn-telegram-bot@0.1.0",
+      "dependsOn": [
+        "@tgcloud/cli@0.2.0"
+      ]
+    },
+    {
+      "ref": "@tgcloud/cli@0.2.0",
+      "dependsOn": [
+        "chalk@5.6.2",
+        "commander@12.1.0",
+        "diff@9.0.0",
+        "json5@2.2.3",
+        "ora@8.2.0"
+      ]
+    },
+    {
+      "ref": "ansi-regex@6.4.0",
+      "dependsOn": []
+    },
+    {
+      "ref": "chalk@5.6.2",
+      "dependsOn": []
+    },
+    {
+      "ref": "cli-cursor@5.0.0",
+      "dependsOn": [
+        "restore-cursor@5.1.0"
+      ]
+    },
+    {
+      "ref": "cli-spinners@2.9.2",
+      "dependsOn": []
+    },
+    {
+      "ref": "commander@12.1.0",
+      "dependsOn": []
+    },
+    {
+      "ref": "diff@9.0.0",
+      "dependsOn": []
+    },
+    {
+      "ref": "emoji-regex@10.6.0",
+      "dependsOn": []
+    },
+    {
+      "ref": "get-east-asian-width@1.7.0",
+      "dependsOn": []
+    },
+    {
+      "ref": "is-interactive@2.0.0",
+      "dependsOn": []
+    },
+    {
+      "ref": "is-unicode-supported@2.1.0",
+      "dependsOn": []
+    },
+    {
+      "ref": "json5@2.2.3",
+      "dependsOn": []
+    },
+    {
+      "ref": "log-symbols@6.0.0",
+      "dependsOn": [
+        "chalk@5.6.2",
+        "is-unicode-supported@1.3.0"
+      ]
+    },
+    {
+      "ref": "is-unicode-supported@1.3.0",
+      "dependsOn": []
+    },
+    {
+      "ref": "mimic-function@5.0.1",
+      "dependsOn": []
+    },
+    {
+      "ref": "onetime@7.0.0",
+      "dependsOn": [
+        "mimic-function@5.0.1"
+      ]
+    },
+    {
+      "ref": "ora@8.2.0",
+      "dependsOn": [
+        "chalk@5.6.2",
+        "cli-cursor@5.0.0",
+        "cli-spinners@2.9.2",
+        "is-interactive@2.0.0",
+        "is-unicode-supported@2.1.0",
+        "log-symbols@6.0.0",
+        "stdin-discarder@0.2.2",
+        "string-width@7.2.0",
+        "strip-ansi@7.2.0"
+      ]
+    },
+    {
+      "ref": "restore-cursor@5.1.0",
+      "dependsOn": [
+        "onetime@7.0.0",
+        "signal-exit@4.1.0"
+      ]
+    },
+    {
+      "ref": "signal-exit@4.1.0",
+      "dependsOn": []
+    },
+    {
+      "ref": "stdin-discarder@0.2.2",
+      "dependsOn": []
+    },
+    {
+      "ref": "string-width@7.2.0",
+      "dependsOn": [
+        "emoji-regex@10.6.0",
+        "get-east-asian-width@1.7.0",
+        "strip-ansi@7.2.0"
+      ]
+    },
+    {
+      "ref": "strip-ansi@7.2.0",
+      "dependsOn": [
+        "ansi-regex@6.4.0"
+      ]
+    }
+  ]
+}

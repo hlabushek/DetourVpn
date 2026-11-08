@@ -1,0 +1,15 @@
+{
+  "issue": "I-030",
+  "timestamp_utc": "2026-11-06T14:51:37Z",
+  "target": "authorized_android_device",
+  "read_only": true,
+  "authorized_device_count": 1,
+  "application_id": "com.detourvpn.client",
+  "version_name": "0.1.0-beta.21",
+  "version_code": 22,
+  "active_vpn_transport": false,
+  "always_on_configured": false,
+  "lockdown": false,
+  "connect_attempted": false,
+  "device_identifier_exported": false
+}

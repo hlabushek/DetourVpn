@@ -1,0 +1,12 @@
+{
+  "issue": "I-030",
+  "timestamp_utc": "2026-11-04T16:23:10.473674+00:00",
+  "target": "isolated_beta",
+  "mode": "read_only",
+  "latest_state": "closed",
+  "non_closed_connections": 0,
+  "reserved_bytes": 0,
+  "revoke_gate": "closed",
+  "result": "pass",
+  "identifiers_credentials_and_raw_data_exported": false
+}

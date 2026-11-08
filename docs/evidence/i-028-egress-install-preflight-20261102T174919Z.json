@@ -1,0 +1,35 @@
+{
+  "issue": "I-028",
+  "recorded_at_utc": "2026-11-02T17:49:19Z",
+  "scope": "owner-authorized bounded staging A Install preflight; physical Test not started",
+  "outcome": "blocked_before_staging_runtime_creation",
+  "suite": "Egress",
+  "installer": {
+    "source_staged_and_checksums_verified": true,
+    "failed_line": 52,
+    "guard": "available_kib must be greater than 1500000",
+    "available_kib": 1358336,
+    "minimum_kib_exclusive": 1500000,
+    "mem_available_kib": 1520972,
+    "memory_guard_passed": true
+  },
+  "closed_run_archive": {
+    "closed_run_archived": true,
+    "private_journal_preserved": true
+  },
+  "read_only_postcheck": {
+    "timeout_timer_active_state": "inactive",
+    "i028_agent_or_relay_process_seen": false,
+    "physical_phone_default_network": "CELLULAR",
+    "physical_phone_active_vpn": false,
+    "isolated_test_package_present": false,
+    "owner_app_com_detourvpn_client_present": true,
+    "legacy_probe_org_example_vpnpoc_present": true
+  },
+  "new_staging_runtime_created": false,
+  "test_started": false,
+  "passed": false,
+  "vpn_dataplane_acceptance": false,
+  "owner_quota_changed": false,
+  "interpretation": "Disk free space was below the install guard by 141664 KiB. The guard occurs before the installer creates /opt runtime resources. Existing host files and logs were not deleted."
+}

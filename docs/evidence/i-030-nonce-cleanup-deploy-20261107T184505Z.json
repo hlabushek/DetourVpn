@@ -1,0 +1,16 @@
+{
+    "issue":  "I-030",
+    "related":  "I-027",
+    "timestamp_utc":  "2026-11-07T18:45:05.5847757Z",
+    "target":  "isolated beta control plane",
+    "hostname":  "hiplet-137728",
+    "changed_files":  [
+                          "services/api/src/vpn_api/nodes/service.py",
+                          "scripts/beta_maintenance.py"
+                      ],
+    "readiness_http":  200,
+    "migrations":  "none",
+    "api_restart":  "none",
+    "maintenance_unit_run":  "success",
+    "result":  "success"
+}
