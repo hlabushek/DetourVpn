@@ -59,7 +59,9 @@ Why: only an explicit task start and an import were seen; the 07:00 trigger and 
 
 ## 4. Support recipient and tester instructions
 
-1. Choose one private contact for the diagnostic share flow; do not commit it. Decide the
+1. A private channel and the support contact `@DetourVpnHelper` were chosen on 2026-11-02 (see
+   `docs/evidence/i-030-owner-ops-confirmation-20261102.json`); confirm they are still right and that
+   the diagnostic share flow targets them. Decide the
    retention for support messages and for old encrypted backups (needed by ADR-091: deleted
    accounts stay in older backups until they expire). Write the chosen retention into
    ADR-090.
