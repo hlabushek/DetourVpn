@@ -29,7 +29,12 @@ class Base(DeclarativeBase):
 class User(Base):
     __tablename__ = "users"
     __table_args__ = (
-        CheckConstraint("status IN ('pending', 'active', 'disabled')", name="ck_users_status"),
+        CheckConstraint(
+            "status IN ('pending', 'active', 'disabled', 'deleted')", name="ck_users_status"
+        ),
+        CheckConstraint(
+            "(status = 'deleted') = (deleted_at IS NOT NULL)", name="ck_users_deleted_at"
+        ),
         CheckConstraint("role IN ('user', 'admin')", name="ck_users_role"),
         Index("ix_users_created_at", "created_at"),
     )
@@ -40,6 +45,7 @@ class User(Base):
     locale: Mapped[str] = mapped_column(String(16), server_default=text("'ru'"))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     verified_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
 class AdminIdentity(Base):

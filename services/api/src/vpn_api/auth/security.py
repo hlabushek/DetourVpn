@@ -51,6 +51,7 @@ def require_permission(principal: Principal, permission: str) -> None:
             "tunnels:manage",
             "rewards:claim",
             "referrals:manage",
+            "account:delete",
         },
         "admin": {
             "self:read",

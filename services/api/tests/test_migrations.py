@@ -148,7 +148,7 @@ def test_downgrade_with_data_fails_without_losing_rows_or_revision(engine: Engin
         assert session.scalar(select(func.count()).select_from(User)) == 1
         assert (
             session.scalar(text("SELECT version_num FROM alembic_version"))
-            == "0018_peer_window_resolution"
+            == "0019_account_deletion"
         )
 
 
@@ -185,7 +185,7 @@ def test_downgrade_cannot_delete_a_concurrently_committing_account(engine: Engin
         assert session.scalar(select(func.count()).select_from(User)) == 1
         assert (
             session.scalar(text("SELECT version_num FROM alembic_version"))
-            == "0018_peer_window_resolution"
+            == "0019_account_deletion"
         )
 
 

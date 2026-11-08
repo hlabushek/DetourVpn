@@ -10,6 +10,7 @@ from sqlalchemy import Engine
 from sqlalchemy.exc import SQLAlchemyError
 from starlette.exceptions import HTTPException
 
+from vpn_api.account import router as account_router
 from vpn_api.admin import AdminService
 from vpn_api.admin import router as admin_router
 from vpn_api.auth.mini_app import router as mini_app_router
@@ -91,6 +92,7 @@ def create_app(
     app.include_router(router)
     app.include_router(mini_app_router)
     app.include_router(devices_router)
+    app.include_router(account_router)
     app.include_router(quota_router)
     app.include_router(rewards_router)
     app.include_router(referrals_router)
