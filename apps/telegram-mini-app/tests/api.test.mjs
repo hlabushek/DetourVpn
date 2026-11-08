@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { CabinetAPI, exactJSON, bytes, loginAttemptFromFragment } from "../src/api.mjs";
+import { CabinetAPI, exactJSON, bytes, gigabytesToBytes, loginAttemptFromFragment } from "../src/api.mjs";
 
 test("int64 remains exact, strings and escaped quotes are not rewritten", () => {
     const result = exactJSON(
@@ -134,4 +134,76 @@ test("referral retries preserve the key and stay separate from other rewards", a
     assert.notEqual(requests[0].idempotency_key, requests[2].idempotency_key);
     assert.equal(requests[3].path, "/api/v1/referrals/claim");
     assert.equal(api.pending.size, 0);
+});
+
+function signedIn(fetcher) {
+    const api = new CabinetAPI(fetcher);
+    api.tokens = {
+        access_token: "a".repeat(43),
+        refresh_token: "r".repeat(43),
+        access_expires_at: new Date(Date.now() + 600000).toISOString(),
+    };
+    return api;
+}
+
+test("device management uses the right verbs and paths and never reuses a code key", async () => {
+    const calls = [];
+    const api = signedIn(async (path, options) => {
+        calls.push({ path, method: options.method, body: options.body, headers: options.headers });
+        return options.method === "DELETE" ? new Response(null, { status: 204 }) : Response.json({ ok: true });
+    });
+    await api.createLinkCode({ label: "Phone", trafficCapBytes: 5000000000 });
+    await api.createLinkCode();
+    await api.listLinkCodes();
+    await api.cancelLinkCode("11111111-1111-4111-8111-111111111111");
+    await api.patchDevice("22222222-2222-4222-8222-222222222222", { label: null });
+    await api.revokeDevice("22222222-2222-4222-8222-222222222222");
+    assert.deepEqual(
+        calls.map((c) => `${c.method} ${c.path}`),
+        [
+            "POST /api/v1/devices/link-codes",
+            "POST /api/v1/devices/link-codes",
+            "GET /api/v1/devices/link-codes",
+            "DELETE /api/v1/devices/link-codes/11111111-1111-4111-8111-111111111111",
+            "PATCH /api/v1/devices/22222222-2222-4222-8222-222222222222",
+            "DELETE /api/v1/devices/22222222-2222-4222-8222-222222222222",
+        ],
+    );
+    const [first, second] = [JSON.parse(calls[0].body), JSON.parse(calls[1].body)];
+    assert.notEqual(first.idempotency_key, second.idempotency_key);
+    assert.equal(first.label, "Phone");
+    assert.equal(first.traffic_cap_bytes, 5000000000);
+    assert.equal(second.label, undefined);
+    assert.equal(second.traffic_cap_bytes, undefined);
+    assert.deepEqual(JSON.parse(calls[4].body), { label: null });
+    assert.equal(calls[3].body, undefined); // DELETE carries no body and no content type.
+    assert.equal(calls[3].headers["Content-Type"], undefined);
+});
+
+test("device ids are encoded, never concatenated raw into a path", async () => {
+    let seen;
+    const api = signedIn(async (path) => {
+        seen = path;
+        return new Response(null, { status: 204 });
+    });
+    await api.revokeDevice("../quota");
+    assert.equal(seen, "/api/v1/devices/..%2Fquota");
+});
+
+test("API errors from device calls surface the stable error code", async () => {
+    const api = signedIn(async () =>
+        Response.json({ error: { code: "device_limit_reached" } }, { status: 409 }),
+    );
+    await assert.rejects(api.createLinkCode(), (e) => e.message === "device_limit_reached" && e.status === 409);
+});
+
+test("traffic cap text converts to integer bytes or is rejected", () => {
+    assert.equal(gigabytesToBytes(""), null);
+    assert.equal(gigabytesToBytes("  "), null);
+    assert.equal(gigabytesToBytes("5"), 5000000000);
+    assert.equal(gigabytesToBytes("1,5"), 1500000000);
+    assert.equal(gigabytesToBytes("0.001"), 1000000);
+    for (const bad of ["0", "-1", "abc", "1.2345", "1e3", "9999999", "0.0"]) {
+        assert.equal(gigabytesToBytes(bad), undefined, bad);
+    }
 });

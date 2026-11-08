@@ -547,3 +547,26 @@ nav button.selected {
 }
 .invite-code { user-select: all; }
 .referral-item { display: grid; gap: 10px; margin-block: 18px; }
+
+.flag {
+    flex: none;
+    vertical-align: middle;
+}
+
+/* Devices and link codes (ADR-093). */
+.device-row { align-items: flex-start; gap: 12px; }
+.device-body { display: flex; flex-direction: column; gap: 4px; min-width: 0; flex: 1; }
+.device-body progress { width: 100%; height: 6px; }
+.device-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 6px; }
+.device-edit { display: flex; flex-direction: column; gap: 8px; margin-top: 6px; }
+.device-edit input, .device-row input {
+    font: inherit; color: inherit; padding: 10px 12px; border-radius: 12px;
+    border: 1px solid var(--line); background: transparent; min-width: 0;
+}
+.badge {
+    margin-left: 8px; padding: 1px 8px; border-radius: 999px; font-size: 12px;
+    border: 1px solid var(--line); color: var(--muted);
+}
+.danger { border-color: #ff7e88; color: #ff7e88; }
+.code-box { display: flex; flex-direction: column; gap: 8px; align-items: flex-start; }
+.link-code { font-size: 32px; letter-spacing: 3px; font-variant-numeric: tabular-nums; user-select: all; }

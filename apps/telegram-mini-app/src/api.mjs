@@ -34,6 +34,16 @@ export function bytes(value) {
     return `${n / unit},${((n % unit) * 10n) / unit} ${unit === 1000000000n ? "ГБ" : "МБ"}`;
 }
 
+/** Decimal GB text ("1,5") to integer bytes; "" -> null (no cap); invalid or out of range -> undefined. */
+export function gigabytesToBytes(text) {
+    const value = String(text ?? "").trim().replace(",", ".");
+    if (value === "") return null;
+    if (!/^\d{1,6}(\.\d{1,3})?$/.test(value)) return undefined;
+    const [whole, fraction = ""] = value.split(".");
+    const result = BigInt(whole) * 1000000000n + BigInt(fraction.padEnd(9, "0"));
+    return result >= 1n && result <= 2n ** 50n ? Number(result) : undefined;
+}
+
 export function loginAttemptFromFragment(fragment) {
     if (!fragment.startsWith("#")) return { present: false, requestId: null };
     const value = new URLSearchParams(fragment.slice(1)).get("login_attempt");
@@ -58,7 +68,7 @@ export class CabinetAPI {
         this.pending = new Map();
         this.closed = false;
     }
-    async request(path, body, authenticated = true) {
+    async request(path, body, authenticated = true, method) {
         if (!path.startsWith("/api/v1/")) throw new Error("invalid_path");
         if (this.closed) throw new Error("session_closed");
         if (
@@ -80,7 +90,7 @@ export class CabinetAPI {
             await this.refreshing;
         }
         const response = await this.fetcher(path, {
-            method: body === undefined ? "GET" : "POST",
+            method: method ?? (body === undefined ? "GET" : "POST"),
             credentials: "omit",
             cache: "no-store",
             redirect: "error",
@@ -119,6 +129,28 @@ export class CabinetAPI {
             { init_data: initData, request_id: requestId },
             false,
         );
+    }
+    // Device management (ADR-093). A link code is shown once, so a lost response is never
+    // retried with the same idempotency key (the server would refuse to reveal it again): each
+    // attempt uses a fresh key and a stray unused code is simply cancelled in the list.
+    async createLinkCode({ label, trafficCapBytes } = {}) {
+        return this.request("/api/v1/devices/link-codes", {
+            idempotency_key: crypto.randomUUID(),
+            ...(label ? { label } : {}),
+            ...(trafficCapBytes ? { traffic_cap_bytes: trafficCapBytes } : {}),
+        });
+    }
+    async listLinkCodes() {
+        return this.request("/api/v1/devices/link-codes");
+    }
+    async cancelLinkCode(id) {
+        return this.request(`/api/v1/devices/link-codes/${encodeURIComponent(id)}`, undefined, true, "DELETE");
+    }
+    async patchDevice(id, patch) {
+        return this.request(`/api/v1/devices/${encodeURIComponent(id)}`, patch, true, "PATCH");
+    }
+    async revokeDevice(id) {
+        return this.request(`/api/v1/devices/${encodeURIComponent(id)}`, undefined, true, "DELETE");
     }
     async claim(rule) {
         const key = this.pending.get(rule) ?? crypto.randomUUID();

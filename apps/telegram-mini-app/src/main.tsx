@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { CabinetAPI, ApiError, bytes, loginAttemptFromFragment } from "./api.mjs";
+import { Devices, type Device } from "./Devices";
 import "./style.css";
 
 type Rule = {
@@ -26,7 +27,6 @@ type Entry = {
     source_type: string;
     created_at: string;
 };
-type Device = { id: string; platform: string; created_at: string };
 type ReferralState = {
     code: string | null; bound: boolean; invited: string; rewarded: string;
     campaigns: {id: string; reward_bytes: string; inviter_cap: string; ends_at: string}[];
@@ -131,6 +131,10 @@ function message(error: unknown) {
             reward_limit_reached:
                 "Лимит награды достигнут. Следующее обновление — по UTC.",
             rate_limited: "Слишком много запросов. Попробуйте через минуту.",
+            device_limit_reached: "Достигнут лимит устройств. Отключите ненужное устройство или отмените неиспользованный код.",
+            link_code_exists: "Этот запрос уже обработан. Отмените неиспользованный код и создайте новый.",
+            forbidden: "Это действие доступно только владельцу аккаунта.",
+            not_found: "Устройство или код уже не существует. Обновите список.",
         };
         return (
             messages[error.message] ??
@@ -601,28 +605,16 @@ function App() {
                         {tab === "profile" && (
                             <>
                                 <h2>Мои устройства</h2>
-                                <section className="card">
-                                    {snapshot?.devices.map((d) => (
-                                        <div className="device" key={d.id}>
-                                            <Icon name="phone" />
-                                            <div>
-                                                <b>
-                                                    Android · {d.id.slice(0, 8)}
-                                                </b>
-                                                <small>
-                                                    Добавлено{" "}
-                                                    {date(d.created_at)}
-                                                </small>
-                                            </div>
-                                        </div>
-                                    ))}
-                                    {snapshot && !snapshot.devices.length && (
-                                        <p>
-                                            Устройств пока нет. Добавьте
-                                            устройство через Android-приложение.
-                                        </p>
-                                    )}
-                                </section>
+                                {snapshot && (
+                                    <Devices
+                                        api={api.current}
+                                        devices={snapshot.devices}
+                                        busy={busy}
+                                        run={action}
+                                        reload={load}
+                                        notify={setNotice}
+                                    />
+                                )}
                                 <h2>Последние операции</h2>
                                 <section className="card history">
                                     {snapshot?.history.map((e) => (
