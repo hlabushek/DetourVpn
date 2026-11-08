@@ -209,6 +209,7 @@ void main() {
       addTearDown(tester.view.resetPhysicalSize);
       addTearDown(tester.view.resetDevicePixelRatio);
       var signedOut = false;
+      var deleted = 0;
       await tester.pumpWidget(
         MaterialApp(
           theme: orbitTheme(Brightness.light),
@@ -220,6 +221,9 @@ void main() {
                 onTheme: () {},
                 onSignOut: () async {
                   signedOut = true;
+                },
+                onDeleteAccount: () async {
+                  deleted += 1;
                 },
               ),
             ),
@@ -235,6 +239,22 @@ void main() {
       await tester.scrollUntilVisible(find.text('Выйти из аккаунта'), 250);
       await tester.tap(find.text('Выйти из аккаунта'));
       expect(signedOut, true);
+      // Cancel keeps the account; only the explicit confirmation calls the callback.
+      await tester.scrollUntilVisible(
+        find.byKey(const Key('delete-account-button')),
+        250,
+      );
+      await tester.tap(find.byKey(const Key('delete-account-button')));
+      await tester.pumpAndSettle();
+      expect(find.text('Удалить аккаунт?'), findsOneWidget);
+      await tester.tap(find.byKey(const Key('delete-account-cancel')));
+      await tester.pumpAndSettle();
+      expect(deleted, 0);
+      await tester.tap(find.byKey(const Key('delete-account-button')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('delete-account-confirm')));
+      await tester.pumpAndSettle();
+      expect(deleted, 1);
       expect(tester.takeException(), isNull);
     },
   );

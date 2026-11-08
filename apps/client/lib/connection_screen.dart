@@ -387,13 +387,43 @@ class ProfileScreen extends StatelessWidget {
   const ProfileScreen({
     super.key,
     required this.onSignOut,
+    required this.onDeleteAccount,
     required this.onTheme,
     required this.controller,
   });
   final Future<void> Function() onSignOut;
+  final Future<void> Function() onDeleteAccount;
   final VoidCallback onTheme;
   final ConnectionController controller;
   static const _vpnSettings = MethodChannel('project.vpn/tunnel.v1');
+
+  Future<void> _confirmDelete(BuildContext context) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Удалить аккаунт?'),
+        content: const Text(
+          'VPN будет отключён, устройства и сессии отозваны, связь с вашим '
+          'Telegram-аккаунтом удалена. Неиспользованный тестовый трафик пропадёт. '
+          'Для возврата потребуется новое приглашение. Действие нельзя отменить.',
+        ),
+        actions: [
+          TextButton(
+            key: const Key('delete-account-cancel'),
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Отмена'),
+          ),
+          TextButton(
+            key: const Key('delete-account-confirm'),
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('Удалить'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed == true) await onDeleteAccount();
+  }
+
   @override
   Widget build(BuildContext context) => ListenableBuilder(
     listenable: controller,
@@ -489,6 +519,12 @@ class ProfileScreen extends StatelessWidget {
           onPressed: controller.busy ? null : onSignOut,
           icon: const Icon(Icons.logout),
           label: const Text('Выйти из аккаунта'),
+        ),
+        TextButton.icon(
+          key: const Key('delete-account-button'),
+          onPressed: controller.busy ? null : () => _confirmDelete(context),
+          icon: const Icon(Icons.delete_outline),
+          label: const Text('Удалить аккаунт'),
         ),
         if (controller.error != null)
           Text(

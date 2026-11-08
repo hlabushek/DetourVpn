@@ -24,6 +24,8 @@ String messageFor(String code) => switch (code) {
     'Не удалось сохранить защищённую сессию. Повторите вход.',
   'session_erasure_failed' =>
     'Не удалось подтвердить удаление сессии с телефона. Повторите выход; при повторной ошибке потребуется очистка данных приложения в Android.',
+  'account_delete_failed' =>
+    'Не удалось удалить аккаунт. Ничего не изменено; проверьте сеть и повторите.',
   'permission_denied' =>
     'Разрешение VPN не выдано. Нажмите «Подключить» и подтвердите запрос Android.',
   'insufficient_quota' || 'insufficient_window_funding' =>

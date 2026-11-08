@@ -133,6 +133,34 @@ class _VpnAppState extends State<VpnApp> with WidgetsBindingObserver {
     } catch (_) {
       /* Local session still erased. */
     }
+    await _eraseLocalSession(value);
+  }
+
+  /// ADR-091: deletes the server account first. Local state is erased only after the
+  /// server confirmed, so a failed request never looks like a completed deletion.
+  Future<void> deleteAccount() async {
+    final value = connection!;
+    await value.disconnect();
+    if (value.error == 'native_disconnect_failed') return;
+    try {
+      await widget.api!.call('POST', '/api/v1/me/delete', {
+        'confirm': 'delete-my-account',
+      });
+    } on ClientError catch (e) {
+      value.error = e.code == 'unauthorized'
+          ? 'unauthorized'
+          : 'account_delete_failed';
+      if (mounted) setState(() {});
+      return;
+    } catch (_) {
+      value.error = 'account_delete_failed';
+      if (mounted) setState(() {});
+      return;
+    }
+    await _eraseLocalSession(value);
+  }
+
+  Future<void> _eraseLocalSession(ConnectionController value) async {
     try {
       await widget.api!.forgetSession();
     } catch (_) {
@@ -247,6 +275,7 @@ class _VpnAppState extends State<VpnApp> with WidgetsBindingObserver {
                     ),
                     2 => ProfileScreen(
                       onSignOut: signOut,
+                      onDeleteAccount: deleteAccount,
                       onTheme: () => setState(
                         () => theme = theme == ThemeMode.dark
                             ? ThemeMode.light
