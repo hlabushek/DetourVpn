@@ -52,6 +52,9 @@ class MeResponse(BaseModel):
     id: UUID
     role: str
     telegram_subject: int
+    # ADR-093: lets a guest device know its role and which device to remove when leaving.
+    guest: bool = False
+    device_id: UUID | None = None
 
 
 class WebhookResponse(BaseModel):

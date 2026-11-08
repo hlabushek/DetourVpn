@@ -165,6 +165,7 @@ class SessionFamily(Base):
         CheckConstraint(
             "client_kind IN ('native', 'mini_app')", name="ck_session_families_client_kind"
         ),
+        CheckConstraint("role IN ('owner', 'guest')", name="ck_session_families_role"),
         Index("ix_session_families_user_id", "user_id"),
         Index("ix_session_families_expires_at", "expires_at"),
         Index("ix_session_families_device_id", "device_id"),
@@ -182,6 +183,10 @@ class SessionFamily(Base):
     revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     device_id: Mapped[UUID | None] = mapped_column()
     client_kind: Mapped[str] = mapped_column(String(16), server_default=text("'native'"))
+    role: Mapped[str] = mapped_column(String(8), server_default=text("'owner'"))
+    link_code_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("device_link_codes.id", ondelete="SET NULL")
+    )
 
 
 class MiniAppExchange(Base):
@@ -196,6 +201,9 @@ class Device(Base):
     __table_args__ = (
         CheckConstraint("platform = 'android'", name="ck_devices_platform"),
         CheckConstraint("key_type = 'x25519'", name="ck_devices_key_type"),
+        CheckConstraint("role IN ('owner', 'guest')", name="ck_devices_role"),
+        CheckConstraint("length(label) BETWEEN 1 AND 40", name="ck_devices_label"),
+        CheckConstraint("traffic_cap_bytes > 0", name="ck_devices_traffic_cap"),
         UniqueConstraint("public_key", name="uq_devices_public_key"),
         UniqueConstraint("id", "user_id", name="uq_devices_id_user_id"),
         Index("ix_devices_user_id_revoked_at", "user_id", "revoked_at"),
@@ -206,6 +214,36 @@ class Device(Base):
     key_type: Mapped[str] = mapped_column(String(16))
     public_key: Mapped[str] = mapped_column(String(44))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    role: Mapped[str] = mapped_column(String(8), server_default=text("'owner'"))
+    label: Mapped[str | None] = mapped_column(String(40))
+    traffic_cap_bytes: Mapped[int | None] = mapped_column(BigInteger)
+
+
+class DeviceLinkCode(Base):
+    """One-time guest-device code; only a keyed digest is stored (ADR-093)."""
+
+    __tablename__ = "device_link_codes"
+    __table_args__ = (
+        UniqueConstraint("code_digest", name="uq_device_link_codes_digest"),
+        UniqueConstraint("user_id", "idempotency_key", name="uq_device_link_codes_key"),
+        CheckConstraint("length(label) BETWEEN 1 AND 40", name="ck_device_link_codes_label"),
+        CheckConstraint("traffic_cap_bytes > 0", name="ck_device_link_codes_cap"),
+        CheckConstraint("expires_at > created_at", name="ck_device_link_codes_expiry"),
+        Index("ix_device_link_codes_user_id", "user_id"),
+    )
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    user_id: Mapped[UUID] = mapped_column(ForeignKey("users.id", ondelete="RESTRICT"))
+    code_digest: Mapped[str] = mapped_column(String(64))
+    idempotency_key: Mapped[UUID] = mapped_column()
+    label: Mapped[str | None] = mapped_column(String(40))
+    traffic_cap_bytes: Mapped[int | None] = mapped_column(BigInteger)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    consumed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    consumed_device_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("devices.id", ondelete="SET NULL")
+    )
     revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
@@ -834,6 +872,8 @@ class VPNNode(Base):
         CheckConstraint("contract_version = 1", name="ck_vpn_nodes_contract_version"),
         CheckConstraint("length(name) BETWEEN 1 AND 80", name="ck_vpn_nodes_name"),
         CheckConstraint("length(region) BETWEEN 1 AND 32", name="ck_vpn_nodes_region"),
+        CheckConstraint("country_code ~ '^[A-Z]{2}$'", name="ck_vpn_nodes_country_code"),
+        CheckConstraint("length(city) BETWEEN 1 AND 64", name="ck_vpn_nodes_city"),
         UniqueConstraint("provisioning_key", name="uq_vpn_nodes_provisioning_key"),
         UniqueConstraint("id", "secret_digest", name="uq_vpn_nodes_id_secret_digest"),
     )
@@ -841,6 +881,8 @@ class VPNNode(Base):
     provisioning_key: Mapped[UUID] = mapped_column()
     name: Mapped[str] = mapped_column(String(80))
     region: Mapped[str] = mapped_column(String(32))
+    country_code: Mapped[str | None] = mapped_column(String(2))
+    city: Mapped[str | None] = mapped_column(String(64))
     status: Mapped[str] = mapped_column(String(16), server_default=text("'active'"))
     contract_version: Mapped[int] = mapped_column(Integer, server_default=text("1"))
     secret_digest: Mapped[str] = mapped_column(String(64))

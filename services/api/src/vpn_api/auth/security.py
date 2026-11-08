@@ -38,6 +38,8 @@ class Principal:
     family_id: UUID
     role: str
     telegram_subject: int
+    guest: bool = False
+    device_id: UUID | None = None
 
 
 def require_permission(principal: Principal, permission: str) -> None:

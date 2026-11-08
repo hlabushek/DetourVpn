@@ -73,6 +73,7 @@ def test_empty_database_upgrade_repeat_and_no_schema_drift(engine: Engine) -> No
         "admin_sessions",
         "admin_actions",
         "beta_invites",
+        "device_link_codes",
         "peer_window_holds",
         "peer_window_allocations",
         "peer_window_receipts",
@@ -148,7 +149,7 @@ def test_downgrade_with_data_fails_without_losing_rows_or_revision(engine: Engin
         assert session.scalar(select(func.count()).select_from(User)) == 1
         assert (
             session.scalar(text("SELECT version_num FROM alembic_version"))
-            == "0019_account_deletion"
+            == "0021_device_link_codes"
         )
 
 
@@ -185,7 +186,7 @@ def test_downgrade_cannot_delete_a_concurrently_committing_account(engine: Engin
         assert session.scalar(select(func.count()).select_from(User)) == 1
         assert (
             session.scalar(text("SELECT version_num FROM alembic_version"))
-            == "0019_account_deletion"
+            == "0021_device_link_codes"
         )
 
 

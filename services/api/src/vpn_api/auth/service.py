@@ -33,6 +33,7 @@ from vpn_api.db.models import (
     BotUpdate,
     CodeIssue,
     Device,
+    DeviceLinkCode,
     LoginAttempt,
     MiniAppExchange,
     RateBucket,
@@ -49,6 +50,19 @@ def database_now(session: Session) -> datetime:
     if not isinstance(value, datetime):
         raise RuntimeError("Database clock unavailable")
     return value
+
+
+# Everything else (rewards, referrals, account deletion, code management) is owner-only.
+GUEST_PERMISSIONS = frozenset(
+    {
+        "self:read",
+        "sessions:revoke",
+        "devices:manage",
+        "devices:read",
+        "quota:read",
+        "tunnels:manage",
+    }
+)
 
 
 @dataclass(frozen=True)
@@ -70,6 +84,11 @@ def cleanup_retained_auth_rows(engine: Engine) -> dict[str, int]:
             (CodeIssue, CodeIssue.created_at < now - timedelta(days=1)),
             (BotUpdate, BotUpdate.created_at < now - timedelta(days=7)),
             (SessionFamily, SessionFamily.expires_at < now - timedelta(days=1)),
+            (
+                DeviceLinkCode,
+                (DeviceLinkCode.expires_at < now - timedelta(days=1))
+                & DeviceLinkCode.consumed_at.is_(None),
+            ),
         ):
             ids = session.execute(delete(model).where(condition).returning(model.__table__.c[0]))
             result[model.__tablename__] = len(ids.all())
@@ -116,6 +135,8 @@ class AuthService:
             "device": (30, 300),
             "reward": (120, 3000),
             "mini_app": (30, 300),
+            "link_create": (10, 100),
+            "link_redeem": (10, 100),
         }
         per_network, global_limit = limits[operation]
         exceeded = False
@@ -468,7 +489,12 @@ class AuthService:
             raise AuthError("unauthorized")
         if identity is None:
             raise AuthError("unauthorized")
-        principal = Principal(user.id, family.id, user.role, identity.provider_subject)
+        guest = family.role == "guest"
+        principal = Principal(
+            user.id, family.id, user.role, identity.provider_subject, guest, family.device_id
+        )
+        if guest and permission not in GUEST_PERMISSIONS:
+            raise AuthError("forbidden", 403)
         if family.client_kind == "mini_app" and permission not in {
             "self:read",
             "sessions:revoke",
@@ -525,6 +551,8 @@ class AuthService:
     def logout(self, access: str, all_sessions: bool) -> None:
         with transaction(self.engine) as session:
             principal = self.authenticate(session, access, "sessions:revoke")
+            if principal.guest and all_sessions:
+                raise AuthError("forbidden", 403)
             statement = update(SessionFamily).where(SessionFamily.user_id == principal.user_id)
             if not all_sessions:
                 statement = statement.where(SessionFamily.id == principal.family_id)

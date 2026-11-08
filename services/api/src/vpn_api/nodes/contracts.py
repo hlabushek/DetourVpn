@@ -11,6 +11,8 @@ class ProvisionNodeInput(BaseModel):
     idempotency_key: UUID
     name: str = Field(min_length=1, max_length=80, pattern=r"^[A-Za-z0-9 _.-]+$")
     region: str = Field(min_length=1, max_length=32, pattern=r"^[a-z0-9-]+$")
+    country_code: str | None = Field(default=None, pattern=r"^[A-Z]{2}$")
+    city: str | None = Field(default=None, min_length=1, max_length=64)
 
 
 class ProvisionNodeResult(BaseModel):

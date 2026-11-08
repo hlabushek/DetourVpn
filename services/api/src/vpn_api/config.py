@@ -35,6 +35,8 @@ class Settings(BaseSettings):
     telegram_bot_username: str = ""
     telegram_bot_id: int = 0
     initial_quota_bytes: int = Field(default=0, ge=0, le=2**63 - 1)
+    # Active devices per account; a later plan entitlement may replace it (ADR-093).
+    device_limit: int = Field(default=5, ge=1, le=50)
     tunnel_profile_file: Path | None = Field(default=None, repr=False)
     enable_window_tunnels: bool = False
     window_manifest_file: Path | None = Field(default=None, repr=False)

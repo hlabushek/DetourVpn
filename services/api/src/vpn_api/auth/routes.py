@@ -77,7 +77,11 @@ def me(auth: Service, access: Access) -> MeResponse:
     with transaction(auth.engine) as session:
         principal = auth.authenticate(session, access, "self:read")
         return MeResponse(
-            id=principal.user_id, role=principal.role, telegram_subject=principal.telegram_subject
+            id=principal.user_id,
+            role=principal.role,
+            telegram_subject=0 if principal.guest else principal.telegram_subject,
+            guest=principal.guest,
+            device_id=principal.device_id,
         )
 
 

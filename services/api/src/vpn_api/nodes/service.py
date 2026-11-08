@@ -82,7 +82,12 @@ class NodeRegistry:
                 select(VPNNode).where(VPNNode.provisioning_key == command.idempotency_key)
             )
             if prior is not None:
-                if (prior.name, prior.region) != (command.name, command.region):
+                if (prior.name, prior.region, prior.country_code, prior.city) != (
+                    command.name,
+                    command.region,
+                    command.country_code,
+                    command.city,
+                ):
                     raise NodeError("node_provisioning_conflict")
                 return ProvisionNodeResult(node_id=prior.id, replayed=True)
             raw_secret = secrets.token_urlsafe(32)
@@ -91,6 +96,8 @@ class NodeRegistry:
                 provisioning_key=command.idempotency_key,
                 name=command.name,
                 region=command.region,
+                country_code=command.country_code,
+                city=command.city,
                 status=initial_status,
                 secret_digest=hashlib.sha256(raw_secret.encode("ascii")).hexdigest(),
             )

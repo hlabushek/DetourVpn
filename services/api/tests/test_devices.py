@@ -168,6 +168,7 @@ def test_revoke_own_device_closes_current_session(harness: Harness) -> None:
 
 def test_device_limit_is_atomic_under_concurrent_registration(harness: Harness) -> None:
     h = harness
+    h.auth.settings.device_limit = 3  # The default is 5 (ADR-093); this race needs 3.
     tokens = [login(h) for _ in range(4)]
     for issued in tokens[:2]:
         register_device(h.auth, issued.access_token, key_input())

@@ -21,6 +21,7 @@ from vpn_api.auth.telegram import Sender, TelegramSender
 from vpn_api.body_limit import BodyLimitMiddleware
 from vpn_api.config import Settings
 from vpn_api.db.connection import create_database_engine
+from vpn_api.devices import link_router as device_link_router
 from vpn_api.devices import router as devices_router
 from vpn_api.nodes.catalog import router as nodes_router
 from vpn_api.nodes.routes import router as agent_router
@@ -92,6 +93,7 @@ def create_app(
     app.include_router(router)
     app.include_router(mini_app_router)
     app.include_router(devices_router)
+    app.include_router(device_link_router)
     app.include_router(account_router)
     app.include_router(quota_router)
     app.include_router(rewards_router)

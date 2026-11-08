@@ -16,7 +16,15 @@ from vpn_api.auth.routes import Access, Service, network
 from vpn_api.auth.security import beta_invite_digest
 from vpn_api.auth.service import AuthService, database_now
 from vpn_api.db.connection import transaction
-from vpn_api.db.models import AuthIdentity, BetaInvite, Device, LoginAttempt, SessionFamily, User
+from vpn_api.db.models import (
+    AuthIdentity,
+    BetaInvite,
+    Device,
+    DeviceLinkCode,
+    LoginAttempt,
+    SessionFamily,
+    User,
+)
 from vpn_api.schemas import ErrorResponse
 from vpn_api.tunnels.service import revoke_device_tunnels
 
@@ -65,6 +73,11 @@ def delete_account(auth: AuthService, access: str) -> None:
                 )
                 .values(revoked_at=now)
             )
+        session.execute(
+            update(DeviceLinkCode)
+            .where(DeviceLinkCode.user_id == user_id, DeviceLinkCode.revoked_at.is_(None))
+            .values(revoked_at=now)
+        )
         session.execute(
             delete(LoginAttempt).where(LoginAttempt.subject == principal.telegram_subject)
         )

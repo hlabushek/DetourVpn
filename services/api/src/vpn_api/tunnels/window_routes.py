@@ -60,6 +60,8 @@ class WindowNodeView(BaseModel):
     id: UUID
     name: str
     region: str
+    country_code: str | None = None
+    city: str | None = None
     slots: int
     occupied: int
     available: bool
@@ -142,6 +144,8 @@ def nodes(auth: Service, access: Access) -> WindowCatalog:
                     id=node.id,
                     name=node.name,
                     region=node.region,
+                    country_code=node.country_code,
+                    city=node.city,
                     slots=len(selected.slots),
                     occupied=occupied,
                     available=available,

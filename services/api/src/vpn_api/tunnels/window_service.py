@@ -25,6 +25,7 @@ from vpn_api.db.models import (
     User,
     VPNNode,
 )
+from vpn_api.devices_usage import cap_reached
 from vpn_api.nodes.service import NodeError
 from vpn_api.quota.contracts import QuotaError
 from vpn_api.quota.service import LedgerService
@@ -234,6 +235,8 @@ def create_connection(
         ):
             raise AuthError("window_idempotency_conflict", 409)
         return prior
+    if cap_reached(session, device.id, device.traffic_cap_bytes):
+        raise AuthError("device_traffic_cap_reached", 403)
     auth.lock(session, "tunnel-node-slot", int(selected.node_id.hex[:15], 16))
     node = available_runtime(session, selected)
     if (
@@ -398,6 +401,9 @@ def renew_connection(
         session, connection, old
     ):
         raise AuthError("window_not_renewable", 409)
+    renewing = session.get(Device, connection.device_id)
+    if renewing is not None and cap_reached(session, renewing.id, renewing.traffic_cap_bytes):
+        raise AuthError("device_traffic_cap_reached", 403)
     deadline = funding_deadline(session, principal.user_id, body.budget_bytes)
     now = database_now(session)
     grant = WindowGrant.model_validate(

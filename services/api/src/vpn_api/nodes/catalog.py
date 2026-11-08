@@ -39,6 +39,8 @@ class NodeView(BaseModel):
     id: UUID
     name: str
     region: str
+    country_code: str | None = None
+    city: str | None = None
     reason: NodeReason
 
 
@@ -68,6 +70,8 @@ def list_nodes(auth: Service, access: Access) -> NodeCatalog:
                         id=node.id,
                         name=node.name,
                         region=node.region,
+                        country_code=node.country_code,
+                        city=node.city,
                         reason=node_reason(session, selected, now),
                     )
                 )
