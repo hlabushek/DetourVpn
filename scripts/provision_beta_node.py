@@ -125,6 +125,12 @@ def validate_beta_settings(settings: Settings) -> Settings:
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--idempotency-key", required=True, type=UUID)
+    # Defaults keep the original single-node (Helsinki) behaviour; a further node passes its own
+    # identity. Values are validated by ProvisionNodeInput, which rejects malformed input.
+    parser.add_argument("--name", default="detourvpn-beta-helsinki")
+    parser.add_argument("--region", default="helsinki")
+    parser.add_argument("--country-code", default="FI")
+    parser.add_argument("--city", default="Helsinki")
     arguments = parser.parse_args(argv)
     engine = None
     try:
@@ -136,8 +142,10 @@ def main(argv: list[str] | None = None) -> int:
         result = NodeRegistry(engine).provision(
             ProvisionNodeInput(
                 idempotency_key=arguments.idempotency_key,
-                name="detourvpn-beta-helsinki",
-                region="helsinki",
+                name=arguments.name,
+                region=arguments.region,
+                country_code=arguments.country_code,
+                city=arguments.city,
             ),
             initial_status="disabled",
         )
