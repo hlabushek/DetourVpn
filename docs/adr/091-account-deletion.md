@@ -23,7 +23,7 @@ user lock taken by `authenticate`:
 3. revoke the subject's beta invite, so a returning person needs a new admin invite and cannot
    farm a fresh initial grant;
 4. delete the subject's `login_attempts` and the `auth_identities` row;
-5. set `users.status='deleted'`, `users.deleted_at=now` (migration `0018_account_deletion`,
+5. set `users.status='deleted'`, `users.deleted_at=now` (migration `0019_account_deletion`,
    check constraint ties the two).
 
 Accounting rows are kept, linked only to the tombstone's random id. Replaying the request
@@ -46,13 +46,10 @@ nothing.
 - Admin-initiated deletion on a tester's request is not implemented; the owner can revoke the
   invite and devices through the existing admin operations.
 
-## Integration blocker (found 2026-11-08)
+## Integration note (resolved 2026-11-08)
 
-The owner's working tree contains an uncommitted migration `0018_peer_window_resolution`
-(revision 0018, parent `0017_login_delivery_receipt`) that is already applied to the beta
-database. This ADR's `0018_account_deletion` has the same number and parent, so both cannot be
-merged as they are: Alembic would see two heads, and the restore drill of the real beta archive
-fails with `schema_mismatch` on this branch. Before any merge, renumber to `0019_account_deletion`
-with `down_revision = "0018_peer_window_resolution"` once that migration is committed, and resolve
-the overlapping edits in `db/models.py`, `tests/test_migrations.py` and the Flutter files
-`window_connection.dart` and `connection_screen.dart`, which are also modified in the working tree.
+The owner's `0018_peer_window_resolution` was committed (`f912cf3`). This ADR's migration is
+therefore `0019_account_deletion` with parent `0018_peer_window_resolution`; `models.py`,
+`test_migrations.py`, `openapi.json` and the Flutter files merged without behavior changes.
+The restore drill of the real beta archive (schema 0018) reports `schema_mismatch` on this
+branch until `0019` is deployed, by design of `check_schema`.

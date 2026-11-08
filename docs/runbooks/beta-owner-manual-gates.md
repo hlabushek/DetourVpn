@@ -76,7 +76,7 @@ environment. Follow `closed-beta-first-tester.md` exactly, starting from
 
 ## 6. After the next API deploy: account deletion check
 
-Requires deploying migration `0018_account_deletion` and the new API/APK, which this checklist
+Requires deploying migration `0019_account_deletion` and the new API/APK, which this checklist
 does not authorize. After the owner has deployed them with a normal backup beforehand:
 
 1. With a throwaway second Telegram account that has a fresh invite, sign in, connect once,
