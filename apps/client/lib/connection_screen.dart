@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'connection.dart';
+import 'country_flag.dart';
 import 'diagnostic_report.dart';
 import 'native_tunnel.dart';
 import 'window_connection.dart';
@@ -79,7 +80,17 @@ class ConnectionScreen extends StatelessWidget {
                       for (final node in c.nodes)
                         RadioListTile<String?>(
                           value: node.id,
-                          title: Text('${node.name} · ${node.region}'),
+                          title: Row(
+                            children: [
+                              CountryFlag(node.countryCode),
+                              const SizedBox(width: 10),
+                              Flexible(
+                                child: Text(
+                                  '${node.name} · ${node.city ?? node.region}',
+                                ),
+                              ),
+                            ],
+                          ),
                           subtitle: Text(nodeMessage(node.reason)),
                           enabled:
                               !c.busy &&
@@ -168,12 +179,6 @@ class ConnectionScreen extends StatelessWidget {
                 ],
               ),
             ),
-            const SizedBox(height: 12),
-            Text(
-              'Тестовый режим · до 60 с · резерв 1 МБ',
-              textAlign: TextAlign.center,
-              style: Theme.of(context).textTheme.labelMedium,
-            ),
             const SizedBox(height: 16),
             OrbitArtwork(
               child: Column(
@@ -186,14 +191,25 @@ class ConnectionScreen extends StatelessWidget {
                     color: Theme.of(context).colorScheme.primary,
                   ),
                   const SizedBox(height: 16),
-                  Text(
-                    chosen == null
-                        ? (c is WindowConnectionController
-                              ? 'Выберите сервер'
-                              : 'Первый доступный узел')
-                        : '${chosen.name} · ${chosen.region}',
-                    textAlign: TextAlign.center,
-                    style: Theme.of(context).textTheme.titleMedium,
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      if (chosen != null) ...[
+                        CountryFlag(chosen.countryCode),
+                        const SizedBox(width: 10),
+                      ],
+                      Flexible(
+                        child: Text(
+                          chosen == null
+                              ? (c is WindowConnectionController
+                                    ? 'Выберите сервер'
+                                    : 'Первый доступный узел')
+                              : '${chosen.name} · ${chosen.city ?? chosen.region}',
+                          textAlign: TextAlign.center,
+                          style: Theme.of(context).textTheme.titleMedium,
+                        ),
+                      ),
+                    ],
                   ),
                   const SizedBox(height: 20),
                   SizedBox(
@@ -390,7 +406,11 @@ class ProfileScreen extends StatelessWidget {
     required this.onDeleteAccount,
     required this.onTheme,
     required this.controller,
+    this.guest = false,
+    this.onLeaveDevice,
   });
+  final bool guest;
+  final Future<void> Function()? onLeaveDevice;
   final Future<void> Function() onSignOut;
   final Future<void> Function() onDeleteAccount;
   final VoidCallback onTheme;
@@ -424,6 +444,32 @@ class ProfileScreen extends StatelessWidget {
     if (confirmed == true) await onDeleteAccount();
   }
 
+  Future<void> _confirmLeave(BuildContext context) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Отключить это устройство?'),
+        content: const Text(
+          'VPN будет отключён, устройство удалено из аккаунта владельца. '
+          'Чтобы подключиться снова, понадобится новый код.',
+        ),
+        actions: [
+          TextButton(
+            key: const Key('leave-device-cancel'),
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Отмена'),
+          ),
+          TextButton(
+            key: const Key('leave-device-confirm'),
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('Отключить'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed == true) await onLeaveDevice?.call();
+  }
+
   @override
   Widget build(BuildContext context) => ListenableBuilder(
     listenable: controller,
@@ -432,16 +478,19 @@ class ProfileScreen extends StatelessWidget {
       children: [
         Text('Профиль', style: Theme.of(context).textTheme.headlineMedium),
         const SizedBox(height: 24),
-        const OrbitPanel(
+        OrbitPanel(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Icon(Icons.person_outline, size: 36),
-              SizedBox(height: 12),
-              Text('Вход через Telegram'),
-              SizedBox(height: 8),
+              const Icon(Icons.person_outline, size: 36),
+              const SizedBox(height: 12),
+              Text(guest ? 'Гостевое устройство' : 'Вход через Telegram'),
+              const SizedBox(height: 8),
               Text(
-                'Ключ устройства и сессия зашифрованы с помощью Android Keystore. После перезапуска VPN подключается вручную.',
+                guest
+                    ? 'Это устройство подключено к аккаунту владельца по коду. Трафик списывается с его баланса; '
+                          'управлять аккаунтом и другими устройствами может только владелец.'
+                    : 'Ключ устройства и сессия зашифрованы с помощью Android Keystore. После перезапуска VPN подключается вручную.',
               ),
             ],
           ),
@@ -469,9 +518,7 @@ class ProfileScreen extends StatelessWidget {
               const Text('О тестовой версии'),
               SizedBox(height: 12),
               Text(
-                controller is WindowConnectionController
-                    ? 'Доступ продлевается ограниченными окнами с серверным подтверждением. Учитывается внешний UDP, включая заголовки и handshake. При неизвестном расходе резерв удерживается для сверки. Без API окно истекает; DNS/IPv6 и фон требуют физической проверки.'
-                    : 'Подключения до 60 секунд с резервом 1 048 576 байт. Статус VPN учитывает системный интерфейс, свежий handshake и активный lease. Проверка внешнего IP и DNS выполняется отдельно.',
+                'Это бета-версия: возможны сбои, а работа в фоне и на разных сетях ещё проверяется. Статус VPN учитывает системный интерфейс и свежий handshake.',
               ),
               SizedBox(height: 12),
               Text(
@@ -515,17 +562,26 @@ class ProfileScreen extends StatelessWidget {
             }
           },
         ),
-        OutlinedButton.icon(
-          onPressed: controller.busy ? null : onSignOut,
-          icon: const Icon(Icons.logout),
-          label: const Text('Выйти из аккаунта'),
-        ),
-        TextButton.icon(
-          key: const Key('delete-account-button'),
-          onPressed: controller.busy ? null : () => _confirmDelete(context),
-          icon: const Icon(Icons.delete_outline),
-          label: const Text('Удалить аккаунт'),
-        ),
+        if (guest)
+          OutlinedButton.icon(
+            key: const Key('leave-device-button'),
+            onPressed: controller.busy ? null : () => _confirmLeave(context),
+            icon: const Icon(Icons.link_off),
+            label: const Text('Отключить это устройство'),
+          )
+        else ...[
+          OutlinedButton.icon(
+            onPressed: controller.busy ? null : onSignOut,
+            icon: const Icon(Icons.logout),
+            label: const Text('Выйти из аккаунта'),
+          ),
+          TextButton.icon(
+            key: const Key('delete-account-button'),
+            onPressed: controller.busy ? null : () => _confirmDelete(context),
+            icon: const Icon(Icons.delete_outline),
+            label: const Text('Удалить аккаунт'),
+          ),
+        ],
         if (controller.error != null)
           Text(
             messageFor(controller.error!),

@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 
 import 'api.dart';
+import 'country_flag.dart';
 import 'connection.dart';
 import 'native_tunnel.dart';
 
@@ -100,7 +101,7 @@ class WindowConnectionController extends ConnectionController {
     try {
       final value = await api.call('GET', '$root/nodes');
       final rows = value['nodes'];
-      if (rows is! List || rows.length > 16)
+      if (rows is! List || rows.length > maxCatalogNodes)
         throw const ClientError('invalid_response');
       final parsed = <NodeOption>[];
       for (final row in rows) {
@@ -118,6 +119,8 @@ class WindowConnectionController extends ConnectionController {
             row['name'] as String,
             row['region'] as String,
             (row['available'] as bool) ? 'available' : 'capacity',
+            countryCode: parseCountryCode(row['country_code']),
+            city: parseCity(row['city']),
           ),
         );
       }

@@ -14,6 +14,7 @@ const b = '00000000-0000-4000-8000-000000000002';
 // TEST ONLY node/native data. No tunnel traffic or reachability is demonstrated.
 class FailoverApi extends FakeApi {
   bool staleA = false;
+  int extraNodes = 0;
   bool catalogFails = false;
   bool recoveryReady = false;
   int recoveries = 0;
@@ -44,6 +45,16 @@ class FailoverApi extends FakeApi {
             'region': 'test-b',
             'reason': 'available',
           },
+          for (var i = 0; i < extraNodes; i++)
+            {
+              'id':
+                  '00000000-0000-4000-8000-${(100 + i).toString().padLeft(12, '0')}',
+              'name': 'TEST ONLY X$i',
+              'region': 'test-x$i',
+              'country_code': 'DE',
+              'city': 'Frankfurt',
+              'reason': 'available',
+            },
         ],
         'checked_at': DateTime.now().toUtc().toIso8601String(),
       };
@@ -173,6 +184,23 @@ void main() {
     expect(c.nodes.length, 2);
     expect(native.up, true);
     expect(api.deletes, 0);
+  });
+
+  test('catalog accepts up to 16 nodes with country and city', () async {
+    api.extraNodes = 14;
+    await c.refreshNodes();
+    expect(c.nodesError, isNull);
+    expect(c.nodes.length, 16);
+    expect(c.nodes.last.countryCode, 'DE');
+    expect(c.nodes.last.city, 'Frankfurt');
+    expect(c.nodes.first.countryCode, isNull);
+  });
+
+  test('catalog with more than 16 nodes is rejected', () async {
+    api.extraNodes = 15;
+    await c.refreshNodes();
+    expect(c.nodesError, 'invalid_response');
+    expect(c.nodes, isEmpty);
   });
 
   test('disposed controller ignores pending catalog', () async {

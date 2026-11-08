@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 
 import 'api.dart';
+import 'country_flag.dart';
 import 'native_tunnel.dart';
 import 'quota.dart';
 
@@ -33,13 +34,19 @@ String messageFor(String code) => switch (code) {
   'device_revoked' ||
   'session_expired' ||
   'unauthorized' => 'Доступ завершён. Отключите VPN и войдите снова.',
+  'leave_device_failed' =>
+    'Не удалось отключить устройство. Проверьте сеть и повторите.',
+  'invalid_link_code' =>
+    'Код недействителен, просрочен или уже использован. Попросите владельца создать новый.',
+  'device_traffic_cap_reached' =>
+    'Достигнут лимит трафика для этого устройства. Обратитесь к владельцу аккаунта.',
   'device_limit_reached' =>
     'Достигнут лимит устройств. Отзовите старое устройство в аккаунте.',
   'session_device_mismatch' =>
     'Сессия принадлежит другому ключу. Войдите снова на этом устройстве.',
   'device_conflict' =>
     'Ключ связан с другим аккаунтом или отозван. Остановите приложение в настройках Android и войдите снова.',
-  'tunnel_node_capacity' => 'Тестовый узел занят. Повторите позже.',
+  'tunnel_node_capacity' => 'Сервер занят. Повторите позже.',
   'tunnel_recovery_not_ready' =>
     'Завершение пока запрещено: дождитесь истечения lease и подтверждения недоступности узла.',
   'tunnel_node_unavailable' ||
@@ -112,12 +119,24 @@ String nodeMessage(String reason) => switch (reason) {
   'disabled' => 'Выключен оператором',
   'heartbeat_stale' => 'Нет свежего ответа агента',
   'runtime_mismatch' => 'Движок не подтверждён',
-  'capacity' => 'Тестовый узел занят',
+  'capacity' => 'Сервер занят',
   _ => 'Состояние неизвестно',
 };
 
+/// Upper bound shared with the server window manifest (at most 16 nodes).
+const maxCatalogNodes = 16;
+
 class NodeOption {
-  NodeOption(this.id, this.name, this.region, this.reason);
+  NodeOption(
+    this.id,
+    this.name,
+    this.region,
+    this.reason, {
+    this.countryCode,
+    this.city,
+  });
+  final String? countryCode;
+  final String? city;
   final String id;
   final String name;
   final String region;
@@ -178,7 +197,7 @@ class ConnectionController extends ChangeNotifier {
     try {
       final response = await api.call('GET', '/api/v1/nodes');
       final raw = response['nodes'];
-      if (raw is! List || raw.length > 2)
+      if (raw is! List || raw.length > maxCatalogNodes)
         throw const ClientError('invalid_response');
       final parsed = <NodeOption>[];
       for (final row in raw) {
@@ -204,6 +223,8 @@ class ConnectionController extends ChangeNotifier {
             row['name'] as String,
             row['region'] as String,
             row['reason'] as String,
+            countryCode: parseCountryCode(row['country_code']),
+            city: parseCity(row['city']),
           ),
         );
       }

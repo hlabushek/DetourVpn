@@ -41,6 +41,7 @@ class VpnApp extends StatefulWidget {
 class _VpnAppState extends State<VpnApp> with WidgetsBindingObserver {
   ConnectionController? connection;
   bool showLogin = true;
+  bool guest = false;
   ThemeMode theme = ThemeMode.dark;
   int tab = 0;
   bool restoring = false;
@@ -78,7 +79,19 @@ class _VpnAppState extends State<VpnApp> with WidgetsBindingObserver {
     }
   }
 
+  /// Guest devices (ADR-093) get a reduced profile. The server enforces the limits either way;
+  /// a failed lookup just leaves the owner layout, never grants anything.
+  Future<void> _loadRole() async {
+    try {
+      final me = await widget.api!.call('GET', '/api/v1/me');
+      if (mounted) setState(() => guest = me['guest'] == true);
+    } catch (_) {
+      /* Owner layout stays. */
+    }
+  }
+
   void signedIn() {
+    unawaited(_loadRole());
     final value =
         connection ??
         (windows
@@ -122,6 +135,34 @@ class _VpnAppState extends State<VpnApp> with WidgetsBindingObserver {
     value.startPolling();
     unawaited(value.refresh());
     unawaited(value.refreshQuota());
+  }
+
+  /// A guest removes its own device (frees the slot, closes its tunnel) and then signs out.
+  Future<void> leaveAccount() async {
+    final value = connection!;
+    await value.disconnect();
+    if (value.error == 'native_disconnect_failed') return;
+    try {
+      // The device list endpoint returns a JSON array, which Api.call does not decode;
+      // /me carries the caller's own device id instead.
+      final me = await widget.api!.call('GET', '/api/v1/me');
+      final id = me['device_id'];
+      if (id is String) {
+        await widget.api!.call('DELETE', '/api/v1/devices/$id');
+      }
+    } on ClientError catch (e) {
+      value.error = e.code == 'unauthorized'
+          ? 'unauthorized'
+          : 'leave_device_failed';
+      if (mounted) setState(() {});
+      return;
+    } catch (_) {
+      value.error = 'leave_device_failed';
+      if (mounted) setState(() {});
+      return;
+    }
+    await _eraseLocalSession(value);
+    if (mounted) setState(() => guest = false);
   }
 
   Future<void> signOut() async {
@@ -276,6 +317,8 @@ class _VpnAppState extends State<VpnApp> with WidgetsBindingObserver {
                     2 => ProfileScreen(
                       onSignOut: signOut,
                       onDeleteAccount: deleteAccount,
+                      guest: guest,
+                      onLeaveDevice: leaveAccount,
                       onTheme: () => setState(
                         () => theme = theme == ThemeMode.dark
                             ? ThemeMode.light
@@ -311,6 +354,8 @@ class LoginScreen extends StatefulWidget {
 
 class _LoginScreenState extends State<LoginScreen> {
   final code = TextEditingController();
+  final linkCode = TextEditingController();
+  bool linkMode = false;
   Map<String, dynamic>? challenge;
   bool working = false;
   bool restoringChallenge = true;
@@ -398,6 +443,8 @@ class _LoginScreenState extends State<LoginScreen> {
   void dispose() {
     code.clear();
     code.dispose();
+    linkCode.clear();
+    linkCode.dispose();
     challenge = null;
     super.dispose();
   }
@@ -534,6 +581,46 @@ class _LoginScreenState extends State<LoginScreen> {
           padding: const EdgeInsets.only(top: 16),
           child: Semantics(liveRegion: true, child: Text(error!)),
         ),
+      const SizedBox(height: 16),
+      if (!linkMode)
+        TextButton(
+          key: const Key('link-code-open'),
+          onPressed: working ? null : () => setState(() => linkMode = true),
+          child: const Text('У меня есть код устройства'),
+        ),
+      if (linkMode) ...[
+        const Text(
+          'Введите одноразовый код, который передал владелец аккаунта. '
+          'Устройство подключится как гостевое: оно пользуется VPN за счёт трафика владельца, '
+          'но не управляет аккаунтом.',
+        ),
+        TextField(
+          key: const Key('link-code-field'),
+          controller: linkCode,
+          autocorrect: false,
+          enableSuggestions: false,
+          textCapitalization: TextCapitalization.characters,
+          maxLength: 32,
+          decoration: const InputDecoration(labelText: 'Код устройства'),
+        ),
+        FilledButton(
+          key: const Key('link-code-submit'),
+          onPressed: working
+              ? null
+              : () => perform(() async {
+                  final value = await widget.api.call(
+                    'POST',
+                    '/api/v1/auth/link/redeem',
+                    {'code': linkCode.text.trim()},
+                  );
+                  await widget.api.writePendingLogin(null);
+                  await widget.api.acceptSession(value);
+                  linkCode.clear();
+                  widget.onSignedIn();
+                }),
+          child: const Text('Подключить это устройство'),
+        ),
+      ],
       const SizedBox(height: 24),
       const Text(
         'Ключ устройства и сессия зашифрованы на телефоне с помощью Android Keystore. После перезапуска приложения VPN подключается вручную. '
