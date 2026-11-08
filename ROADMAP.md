@@ -612,3 +612,8 @@ failed receipts remain preserved. Evidence:
 `docs/evidence/i-019-staging.json`,
 `docs/evidence/i-019-b-reuse-diagnostic.json`, and
 `docs/evidence/i-019-session-cleanup.json`.
+
+- Закрытая бета: **ADR-090 предложен 2026-11-08** (границы 5–20 тестеров, stop-критерии,
+  go/no-go по открытым пунктам `docs/beta-readiness-20261029.md`). Квота 512 MiB, срок
+  4 недели, награды выключены — согласовано владельцем «пока что»; открыт бюджет VPS
+  (тариф и лимит трафика). Это определение, не готовность к запуску.
