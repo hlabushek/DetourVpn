@@ -121,6 +121,16 @@ __NEWHASH__
 LIST
 test "$(sha256sum "$root/scripts/closed_migrate.py" | cut -d ' ' -f1)" = __MIGRATOR__
 test ! -e "$backup"; test "$(stat -c '%a' /root)" = 700
+phase=remove_cr_artifacts
+# Earlier attempts wrote every file next to its original with a trailing CR in the name.
+# Remove exactly those names (never a glob, never a directory).
+while IFS= read -r rel; do
+  [ -z "$rel" ] && continue
+  if [ -e /opt/detourvpn-beta/"$rel"$'\r' ]; then rm -f -- /opt/detourvpn-beta/"$rel"$'\r'; echo cr_artifact_removed=1; fi
+done <<'LIST'
+__CHANGED__
+__NEW__
+LIST
 phase=verify_uploaded
 while read -r want name; do [ -z "$name" ] && continue; test "$(sha256sum "$stage/$name" | cut -d ' ' -f1)" = "$want"; done <<'LIST'
 __UPLOADED__
@@ -155,7 +165,9 @@ phase=replace_and_migrate
 systemctl stop detourvpn-beta-api.service
 while read -r want name; do
   [ -z "$name" ] && continue
-  rel="$(awk -v n="$name" '$1==n{print $2}' "$stage/map")"
+  rel="$(awk -v n="$name" '$1==n{print $2}' "$stage/map" | tr -d '\r')"
+  case "$rel" in services/api/*) ;; *) echo bad_relative_path; false ;; esac
+  test -n "$rel"
   new="$root/$rel.dev0021-$rid"
   if [ -e "$root/$rel" ]; then
     install -o "$(stat -c '%U' "$root/$rel")" -g "$(stat -c '%G' "$root/$rel")" -m "$(stat -c '%a' "$root/$rel")" "$stage/$name" "$new"
@@ -168,6 +180,9 @@ done <<'LIST'
 __UPLOADED__
 LIST
 echo files_replaced="$replaced"
+while read -r want rel; do [ -z "$rel" ] && continue; test "$(sha256sum "$root/$rel" | cut -d ' ' -f1)" = "$want"; done <<'LIST'
+__INSTALLED__
+LIST
 echo models_sha_after_loop="$(sha256sum "$root/services/api/src/vpn_api/db/models.py" | cut -c1-16)"
 echo versions_after_loop="$(ls "$root/services/api/migrations/versions" | grep '^002' | tr '
 ' ' ')"
@@ -264,7 +279,10 @@ def main() -> int:
         t = Path(tmp)
         for p, data in files.items():
             (t / names[p]).write_bytes(data)
-        (t / "map").write_text("\n".join(f"{names[p]} {p}" for p in files) + "\n", encoding="utf-8")
+        # Bytes, not write_text: on Windows text mode would turn "\n" into "\r\n" and the host
+        # would then see every path with a trailing carriage return.
+        map_text = "\n".join(f"{names[p]} {p}" for p in files) + "\n"
+        (t / "map").write_bytes(map_text.encode("utf-8"))
         (t / "deploy.sh").write_bytes(script.replace("\r", "").encode("utf-8"))
         cmd = f"set -eu; test ! -e '{stage}'; install -d -o root -g root -m 0700 '{stage}'"
         subprocess.run(ssh + [cmd], check=True)  # noqa: S603
@@ -286,7 +304,7 @@ def main() -> int:
     wanted = {
         "rollout", "rollback_phase", "readiness", "database_revision", "database_backup_bytes",
         "database_backup_sha256", "redeem_probe_http", "schema_revision_after_rollback",
-        "migrate_unit_failed", "migrate_out", "revision_after_migrate", "diag", "diag_failed", "versions_002x_count", "files_replaced", "leftover_new_file_ok", "models_sha_after_loop", "versions_after_loop",
+        "migrate_unit_failed", "migrate_out", "revision_after_migrate", "diag", "diag_failed", "versions_002x_count", "files_replaced", "leftover_new_file_ok", "cr_artifact_removed", "models_sha_after_loop", "versions_after_loop",
     }
     print("\n".join(x for x in result.stdout.splitlines() if x.split("=")[0] in wanted))
     print(f"exit_code={result.returncode}")
