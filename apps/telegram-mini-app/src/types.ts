@@ -46,7 +46,7 @@ export type Tab = "home" | "rewards" | "profile";
 type WebApp = {
     initData: string;
     /** Display only: the name is never sent to the backend. */
-    initDataUnsafe?: { user?: { first_name?: string } };
+    initDataUnsafe?: { user?: { id?: number; first_name?: string } };
     colorScheme: string;
     ready: () => void;
     expand: () => void;

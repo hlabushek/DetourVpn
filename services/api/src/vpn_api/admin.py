@@ -623,6 +623,43 @@ def user_window_status(user_id: UUID, admin: Admin, access: Access) -> AdminWind
         )
 
 
+@router.get("/beta-invites")
+def beta_invites(admin: Admin, access: Access) -> dict[str, object]:
+    """Read-only list of beta invites. Never exposes a Telegram ID, only the owner's own label."""
+    with transaction(admin.engine) as session:
+        admin.authenticate(session, access, write=True)
+        settings = admin.settings
+        if not settings.beta_invites_only or settings.auth_pepper is None:
+            return {"enabled": False, "bot_username": "", "items": []}
+        pepper = settings.auth_pepper.get_secret_value()
+        # Match invites to accounts by the same keyed digest the auth flows use (small beta table).
+        joined = {
+            beta_invite_digest(pepper, subject): user_id
+            for subject, user_id in session.execute(
+                select(AuthIdentity.provider_subject, AuthIdentity.user_id)
+                .where(AuthIdentity.provider == "telegram_bot")
+                .limit(10000)
+            )
+        }
+        items: list[dict[str, object]] = []
+        for invite in session.scalars(
+            select(BetaInvite).order_by(BetaInvite.created_at.desc(), BetaInvite.id).limit(200)
+        ):
+            user_id = joined.get(invite.subject_digest)
+            state = "revoked" if invite.revoked_at else "joined" if user_id else "waiting"
+            items.append(
+                {
+                    "id": str(invite.id),
+                    "label": invite.reason,
+                    "created_at": invite.created_at.isoformat(),
+                    "revoked_at": invite.revoked_at.isoformat() if invite.revoked_at else None,
+                    "state": state,
+                    "user_id": str(user_id) if user_id and state != "revoked" else None,
+                }
+            )
+        return {"enabled": True, "bot_username": settings.telegram_bot_username, "items": items}
+
+
 @router.get("/plans", response_model=list[PlanView])
 def plans(admin: Admin, access: Access) -> list[PlanView]:
     with transaction(admin.engine) as session:

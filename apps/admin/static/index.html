@@ -1,39 +1,70 @@
 <!doctype html>
 <html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>DetourVpn — управление</title><link rel="stylesheet" href="style.css"><script type="module" src="admin.js"></script></head>
-<body><header><h1>DetourVpn · управление</h1><p>Закрытая бесплатная эксплуатация. Приём платежей выключен.</p></header>
-<p id="status" role="status" aria-live="polite"></p>
-<section id="login"><h2>Вход администратора</h2>
-<form id="login-form"><label>Логин<input name="username" autocomplete="username" required></label>
+<title>DetourVPN — управление</title><link rel="stylesheet" href="style.css"><script type="module" src="admin.js"></script></head>
+<body>
+<header class="top"><div class="brand"><span class="logo" aria-hidden="true"></span><div><h1>DetourVPN · управление</h1><p class="sub">Закрытый тест. Платежи выключены.</p></div></div>
+<div id="session" class="session" hidden><button id="refresh" class="btn secondary">Обновить</button><button id="logout" class="btn secondary">Выйти</button></div></header>
+<p id="status" role="status" aria-live="polite" class="status"></p>
+<section id="login" class="card narrow"><h2>Вход администратора</h2><p class="hint">Пароль и код из приложения-аутентификатора. Сессия хранится только в памяти страницы.</p>
+<form id="login-form" class="stack"><label>Логин<input name="username" autocomplete="username" required></label>
 <label>Пароль<input name="password" type="password" autocomplete="current-password" required></label>
-<label>Код аутентификатора<input name="code" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" required></label>
-<button>Войти с MFA</button></form></section>
+<label>Код из аутентификатора (6 цифр)<input name="code" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" required></label>
+<button class="btn">Войти</button></form></section>
 <main id="workspace" hidden>
-<nav><button id="refresh">Обновить</button><button id="logout">Выйти</button></nav>
-<section><h2>Пользователи</h2><form id="search-form"><label>UUID или Telegram ID<input name="q"></label><button>Найти</button></form><div id="users"></div></section>
-<section id="beta-invites" hidden><h2>Доступ тестировщика</h2>
-<p>Telegram ID используется только для запроса по HTTPS. Он не показывается в журнале и не должен попадать в причину операции. Выдавайте доступ только после принятия ворот beta.</p>
-<form id="beta-grant-form"><label>Числовой Telegram ID<input name="telegram_subject" type="text" inputmode="numeric" autocomplete="off" autocapitalize="off" spellcheck="false" pattern="[0-9]{1,16}" maxlength="16" required></label>
-<label>Причина без персональных данных<textarea name="reason" minlength="3" maxlength="500" required></textarea></label><button>Выдать приглашение</button></form>
-<form id="beta-revoke-form"><label>Числовой Telegram ID<input name="telegram_subject" type="text" inputmode="numeric" autocomplete="off" autocapitalize="off" spellcheck="false" pattern="[0-9]{1,16}" maxlength="16" required></label>
-<label>Причина без персональных данных<textarea name="reason" minlength="3" maxlength="500" required></textarea></label><button>Отозвать приглашение</button></form>
-<small>Отзыв отключает аккаунт и отзывает его сессии и VPN-туннели. Для нового действия используйте «Начать новую операцию» после проверки журнала.</small></section>
-<section><h2>Выбранный пользователь</h2><p id="selected">Выберите пользователя в списке.</p><div id="quota"></div><div id="devices"></div><div id="subscriptions"></div><div id="history"></div></section>
-<section id="changes"><h2>Изменить трафик или доступ</h2><p>Изменения требуют причины. При сетевой ошибке повтор сохраняет тот же ключ операции.</p>
-<form id="action-form"><label>Действие<select name="operation"><option value="credit">Добавить трафик / компенсация</option><option value="debit">Уменьшить доступный трафик</option><option value="grant_subscription">Выдать / продлить / сменить тариф</option><option value="revoke_subscription">Отменить / отозвать подписку</option><option value="revoke_device">Отозвать устройство и VPN-доступ</option></select></label>
-<label>Тариф для выдачи<select name="plan_id" id="plan-picker"></select></label>
-<label>UUID подписки или устройства для отзыва<input name="resource_id"></label>
-<label>Количество bytes для изменения трафика<input name="amount_bytes" inputmode="numeric" pattern="[0-9]+"></label>
-<label>Причина<textarea name="reason" minlength="3" maxlength="500" required></textarea></label>
-<button>Применить</button><button type="button" id="new-operation">Начать новую операцию</button></form></section>
-<section><h2>Тарифы и версии</h2><p>Цены демонстрационные. Действующая выдача сохраняет свою версию тарифа.</p><div id="plans"></div>
-<button id="demo-catalog">Инициализировать демонстрационный каталог</button>
-<form id="plan-form"><h3>Новая версия тарифа</h3><label>Код<input name="code" pattern="[a-z][a-z0-9_-]{0,31}" required></label>
+<div id="summary" class="stats" aria-label="Сводка"></div>
+<nav id="tabs" class="tabs" role="tablist" aria-label="Разделы"><button role="tab" data-tab="invites" id="tab-invites" hidden>Приглашения</button><button role="tab" data-tab="users">Пользователи</button><button role="tab" data-tab="nodes">Серверы</button><button role="tab" data-tab="plans" id="tab-plans" hidden>Тарифы</button><button role="tab" data-tab="audit">Журнал</button></nav>
+
+<section id="panel-invites" class="panel" role="tabpanel" hidden>
+<div class="card"><h2>Пригласить тестера</h2>
+<ol class="steps">
+<li><div><strong>Отправьте человеку сообщение</strong><p class="hint">Готовый текст со ссылкой на бота. Скопируйте и отправьте любым способом.</p>
+<textarea id="invite-message" readonly rows="8" aria-label="Текст приглашения"></textarea><button id="copy-message" type="button" class="btn secondary">Скопировать текст</button></div></li>
+<li><div><strong>Человек открывает бота и присылает вам свой ID</strong><p class="hint">Пока доступа нет, Mini App показывает ему число (его Telegram ID) и кнопку «Скопировать ID». Принимайте только числа.</p></div></li>
+<li><div><strong>Вставьте ID и добавьте человека</strong>
+<form id="beta-grant-form" class="stack"><label>Telegram ID человека (только цифры)<input name="telegram_subject" type="text" inputmode="numeric" autocomplete="off" autocapitalize="off" spellcheck="false" pattern="[0-9]{1,16}" maxlength="16" required></label>
+<label>Пометка, кто это (псевдоним, без имени и контактов)<input name="reason" minlength="3" maxlength="500" placeholder="например: Тестер 1, Android" required></label>
+<button class="btn">Добавить в бету</button></form>
+<p class="hint">ID не сохраняется в журнале и не показывается после добавления. Пометка видна только вам. После добавления человек просто открывает Mini App снова.</p></div></li>
+</ol></div>
+<div class="card"><h2>Приглашённые</h2><div id="invites"></div>
+<div id="revoke-panel" class="warn-box" hidden><h3>Отозвать доступ: <span id="revoke-label"></span></h3>
+<p>Аккаунт будет отключён, сессии и VPN-подключения отозваны. Для подтверждения введите Telegram ID этого человека.</p>
+<form id="beta-revoke-form" class="stack"><label>Telegram ID<input name="telegram_subject" type="text" inputmode="numeric" autocomplete="off" autocapitalize="off" spellcheck="false" pattern="[0-9]{1,16}" maxlength="16" required></label>
+<label>Причина отзыва (без ID)<input name="reason" minlength="3" maxlength="500" required></label>
+<div class="row"><button class="btn danger">Отозвать доступ</button><button type="button" id="revoke-cancel" class="btn secondary">Отмена</button></div></form></div>
+<p class="hint">«Ждёт входа» — человек добавлен, но ещё не открывал Mini App. «Вошёл» — аккаунт создан. Отозванного человека можно пригласить заново.</p></div>
+</section>
+
+<section id="panel-users" class="panel" role="tabpanel" hidden>
+<div class="card"><h2>Пользователи</h2><form id="search-form" class="row"><label class="grow">Найти по номеру или Telegram ID<input name="q" placeholder="пусто — показать последних"></label><button class="btn">Найти</button></form><div id="users"></div></div>
+<div class="card"><h2>Выбранный пользователь</h2><p id="selected" class="hint">Выберите пользователя в списке выше.</p><div id="quota"></div><h3>Устройства</h3><div id="devices"></div><h3>Тарифы</h3><div id="subscriptions"></div><h3>История трафика</h3><div id="history"></div></div>
+<div id="changes" class="card" hidden><h2>Изменить трафик или доступ</h2><p class="hint">Действует на выбранного пользователя. При сетевой ошибке повтор не дублирует операцию.</p>
+<form id="action-form" class="stack"><label>Что сделать<select name="operation"><option value="credit">Добавить трафик (компенсация)</option><option value="debit">Уменьшить трафик</option><option value="grant_subscription">Выдать или сменить тариф</option><option value="revoke_subscription">Отменить подписку</option><option value="revoke_device">Отозвать устройство</option></select></label>
+<div class="row" data-for="credit debit"><label>Сколько<input name="amount" inputmode="decimal" placeholder="например 5 или 1,5"></label><label>Единица<select name="unit"><option value="gib">ГиБ</option><option value="mib">МиБ</option></select></label></div>
+<label data-for="grant_subscription">Тариф<select name="plan_id" id="plan-picker"></select></label>
+<label data-for="revoke_subscription revoke_device">Номер подписки или устройства (из таблиц выше)<input name="resource_id"></label>
+<label>Причина (обязательно)<textarea name="reason" minlength="3" maxlength="500" required></textarea></label>
+<div class="row"><button class="btn">Применить</button><button type="button" id="new-operation" class="btn secondary">Начать новую операцию</button></div></form></div>
+</section>
+
+<section id="panel-nodes" class="panel" role="tabpanel" hidden>
+<div class="card"><h2>Серверы</h2><p class="hint">«На связи» значит, что агент узла недавно отвечал. Это не доказывает, что VPN работает: проверяйте подключением с телефона.</p><div id="nodes"></div>
+<p class="hint">Новый сервер добавляется с компьютера двумя командами: <code>add_beta_node prepare</code> и <code>add_beta_node run</code> (инструкция: docs/runbooks/beta-add-node.md).</p></div>
+</section>
+
+<section id="panel-plans" class="panel" role="tabpanel" hidden>
+<div class="card"><h2>Тарифы</h2><p class="hint">Цены демонстрационные, платежи выключены. Выданный тариф сохраняет свою версию.</p><div id="plans"></div>
+<button id="demo-catalog" class="btn secondary">Создать демонстрационный каталог</button></div>
+<div class="card"><h2>Новая версия тарифа</h2>
+<form id="plan-form" class="stack"><label>Код<input name="code" pattern="[a-z][a-z0-9_-]{0,31}" required></label>
 <label>Название<input name="name" maxlength="80" required></label><label>Тип<select name="kind"><option value="subscription">Подписка</option><option value="addon">Дополнительный пакет</option></select></label>
 <label>Цена, копейки<input name="price_minor" inputmode="numeric" pattern="[0-9]+" required></label>
-<label>Квота, bytes<input name="quota_bytes" inputmode="numeric" pattern="[0-9]+" required></label>
+<label>Квота, байты (точное число)<input name="quota_bytes" inputmode="numeric" pattern="[0-9]+" required></label>
 <label>Период, дней<input name="period_days" type="number" min="1" max="366" value="30" required></label>
-<label>Причина<textarea name="reason" minlength="3" maxlength="500" required></textarea></label><button>Создать версию</button></form></section>
-<section><h2>Узлы</h2><p>Статус control plane не подтверждает VPN egress. Текущий v2: один peer на узел, lease до 60 секунд.</p><div id="nodes"></div></section>
-<section><h2>Журнал административных действий</h2><div id="audit"></div></section>
+<label>Причина<textarea name="reason" minlength="3" maxlength="500" required></textarea></label><button class="btn">Создать версию</button></form></div>
+</section>
+
+<section id="panel-audit" class="panel" role="tabpanel" hidden>
+<div class="card"><h2>Журнал административных действий</h2><div id="audit"></div></div>
+</section>
 </main></body></html>

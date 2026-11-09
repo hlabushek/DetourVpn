@@ -9,6 +9,7 @@ import { Orbit } from "./components/Orbit";
 import { Bonuses, type ReferralActions } from "./screens/Bonuses";
 import { Home } from "./screens/Home";
 import { Profile } from "./screens/Profile";
+import { isNoAccess, viewerId } from "./access.mjs";
 import { message, SESSION_GONE } from "./messages";
 import { date, type Rule, type Snapshot, type Tab } from "./types";
 import "./style.css";
@@ -21,6 +22,32 @@ function displayName(): string | null {
     return name || null;
 }
 
+/** The viewer's own Telegram ID with a copy button, so a tester can send it to whoever invites them. */
+function MyId() {
+    const id = viewerId(window.Telegram?.WebApp.initDataUnsafe?.user);
+    const [copied, setCopied] = useState(false);
+    if (!id) return null;
+    async function copy() {
+        try {
+            await navigator.clipboard.writeText(id as string);
+            setCopied(true);
+        } catch {
+            setCopied(false);
+        }
+    }
+    return (
+        <section className="card id-card">
+            <p className="muted">Ваш Telegram ID</p>
+            <p className="id-value" aria-label="Ваш Telegram ID">
+                {id}
+            </p>
+            <button className="primary" onClick={() => void copy()}>
+                {copied ? "Скопировано" : "Скопировать ID"}
+            </button>
+        </section>
+    );
+}
+
 function App() {
     const api = useRef(new CabinetAPI());
     const [loginAttempt] = useState(() => loginAttemptFromFragment(window.location.hash));
@@ -28,6 +55,7 @@ function App() {
     const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
     const [error, setError] = useState("");
     const [sessionGone, setSessionGone] = useState(false);
+    const [noAccess, setNoAccess] = useState(false);
     const [notice, setNotice] = useState("");
     const [busy, setBusy] = useState(true);
     const [signedIn, setSignedIn] = useState(false);
@@ -42,6 +70,7 @@ function App() {
 
     function fail(e: unknown) {
         setError(message(e));
+        if (isNoAccess(e)) setNoAccess(true);
         if (e instanceof ApiError && SESSION_GONE.has(e.message)) setSessionGone(true);
     }
 
@@ -91,6 +120,7 @@ function App() {
                                   : "Проверьте личный чат с ботом и введите код в Android-приложении. Не пересылайте его и не вводите в Mini App.",
                         );
                     }
+                    if (active.current && result.status === "rejected") setNoAccess(true);
                     return;
                 }
                 await api.current.login(tg.initData);
@@ -222,12 +252,31 @@ function App() {
                     <p>Код приходит в личный чат с ботом. Введите его только в Android-приложении.</p>
                     <p className="muted">Mini App не получает Android-сессию и не управляет VPN.</p>
                 </section>
+                {noAccess && (
+                    <>
+                        <p className="muted center">
+                            Если вас ещё не добавили в закрытую бету, отправьте этот ID тому, кто вас пригласил.
+                        </p>
+                        <MyId />
+                    </>
+                )}
             </Shell>
         );
     }
 
     let content: React.ReactNode;
-    if (closed) {
+    if (noAccess && !snapshot) {
+        content = (
+            <>
+                <StateView
+                    icon="info"
+                    title="Доступ пока не открыт"
+                    text="DetourVPN сейчас работает как закрытый тест. Отправьте ваш Telegram ID тому, кто вас пригласил, и после добавления откройте Mini App снова."
+                />
+                <MyId />
+            </>
+        );
+    } else if (closed) {
         content = (
             <StateView
                 icon="logout"

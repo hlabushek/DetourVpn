@@ -932,3 +932,56 @@ def test_unknown_window_resolution_refuses_live_connection(admin: Harness) -> No
         assert session.get(PeerWindowResolution, window_id) is None
         quota = LedgerService(h.engine).quota(session, h.user_id)
         assert quota.used_bytes == 0 and quota.reserved_bytes == amount
+
+
+def test_beta_invite_list_shows_state_without_telegram_ids(
+    admin: Harness, harness: UserHarness
+) -> None:
+    h = admin
+    user = harness
+    waiting_subject, joined_subject = 555000111, 555000222
+    h.service.settings.beta_invites_only = True
+    h.service.settings.auth_pepper = user.settings.auth_pepper
+    h.service.settings.telegram_bot_username = "TestOnlyBot"
+    user.auth.settings.beta_invites_only = True
+    admin_headers = authorization(h)
+    for subject, label in (
+        (waiting_subject, "TEST ONLY waiting"),
+        (joined_subject, "TEST ONLY joined"),
+    ):
+        change(
+            h,
+            admin_headers,
+            operation="grant_beta_invite",
+            telegram_subject=subject,
+            reason=label,
+        )
+    tokens = login(user, joined_subject)
+    assert user.client.get("/api/v1/me", headers=headers(tokens)).status_code == 200
+
+    listed = h.client.get("/api/admin/v1/beta-invites", headers=admin_headers)
+    assert listed.status_code == 200
+    for subject in (waiting_subject, joined_subject):
+        assert str(subject) not in listed.text
+    data = listed.json()
+    assert data["enabled"] is True and data["bot_username"] == "TestOnlyBot"
+    states = {item["label"]: item for item in data["items"]}
+    assert states["TEST ONLY waiting"]["state"] == "waiting"
+    assert states["TEST ONLY waiting"]["user_id"] is None
+    assert states["TEST ONLY joined"]["state"] == "joined"
+    assert states["TEST ONLY joined"]["user_id"] is not None
+
+    change(h, admin_headers, operation="revoke_beta_invite", telegram_subject=joined_subject)
+    after = {
+        i["label"]: i
+        for i in h.client.get("/api/admin/v1/beta-invites", headers=admin_headers).json()["items"]
+    }
+    assert after["TEST ONLY joined"]["state"] == "revoked"
+    assert after["TEST ONLY joined"]["user_id"] is None
+
+
+def test_beta_invite_list_requires_an_admin_session_and_reports_disabled(admin: Harness) -> None:
+    h = admin
+    assert h.client.get("/api/admin/v1/beta-invites").status_code == 401
+    disabled = h.client.get("/api/admin/v1/beta-invites", headers=authorization(h))
+    assert disabled.json() == {"enabled": False, "bot_username": "", "items": []}

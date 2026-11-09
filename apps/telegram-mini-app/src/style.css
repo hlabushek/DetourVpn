@@ -680,6 +680,20 @@ input::placeholder {
     stroke-width: 1.4;
 }
 
+.id-card {
+    display: grid;
+    justify-items: center;
+    gap: var(--space-1);
+    text-align: center;
+}
+.id-value {
+    font-size: 30px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    user-select: all;
+    overflow-wrap: anywhere;
+}
+
 /* Skeleton */
 .skeleton {
     display: grid;
