@@ -19,6 +19,50 @@ class SettingsScreen extends StatelessWidget {
   final ConnectionController? controller;
   static const _vpnSettings = MethodChannel('project.vpn/tunnel.v1');
 
+  /// Split settings are applied when the tunnel is built, so they can only change while it is
+  /// off. With the VPN on, offer to turn it off first instead of leaving a dead button.
+  Future<void> _openSplitApps(
+    BuildContext context,
+    WindowConnectionController c,
+  ) async {
+    final navigator = Navigator.of(context);
+    final messenger = ScaffoldMessenger.of(context);
+    if (c.hasLease) {
+      final disconnect = await showDialog<bool>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: const Text('Отключить VPN?'),
+          content: const Text(
+            'Список приложений применяется при подключении. Чтобы его изменить, VPN нужно отключить. После изменения подключитесь снова.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(false),
+              child: const Text('Отмена'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(dialogContext).pop(true),
+              child: const Text('Отключить и открыть'),
+            ),
+          ],
+        ),
+      );
+      if (disconnect != true) return;
+      await c.disconnect();
+      if (c.hasLease || c.busy) {
+        messenger.showSnackBar(
+          const SnackBar(
+            content: Text('Не удалось отключить VPN. Отключите его на главном экране.'),
+          ),
+        );
+        return;
+      }
+    }
+    await navigator.push(
+      MaterialPageRoute<void>(builder: (_) => const SplitAppsScreen()),
+    );
+  }
+
   @override
   Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(title: const Text('Настройки')),
@@ -52,12 +96,13 @@ class SettingsScreen extends StatelessWidget {
           NavRow(
             icon: Icons.apps_rounded,
             title: 'Приложения вне VPN',
-            subtitle: 'Исключённые приложения используют обычную сеть',
-            enabled: !c.busy && !c.hasLease,
-            onTap: () => Navigator.push(
-              context,
-              MaterialPageRoute<void>(builder: (_) => const SplitAppsScreen()),
-            ),
+            subtitle: c.busy
+                ? 'Подождите: идёт подключение или отключение'
+                : c.hasLease
+                ? 'VPN включён: для изменения его нужно отключить'
+                : 'Исключённые приложения используют обычную сеть',
+            enabled: !c.busy,
+            onTap: () => _openSplitApps(context, c),
           ),
         ],
         const SizedBox(height: 12),

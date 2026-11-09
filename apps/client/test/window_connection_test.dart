@@ -1,8 +1,11 @@
 import 'dart:async';
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:vpn_client/api.dart';
 import 'package:vpn_client/connection.dart';
 import 'package:vpn_client/native_tunnel.dart';
+import 'package:vpn_client/settings_screen.dart';
+import 'package:vpn_client/split_apps.dart';
 import 'package:vpn_client/window_connection.dart';
 import 'connection_test.dart' show FakeNative;
 
@@ -181,6 +184,56 @@ void main() {
     c.selectedNode = node;
   });
   tearDown(() => c.dispose());
+  // The orbit backdrop animates forever, so pumpAndSettle would time out.
+  Future<void> settle(WidgetTester tester) async {
+    for (var i = 0; i < 4; i++) {
+      await tester.pump(const Duration(milliseconds: 300));
+    }
+  }
+
+  Widget settingsHost() => MaterialApp(
+    home: SettingsScreen(onTheme: () {}, controller: c),
+  );
+  testWidgets('apps-outside-VPN row opens the screen directly while VPN is off', (
+    tester,
+  ) async {
+    await tester.pumpWidget(settingsHost());
+    expect(
+      find.text('Исключённые приложения используют обычную сеть'),
+      findsOneWidget,
+    );
+    await tester.tap(find.text('Приложения вне VPN'));
+    await settle(tester);
+    expect(find.byType(SplitAppsScreen), findsOneWidget);
+    expect(find.text('Отключить VPN?'), findsNothing);
+  });
+  testWidgets('apps-outside-VPN row stays tappable while connected and offers to disconnect', (
+    tester,
+  ) async {
+    await tester.runAsync(() => c.connect());
+    await tester.pumpWidget(settingsHost());
+    expect(c.hasLease, isTrue);
+    expect(
+      find.text('VPN включён: для изменения его нужно отключить'),
+      findsOneWidget,
+    );
+    await tester.tap(find.text('Приложения вне VPN'));
+    await settle(tester);
+    expect(find.text('Отключить VPN?'), findsOneWidget);
+    // Cancel keeps the tunnel up and does not open the screen.
+    await tester.tap(find.text('Отмена'));
+    await settle(tester);
+    expect(native.up, isTrue);
+    expect(find.byType(SplitAppsScreen), findsNothing);
+    // Confirm disconnects first, then opens the screen.
+    await tester.tap(find.text('Приложения вне VPN'));
+    await settle(tester);
+    await tester.tap(find.text('Отключить и открыть'));
+    await settle(tester);
+    expect(native.up, isFalse);
+    expect(c.hasLease, isFalse);
+    expect(find.byType(SplitAppsScreen), findsOneWidget);
+  });
   test('production window budget remains 1 MiB by default', () {
     expect(WindowConnectionController.budgetBytes, 1048576);
   });
