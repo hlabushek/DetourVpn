@@ -25,7 +25,9 @@ DEFAULT_INVENTORY = ROOT / "infra" / "beta" / "nodes.json"
 # not universal capacity targets.
 MIN_ROOT_FREE_KB = 1_500_000
 MIN_MEM_AVAILABLE_KB = 350_000
-SUPPORTED_OS = {("ubuntu", "22.04"), ("ubuntu", "24.04"), ("debian", "12")}
+# The node bootstrap recognises the systemd 255 `systemd-executor` launcher only (Ubuntu 24.04);
+# on systemd 249/252 (Ubuntu 22.04, Debian 12) it fails with slot_core_identity_conflict.
+SUPPORTED_OS = {("ubuntu", "24.04")}
 
 REMOTE_PROGRAM = r"""
 set -u
@@ -42,6 +44,7 @@ echo "ip_forward=$(cat /proc/sys/net/ipv4/ip_forward 2>/dev/null || echo unknown
 echo "default_routes=$(ip -4 route show default 2>/dev/null | wc -l)"
 echo "host_ip_assigned=$(ip -4 -o addr show 2>/dev/null | awk '{print $4}' | cut -d/ -f1 | grep -cx "$host_ip")"
 if [ -d /run/systemd/system ]; then echo "systemd=1"; else echo "systemd=0"; fi
+if [ -x /usr/lib/systemd/systemd-executor ]; then echo "systemd_executor=1"; else echo "systemd_executor=0"; fi
 echo "udp_ports_busy=$(ss -H -lun 2>/dev/null | awk '{print $5}' | grep -cE ":($ports)$")"
 """
 
@@ -78,6 +81,7 @@ def evaluate(values: dict[str, str]) -> list[dict[str, object]]:
         ),
         ("arch_x86_64", values.get("arch") == "x86_64", True),
         ("systemd", values.get("systemd") == "1", True),
+        ("systemd_executor", values.get("systemd_executor") == "1", True),
         # ADR-052: one default route, the public IPv4 assigned directly, forwarding already on.
         ("single_default_route", values.get("default_routes") == "1", True),
         ("public_ipv4_assigned_directly", values.get("host_ip_assigned") == "1", True),

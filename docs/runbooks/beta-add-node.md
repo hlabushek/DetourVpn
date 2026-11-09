@@ -1,40 +1,62 @@
-# Добавление нового beta-узла: что можно сделать сейчас
+# Добавление нового beta-узла (ADR-094, этапы 1–2)
 
-Статус: этап 1 из ADR-094. Автоматической активации нового узла пока нет, это этап 2.
+Каждая команда по умолчанию только читает (сухой прогон); изменения делает `--execute`.
+Новый узел должен пройти все шаги по порядку. Ни один шаг не доказывает handshake и egress:
+это отдельная физическая приёмка (ADR-061/062).
 
 ## 1. Подготовка хоста (вручную)
 
-1. Новый VPS: Ubuntu 22.04/24.04 или Debian 12, x86_64, публичный IPv4 назначен интерфейсу
-   напрямую, один маршрут по умолчанию, `net.ipv4.ip_forward=1` (ADR-052).
-2. Добавьте на хост публичную часть ключа `~/.ssh/detourvpn-beta-*` и сверьте отпечаток хоста
-   с консолью провайдера, затем один раз подключитесь вручную, чтобы хост попал в `known_hosts`.
+1. Новый VPS: **Ubuntu 24.04**, x86_64, публичный IPv4 назначен интерфейсу напрямую, один маршрут
+   по умолчанию, `net.ipv4.ip_forward=1` (ADR-052). Ubuntu 22.04 и Debian 12 не подходят:
+   код узла рассчитан на `systemd-executor` из systemd 255.
+2. Добавьте на хост публичную часть ключа `~/.ssh/detourvpn-beta-*`, сверьте отпечаток хоста с
+   консолью провайдера, один раз подключитесь вручную (хост попадёт в `known_hosts`). Если сервер
+   переустанавливали, сначала удалите старую запись: `ssh-keygen -R <адрес>`.
+3. В панели провайдера (если есть фаервол) откройте UDP-порты слотов 51901–51916.
 
-## 2. Инвентарь
+## 2. Инвентарь и предпроверка
 
-1. Скопируйте `infra/beta/nodes.example.json` в `infra/beta/nodes.json` (файл в `.gitignore`).
-2. Добавьте запись: `name` вида `detourvpn-beta-<город>`, `region`, `country_code` (ISO 3166-1
-   alpha-2), `city`, `host`, `ssh_user`, `ssh_key` (имя файла `detourvpn-*` в `~/.ssh`),
-   `ssh_port`, `udp_ports` (диапазон слотов, не больше 16 портов).
-
-## 3. Предпроверка кандидата (только чтение)
+1. Скопируйте `infra/beta/nodes.example.json` в `infra/beta/nodes.json` (файл в `.gitignore`) и
+   добавьте запись узла (`udp_ports`: `[51901, 51916]`).
+2. Предпроверка (только чтение):
 
 ```powershell
 uv run --frozen python -m scripts.check_candidate_node --node detourvpn-beta-<город>
 ```
 
-Вердикт `ready` значит, что предусловия выполнены. Для квитанции: `--receipt <новый файл>`.
-Файл не содержит адресов. Выход 0 = `ready`, 1 = `not_ready`, 2 = ошибка инвентаря или SSH.
+Нужен вердикт `ready` (выход 0).
 
-## 4. Дальше
+## 3. Установка узла на новый хост
 
-Регистрация (`provision_beta_node.py` с `--name --region --country-code --city`), связывание,
-активация и приёмка handshake/egress/учёта пока идут по ADR-061/062 и требуют этапа 2 для узлов
-кроме Helsinki. Выберите конкретный второй узел и откройте отдельную задачу.
+```powershell
+uv run --frozen python -m scripts.install_beta_node --node detourvpn-beta-<город>
+uv run --frozen python -m scripts.install_beta_node --node detourvpn-beta-<город> --execute
+```
+
+Первая команда сухой прогон. Вторая ставит узел и запускает закрытый слот; агент не запускается.
+Ошибка откатывает всё созданное этим запуском.
+
+## 4. Регистрация, привязка, включение
+
+```powershell
+uv run --frozen python -m scripts.connect_beta_node status --node detourvpn-beta-<город>
+uv run --frozen python -m scripts.connect_beta_node register --node detourvpn-beta-<город> --execute
+uv run --frozen python -m scripts.connect_beta_node bind --node detourvpn-beta-<город> --execute
+uv run --frozen python -m scripts.connect_beta_node activate --node detourvpn-beta-<город> --execute
+```
+
+Без `--execute` каждая команда только проверяет. Откат включения:
+`connect_beta_node rollback --node ... --execute` (останавливает агент, строка снова `disabled`).
+Перезапуск API не нужен: он читает манифест на каждый запрос.
+
+## 5. Приёмка (вручную, до приглашения кого-либо)
+
+Физическое подключение с телефона к новому узлу: handshake, внешний IP из сети нового узла,
+учёт трафика. Только после этого узел считается принятым.
 
 ## Журнал
 
-- 2026-11-09: кандидат `detourvpn-beta-germany` (VPS в Германии, Ubuntu 22.04). Ключ
-  `detourvpn-beta-germany` выложен владельцем, `ip_forward` включён владельцем отдельным файлом
-  `/etc/sysctl.d/99-detourvpn-forward.conf`. Предпроверка: `ready`
-  (`docs/evidence/beta-node-germany-preflight-20261109.json`). Узел не зарегистрирован, не
-  активирован и не принимает пользователей.
+- 2026-11-09: кандидат `detourvpn-beta-germany` (VPS xorek). Ubuntu 22.04: установка упала на
+  запуске bootstrap (`slot_core_identity_conflict`, systemd 249), откат чистый. Нужна переустановка
+  с Ubuntu 24.04. Старый receipt предпроверки (22.04 `ready`) устарел, актуальный:
+  `docs/evidence/beta-node-germany-preflight-20261109-corrected.json`.

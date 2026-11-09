@@ -10,7 +10,7 @@
       "ssh_user": "root",
       "ssh_key": "detourvpn-beta-EXAMPLE",
       "ssh_port": 22,
-      "udp_ports": [51820, 51829]
+      "udp_ports": [51901, 51916]
     }
   ]
 }
