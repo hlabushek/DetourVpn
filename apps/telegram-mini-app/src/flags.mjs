@@ -24,6 +24,27 @@ const VERTICAL = {
     IT: ["#009246", "#ffffff", "#ce2b37"],
 };
 
+/** Russian display names; mirror of `countryNames` in country_flag.dart. */
+export const COUNTRY_NAMES = Object.freeze({
+    FI: "Финляндия",
+    SE: "Швеция",
+    DK: "Дания",
+    NO: "Норвегия",
+    DE: "Германия",
+    NL: "Нидерланды",
+    AT: "Австрия",
+    PL: "Польша",
+    EE: "Эстония",
+    LT: "Литва",
+    FR: "Франция",
+    IT: "Италия",
+});
+
+/** Display name for a known code, otherwise null (own-property lookup only). */
+export function countryName(code) {
+    return typeof code === "string" && Object.hasOwn(COUNTRY_NAMES, code) ? COUNTRY_NAMES[code] : null;
+}
+
 /** ISO 3166-1 alpha-2 in upper case, otherwise null (never throws on bad server data). */
 export function parseCountryCode(value) {
     return typeof value === "string" && /^[A-Z]{2}$/.test(value) ? value : null;

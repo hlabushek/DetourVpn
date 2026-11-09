@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { CabinetAPI, bytes, gigabytesToBytes } from "./api.mjs";
 import { Flag } from "./Flag";
+import { Icon } from "./components/Icon";
 
 // Integers arrive as decimal strings (exactJSON keeps int64 exact).
 export type Device = {
@@ -42,6 +43,20 @@ function confirmAction(text: string, done: () => void) {
 
 const when = (value: string) => new Date(value).toLocaleString("ru-RU");
 
+/** "09:41" until the code expires; display only, the server enforces expiry. */
+function useCountdown(expiresAt: string | null) {
+    const [now, setNow] = useState(() => Date.now());
+    useEffect(() => {
+        if (!expiresAt) return;
+        const timer = window.setInterval(() => setNow(Date.now()), 1000);
+        return () => window.clearInterval(timer);
+    }, [expiresAt]);
+    if (!expiresAt) return null;
+    const left = Math.max(0, Math.floor((new Date(expiresAt).getTime() - now) / 1000));
+    if (left === 0) return null;
+    return `${String(Math.floor(left / 60)).padStart(2, "0")}:${String(left % 60).padStart(2, "0")}`;
+}
+
 export function Devices({ api, devices, busy, run, reload, notify }: Props) {
     const [codes, setCodes] = useState<LinkCode[]>([]);
     const [created, setCreated] = useState<Created | null>(null);
@@ -51,6 +66,7 @@ export function Devices({ api, devices, busy, run, reload, notify }: Props) {
     const [editing, setEditing] = useState<string | null>(null);
     const [editLabel, setEditLabel] = useState("");
     const [editCap, setEditCap] = useState("");
+    const left = useCountdown(created?.expires_at ?? null);
 
     async function loadCodes() {
         try {
@@ -135,135 +151,183 @@ export function Devices({ api, devices, busy, run, reload, notify }: Props) {
 
     return (
         <>
-            <section className="card">
-                {devices.map((d) => {
-                    const capValue = d.traffic_cap_bytes ? Number(d.traffic_cap_bytes) : null;
-                    const used = d.used_bytes_total ? Number(d.used_bytes_total) : 0;
-                    return (
-                        <div className="device device-row" key={d.id}>
-                            <Flag code={d.last_country_code} />
-                            <div className="device-body">
-                                <b>
-                                    {d.label ?? `Android · ${d.id.slice(0, 8)}`}
-                                    {d.role === "guest" && <span className="badge">Гость</span>}
-                                </b>
-                                <small>Добавлено {when(d.created_at)}</small>
-                                {d.last_connected_at && (
-                                    <small>Последнее подключение {when(d.last_connected_at)}</small>
-                                )}
-                                <small>
-                                    Трафик: {bytes(d.used_bytes_30d ?? "0")} за 30 дней ·{" "}
-                                    {bytes(d.used_bytes_total ?? "0")} всего
-                                </small>
-                                {capValue !== null && (
-                                    <>
-                                        <small>Лимит устройства: {bytes(d.traffic_cap_bytes ?? "0")}</small>
-                                        <progress max={capValue} value={Math.min(used, capValue)} />
-                                    </>
-                                )}
-                                {editing === d.id ? (
-                                    <div className="device-edit">
-                                        <input
-                                            value={editLabel}
-                                            maxLength={40}
-                                            placeholder="Название"
-                                            aria-label="Название устройства"
-                                            onChange={(e) => setEditLabel(e.target.value)}
-                                        />
-                                        <input
-                                            value={editCap}
-                                            inputMode="decimal"
-                                            placeholder="Лимит, ГБ (пусто — без лимита)"
-                                            aria-label="Лимит трафика устройства, ГБ"
-                                            onChange={(e) => setEditCap(e.target.value)}
-                                        />
-                                        {capError && <small role="alert">{capError}</small>}
-                                        <div className="device-actions">
-                                            <button className="primary" disabled={busy} onClick={() => void saveEdit(d)}>
-                                                Сохранить
-                                            </button>
-                                            <button disabled={busy} onClick={() => setEditing(null)}>
-                                                Отмена
-                                            </button>
-                                        </div>
-                                    </div>
-                                ) : (
-                                    <div className="device-actions">
-                                        <button disabled={busy} onClick={() => startEdit(d)}>
-                                            Изменить
-                                        </button>
-                                        <button className="danger" disabled={busy} onClick={() => disconnect(d)}>
-                                            Отключить
-                                        </button>
-                                    </div>
-                                )}
-                            </div>
+            {devices.map((d) => {
+                const capValue = d.traffic_cap_bytes ? Number(d.traffic_cap_bytes) : null;
+                const used = d.used_bytes_total ? Number(d.used_bytes_total) : 0;
+                return (
+                    <section className="card device-card" key={d.id}>
+                        <div className="device-head">
+                            <Flag code={d.last_country_code} width={36} />
+                            <b>{d.label ?? `Android · ${d.id.slice(0, 8)}`}</b>
+                            {d.role === "guest" && <span className="badge">Гость</span>}
                         </div>
-                    );
-                })}
-                {!devices.length && <p>Устройств пока нет. Добавьте устройство через Android-приложение.</p>}
-            </section>
+                        <div className="device-meta">
+                            <small>Добавлено {when(d.created_at)}</small>
+                            {d.last_connected_at && <small>Последнее подключение {when(d.last_connected_at)}</small>}
+                            <small>
+                                Трафик: {bytes(d.used_bytes_30d ?? "0")} за 30 дней · {bytes(d.used_bytes_total ?? "0")}{" "}
+                                всего
+                            </small>
+                        </div>
+                        {capValue !== null && (
+                            <div className="cap">
+                                <div className="cap-row">
+                                    <small>Лимит устройства: {bytes(d.traffic_cap_bytes ?? "0")}</small>
+                                    <small>{bytes(d.used_bytes_total ?? "0")}</small>
+                                </div>
+                                <div className="meter" role="img" aria-label="Расход относительно лимита устройства">
+                                    <span style={{ width: `${Math.min(100, (used / capValue) * 100)}%` }} />
+                                </div>
+                            </div>
+                        )}
+                        {editing === d.id ? (
+                            <div className="device-edit">
+                                <label>
+                                    Название
+                                    <input
+                                        value={editLabel}
+                                        maxLength={40}
+                                        placeholder="Например, Телефон Пети"
+                                        aria-label="Название устройства"
+                                        onChange={(e) => setEditLabel(e.target.value)}
+                                    />
+                                </label>
+                                <label>
+                                    Лимит трафика, ГБ
+                                    <input
+                                        value={editCap}
+                                        inputMode="decimal"
+                                        placeholder="Пусто — без лимита"
+                                        aria-label="Лимит трафика устройства, ГБ"
+                                        onChange={(e) => setEditCap(e.target.value)}
+                                    />
+                                </label>
+                                {capError && (
+                                    <small role="alert" className="field-error">
+                                        {capError}
+                                    </small>
+                                )}
+                                <div className="device-actions">
+                                    <button className="primary" disabled={busy} onClick={() => void saveEdit(d)}>
+                                        Сохранить
+                                    </button>
+                                    <button className="secondary" disabled={busy} onClick={() => setEditing(null)}>
+                                        Отмена
+                                    </button>
+                                </div>
+                            </div>
+                        ) : (
+                            <div className="device-actions">
+                                <button className="secondary" disabled={busy} onClick={() => startEdit(d)}>
+                                    Изменить
+                                </button>
+                                <button className="danger" disabled={busy} onClick={() => disconnect(d)}>
+                                    Отключить
+                                </button>
+                            </div>
+                        )}
+                    </section>
+                );
+            })}
+            {!devices.length && (
+                <section className="card">
+                    <p className="muted">Устройств пока нет. Добавьте устройство через Android-приложение.</p>
+                </section>
+            )}
 
-            <h2>Подключить устройство</h2>
+            <h2 className="section-title">Подключить устройство</h2>
             <section className="card">
-                <p>
-                    Одноразовый код действует 10 минут. Устройство по коду получает доступ как гость: оно
-                    пользуется VPN за счёт вашего трафика, но не может управлять аккаунтом и другими
-                    устройствами. Отключить его можно в любой момент.
-                </p>
                 {created ? (
                     <div className="code-box" role="status">
+                        <small className="muted">Код для подключения</small>
                         <strong className="link-code">{created.code}</strong>
-                        <small>Действует до {new Date(created.expires_at).toLocaleTimeString("ru-RU")}. Показан один раз.</small>
+                        <p className="timer">
+                            <Icon name="clock" />
+                            {left ? (
+                                <>
+                                    Действует ещё <b>{left}</b>
+                                </>
+                            ) : (
+                                "Срок действия истёк"
+                            )}
+                        </p>
                         <div className="device-actions">
                             <button className="primary" onClick={() => void copy(created.code)}>
+                                <Icon name="copy" />
                                 Скопировать
                             </button>
-                            <button onClick={() => setCreated(null)}>Скрыть</button>
+                            <button className="secondary" onClick={() => setCreated(null)}>
+                                Скрыть
+                            </button>
                         </div>
+                        <p className="warn-note">
+                            <Icon name="alert" />
+                            Показан один раз. Передайте только тому, кому доверяете.
+                        </p>
                     </div>
                 ) : (
                     <div className="device-edit">
-                        <input
-                            value={label}
-                            maxLength={40}
-                            placeholder="Название, например «Телефон Пети»"
-                            aria-label="Название нового устройства"
-                            onChange={(e) => setLabel(e.target.value)}
-                        />
-                        <input
-                            value={cap}
-                            inputMode="decimal"
-                            placeholder="Лимит трафика, ГБ (необязательно)"
-                            aria-label="Лимит трафика нового устройства, ГБ"
-                            onChange={(e) => setCap(e.target.value)}
-                        />
-                        {capError && <small role="alert">{capError}</small>}
+                        <label>
+                            Название
+                            <input
+                                value={label}
+                                maxLength={40}
+                                placeholder="Например, Телефон Пети"
+                                aria-label="Название нового устройства"
+                                onChange={(e) => setLabel(e.target.value)}
+                            />
+                        </label>
+                        <label>
+                            Лимит трафика, ГБ (необязательно)
+                            <input
+                                value={cap}
+                                inputMode="decimal"
+                                placeholder="Например, 5"
+                                aria-label="Лимит трафика нового устройства, ГБ"
+                                onChange={(e) => setCap(e.target.value)}
+                            />
+                        </label>
+                        {capError && (
+                            <small role="alert" className="field-error">
+                                {capError}
+                            </small>
+                        )}
+                        <p className="info-note">
+                            <Icon name="info" />
+                            Одноразовый код действует 10 минут. Устройство по коду получает доступ как гость: пользуется
+                            VPN за счёт вашего трафика, но не управляет аккаунтом. Отключить его можно в любой момент.
+                        </p>
                         <button className="primary" disabled={busy} onClick={() => void create()}>
+                            <Icon name="link" />
                             Получить код
                         </button>
                     </div>
                 )}
-                {codes.length > 0 && (
-                    <>
-                        <h3>Неиспользованные коды</h3>
+            </section>
+            {codes.length > 0 && (
+                <>
+                    <h2 className="section-title">Неиспользованные коды</h2>
+                    <section className="card codes">
                         {codes.map((c) => (
-                            <div className="device" key={c.id}>
-                                <div className="device-body">
+                            <div className="code-row" key={c.id}>
+                                <span className="tile">
+                                    <Icon name="link" />
+                                </span>
+                                <span className="row-text">
                                     <b>{c.label ?? "Без названия"}</b>
                                     <small>
                                         до {new Date(c.expires_at).toLocaleTimeString("ru-RU")}
                                         {c.traffic_cap_bytes ? ` · лимит ${bytes(c.traffic_cap_bytes)}` : ""}
                                     </small>
-                                </div>
-                                <button disabled={busy} onClick={() => cancel(c)}>
+                                </span>
+                                <button className="danger small" disabled={busy} onClick={() => cancel(c)}>
                                     Отменить
                                 </button>
                             </div>
                         ))}
-                    </>
-                )}
-            </section>
+                    </section>
+                </>
+            )}
         </>
     );
 }
