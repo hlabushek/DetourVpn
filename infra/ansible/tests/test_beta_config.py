@@ -7,7 +7,13 @@ BETA = ROOT / "infra" / "beta"
 
 
 def test_beta_templates_have_independent_identity_and_no_host_binding() -> None:
-    files = [path for path in BETA.iterdir() if path.is_file() and path.suffix != ".md"]
+    # nodes.json is the owner's local, gitignored node inventory (real addresses by design);
+    # only committed templates are checked for isolation.
+    files = [
+        path
+        for path in BETA.iterdir()
+        if path.is_file() and path.suffix != ".md" and path.name != "nodes.json"
+    ]
     joined = "\n".join(path.read_text(encoding="utf-8") for path in files)
 
     for forbidden in (
