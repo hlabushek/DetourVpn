@@ -162,6 +162,29 @@ while read -r want name; do
 done <<'LIST'
 __UPLOADED__
 LIST
+cat > "$stage/diag.py" <<'PY'
+import sys
+sys.path.insert(0, '/opt/detourvpn-beta/services/api/src')
+from alembic.config import Config
+from alembic.script import ScriptDirectory
+from sqlalchemy import text
+from vpn_api.config import Settings
+from vpn_api.db.connection import create_database_engine
+import vpn_api.db.models as m
+cfg = Config('/opt/detourvpn-beta/alembic.ini')
+print('script_head', ScriptDirectory.from_config(cfg).get_current_head())
+print('models_file', m.__file__, 'device_has_role', hasattr(m.Device, 'role'))
+e = create_database_engine(Settings(_env_file=None))
+with e.connect() as c:
+    print('user', c.scalar(text('select current_user')), 'db', c.scalar(text('select current_database()')), 'port', c.scalar(text('select inet_server_port()')))
+    print('db_rev', c.scalar(text('select version_num from alembic_version')))
+    print('has_country', c.scalar(text("select count(*) from information_schema.columns where table_name='vpn_nodes' and column_name='country_code'")))
+    print('search_path', c.scalar(text('show search_path')))
+PY
+systemd-run --quiet --wait --pipe --collect --unit="detourvpn-dev0021-diag-$rid" --property=WorkingDirectory="$root" --property="EnvironmentFile=/run/detourvpn-dev0021-migrate-$rid.env" "$root/.venv/bin/python" "$stage/diag.py" >"$backup/diag.out" 2>&1 || echo diag_failed=1
+echo diag="$(tr '
+' ' ' < "$backup/diag.out" | cut -c1-700)"
+ls "$root/services/api/migrations/versions" | grep -c '^002' | sed 's/^/versions_002x_count=/'
 systemd-run --quiet --wait --pipe --collect --unit="detourvpn-dev0021-migrate-$rid" --property=WorkingDirectory="$root" --property="EnvironmentFile=/run/detourvpn-dev0021-migrate-$rid.env" "$root/.venv/bin/python" scripts/closed_migrate.py >"$backup/migrate.out" 2>&1 || echo migrate_unit_failed=1
 echo migrate_out="$(tr '
 ' ' ' < "$backup/migrate.out" | cut -c1-600)"
@@ -243,7 +266,7 @@ def main() -> int:
     wanted = {
         "rollout", "rollback_phase", "readiness", "database_revision", "database_backup_bytes",
         "database_backup_sha256", "redeem_probe_http", "schema_revision_after_rollback",
-        "migrate_unit_failed", "migrate_out", "revision_after_migrate",
+        "migrate_unit_failed", "migrate_out", "revision_after_migrate", "diag", "diag_failed", "versions_002x_count",
     }
     print("\n".join(x for x in result.stdout.splitlines() if x.split("=")[0] in wanted))
     print(f"exit_code={result.returncode}")
