@@ -113,8 +113,11 @@ while read -r want rel; do
 done <<'LIST'
 __BASELINES__
 LIST
-while IFS= read -r rel; do [ -z "$rel" ] && continue; test ! -e "$root/$rel"; done <<'LIST'
-__NEW__
+while read -r want rel; do
+  [ -z "$rel" ] && continue
+  if [ -e "$root/$rel" ]; then test "$(sha256sum "$root/$rel" | cut -d ' ' -f1)" = "$want"; echo leftover_new_file_ok="$rel"; fi
+done <<'LIST'
+__NEWHASH__
 LIST
 test "$(sha256sum "$root/scripts/closed_migrate.py" | cut -d ' ' -f1)" = __MIGRATOR__
 test ! -e "$backup"; test "$(stat -c '%a' /root)" = 700
@@ -242,6 +245,7 @@ def main() -> int:
         .replace("__UPLOADED__", uploaded)
         .replace("__INSTALLED__", installed)
         .replace("__CHANGED__", "\n".join(CHANGED))
+        .replace("__NEWHASH__", "\n".join(f"{sha(files[p])} {p}" for p in NEW))
         .replace("__NEW__", "\n".join(NEW))
     )
     ssh = [
@@ -282,7 +286,7 @@ def main() -> int:
     wanted = {
         "rollout", "rollback_phase", "readiness", "database_revision", "database_backup_bytes",
         "database_backup_sha256", "redeem_probe_http", "schema_revision_after_rollback",
-        "migrate_unit_failed", "migrate_out", "revision_after_migrate", "diag", "diag_failed", "versions_002x_count", "files_replaced", "models_sha_after_loop", "versions_after_loop",
+        "migrate_unit_failed", "migrate_out", "revision_after_migrate", "diag", "diag_failed", "versions_002x_count", "files_replaced", "leftover_new_file_ok", "models_sha_after_loop", "versions_after_loop",
     }
     print("\n".join(x for x in result.stdout.splitlines() if x.split("=")[0] in wanted))
     print(f"exit_code={result.returncode}")
