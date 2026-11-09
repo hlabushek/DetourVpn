@@ -65,3 +65,6 @@ node_modules/
 .vscode/
 .DS_Store
 Thumbs.db
+
+# Real beta node inventory holds addresses; only nodes.example.json is committed (ADR-094)
+infra/beta/nodes.json
