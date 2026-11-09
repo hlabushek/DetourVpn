@@ -6,6 +6,7 @@ import android.net.ConnectivityManager;
 import android.net.NetworkCapabilities;
 import android.os.SystemClock;
 import android.os.Handler;
+import android.os.PowerManager;
 import android.os.Looper;
 import io.flutter.FlutterInjector;
 import io.flutter.embedding.engine.FlutterEngine;
@@ -38,6 +39,32 @@ public final class ClientApplication extends Application implements Tunnel {
     private FlutterEngine recoveryEngine;
     long deadline;
     String reason = "";
+    // Window renewals are driven from Dart timers. Without this the CPU may sleep with the screen
+    // off and a 90 s window then expires. The lock has a timeout and is refreshed on each renewal,
+    // so a dead process can never leak it.
+    private PowerManager.WakeLock cpuLock;
+    private static final long CPU_LOCK_MS = 180_000L;
+
+    private void holdCpu() {
+        try {
+            if (cpuLock == null) {
+                PowerManager manager = (PowerManager) getSystemService(POWER_SERVICE);
+                cpuLock = manager.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "detourvpn:window");
+                cpuLock.setReferenceCounted(false);
+            }
+            cpuLock.acquire(CPU_LOCK_MS);
+        } catch (RuntimeException ignored) {
+            // Best effort: the tunnel still works, only background renewal is less reliable.
+        }
+    }
+
+    private void releaseCpu() {
+        try {
+            if (cpuLock != null && cpuLock.isHeld()) cpuLock.release();
+        } catch (RuntimeException ignored) {
+            // Already released by the timeout.
+        }
+    }
     @Override public void onCreate() {
         super.onCreate();
         GoBackend.setAlwaysOnCallback(new GoBackend.AlwaysOnCallback() {
@@ -173,6 +200,7 @@ public final class ClientApplication extends Application implements Tunnel {
                                 submittedAt + ((Number) call.argument("remainingMs")).longValue(),
                                 SystemClock.elapsedRealtime());
                         deadline = window.deadline;
+                        holdCpu();
                         break;
                     case "connectWindow":
                         Number duration = call.argument("remainingMs");
@@ -194,6 +222,7 @@ public final class ClientApplication extends Application implements Tunnel {
                                 throw new IllegalStateException();
                             }
                             reason = "";
+                            holdCpu();
                         } catch (Exception failure) {
                             stop();
                             throw failure;
@@ -276,6 +305,7 @@ public final class ClientApplication extends Application implements Tunnel {
     }
 
     void stop() throws Exception {
+        releaseCpu();
         if (provider != null) provider.disconnect();
         deadline = 0;
         window.clear();

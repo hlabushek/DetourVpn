@@ -52,7 +52,9 @@ class SettingsScreen extends StatelessWidget {
       if (c.hasLease || c.busy) {
         messenger.showSnackBar(
           const SnackBar(
-            content: Text('Не удалось отключить VPN. Отключите его на главном экране.'),
+            content: Text(
+              'Не удалось отключить VPN. Отключите его на главном экране.',
+            ),
           ),
         );
         return;
@@ -103,6 +105,28 @@ class SettingsScreen extends StatelessWidget {
                 : 'Исключённые приложения используют обычную сеть',
             enabled: !c.busy,
             onTap: () => _openSplitApps(context, c),
+          ),
+          const SizedBox(height: 12),
+          NavRow(
+            icon: Icons.battery_saver_outlined,
+            title: 'Работа в фоне',
+            subtitle:
+                'Если VPN отключается при выключенном экране, разрешите DetourVPN работать без ограничений батареи',
+            onTap: () async {
+              try {
+                await _vpnSettings.invokeMethod<void>('openBatterySettings');
+              } on PlatformException {
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text(
+                        'Откройте настройки Android → Приложения → DetourVPN → Батарея',
+                      ),
+                    ),
+                  );
+                }
+              }
+            },
           ),
         ],
         const SizedBox(height: 12),

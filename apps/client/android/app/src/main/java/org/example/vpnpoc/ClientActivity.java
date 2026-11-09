@@ -148,6 +148,15 @@ public final class ClientActivity extends FlutterActivity {
             }
             return;
         }
+        if (call.method.equals("openBatterySettings")) {
+            try {
+                startActivity(new Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS));
+                result.success(null);
+            } catch (RuntimeException ignored) {
+                result.error("battery_settings_unavailable", "Не удалось открыть настройки батареи", null);
+            }
+            return;
+        }
         if (call.method.equals("shareDiagnosticReport")) {
             String code = call.argument("code");
             String stage = call.argument("stage");

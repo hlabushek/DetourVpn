@@ -194,46 +194,48 @@ void main() {
   Widget settingsHost() => MaterialApp(
     home: SettingsScreen(onTheme: () {}, controller: c),
   );
-  testWidgets('apps-outside-VPN row opens the screen directly while VPN is off', (
-    tester,
-  ) async {
-    await tester.pumpWidget(settingsHost());
-    expect(
-      find.text('Исключённые приложения используют обычную сеть'),
-      findsOneWidget,
-    );
-    await tester.tap(find.text('Приложения вне VPN'));
-    await settle(tester);
-    expect(find.byType(SplitAppsScreen), findsOneWidget);
-    expect(find.text('Отключить VPN?'), findsNothing);
-  });
-  testWidgets('apps-outside-VPN row stays tappable while connected and offers to disconnect', (
-    tester,
-  ) async {
-    await tester.runAsync(() => c.connect());
-    await tester.pumpWidget(settingsHost());
-    expect(c.hasLease, isTrue);
-    expect(
-      find.text('VPN включён: для изменения его нужно отключить'),
-      findsOneWidget,
-    );
-    await tester.tap(find.text('Приложения вне VPN'));
-    await settle(tester);
-    expect(find.text('Отключить VPN?'), findsOneWidget);
-    // Cancel keeps the tunnel up and does not open the screen.
-    await tester.tap(find.text('Отмена'));
-    await settle(tester);
-    expect(native.up, isTrue);
-    expect(find.byType(SplitAppsScreen), findsNothing);
-    // Confirm disconnects first, then opens the screen.
-    await tester.tap(find.text('Приложения вне VPN'));
-    await settle(tester);
-    await tester.tap(find.text('Отключить и открыть'));
-    await settle(tester);
-    expect(native.up, isFalse);
-    expect(c.hasLease, isFalse);
-    expect(find.byType(SplitAppsScreen), findsOneWidget);
-  });
+  testWidgets(
+    'apps-outside-VPN row opens the screen directly while VPN is off',
+    (tester) async {
+      await tester.pumpWidget(settingsHost());
+      expect(
+        find.text('Исключённые приложения используют обычную сеть'),
+        findsOneWidget,
+      );
+      await tester.tap(find.text('Приложения вне VPN'));
+      await settle(tester);
+      expect(find.byType(SplitAppsScreen), findsOneWidget);
+      expect(find.text('Отключить VPN?'), findsNothing);
+    },
+  );
+  testWidgets(
+    'apps-outside-VPN row stays tappable while connected and offers to disconnect',
+    (tester) async {
+      await tester.runAsync(() => c.connect());
+      await tester.pumpWidget(settingsHost());
+      expect(c.hasLease, isTrue);
+      expect(
+        find.text('VPN включён: для изменения его нужно отключить'),
+        findsOneWidget,
+      );
+      await tester.tap(find.text('Приложения вне VPN'));
+      await settle(tester);
+      expect(find.text('Отключить VPN?'), findsOneWidget);
+      // Cancel keeps the tunnel up and does not open the screen.
+      await tester.tap(find.text('Отмена'));
+      await settle(tester);
+      expect(native.up, isTrue);
+      expect(find.byType(SplitAppsScreen), findsNothing);
+      // Confirm disconnects first, then opens the screen.
+      await tester.tap(find.text('Приложения вне VPN'));
+      await settle(tester);
+      await tester.tap(find.text('Отключить и открыть'));
+      await settle(tester);
+      expect(native.up, isFalse);
+      expect(c.hasLease, isFalse);
+      expect(find.byType(SplitAppsScreen), findsOneWidget);
+    },
+  );
   test('production window budget remains 1 MiB by default', () {
     expect(WindowConnectionController.budgetBytes, 1048576);
   });
