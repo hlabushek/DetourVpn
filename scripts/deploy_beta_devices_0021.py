@@ -147,6 +147,7 @@ with os.fdopen(fd, 'w', encoding='utf-8') as stream:
     stream.write('VPN_DATABASE_URL=' + url + '\n')
 PY
 changed=1
+replaced=0
 phase=replace_and_migrate
 systemctl stop detourvpn-beta-api.service
 while read -r want name; do
@@ -159,9 +160,14 @@ while read -r want name; do
     install -o root -g detourvpn-beta -m 0640 "$stage/$name" "$new"
   fi
   mv -f -- "$new" "$root/$rel"
+  replaced=$((replaced + 1))
 done <<'LIST'
 __UPLOADED__
 LIST
+echo files_replaced="$replaced"
+echo models_sha_after_loop="$(sha256sum "$root/services/api/src/vpn_api/db/models.py" | cut -c1-16)"
+echo versions_after_loop="$(ls "$root/services/api/migrations/versions" | grep '^002' | tr '
+' ' ')"
 cat > "$stage/diag.py" <<'PY'
 import sys
 sys.path.insert(0, '/opt/detourvpn-beta/services/api/src')
@@ -173,6 +179,9 @@ from vpn_api.db.connection import create_database_engine
 import vpn_api.db.models as m
 cfg = Config('/opt/detourvpn-beta/alembic.ini')
 print('script_head', ScriptDirectory.from_config(cfg).get_current_head())
+import hashlib, os
+print('unit_models_sha', hashlib.sha256(open('/opt/detourvpn-beta/services/api/src/vpn_api/db/models.py','rb').read()).hexdigest()[:16])
+print('unit_versions', sorted(x for x in os.listdir('/opt/detourvpn-beta/services/api/migrations/versions') if x.startswith('002')))
 print('models_file', m.__file__, 'device_has_role', hasattr(m.Device, 'role'))
 e = create_database_engine(Settings(_env_file=None))
 with e.connect() as c:
@@ -273,7 +282,7 @@ def main() -> int:
     wanted = {
         "rollout", "rollback_phase", "readiness", "database_revision", "database_backup_bytes",
         "database_backup_sha256", "redeem_probe_http", "schema_revision_after_rollback",
-        "migrate_unit_failed", "migrate_out", "revision_after_migrate", "diag", "diag_failed", "versions_002x_count",
+        "migrate_unit_failed", "migrate_out", "revision_after_migrate", "diag", "diag_failed", "versions_002x_count", "files_replaced", "models_sha_after_loop", "versions_after_loop",
     }
     print("\n".join(x for x in result.stdout.splitlines() if x.split("=")[0] in wanted))
     print(f"exit_code={result.returncode}")
