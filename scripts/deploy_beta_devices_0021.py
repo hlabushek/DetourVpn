@@ -162,7 +162,10 @@ while read -r want name; do
 done <<'LIST'
 __UPLOADED__
 LIST
-systemd-run --quiet --wait --pipe --collect --unit="detourvpn-dev0021-migrate-$rid" --property=WorkingDirectory="$root" --property="EnvironmentFile=/run/detourvpn-dev0021-migrate-$rid.env" "$root/.venv/bin/python" scripts/closed_migrate.py >/dev/null
+systemd-run --quiet --wait --pipe --collect --unit="detourvpn-dev0021-migrate-$rid" --property=WorkingDirectory="$root" --property="EnvironmentFile=/run/detourvpn-dev0021-migrate-$rid.env" "$root/.venv/bin/python" scripts/closed_migrate.py >"$backup/migrate.out" 2>&1 || echo migrate_unit_failed=1
+echo migrate_out="$(tr '
+' ' ' < "$backup/migrate.out" | cut -c1-600)"
+echo revision_after_migrate="$(q || echo query_failed)"
 test "$(q)" = 0021_device_link_codes
 rm -f -- /run/detourvpn-dev0021-migrate-"$rid".env
 phase=api_startup
@@ -240,6 +243,7 @@ def main() -> int:
     wanted = {
         "rollout", "rollback_phase", "readiness", "database_revision", "database_backup_bytes",
         "database_backup_sha256", "redeem_probe_http", "schema_revision_after_rollback",
+        "migrate_unit_failed", "migrate_out", "revision_after_migrate",
     }
     print("\n".join(x for x in result.stdout.splitlines() if x.split("=")[0] in wanted))
     print(f"exit_code={result.returncode}")
