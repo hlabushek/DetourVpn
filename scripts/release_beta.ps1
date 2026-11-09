@@ -6,7 +6,11 @@ param(
     [switch]$NoApk,
     # After a successful build, install over the connected phone with adb (keeps app data).
     [switch]$Install,
-    [string]$ApiOrigin = 'https://193.68.88.239'
+    [string]$ApiOrigin = 'https://193.68.88.239',
+    # Each APK build leaves a ~1.6 GB source snapshot behind. Keep this many newest, delete older.
+    [int]$KeepBuilds = 3,
+    # Only report what the cleanup would delete.
+    [switch]$PruneDryRun
 )
 # One command for a beta release:
 #   1. checks (Mini App tests + build, admin tests, admin contract tests)
@@ -23,10 +27,27 @@ function Run([string]$Name, [scriptblock]$Block) {
     if ($LASTEXITCODE -ne 0) { throw "FAILED: $Name (exit code $LASTEXITCODE)" }
 }
 
+function Prune-Builds {
+    # Only the build script's own snapshot folders (32 hex characters) under ProjectVpn\i013-builds.
+    $dir = Join-Path $env:LOCALAPPDATA 'ProjectVpn\i013-builds'
+    if (-not (Test-Path -LiteralPath $dir)) { return }
+    $old = @(Get-ChildItem -LiteralPath $dir -Directory | Where-Object { $_.Name -match '^[0-9a-f]{32}$' } |
+        Sort-Object LastWriteTime -Descending | Select-Object -Skip $KeepBuilds)
+    Write-Host "old_build_snapshots=$($old.Count); keeping_newest=$KeepBuilds"
+    if ($PruneDryRun) { Write-Host 'prune=dry_run (nothing deleted)'; return }
+    foreach ($item in $old) {
+        # Never follow links: remove a reparse point itself, not its target.
+        if ($item.Attributes -band [IO.FileAttributes]::ReparsePoint) { continue }
+        Remove-Item -LiteralPath $item.FullName -Recurse -Force -ErrorAction SilentlyContinue
+    }
+    Write-Host 'prune=done'
+}
+
 Step 'Preflight'
 $branch = (git rev-parse --abbrev-ref HEAD).Trim()
 $dirty = @(git status --porcelain | Where-Object { $_ -notmatch '^\?\? \.claude/' })
 if ($dirty.Count -gt 0) { throw 'There are uncommitted changes; commit or stash them first so the build matches git.' }
+Prune-Builds
 $free = [math]::Round((Get-PSDrive -Name ($root.Substring(0, 1))).Free / 1GB, 1)
 Write-Host "branch=$branch; free_disk_gb=$free"
 if ($free -lt 4) { throw 'Less than 4 GB free on the disk: free some space first (the build needs it).' }
@@ -69,5 +90,6 @@ if (-not $NoApk) {
     }
 }
 
+Prune-Builds
 Step 'Done'
 Write-Host 'All requested steps finished. Commit the new receipt in docs/evidence if you want it recorded.'
