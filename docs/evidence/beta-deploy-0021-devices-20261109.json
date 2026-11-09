@@ -1,0 +1,21 @@
+{
+  "date": "2026-11-09",
+  "target": "isolated_beta_control_plane",
+  "change": "migrations 0020_vpn_node_country, 0021_device_link_codes and matching API code (ADR-092, ADR-093)",
+  "revision_before": "0019_account_deletion",
+  "revision_after": "0021_device_link_codes",
+  "server_db_dump_before_created_and_validated": true,
+  "owner_pc_backup_before": true,
+  "files_replaced": 17,
+  "api_ready_http": 200,
+  "unauthenticated_nodes_http": 401,
+  "invalid_link_code_probe_http": 404,
+  "external_ready_path_closed_http": 404,
+  "backup_after_on_0021": true,
+  "restore_drill_after": "pass",
+  "api_errors_in_journal_10min": 0,
+  "rows_after": {"users": 3, "devices_owner": 7, "devices_guest": 0, "link_codes": 0, "nodes_with_country": 0},
+  "failed_attempts_before_success": 3,
+  "root_cause_of_failed_attempts": "deploy map written with CRLF; files were created beside originals with a trailing CR in the name; fixed in scripts/deploy_beta_devices_0021.py and the 17 artifacts removed",
+  "not_done": ["mini-app release", "APK build and signing", "physical checks of device-code sign-in", "country set on nodes"]
+}
