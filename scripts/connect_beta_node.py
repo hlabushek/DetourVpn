@@ -294,7 +294,7 @@ def restore():
 reload = subprocess.run(["/usr/bin/systemctl", "reload", "caddy"], capture_output=True, check=False)
 ok = reload.returncode == 0 and subprocess.run(["/usr/bin/systemctl", "is-active", "--quiet", "caddy"], check=False).returncode == 0
 if ok:
-    probe = subprocess.run(["/usr/bin/curl", "-ks", "-o", "/dev/null", "-w", "%{http_code}", "--resolve", "193.68.88.239:443:127.0.0.1", "https://193.68.88.239/mini-app/"], capture_output=True, check=False)
+    probe = subprocess.run(["/usr/bin/curl", "-ks", "-m", "8", "-o", "/dev/null", "-w", "%{http_code}", "https://193.68.88.239/mini-app/"], capture_output=True, check=False)
     ok = probe.stdout.strip() == b"200"
 if not ok:
     restore(); raise SystemExit(42)
