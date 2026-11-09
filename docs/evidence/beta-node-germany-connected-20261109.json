@@ -1,0 +1,11 @@
+{
+  "agent_seen": "1",
+  "caddy_ips": "2",
+  "command": "status",
+  "credential": "absent",
+  "in_manifest": "1",
+  "manifest_nodes": "2",
+  "mode": "dry_run",
+  "node": "detourvpn-beta-germany",
+  "row": "active"
+}

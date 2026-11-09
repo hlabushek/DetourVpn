@@ -60,3 +60,4 @@ uv run --frozen python -m scripts.connect_beta_node activate --node detourvpn-be
   запуске bootstrap (`slot_core_identity_conflict`, systemd 249), откат чистый. Нужна переустановка
   с Ubuntu 24.04. Старый receipt предпроверки (22.04 `ready`) устарел, актуальный:
   `docs/evidence/beta-node-germany-preflight-20261109-corrected.json`.
+- 2026-11-09 (позже): VPS переустановлен на Ubuntu 24.04; предпроверка `ready`, установка, регистрация, привязка (Caddy и манифест, 2 узла) и включение прошли; агент активен и опрашивает API, автозапуск включён. Первая привязка откатилась из-за неверной пробы Caddy (исправлено). Приёмка с телефона не выполнена.
