@@ -1,0 +1,17 @@
+{
+  "date": "2026-11-09",
+  "target": "isolated_beta_control_plane",
+  "change": "Mini App release 4a5633c8bca15c2c9580aee0b9813a5f (device management, link codes, flags, Soft Orbit)",
+  "previous_release_kept_on_disk": true,
+  "api_env_backup_created": true,
+  "api_ready_http": 200,
+  "external_mini_app_http": 200,
+  "external_asset_http": 200,
+  "external_ready_path_closed_http": 404,
+  "served_js_hash_matches_build": true,
+  "api_errors_in_journal_10min": 0,
+  "api_env_mode_owner": "600 root:root",
+  "not_done": [
+    "physical Telegram client check of the new Mini App"
+  ]
+}
