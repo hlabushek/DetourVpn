@@ -33,8 +33,8 @@ nothing.
 ## Consequences and limits
 
 - Telegram identifier is removed from the application database. Previously taken encrypted
-  backups still contain it until they expire under the backup retention (documented in the
-  runbook; retention itself is an open owner decision).
+  backups still contain it until they expire under the backup retention: 7 days (owner decision
+  2026-11-08, ADR-090). Until the owner prunes the PC folder by hand, copies there can be older.
 - Device public keys stay on revoked `devices` rows (unique constraint, not personal data by
   themselves, but linkable to the tombstone). Not purged.
 - If invite enforcement is off (`VPN_BETA_INVITES_ONLY=false`), a returning Telegram user

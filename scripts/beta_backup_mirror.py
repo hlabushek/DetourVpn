@@ -19,7 +19,7 @@ from pathlib import Path
 MAX_BYTES = 64 * 1024 * 1024
 FERNET_PREFIX = b"gAAAAA"
 NAME = re.compile(r"^beta-(\d{8}T\d{6}Z)-([0-9a-f]{16})\.enc$")
-DEFAULT_KEEP = 14
+DEFAULT_KEEP = 7
 STALE_AFTER = timedelta(hours=48)
 HOST = re.compile(r"^[0-9A-Za-z.:-]{3,64}$")
 

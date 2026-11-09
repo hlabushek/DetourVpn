@@ -61,17 +61,16 @@ Why: only an explicit task start and an import were seen; the 07:00 trigger and 
 
 1. A private channel and the support contact `@DetourVpnHelper` were chosen on 2026-11-02 (see
    `docs/evidence/i-030-owner-ops-confirmation-20261102.json`); confirm they are still right and that
-   the diagnostic share flow targets them. Decide the
-   retention for support messages and for old encrypted backups (needed by ADR-091: deleted
-   accounts stay in older backups until they expire). Write the chosen retention into
-   ADR-090.
+   the diagnostic share flow targets them. Retention for support
+   messages and old encrypted backups is decided: 7 days (ADR-090, ADR-091). Apply it with
+   section 7 below.
 2. Read `beta-tester-quickstart.md` once as if you were the tester and mark any step that
    needs knowledge only you have.
 3. Confirm `beta-tester-support.md` matches what you will actually answer.
 
 ## 5. First tester (I-026 friend onboarding)
 
-Run only after gates 1-4 pass, with ADR-090's quota (512 MiB) configured in the beta
+Run only after gates 1-4 pass, with ADR-090's quota (5 GiB, `VPN_INITIAL_QUOTA_BYTES=5368709120`) configured in the beta
 environment. Follow `closed-beta-first-tester.md` exactly, starting from
 `docs/evidence/i-026-first-tester-run.template.json`. Start with one trusted tester, then the
 2-3 person pilot. Stop on any ADR-090 stop criterion.
@@ -89,9 +88,38 @@ does not authorize. After the owner has deployed them with a normal backup befor
    (read-only DB query by the owner).
 3. Record booleans only.
 
+## 7. Retention 7 days: manual steps (nothing here was run by Claude)
+
+Decision 2026-11-08 (ADR-090): backups, support messages and node/API logs with client
+addresses are kept at most 7 days. The repository now sets the node mirror to 7 copies, but
+the running node still uses the old unit until you redeploy it. Do each step yourself; take a
+read-only baseline first and never delete broad paths.
+
+1. **Node mirror (14 -> 7 copies).** Redeploy via `scripts/install_beta_backup_mirror.ps1`
+   (it installs `--keep 7`), or edit the installed unit's `--keep 14` to `--keep 7` and run
+   `systemctl daemon-reload`. The next successful pull prunes down to 7. Check with
+   `ls /var/lib/detourvpn-backup-mirror/archives | wc -l` (expect 7 or fewer).
+2. **Owner PC folder** `%LOCALAPPDATA%\DetourVpn\beta-backup`: no automatic deletion exists.
+   About once a week, after confirming the newest archive passes the restore drill (section 3),
+   delete archives older than 7 days by hand. Never delete the newest working one.
+3. **API host** keeps only `latest.enc` (overwritten daily); nothing to prune.
+4. **Journald on the beta node and the API host.** Not configured in the repository, so
+   whatever the distribution default is applies (often months, size-bound only). Check:
+   `journalctl --disk-usage` and `journalctl --list-boots | head -1` for the oldest entry.
+   Set a drop-in `/etc/systemd/journald.conf.d/detourvpn-retention.conf` with
+   `[Journal]` and `MaxRetentionSec=7day`, then `systemctl restart systemd-journald`
+   (rotation by age happens on the next rotation, vacuum is a separate manual step and is not
+   needed to satisfy the rule going forward). Do the same on both hosts. Caddy and the API
+   are configured not to write access logs; confirm no other service on the host writes
+   client addresses to files (`/var/log`).
+5. **Support messages** in the private Telegram channel: delete messages older than 7 days
+   by hand or set the chat auto-delete timer to 1 week.
+6. Record booleans only: `mirror_keep_7`, `pc_folder_pruned`, `journald_max_7d_node`,
+   `journald_max_7d_api`, `support_autodelete_7d`.
+
 ## Stop
 
 If any step fails, record the fixed failure stage and stop; do not retry by changing the
-procedure. Open items that are not on this list: VPS plan and traffic limit (budget rule in
-ADR-090), phase-6 measurements (usage lag, battery/memory, free-traffic cost), and the
+procedure. Open items that are not on this list: record the actual VPS plan and traffic limit (the owner's
+"no limit" assumption in ADR-090 is unverified), phase-6 measurements (usage lag, battery/memory, free-traffic cost), and the
 independent egress check in `docs/beta-lte-first-connection-analysis-20261108.md`.

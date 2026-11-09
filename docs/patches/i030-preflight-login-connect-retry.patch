@@ -1,0 +1,86 @@
+diff --git a/scripts/i030_beta_owner_preflight.py b/scripts/i030_beta_owner_preflight.py
+index df1b8ba..4540f00 100644
+--- a/scripts/i030_beta_owner_preflight.py
++++ b/scripts/i030_beta_owner_preflight.py
+@@ -7,12 +7,15 @@ import hashlib
+ import json
+ import os
+ import re
++import ssl
+ import subprocess
+ import time
+ import sys
+ from datetime import UTC, datetime
+ from pathlib import Path
++from http.client import HTTPException, HTTPSConnection
+ from urllib.error import HTTPError, URLError
++from urllib.parse import urlsplit
+ from urllib.request import Request, urlopen
+ 
+ ROOT = Path(__file__).resolve().parents[1]
+@@ -26,6 +29,7 @@ SUPPORTED_APP_VERSIONS = {
+ BETA_SIGNER_SHA256 = "6b99a02bee6dc8dba659af64fcd025782fc3011a41099168e3f3a766b84ef3b8"
+ # ADR-084: beta.22 requests 16 MiB windows; a renewal pins a second hold while the first is open.
+ MIN_WINDOW_BYTES = 16_777_216
++CONNECT_ATTEMPTS = 5
+ 
+ 
+ def expected_apk_receipt(
+@@ -137,6 +141,43 @@ def device_preflight() -> dict[str, object]:
+     }
+ 
+ 
++def _post_once_connected(path: str, headers: dict[str, str], data: bytes | None) -> object:
++    """POST with retries only while the TCP/TLS connection is being established.
++
++    A reset during connect() means no request byte reached the server, so repeating is
++    safe and cannot burn a TOTP code. Once the request is sent, nothing is retried.
++    """
++    parts = urlsplit(ORIGIN)
++    for attempt in range(CONNECT_ATTEMPTS):
++        conn = HTTPSConnection(
++            parts.hostname or "", parts.port or 443, timeout=20,
++            context=ssl.create_default_context(),
++        )
++        try:
++            try:
++                conn.connect()
++            except (OSError, ssl.SSLError):
++                if attempt + 1 == CONNECT_ATTEMPTS:
++                    raise RuntimeError("beta_api_unavailable") from None
++                time.sleep(4 * (attempt + 1))
++                continue
++            try:
++                conn.request("POST", path, body=data, headers=headers)
++                response = conn.getresponse()
++                payload = response.read()
++            except (OSError, HTTPException):
++                raise RuntimeError("beta_api_unavailable_after_send") from None
++            if response.status >= 400:
++                raise RuntimeError(f"beta_api_http_{response.status}")
++            try:
++                return json.loads(payload)
++            except ValueError:
++                raise RuntimeError("beta_api_unavailable_after_send") from None
++        finally:
++            conn.close()
++    raise RuntimeError("beta_api_unavailable")
++
++
+ def call(method: str, path: str, body: dict[str, str] | None = None,
+          token: str | None = None) -> object:
+     headers = {"Accept": "application/json"}
+@@ -146,8 +187,11 @@ def call(method: str, path: str, body: dict[str, str] | None = None,
+         data = json.dumps(body, separators=(",", ":")).encode()
+     if token:
+         headers["Authorization"] = f"Bearer {token}"
+-    # The beta host resets bursts of new connections. Only idempotent reads are retried;
+-    # a login or any other write is attempted once.
++    if method == "POST":
++        # The beta host resets bursts of new connections. A write is retried only before the
++        # request is sent (connect phase); after that it is attempted exactly once.
++        return _post_once_connected(path, headers, data)
++    # Idempotent reads are retried on any transient failure.
+     attempts = 4 if method == "GET" else 1
+     for attempt in range(attempts):
+         try:

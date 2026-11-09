@@ -41,7 +41,7 @@ def make_dir(tmp_path: Path) -> Path:
 
 def test_stores_new_archive_with_private_mode(tmp_path: Path) -> None:
     directory = make_dir(tmp_path)
-    result = mirror.run(directory, fake_command(tmp_path, blob()), 14, 1, 0, 30, T0)
+    result = mirror.run(directory, fake_command(tmp_path, blob()), 7, 1, 0, 30, T0)
     assert result["status"] == "stored" and result["kept"] == 1
     (path,) = list(directory.iterdir())
     assert mirror.NAME.match(path.name)
@@ -53,11 +53,11 @@ def test_stores_new_archive_with_private_mode(tmp_path: Path) -> None:
 def test_identical_archive_is_not_duplicated_and_goes_stale(tmp_path: Path) -> None:
     directory = make_dir(tmp_path)
     command = fake_command(tmp_path, blob())
-    mirror.run(directory, command, 14, 1, 0, 30, T0)
-    again = mirror.run(directory, command, 14, 1, 0, 30, T0 + timedelta(hours=24))
+    mirror.run(directory, command, 7, 1, 0, 30, T0)
+    again = mirror.run(directory, command, 7, 1, 0, 30, T0 + timedelta(hours=24))
     assert again["status"] == "unchanged" and len(list(directory.iterdir())) == 1
     with pytest.raises(mirror.MirrorError, match="source_stale"):
-        mirror.run(directory, command, 14, 1, 0, 30, T0 + timedelta(hours=49))
+        mirror.run(directory, command, 7, 1, 0, 30, T0 + timedelta(hours=49))
 
 
 def test_retention_keeps_only_newest(tmp_path: Path) -> None:
@@ -73,11 +73,11 @@ def test_retention_keeps_only_newest(tmp_path: Path) -> None:
 def test_rejects_plaintext_empty_and_failed_fetch(tmp_path: Path) -> None:
     directory = make_dir(tmp_path)
     with pytest.raises(mirror.MirrorError, match="not_encrypted_archive"):
-        mirror.run(directory, fake_command(tmp_path, b"PGDMP plain"), 14, 1, 0, 30, T0)
+        mirror.run(directory, fake_command(tmp_path, b"PGDMP plain"), 7, 1, 0, 30, T0)
     with pytest.raises(mirror.MirrorError, match="size_invalid"):
-        mirror.run(directory, fake_command(tmp_path, b""), 14, 1, 0, 30, T0)
+        mirror.run(directory, fake_command(tmp_path, b""), 7, 1, 0, 30, T0)
     with pytest.raises(mirror.MirrorError, match="fetch_failed"):
-        mirror.run(directory, fake_command(tmp_path, blob(), status=1), 14, 2, 0, 30, T0)
+        mirror.run(directory, fake_command(tmp_path, blob(), status=1), 7, 2, 0, 30, T0)
     assert list(directory.iterdir()) == []
 
 
@@ -87,7 +87,7 @@ def test_oversize_is_rejected_without_storing(
     directory = make_dir(tmp_path)
     monkeypatch.setattr(mirror, "MAX_BYTES", 100)
     with pytest.raises(mirror.MirrorError, match="size_invalid"):
-        mirror.run(directory, fake_command(tmp_path, blob("z") * 5), 14, 1, 0, 30, T0)
+        mirror.run(directory, fake_command(tmp_path, blob("z") * 5), 7, 1, 0, 30, T0)
     assert list(directory.iterdir()) == []
 
 
@@ -97,7 +97,7 @@ def test_unsafe_destination_is_refused(tmp_path: Path) -> None:
     directory.mkdir(mode=0o755)
     directory.chmod(0o755)
     with pytest.raises(mirror.MirrorError, match="destination_unsafe"):
-        mirror.run(directory, fake_command(tmp_path, blob()), 14, 1, 0, 30, T0)
+        mirror.run(directory, fake_command(tmp_path, blob()), 7, 1, 0, 30, T0)
 
 
 def test_ssh_command_pins_host_key_and_rejects_bad_host(tmp_path: Path) -> None:

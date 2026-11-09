@@ -71,6 +71,7 @@ def test_beta_ingress_hides_internal_routes_and_bootstrap_does_not_proxy() -> No
     for path in (
         "/api/v1/auth/*",
         "/api/v1/me",
+        "/api/v1/me/delete",
         "/api/v1/devices",
         "/api/v1/nodes",
         "/api/v1/quota",

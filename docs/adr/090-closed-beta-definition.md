@@ -1,7 +1,8 @@
 # ADR-090 — definition of the closed beta
 
-Status: proposed 2026-11-08; quota, duration and rewards values agreed by the owner in chat
-2026-11-08 ("for now"). The budget figure is still open. Not yet accepted as a whole.
+Status: proposed 2026-11-08; quota, duration, rewards, retention and legal-review values decided
+by the owner in chat 2026-11-08. The VPS plan and traffic limit are an unverified owner assumption
+(see Quota and cost). Not yet accepted as a whole.
 Documentation only; no code, no production action, no external side effect.
 
 ## Context
@@ -9,9 +10,9 @@ Documentation only; no code, no production action, no external side effect.
 Beta.22 has repeatable owner evidence on one Pixel 8 Pro, one carrier and one home network
 (ADR-088/089, `../prepared/I-030-append-20261108.md`). That is not launch-ready evidence.
 The repository has no definition of what "closed beta" means, so launch criteria were implicit.
-This ADR fixes scope, promises, stop criteria and go/no-go. Values marked **OWNER** are not
-decided here; they need the owner's explicit choice and must not be filled in by assumption.
-Only the VPS budget remains marked this way.
+This ADR fixes scope, promises, stop criteria and go/no-go. Values marked **OWNER** need the owner's
+explicit choice and must not be filled in by assumption. No value is open any more, but the VPS
+traffic assumption below is unverified.
 
 ## Decision
 
@@ -42,15 +43,29 @@ measured consumption is within budget.
 - Any compatibility outside the matrix.
 
 ### Quota and cost
-- Per-tester starting quota: 512 MiB (`VPN_INITIAL_QUOTA_BYTES=536870912`), the same for the
-  pilot. Chosen as a working scale: the owner test account was granted about 550 MB and a
-  100–200 s session consumed 6–7 MB. Real tester consumption is not yet measured.
-  The code default stays 0; the value is set only in the beta environment config.
-- Ceiling for the whole beta: 20 x 512 MiB = 10 GiB granted.
-- Budget rule: total granted quota must not exceed 50% of the beta node's included monthly
-  traffic. **OWNER, open:** the VPS plan and its traffic limit are not recorded. If the limit is
-  below 20 GiB per month, the per-tester quota drops to 256 MiB. Record the figures in the
-  evidence file before launch.
+- Per-tester starting quota: 5 GiB (`VPN_INITIAL_QUOTA_BYTES=5368709120`), the same for the
+  pilot (owner decision 2026-11-08, replacing the earlier 512 MiB). Real tester consumption is not
+  yet measured: the owner test account was granted about 550 MB and a 100-200 s session consumed
+  6-7 MB. The code default stays 0; the value is set only in the beta environment config.
+- Ceiling for the whole beta: 20 x 5 GiB = 100 GiB granted.
+- Budget rule (owner decision 2026-11-08): the VPS is assumed to have no meaningful traffic limit,
+  so there is no numeric granted-quota cap relative to included traffic. **This is an owner
+  assumption, not verified.** The actual plan and its traffic limit (or absence of one) must still
+  be recorded in `docs/evidence/` before launch; no figure is invented here. If the recorded plan
+  turns out to have a limit, the budget stop criterion below applies and the quota must be reviewed.
+
+### Data retention (owner decision 2026-11-08)
+- Encrypted backups (node mirror, API host, owner PC) and tester support messages: 7 days.
+  Repository side: the node mirror keeps 7 copies (`--keep 7`, one archive a day). The API host
+  holds only the latest archive (`latest.enc`, overwritten). The owner PC folder has no automatic
+  deletion; the owner deletes archives older than 7 days by hand
+  (`docs/runbooks/beta-owner-manual-gates.md`, section 7).
+- Node and API host logs that may contain a client address: at most 7 days. The repository does not
+  configure journald; the owner sets it manually (same runbook section). The API is started with
+  `--no-access-log`, and the beta database container does not log statements.
+- Legal review: the owner decided it is not required for the closed beta. ROADMAP section 9 puts
+  the data-handling policy under legal review, so this is a **conscious residual risk**, not a
+  completed check. The scope stays 5-20 acquaintances; any expansion needs a new decision.
 
 ### Stop criteria (any one pauses the beta and issues a revoke of new leases)
 1. A secret, private key, token or user traffic data appears in a log, report or screenshot.
@@ -59,7 +74,7 @@ measured consumption is within budget.
 3. Quota ledger and reconciliation disagree.
 4. A node fails and does not recover through the documented runbook.
 5. A tester reports a privacy complaint or an unconsented data collection.
-6. Spend reaches the budget limit.
+6. Spend reaches the budget limit (applies once the plan and its limit or absence of one are recorded).
 
 ### Go / no-go before the first tester
 All must be true and recorded in `docs/evidence/`. The list is taken from the open gaps in

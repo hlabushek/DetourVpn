@@ -32,7 +32,7 @@
   URL, payloads, SQL/exception text или credentials. Внешняя доставка не включена.
   Для staging нужен scheduler каждые 30s и независимый supervisor его работы;
   это только проектная цель detection <2min, не измеренный SLO.
-- Local retention: до 7 дней для encrypted backups и sanitized operator reports,
+- Local retention (в beta подтверждено владельцем 2026-11-08, ADR-090): до 7 дней для encrypted backups и sanitized operator reports,
   drill DB живёт только во время команды. Удаление старых файлов — вручную
   после проверки свежего backup/drill, без автоматического удаления последней
   копии. Production collection запрещена до общей retention/privacy политики.

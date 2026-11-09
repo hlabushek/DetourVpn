@@ -1,0 +1,29 @@
+{
+  "issue": "I-030",
+  "observed_on": "2026-11-08",
+  "scope": "ADR-091 account deletion on the isolated beta, second tester account, Pixel 8 Pro, APK 0.1.0-beta.23 (code 24)",
+  "deployed": {"migration": "0019_account_deletion", "revision_after": "0019_account_deletion", "backup_before_validated": true, "restore_drill_after_on_0019": "pass", "api_ready_http": 200},
+  "found_and_fixed_during_test": [
+    "Caddy ingress allowlist did not include /api/v1/me/delete (client showed a network error); path added in repo and live config, unauthenticated probe now 401"
+  ],
+  "result": {
+    "app_returned_to_login": true,
+    "user_status": "deleted",
+    "deleted_at_set": true,
+    "auth_identity_removed": true,
+    "login_attempts_for_subject_remaining": 0,
+    "devices_active": 0,
+    "sessions_active": 0,
+    "beta_invite_revoked": true,
+    "peer_connections_non_closed_total": 0,
+    "node_slot_peers": 0,
+    "owner_and_other_accounts_untouched": true,
+    "accounting_rows_kept": true
+  },
+  "not_verified": [
+    "re-login of the deleted subject without a new invite returning beta_invite_required (owner to confirm on the phone)",
+    "reserved_bytes read through the admin API (checked through closed connections and holds only)",
+    "second device or Android version"
+  ],
+  "no_identifiers_recorded": true
+}

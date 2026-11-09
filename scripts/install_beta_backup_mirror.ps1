@@ -1,7 +1,7 @@
 [CmdletBinding()]
 param([switch]$Execute)
 # I-030/I-027: second-host copy of the encrypted beta backup (no new accounts, no decryption key).
-#  - node: unprivileged user + hardened daily timer that pulls the archive and keeps 14 copies;
+#  - node: unprivileged user + hardened daily timer that pulls the archive and keeps 7 copies (about 7 days, ADR-090);
 #  - API host: one dedicated SSH key restricted to a single read-only `cat` of the archive,
 #    and the daily archive timer (until now the archive existed only when the PC asked for it).
 # Preflight is read-only. -Execute changes both hosts and rolls the API host back on failure.
@@ -169,7 +169,7 @@ try {
   if ($script:remoteExit -ne 0 -or $r -notcontains 'first_pull=ok') { throw 'First mirror pull failed.' }
   Write-Host 'mirror_install=success'
   foreach ($pair in @(@($nodeIp,$nodeStage),@($apiIp,$apiStage))) { Invoke-Remote $pair[0] "case '$($pair[1])' in /run/detourvpn-mirror-*) rm -rf -- '$($pair[1])';; esac" | Out-Null }
-  $receipt = [ordered]@{ issue='I-030'; related='I-027'; timestamp_utc=[DateTime]::UtcNow.ToString('o'); target='isolated beta API host and beta node'; node_unit='detourvpn-backup-mirror.timer'; api_unit='detourvpn-beta-backup.timer'; retention_copies=14; decryption_key_on_node=$false; ssh_key_restricted_to_single_cat=$true; first_pull='success'; result='success' }
+  $receipt = [ordered]@{ issue='I-030'; related='I-027'; timestamp_utc=[DateTime]::UtcNow.ToString('o'); target='isolated beta API host and beta node'; node_unit='detourvpn-backup-mirror.timer'; api_unit='detourvpn-beta-backup.timer'; retention_copies=7; decryption_key_on_node=$false; ssh_key_restricted_to_single_cat=$true; first_pull='success'; result='success' }
   $path = Join-Path $repo ("docs\evidence\i-027-backup-mirror-install-{0}.json" -f [DateTime]::UtcNow.ToString('yyyyMMddTHHmmssZ'))
   [IO.File]::WriteAllText($path,($receipt | ConvertTo-Json),[Text.UTF8Encoding]::new($false)); Write-Host "sanitized_receipt=$path"
 } catch {
