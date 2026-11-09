@@ -256,7 +256,14 @@ def main() -> int:
         cmd = f"set -eu; test ! -e '{stage}'; install -d -o root -g root -m 0700 '{stage}'"
         subprocess.run(ssh + [cmd], check=True)  # noqa: S603
         for f in t.iterdir():
-            subprocess.run(scp + [str(f), f"root@{HOST}:{stage}/{f.name}"], check=True)  # noqa: S603
+            for attempt in range(1, 5):  # the link to the host drops now and then; staging is idempotent
+                done = subprocess.run(  # noqa: S603
+                    scp + [str(f), f"root@{HOST}:{stage}/{f.name}"], check=False
+                )
+                if done.returncode == 0:
+                    break
+                if attempt == 4:
+                    raise SystemExit(f"upload_failed file={f.name}")
     result = subprocess.run(  # noqa: S603
         ssh + [f"chmod 0700 '{stage}/deploy.sh' && bash '{stage}/deploy.sh' '{run_id}'"],
         capture_output=True,
