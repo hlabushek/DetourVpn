@@ -1,0 +1,67 @@
+{
+  "node": "detourvpn-beta-germany",
+  "verdict": "ready",
+  "checks": [
+    {
+      "check": "ssh_root",
+      "ok": true,
+      "required": true
+    },
+    {
+      "check": "os_supported",
+      "ok": true,
+      "required": true
+    },
+    {
+      "check": "arch_x86_64",
+      "ok": true,
+      "required": true
+    },
+    {
+      "check": "systemd",
+      "ok": true,
+      "required": true
+    },
+    {
+      "check": "systemd_executor",
+      "ok": true,
+      "required": true
+    },
+    {
+      "check": "single_default_route",
+      "ok": true,
+      "required": true
+    },
+    {
+      "check": "public_ipv4_assigned_directly",
+      "ok": true,
+      "required": true
+    },
+    {
+      "check": "ip_forward_enabled",
+      "ok": true,
+      "required": true
+    },
+    {
+      "check": "udp_ports_free",
+      "ok": true,
+      "required": true
+    },
+    {
+      "check": "memory_advisory",
+      "ok": true,
+      "required": false
+    },
+    {
+      "check": "disk_advisory",
+      "ok": true,
+      "required": false
+    },
+    {
+      "check": "cpu_advisory",
+      "ok": true,
+      "required": false
+    }
+  ],
+  "note": "preconditions only; not evidence of handshake, egress or usage attribution"
+}

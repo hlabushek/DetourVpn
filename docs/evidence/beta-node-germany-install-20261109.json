@@ -1,0 +1,21 @@
+{
+  "node": "detourvpn-beta-germany",
+  "mode": "execute",
+  "preflight": "ready",
+  "package_files": 18,
+  "slots": 1,
+  "archive_bytes": 5345280,
+  "steps": [
+    "step=checks",
+    "step=files",
+    "step=uv",
+    "step=python",
+    "step=venv",
+    "step=config",
+    "step=units",
+    "step=bootstrap",
+    "step=done"
+  ],
+  "installed": true,
+  "note": "node agent not started; node not registered; not evidence of handshake"
+}
