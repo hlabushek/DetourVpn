@@ -11,6 +11,7 @@ from datetime import datetime
 from uuid import UUID
 
 from sqlalchemy import func, select
+from sqlalchemy.dialects.postgresql import distinct_on
 from sqlalchemy.orm import Session
 
 from vpn_api.db.models import (
@@ -82,6 +83,6 @@ def last_seen(session: Session, device_ids: Collection[UUID]) -> dict[UUID, Devi
         .join(VPNNode, VPNNode.id == PeerConnection.node_id)
         .where(PeerConnection.device_id.in_(device_ids))
         .order_by(PeerConnection.device_id, PeerConnection.created_at.desc())
-        .distinct(PeerConnection.device_id)
+        .ext(distinct_on(PeerConnection.device_id))
     )
     return {device_id: DeviceLastSeen(at, country) for device_id, at, country in rows}

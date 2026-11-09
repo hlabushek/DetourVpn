@@ -6,6 +6,7 @@ import importlib.util
 import json
 import os
 import secrets
+from collections.abc import Callable
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from types import SimpleNamespace
@@ -273,19 +274,25 @@ def test_retired_remove_replay_closes_gate_on_corrupt_live_deadline(tmp_path: Pa
     assert native.closes == closes + 1
 
 
+# Deadlines are built when the test runs, not at collection: the agent accepts only 1..60 s
+# remaining, so a "+4 minutes" value computed at import time decays into the valid range once a
+# long full run (for example with PostgreSQL tests enabled) reaches this test.
 @pytest.mark.parametrize(
     "change",
     [
-        {"lease_deadline": (datetime.now(UTC) - timedelta(seconds=1)).isoformat()},
-        {"lease_deadline": (datetime.now(UTC) + timedelta(minutes=4)).isoformat()},
-        {"budget_bytes": 1},
+        lambda: {"lease_deadline": (datetime.now(UTC) - timedelta(seconds=1)).isoformat()},
+        lambda: {"lease_deadline": (datetime.now(UTC) + timedelta(hours=1)).isoformat()},
+        lambda: {"budget_bytes": 1},
     ],
+    ids=["expired", "too_far", "budget_too_small"],
 )
-def test_invalid_lease_never_installs_peer(tmp_path: Path, change: dict[str, object]) -> None:
+def test_invalid_lease_never_installs_peer(
+    tmp_path: Path, change: Callable[[], dict[str, object]]
+) -> None:
     native = FakeNative()
     agent = daemon.Agent(native, tmp_path / "journal")
     agent.startup()
-    assert agent.execute(lease() | change)["applied"] is False
+    assert agent.execute(lease() | change())["applied"] is False
     assert native.budgets == 0 and native.current == []
 
 

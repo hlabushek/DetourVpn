@@ -141,7 +141,14 @@ def test_failover_catalog_selection_recovery_and_replay(harness: Harness, tmp_pa
     catalog = h.client.get("/api/v1/nodes", headers=headers(tokens))
     assert catalog.status_code == 200
     assert [r["reason"] for r in catalog.json()["nodes"]] == ["available", "available"]
-    assert set(catalog.json()["nodes"][0]) == {"id", "name", "region", "reason"}
+    assert set(catalog.json()["nodes"][0]) == {
+        "id",
+        "name",
+        "region",
+        "country_code",
+        "city",
+        "reason",
+    }
     t = request_tunnel(h.auth, tokens.access_token, body)
     assert t.node_id == a.node_id
     assert request_tunnel(h.auth, tokens.access_token, body).id == t.id

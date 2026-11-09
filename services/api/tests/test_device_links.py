@@ -4,6 +4,7 @@ No native keys or tunnels are claimed; public keys are synthetic. Run with VPN_T
 """
 
 import base64
+import json
 import secrets
 from concurrent.futures import ThreadPoolExecutor
 from datetime import timedelta
@@ -119,11 +120,18 @@ def test_unknown_expired_and_cancelled_codes_are_indistinguishable(harness: Harn
         ).status_code
         == 204
     )
+
+    def stable(response: object) -> str:
+        # request_id is random per request by design; everything else must be identical.
+        error = dict(response.json()["error"])  # type: ignore[attr-defined]
+        error.pop("request_id")
+        return json.dumps(error, sort_keys=True)
+
     bodies = {
-        redeem(h, str(expired["code"])).text,  # type: ignore[attr-defined]
-        redeem(h, str(cancelled["code"])).text,  # type: ignore[attr-defined]
-        redeem(h, "ZZZZ-ZZZZ").text,  # type: ignore[attr-defined]
-        redeem(h, "not a code").text,  # type: ignore[attr-defined]
+        stable(redeem(h, str(expired["code"]))),
+        stable(redeem(h, str(cancelled["code"]))),
+        stable(redeem(h, "ZZZZ-ZZZZ")),
+        stable(redeem(h, "not a code")),
     }
     assert len(bodies) == 1 and "invalid_link_code" in bodies.pop()
 

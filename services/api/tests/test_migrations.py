@@ -139,6 +139,48 @@ def test_beta_invite_migration_refuses_downgrade_after_invites_exist(engine: Eng
     assert "beta_invites" in inspect(engine).get_table_names()
 
 
+def test_account_deletion_migration_constraints_and_rollback(engine: Engine) -> None:
+    config = upgrade(engine)
+    columns = {column["name"] for column in inspect(engine).get_columns("users")}
+    assert "deleted_at" in columns
+    # The tombstone state and its timestamp must agree in both directions.
+    with pytest.raises(IntegrityError), transaction(engine) as session:
+        session.execute(
+            text("INSERT INTO users (id, status) VALUES (:id, 'deleted')"), {"id": uuid4()}
+        )
+    with pytest.raises(IntegrityError), transaction(engine) as session:
+        session.execute(
+            text("INSERT INTO users (id, status, deleted_at) VALUES (:id, 'active', now())"),
+            {"id": uuid4()},
+        )
+    # A live account does not block the rollback; the old status set is restored.
+    with transaction(engine) as session:
+        session.execute(
+            text("INSERT INTO users (id, status) VALUES (:id, 'active')"), {"id": uuid4()}
+        )
+    command.downgrade(config, "0018_peer_window_resolution")
+    assert "deleted_at" not in {column["name"] for column in inspect(engine).get_columns("users")}
+    with pytest.raises(IntegrityError), transaction(engine) as session:
+        session.execute(
+            text("INSERT INTO users (id, status) VALUES (:id, 'deleted')"), {"id": uuid4()}
+        )
+    command.upgrade(config, "head")
+    # A real tombstone makes the rollback refuse and leaves the revision untouched.
+    with transaction(engine) as session:
+        session.execute(
+            text("INSERT INTO users (id, status, deleted_at) VALUES (:id, 'deleted', now())"),
+            {"id": uuid4()},
+        )
+    with pytest.raises(RuntimeError, match="deleted accounts exist"):
+        command.downgrade(config, "0018_peer_window_resolution")
+    with transaction(engine) as session:
+        assert (
+            session.scalar(text("SELECT version_num FROM alembic_version"))
+            == "0021_device_link_codes"
+        )
+        assert session.scalar(text("SELECT count(*) FROM users WHERE status = 'deleted'")) == 1
+
+
 def test_downgrade_with_data_fails_without_losing_rows_or_revision(engine: Engine) -> None:
     config = upgrade(engine)
     with transaction(engine) as session:

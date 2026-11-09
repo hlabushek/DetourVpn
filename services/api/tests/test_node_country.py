@@ -8,7 +8,7 @@ from alembic import command
 from alembic.config import Config
 from pydantic import ValidationError
 from sqlalchemy import Engine, inspect, text
-from sqlalchemy.exc import IntegrityError
+from sqlalchemy.exc import DataError, IntegrityError
 
 from vpn_api.db.connection import transaction
 from vpn_api.nodes.catalog import NodeView
@@ -64,9 +64,11 @@ def test_node_country_columns_constraint_and_rollback(engine: Engine) -> None:
 
     insert(None)
     insert("DE")
-    for bad in ("de", "DEU"):
+    for bad in ("de", "D1", "1A"):
         with pytest.raises(IntegrityError):
             insert(bad)
+    with pytest.raises(DataError):  # three letters do not even fit VARCHAR(2)
+        insert("DEU")
     command.downgrade(config, "0019_account_deletion")
     columns = {column["name"] for column in inspect(engine).get_columns("vpn_nodes")}
     assert not {"country_code", "city"} & columns
