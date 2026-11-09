@@ -30,3 +30,11 @@ uv run --frozen python -m scripts.check_candidate_node --node detourvpn-beta-<г
 Регистрация (`provision_beta_node.py` с `--name --region --country-code --city`), связывание,
 активация и приёмка handshake/egress/учёта пока идут по ADR-061/062 и требуют этапа 2 для узлов
 кроме Helsinki. Выберите конкретный второй узел и откройте отдельную задачу.
+
+## Журнал
+
+- 2026-11-09: кандидат `detourvpn-beta-germany` (VPS в Германии, Ubuntu 22.04). Ключ
+  `detourvpn-beta-germany` выложен владельцем, `ip_forward` включён владельцем отдельным файлом
+  `/etc/sysctl.d/99-detourvpn-forward.conf`. Предпроверка: `ready`
+  (`docs/evidence/beta-node-germany-preflight-20261109.json`). Узел не зарегистрирован, не
+  активирован и не принимает пользователей.
