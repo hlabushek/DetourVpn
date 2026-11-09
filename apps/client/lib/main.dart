@@ -3,17 +3,23 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import 'api.dart';
-import 'auth_replay_probe.dart';
 import 'connection.dart';
+import 'home_screen.dart';
+import 'login_screen.dart';
 import 'native_tunnel.dart';
 import 'quota_screen.dart';
-import 'connection_screen.dart';
 import 'orbit_theme.dart';
 import 'orbit_widgets.dart';
+import 'profile_screen.dart';
 import 'session_store.dart';
+import 'settings_screen.dart';
+import 'ui/components.dart';
+import 'ui/glass_nav.dart';
+import 'ui/motion.dart';
 import 'window_connection.dart';
 import 'always_on_recovery.dart';
-export 'connection_screen.dart' show ConnectionScreen;
+export 'home_screen.dart' show ConnectionScreen;
+export 'login_screen.dart' show LoginScreen;
 
 @pragma('vm:entry-point')
 Future<void> alwaysOnRecoveryMain() => runAlwaysOnRecovery();
@@ -230,402 +236,135 @@ class _VpnAppState extends State<VpnApp> with WidgetsBindingObserver {
     super.dispose();
   }
 
-  @override
-  Widget build(BuildContext context) => MaterialApp(
-    title: 'DetourVpn · тестовый клиент',
-    debugShowCheckedModeBanner: false,
-    themeMode: theme,
-    theme: orbitTheme(Brightness.light),
-    darkTheme: orbitTheme(Brightness.dark),
-    home: Scaffold(
-      appBar: AppBar(
-        title: const Text.rich(
-          TextSpan(
-            children: [
-              TextSpan(
-                text: 'Detour',
-                style: TextStyle(fontWeight: FontWeight.w700),
-              ),
-              TextSpan(
-                text: 'Vpn',
-                style: TextStyle(color: Color(0xffbc93ed)),
-              ),
-            ],
-          ),
-        ),
-        actions: [
-          IconButton(
-            tooltip: 'Сменить тему',
-            onPressed: () => setState(
-              () => theme = theme == ThemeMode.dark
-                  ? ThemeMode.light
-                  : ThemeMode.dark,
-            ),
-            icon: const Icon(Icons.contrast),
-          ),
-        ],
-      ),
-      bottomNavigationBar: showLogin
-          ? null
-          : NavigationBar(
-              selectedIndex: tab,
-              onDestinationSelected: (value) {
-                setState(() => tab = value);
-                if (value == 1) unawaited(connection!.refreshQuota());
-              },
-              destinations: const [
-                NavigationDestination(
-                  icon: Icon(Icons.home_outlined),
-                  selectedIcon: Icon(Icons.home_rounded),
-                  label: 'VPN',
-                ),
-                NavigationDestination(
-                  icon: Icon(Icons.bar_chart_rounded),
-                  label: 'Трафик',
-                ),
-                NavigationDestination(
-                  icon: Icon(Icons.person_outline),
-                  selectedIcon: Icon(Icons.person),
-                  label: 'Профиль',
-                ),
-              ],
-            ),
-      body: SafeArea(
-        child: Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 520),
-            child: restoring
-                ? const CircularProgressIndicator()
-                : widget.api == null
-                ? const Padding(
-                    padding: EdgeInsets.all(24),
-                    child: Text(
-                      'API не настроен. Соберите приложение с VPN_API_ORIGIN согласно инструкции I-013.',
-                    ),
-                  )
-                : showLogin
-                ? LoginScreen(
-                    api: widget.api!,
-                    native: widget.native,
-                    onSignedIn: signedIn,
-                  )
-                : switch (tab) {
-                    1 => QuotaScreen(
-                      controller: connection!.quota,
-                      embedded: true,
-                    ),
-                    2 => ProfileScreen(
-                      onSignOut: signOut,
-                      onDeleteAccount: deleteAccount,
-                      guest: guest,
-                      onLeaveDevice: leaveAccount,
-                      onTheme: () => setState(
-                        () => theme = theme == ThemeMode.dark
-                            ? ThemeMode.light
-                            : ThemeMode.dark,
-                      ),
-                      controller: connection!,
-                    ),
-                    _ => ConnectionScreen(
-                      controller: connection!,
-                      onSignOut: signOut,
-                    ),
-                  },
-          ),
-        ),
+  void _toggleTheme() => setState(
+    () => theme = theme == ThemeMode.dark ? ThemeMode.light : ThemeMode.dark,
+  );
+
+  void _openSettings(BuildContext context) => Navigator.of(context).push(
+    MaterialPageRoute<void>(
+      builder: (_) => SettingsScreen(
+        onTheme: _toggleTheme,
+        controller: showLogin ? null : connection,
       ),
     ),
   );
-}
 
-class LoginScreen extends StatefulWidget {
-  const LoginScreen({
-    super.key,
-    required this.api,
-    required this.native,
-    required this.onSignedIn,
-  });
-  final Api api;
-  final NativeTunnel native;
-  final VoidCallback onSignedIn;
-  @override
-  State<LoginScreen> createState() => _LoginScreenState();
-}
+  static const _navItems = [
+    GlassNavItem(
+      icon: Icons.home_outlined,
+      selectedIcon: Icons.home_rounded,
+      label: 'VPN',
+    ),
+    GlassNavItem(
+      icon: Icons.bar_chart_rounded,
+      selectedIcon: Icons.insert_chart_rounded,
+      label: 'Трафик',
+    ),
+    GlassNavItem(
+      icon: Icons.person_outline_rounded,
+      selectedIcon: Icons.person_rounded,
+      label: 'Профиль',
+    ),
+  ];
 
-class _LoginScreenState extends State<LoginScreen> {
-  final code = TextEditingController();
-  final linkCode = TextEditingController();
-  bool linkMode = false;
-  Map<String, dynamic>? challenge;
-  bool working = false;
-  bool restoringChallenge = true;
-  String? error;
-
-  @override
-  void initState() {
-    super.initState();
-    unawaited(_restoreChallenge());
+  void _selectTab(int value) {
+    if (value == tab) return;
+    setState(() => tab = value);
+    if (value == 1) unawaited(connection!.refreshQuota());
   }
 
-  Map<String, dynamic>? _validChallenge(Map<String, dynamic>? value) {
-    if (value == null) return null;
-    final requestId = value['request_id'];
-    final verifier = value['verifier'];
-    final botUrl = value['bot_url'];
-    final expiresAt = value['expires_at'];
-    if (requestId is! String ||
-        !RegExp(
-          r'^[0-9a-fA-F]{8}-(?:[0-9a-fA-F]{4}-){3}[0-9a-fA-F]{12}$',
-        ).hasMatch(requestId) ||
-        verifier is! String ||
-        verifier.isEmpty ||
-        verifier.length > 128 ||
-        botUrl is! String ||
-        expiresAt is! String) {
-      return null;
+  Widget _page() {
+    if (restoring) {
+      return const Center(
+        key: ValueKey('restoring'),
+        child: CircularProgressIndicator(),
+      );
     }
-    final uri = Uri.tryParse(botUrl);
-    final expiry = DateTime.tryParse(expiresAt)?.toUtc();
-    if (uri == null ||
-        uri.scheme != 'https' ||
-        uri.host != 't.me' ||
-        uri.userInfo.isNotEmpty ||
-        uri.hasPort ||
-        expiry == null ||
-        !expiry.isAfter(DateTime.now().toUtc())) {
-      return null;
-    }
-    return {
-      'request_id': requestId,
-      'verifier': verifier,
-      'bot_url': botUrl,
-      'expires_at': expiry.toIso8601String(),
-    };
-  }
-
-  Future<void> _restoreChallenge() async {
-    try {
-      final saved = await widget.api.readPendingLogin();
-      final restored = _validChallenge(saved);
-      if (restored != null) {
-        challenge = restored;
-      } else if (saved != null) {
-        await widget.api.writePendingLogin(null);
-        error =
-            'Сохранённая попытка входа больше недействительна. Запросите новый код.';
-      }
-    } catch (_) {
-      error = 'Не удалось восстановить попытку входа. Запросите новый код.';
-    } finally {
-      if (mounted) setState(() => restoringChallenge = false);
-    }
-  }
-
-  Future<void> perform(Future<void> Function() action) async {
-    if (working) return;
-    setState(() {
-      working = true;
-      error = null;
-    });
-    try {
-      await action();
-    } catch (e) {
-      if (mounted)
-        setState(
-          () => error = messageFor(e is ClientError ? e.code : 'login_failed'),
-        );
-    } finally {
-      if (mounted) setState(() => working = false);
-    }
-  }
-
-  @override
-  void dispose() {
-    code.clear();
-    code.dispose();
-    linkCode.clear();
-    linkCode.dispose();
-    challenge = null;
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) => ListView(
-    padding: const EdgeInsets.all(24),
-    children: [
-      const OrbitArtwork(),
-      Text(
-        'Ваш маршрут\nк свободному интернету',
-        style: Theme.of(context).textTheme.headlineMedium,
-      ),
-      const SizedBox(height: 16),
-      const Text(
-        'Войдите через Telegram. Ключ устройства создаётся на телефоне. '
-        'Android запросит разрешение VPN только после нажатия «Подключить». '
-        'Доступ зависит от подписки, квоты и готовности узла.',
-      ),
-      const SizedBox(height: 24),
-      FilledButton(
-        onPressed: working || restoringChallenge
-            ? null
-            : () => perform(() async {
-                final value = await widget.api.call(
-                  'POST',
-                  '/api/v1/auth/start',
-                );
-                final pending = _validChallenge(value);
-                if (pending == null)
-                  throw const ClientError('invalid_response');
-                await widget.api.writePendingLogin(pending);
-                code.clear();
-                if (mounted) setState(() => challenge = pending);
-              }),
+    if (widget.api == null) {
+      return const Padding(
+        key: ValueKey('no-api'),
+        padding: EdgeInsets.all(24),
         child: Text(
-          restoringChallenge
-              ? 'Восстановление входа…'
-              : challenge == null
-              ? 'Войти через Telegram'
-              : 'Получить новый код входа',
+          'API не настроен. Соберите приложение с VPN_API_ORIGIN согласно инструкции I-013.',
         ),
-      ),
-      if (challenge != null) ...[
-        const SizedBox(height: 12),
-        OutlinedButton(
-          onPressed: working
-              ? null
-              : () => perform(
-                  () =>
-                      widget.native.openLogin(challenge!['bot_url'] as String),
+      );
+    }
+    if (showLogin) {
+      return LoginScreen(
+        key: const ValueKey('login'),
+        api: widget.api!,
+        native: widget.native,
+        onSignedIn: signedIn,
+      );
+    }
+    return KeyedSubtree(
+      key: ValueKey('tab-$tab'),
+      child: switch (tab) {
+        1 => QuotaScreen(controller: connection!.quota, embedded: true),
+        2 => ProfileScreen(
+          onSignOut: signOut,
+          onDeleteAccount: deleteAccount,
+          guest: guest,
+          onLeaveDevice: leaveAccount,
+          controller: connection!,
+        ),
+        _ => ConnectionScreen(
+          controller: connection!,
+          onSignOut: signOut,
+          onOpenTraffic: () => _selectTab(1),
+        ),
+      },
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) => MaterialApp(
+    title: 'DetourVpn',
+    debugShowCheckedModeBanner: false,
+    themeMode: theme,
+    themeAnimationDuration: const Duration(milliseconds: 450),
+    themeAnimationCurve: Curves.easeInOut,
+    theme: orbitTheme(Brightness.light),
+    darkTheme: orbitTheme(Brightness.dark),
+    home: Builder(
+      builder: (context) {
+        final nav = !showLogin && !restoring && widget.api != null;
+        return Scaffold(
+          extendBody: true,
+          appBar: AppBar(
+            title: const OrbitLogo(),
+            actions: [
+              IconButton(
+                tooltip: 'Настройки',
+                onPressed: () => _openSettings(context),
+                icon: const Icon(Icons.settings_outlined),
+              ),
+              const SizedBox(width: 4),
+            ],
+          ),
+          bottomNavigationBar: nav
+              ? GlassNavBar(
+                  items: _navItems,
+                  selectedIndex: tab,
+                  onSelected: _selectTab,
+                )
+              : null,
+          body: OrbitBackdrop(
+            child: SafeArea(
+              bottom: !nav,
+              child: GlassNavInset(
+                inset: nav ? GlassNavBar.insetOf(context) : 0,
+                child: Center(
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 520),
+                    child: OrbitSwitcher(child: _page()),
+                  ),
                 ),
-          child: const Text('Открыть бота в Telegram'),
-        ),
-        const Text(
-          'Откройте бота, нажмите Start и введите полученный код. Не отправляйте его в чат поддержки.',
-        ),
-        TextField(
-          controller: code,
-          obscureText: true,
-          autocorrect: false,
-          enableSuggestions: false,
-          maxLength: 128,
-          decoration: const InputDecoration(labelText: 'Код из Telegram'),
-        ),
-        FilledButton(
-          onPressed: working
-              ? null
-              : () => perform(() async {
-                  final dialogContext = context;
-                  final request = <String, dynamic>{
-                    'request_id': challenge!['request_id'],
-                    'verifier': challenge!['verifier'],
-                    'code': code.text.trim(),
-                  };
-                  final value = await widget.api.call(
-                    'POST',
-                    '/api/v1/auth/verify',
-                    request,
-                  );
-                  final probeResult = i026DuplicateOtpProbeEnabled
-                      ? await probeDuplicateOtpReplay(
-                          widget.api,
-                          request,
-                          value,
-                        )
-                      : null;
-                  await widget.api.writePendingLogin(null);
-                  await widget.api.acceptSession(value);
-                  code.clear();
-                  challenge = null;
-                  if (probeResult != null && dialogContext.mounted) {
-                    final message = switch (probeResult) {
-                      DuplicateOtpReplayResult.rejected =>
-                        'Проверка пройдена: сервер отклонил повторное использование OTP.',
-                      DuplicateOtpReplayResult.accepted =>
-                        'ОШИБКА БЕЗОПАСНОСТИ: сервер принял OTP повторно. Вторичная сессия отозвана; друзей пока не приглашать.',
-                      DuplicateOtpReplayResult.inconclusive =>
-                        'Проверка не завершена: ответ на повторный запрос не удалось подтвердить.',
-                      DuplicateOtpReplayResult.cleanupFailed =>
-                        'Проверка не завершена: не удалось подтвердить отзыв повторной сессии.',
-                    };
-                    await showDialog<void>(
-                      context: dialogContext,
-                      builder: (context) => AlertDialog(
-                        title: const Text('Проверка повторного OTP'),
-                        content: Text(message),
-                        actions: [
-                          TextButton(
-                            onPressed: () => Navigator.of(context).pop(),
-                            child: const Text('Продолжить'),
-                          ),
-                        ],
-                      ),
-                    );
-                  }
-                  widget.onSignedIn();
-                }),
-          child: const Text('Подтвердить вход'),
-        ),
-      ],
-      if (working)
-        const Padding(
-          padding: EdgeInsets.all(16),
-          child: LinearProgressIndicator(),
-        ),
-      if (restoringChallenge && !working)
-        const Padding(
-          padding: EdgeInsets.symmetric(horizontal: 16),
-          child: LinearProgressIndicator(),
-        ),
-      if (error != null)
-        Padding(
-          padding: const EdgeInsets.only(top: 16),
-          child: Semantics(liveRegion: true, child: Text(error!)),
-        ),
-      const SizedBox(height: 16),
-      if (!linkMode)
-        TextButton(
-          key: const Key('link-code-open'),
-          onPressed: working ? null : () => setState(() => linkMode = true),
-          child: const Text('У меня есть код устройства'),
-        ),
-      if (linkMode) ...[
-        const Text(
-          'Введите одноразовый код, который передал владелец аккаунта. '
-          'Устройство подключится как гостевое: оно пользуется VPN за счёт трафика владельца, '
-          'но не управляет аккаунтом.',
-        ),
-        TextField(
-          key: const Key('link-code-field'),
-          controller: linkCode,
-          autocorrect: false,
-          enableSuggestions: false,
-          textCapitalization: TextCapitalization.characters,
-          maxLength: 32,
-          decoration: const InputDecoration(labelText: 'Код устройства'),
-        ),
-        FilledButton(
-          key: const Key('link-code-submit'),
-          onPressed: working
-              ? null
-              : () => perform(() async {
-                  final value = await widget.api.call(
-                    'POST',
-                    '/api/v1/auth/link/redeem',
-                    {'code': linkCode.text.trim()},
-                  );
-                  await widget.api.writePendingLogin(null);
-                  await widget.api.acceptSession(value);
-                  linkCode.clear();
-                  widget.onSignedIn();
-                }),
-          child: const Text('Подключить это устройство'),
-        ),
-      ],
-      const SizedBox(height: 24),
-      const Text(
-        'Ключ устройства и сессия зашифрованы на телефоне с помощью Android Keystore. После перезапуска приложения VPN подключается вручную. '
-        'Просмотренные сайты и DNS-запросы не отправляются в API приложения.',
-      ),
-    ],
+              ),
+            ),
+          ),
+        );
+      },
+    ),
   );
 }

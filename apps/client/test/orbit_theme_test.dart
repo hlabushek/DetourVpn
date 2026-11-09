@@ -5,7 +5,7 @@ import 'package:vpn_client/quota.dart';
 
 void main() {
   test(
-    'all accents have readable text and independent error/warning colors',
+    'soft orbit tokens have readable text and distinct error/warning colors',
     () {
       double contrast(Color a, Color b) {
         final x = a.computeLuminance(), y = b.computeLuminance();
@@ -13,19 +13,20 @@ void main() {
       }
 
       for (final brightness in Brightness.values) {
-        final errors = <Color>{};
-        for (final accent in OrbitAccent.values) {
-          final s = orbitTheme(brightness, accent: accent).colorScheme;
-          errors.add(s.error);
-          expect(contrast(s.surface, s.onSurface), greaterThanOrEqualTo(4.5));
-          expect(contrast(s.primary, s.onPrimary), greaterThanOrEqualTo(4.5));
-          expect(contrast(s.surface, s.error), greaterThanOrEqualTo(4.5));
-          expect(
-            contrast(s.surface, orbitWarning(brightness)),
-            greaterThanOrEqualTo(4.5),
-          );
-        }
-        expect(errors, hasLength(1));
+        final theme = orbitTheme(brightness);
+        final s = theme.colorScheme;
+        final t = theme.extension<OrbitTokens>()!;
+        expect(contrast(s.surface, s.onSurface), greaterThanOrEqualTo(4.5));
+        expect(contrast(t.bg, t.text), greaterThanOrEqualTo(4.5));
+        expect(contrast(t.surface1, t.textMuted), greaterThanOrEqualTo(4.5));
+        expect(contrast(s.primary, s.onPrimary), greaterThanOrEqualTo(4.5));
+        expect(contrast(t.cta, t.onCta), greaterThanOrEqualTo(4.5));
+        expect(contrast(s.surface, s.error), greaterThanOrEqualTo(4.5));
+        expect(
+          contrast(s.surface, orbitWarning(brightness)),
+          greaterThanOrEqualTo(4.5),
+        );
+        expect(s.error, isNot(orbitWarning(brightness)));
       }
     },
   );

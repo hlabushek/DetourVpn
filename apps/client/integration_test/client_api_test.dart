@@ -72,6 +72,8 @@ void main() {
 
     try {
       await tester.pumpWidget(VpnApp(api: api, native: native));
+      await tester.tap(find.byKey(const Key('consent-check')));
+      await tester.pumpAndSettle();
       await tap('Войти через Telegram');
       stage = 'login_challenge';
       await until(() => find.text('Подтвердить вход').evaluate().isNotEmpty);

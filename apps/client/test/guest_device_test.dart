@@ -64,6 +64,45 @@ void _tall(WidgetTester tester) {
 Widget _host(Widget child) => MaterialApp(home: Scaffold(body: child));
 
 void main() {
+  testWidgets(
+    'sign-in actions stay disabled until the beta notice is accepted',
+    (tester) async {
+      _tall(tester);
+      await tester.pumpWidget(
+        _host(
+          LoginScreen(
+            api: _RedeemApi(_Store()),
+            native: FakeNative(),
+            onSignedIn: () {},
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(
+        tester
+            .widget<TextButton>(find.byKey(const Key('link-code-open')))
+            .onPressed,
+        isNull,
+      );
+      expect(
+        tester
+            .widget<FilledButton>(
+              find.widgetWithText(FilledButton, 'Войти через Telegram'),
+            )
+            .onPressed,
+        isNull,
+      );
+      await tester.tap(find.byKey(const Key('consent-check')));
+      await tester.pump();
+      expect(
+        tester
+            .widget<TextButton>(find.byKey(const Key('link-code-open')))
+            .onPressed,
+        isNotNull,
+      );
+    },
+  );
+
   testWidgets('a device code signs in as a guest without Telegram', (
     tester,
   ) async {
@@ -81,6 +120,8 @@ void main() {
     );
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('link-code-field')), findsNothing);
+    await tester.tap(find.byKey(const Key('consent-check')));
+    await tester.pump();
     await tester.tap(find.byKey(const Key('link-code-open')));
     await tester.pump();
     await tester.enterText(
@@ -113,6 +154,8 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('consent-check')));
+    await tester.pump();
     await tester.tap(find.byKey(const Key('link-code-open')));
     await tester.pump();
     await tester.enterText(find.byKey(const Key('link-code-field')), 'ZZZZ');
@@ -135,7 +178,6 @@ void main() {
         ProfileScreen(
           onSignOut: () async {},
           onDeleteAccount: () async => deleted++,
-          onTheme: () {},
           controller: controller,
           guest: true,
           onLeaveDevice: () async => left++,
@@ -171,7 +213,6 @@ void main() {
         ProfileScreen(
           onSignOut: () async {},
           onDeleteAccount: () async {},
-          onTheme: () {},
           controller: controller,
         ),
       ),

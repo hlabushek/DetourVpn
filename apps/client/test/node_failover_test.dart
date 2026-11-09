@@ -5,6 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:vpn_client/api.dart';
 import 'package:vpn_client/connection.dart';
 import 'package:vpn_client/main.dart';
+import 'package:vpn_client/region_picker.dart';
 
 import 'connection_test.dart' show FakeApi, FakeNative;
 
@@ -248,12 +249,22 @@ void main() {
       200,
       scrollable: find
           .descendant(
-            of: find.byType(BottomSheet),
+            of: find.byType(RegionPickerScreen),
             matching: find.byType(Scrollable),
           )
           .first,
     );
     expect(find.text('TEST ONLY A · test-a'), findsWidgets);
+    await tester.scrollUntilVisible(
+      find.text('TEST ONLY B · test-b'),
+      200,
+      scrollable: find
+          .descendant(
+            of: find.byType(RegionPickerScreen),
+            matching: find.byType(Scrollable),
+          )
+          .first,
+    );
     expect(find.text('TEST ONLY B · test-b'), findsOneWidget);
     Navigator.of(tester.element(find.text('Выберите сервер'))).pop();
     await tester.pumpAndSettle();

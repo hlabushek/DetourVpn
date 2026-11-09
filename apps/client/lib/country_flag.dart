@@ -35,6 +35,22 @@ const Map<String, FlagSpec> flagSpecs = {
   'IT': StripesFlag([0xFF009246, 0xFFFFFFFF, 0xFFCE2B37], vertical: true),
 };
 
+/// Russian display names for the same set; mirror of `COUNTRY_NAMES` in flags.mjs.
+const Map<String, String> countryNames = {
+  'FI': 'Финляндия',
+  'SE': 'Швеция',
+  'DK': 'Дания',
+  'NO': 'Норвегия',
+  'DE': 'Германия',
+  'NL': 'Нидерланды',
+  'AT': 'Австрия',
+  'PL': 'Польша',
+  'EE': 'Эстония',
+  'LT': 'Литва',
+  'FR': 'Франция',
+  'IT': 'Италия',
+};
+
 /// Accepts only an ISO 3166-1 alpha-2 code in upper case; anything else is
 /// treated as unknown rather than rejecting the whole node list.
 String? parseCountryCode(Object? value) =>

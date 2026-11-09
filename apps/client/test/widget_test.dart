@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:vpn_client/connection.dart';
 import 'package:vpn_client/main.dart';
-import 'package:vpn_client/connection_screen.dart' show ProfileScreen;
+import 'package:vpn_client/ui/glass_nav.dart';
+import 'package:vpn_client/connection_screen.dart'
+    show ProfileScreen, SettingsScreen;
 import 'package:vpn_client/orbit_theme.dart';
 import 'package:vpn_client/api.dart';
 import 'package:vpn_client/session_store.dart';
@@ -83,16 +85,22 @@ void main() {
     await tester.tap(find.text('Профиль').last);
     await tester.pumpAndSettle();
     expect(find.byType(ProfileScreen), findsOneWidget);
+    await tester.tap(find.byTooltip('Настройки'));
+    await tester.pumpAndSettle();
+    expect(find.byType(SettingsScreen), findsOneWidget);
     await tester.tap(find.text('Оформление'));
     await tester.pumpAndSettle();
     expect(find.text('Светлая тема'), findsOneWidget);
     expect(native.up, true);
+    await tester.pageBack();
+    await tester.pumpAndSettle();
+    expect(find.byType(ProfileScreen), findsOneWidget);
     await tester.scrollUntilVisible(find.text('Выйти из аккаунта'), 200);
     await tester.tap(find.text('Выйти из аккаунта'));
     await tester.pumpAndSettle();
     expect(native.up, false);
     expect(find.byType(LoginScreen), findsOneWidget);
-    expect(find.byType(NavigationBar), findsNothing);
+    expect(find.byType(GlassNavBar), findsNothing);
     await tester.pumpWidget(const SizedBox());
   });
   testWidgets(
@@ -135,6 +143,9 @@ void main() {
       var api = ShellApi(store: store);
       await tester.pumpWidget(VpnApp(api: api, native: FakeNative()));
       await tester.pumpAndSettle();
+      await tester.ensureVisible(find.byKey(const Key('consent-check')));
+      await tester.tap(find.byKey(const Key('consent-check')));
+      await tester.pumpAndSettle();
       await tester.ensureVisible(find.text('Войти через Telegram'));
       await tester.tap(find.text('Войти через Telegram'));
       await tester.pumpAndSettle();
@@ -160,7 +171,11 @@ void main() {
             widget is TextField &&
             widget.decoration?.labelText == 'Код из Telegram',
       );
-      await tester.scrollUntilVisible(restoredCodeField, 200);
+      await tester.scrollUntilVisible(
+        restoredCodeField,
+        200,
+        scrollable: find.byType(Scrollable).first,
+      );
       expect(restoredCodeField, findsOneWidget);
 
       await tester.pumpWidget(const SizedBox());
@@ -208,6 +223,25 @@ void main() {
       tester.view.devicePixelRatio = 1;
       addTearDown(tester.view.resetPhysicalSize);
       addTearDown(tester.view.resetDevicePixelRatio);
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: orbitTheme(Brightness.light),
+          home: MediaQuery(
+            data: const MediaQueryData(textScaler: TextScaler.linear(2)),
+            child: SettingsScreen(onTheme: () {}, controller: c),
+          ),
+        ),
+      );
+      await tester.scrollUntilVisible(
+        find.text('Системные настройки VPN'),
+        250,
+      );
+      expect(find.text('Системные настройки VPN'), findsOneWidget);
+      await tester.scrollUntilVisible(
+        find.textContaining('ещё не принято'),
+        250,
+      );
+      expect(find.textContaining('ещё не принято'), findsOneWidget);
       var signedOut = false;
       var deleted = 0;
       await tester.pumpWidget(
@@ -218,7 +252,6 @@ void main() {
             child: Scaffold(
               body: ProfileScreen(
                 controller: c,
-                onTheme: () {},
                 onSignOut: () async {
                   signedOut = true;
                 },
@@ -230,12 +263,6 @@ void main() {
           ),
         ),
       );
-      await tester.scrollUntilVisible(
-        find.text('Системные настройки VPN'),
-        250,
-      );
-      expect(find.text('Системные настройки VPN'), findsOneWidget);
-      expect(find.textContaining('ещё не принято'), findsOneWidget);
       await tester.scrollUntilVisible(find.text('Выйти из аккаунта'), 250);
       await tester.tap(find.text('Выйти из аккаунта'));
       expect(signedOut, true);
