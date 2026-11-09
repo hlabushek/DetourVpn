@@ -319,7 +319,7 @@ class _VpnAppState extends State<VpnApp> with WidgetsBindingObserver {
 
   @override
   Widget build(BuildContext context) => MaterialApp(
-    title: 'DetourVpn',
+    title: 'DetourVPN',
     debugShowCheckedModeBanner: false,
     themeMode: theme,
     themeAnimationDuration: const Duration(milliseconds: 450),
