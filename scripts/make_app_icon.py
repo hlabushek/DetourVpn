@@ -6,7 +6,7 @@ icon (foreground PNGs + XML) and legacy PNGs under apps/client/android/app/src/m
 
 from pathlib import Path
 
-from PIL import Image, ImageChops
+from PIL import Image, ImageChops, ImageFilter
 
 ROOT = Path(__file__).resolve().parents[1]
 SOURCE = ROOT / "apps" / "client" / "android" / "icon-source" / "app-icon.webp"
@@ -30,6 +30,9 @@ def cropped_square() -> Image.Image:
             r, g, b, _ = pixels[x, y]
             if r > 225 and g > 225 and b > 225:
                 pixels[x, y] = (255, 255, 255, 0)
+    # Remove the light anti-aliased fringe left at the rounded edge: shrink the alpha by 2 px.
+    alpha = square.getchannel("A").filter(ImageFilter.MinFilter(5))
+    square.putalpha(alpha)
     return square
 
 
