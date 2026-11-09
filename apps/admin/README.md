@@ -7,5 +7,5 @@ devices/plans/nodes/audit. Изменения — allowlisted `/api/admin/v1/act
 
 Bootstrap и использование: `docs/runbooks/administration.md`, ADR-035/036.
 Секреты отсутствуют в source/static; токен только RAM. JS сохраняет int64 amounts
-без округления. Нет Node dependencies/build/CDN. Полноценный daily dataplane и
+без округления. Нет Node dependencies/build/CDN. Чистые функции форматирования: `static/format.js`, тесты `node --test apps/admin/tests/*.test.mjs`. Полноценный daily dataplane и
 production/remote acceptance этим интерфейсом не подтверждаются.
