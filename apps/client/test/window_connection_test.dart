@@ -569,6 +569,41 @@ void main() {
     expect(native.up, false);
     expect(api.deletes, 1);
   });
+  test('a window that expired in the background reconnects by itself', () async {
+    final auto = WindowConnectionController(
+      api,
+      native,
+      pollInterval: const Duration(days: 1),
+      renewBeforeMs: 90000,
+      autoReconnectDelay: const Duration(milliseconds: 20),
+    )..selectedNode = node;
+    addTearDown(auto.dispose);
+    await auto.connect();
+    native.remaining = 0;
+    await auto.refresh();
+    expect(auto.error, 'lease_expired');
+    await Future<void>.delayed(const Duration(milliseconds: 300));
+    // The fake API issues one window, so the second attempt fails later; what matters is that
+    // the client tried again on its own.
+    expect(api.creates, greaterThanOrEqualTo(2));
+    await auto.disconnect();
+  });
+  test('user disconnect is never undone by auto reconnect', () async {
+    final auto = WindowConnectionController(
+      api,
+      native,
+      pollInterval: const Duration(days: 1),
+      renewBeforeMs: 90000,
+      autoReconnectDelay: const Duration(milliseconds: 20),
+    )..selectedNode = node;
+    addTearDown(auto.dispose);
+    await auto.connect();
+    native.remaining = 0;
+    await auto.refresh();
+    await auto.disconnect();
+    await Future<void>.delayed(const Duration(milliseconds: 300));
+    expect(native.up, false);
+  });
   test('native down cannot be resurrected by fresh API metadata', () async {
     await c.connect();
     native.up = false;

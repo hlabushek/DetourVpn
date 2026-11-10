@@ -150,7 +150,8 @@ public final class ClientActivity extends FlutterActivity {
         }
         if (call.method.equals("openBatterySettings")) {
             try {
-                startActivity(new Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS));
+                if (!requestBatteryExemption())
+                    startActivity(new Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS));
                 result.success(null);
             } catch (RuntimeException ignored) {
                 result.error("battery_settings_unavailable", "Не удалось открыть настройки батареи", null);
@@ -322,6 +323,7 @@ public final class ClientActivity extends FlutterActivity {
                             }
                             app.reason = "";
                         } catch (Exception failure) { app.stop(); throw failure; }
+                        if (renewable) runOnUiThread(this::askBatteryExemption);
                         break;
                     default: throw new IllegalArgumentException();
                 }
@@ -360,6 +362,33 @@ public final class ClientActivity extends FlutterActivity {
             }
         });
     }
+    /** Shows Android's own "allow background activity" dialog; false if already allowed or unavailable. */
+    private boolean requestBatteryExemption() {
+        try {
+            android.os.PowerManager manager = (android.os.PowerManager) getSystemService(POWER_SERVICE);
+            if (manager == null || manager.isIgnoringBatteryOptimizations(getPackageName())) return true;
+            startActivity(new Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS,
+                    Uri.parse("package:" + getPackageName())));
+            return true;
+        } catch (RuntimeException unavailable) {
+            return false;
+        }
+    }
+
+    /** At most twice per install: without the exemption Android sleeps the renewal timer and the 90 s window ends. */
+    private void askBatteryExemption() {
+        try {
+            var prefs = getSharedPreferences("connection", MODE_PRIVATE);
+            int asked = prefs.getInt("battery_prompted", 0);
+            android.os.PowerManager manager = (android.os.PowerManager) getSystemService(POWER_SERVICE);
+            if (asked >= 2 || manager == null || manager.isIgnoringBatteryOptimizations(getPackageName())) return;
+            prefs.edit().putInt("battery_prompted", asked + 1).apply();
+            requestBatteryExemption();
+        } catch (RuntimeException ignored) {
+            // Best effort only.
+        }
+    }
+
     private static String safeFailureTypes(Throwable failure) {
         var seen = java.util.Collections.newSetFromMap(
                 new java.util.IdentityHashMap<Throwable, Boolean>());

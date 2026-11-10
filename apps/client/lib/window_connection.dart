@@ -16,7 +16,10 @@ class WindowConnectionController extends ConnectionController {
     super.pollInterval,
     this.renewBeforeMs = 55000,
     this.handshakeHintAfter = const Duration(seconds: 25),
+    this.autoReconnectDelay = const Duration(seconds: 2),
   });
+  final Duration? autoReconnectDelay;
+  final List<int> _autoReconnectAt = [];
   static const root = '/api/v1/window-tunnels';
   static const budgetBytes = int.fromEnvironment(
     'VPN_WINDOW_BUDGET_BYTES',
@@ -589,8 +592,29 @@ class WindowConnectionController extends ConnectionController {
           (_grant != null && _clock.elapsedMilliseconds >= _deadline)) {
         phase = ConnectionPhase.failed;
         await _cleanup();
+        if (code == 'lease_expired' && !hasLease)
+          _scheduleAutoReconnect(version);
       }
     }
+  }
+
+  /// The 90 s window is renewed by a timer that Android may suspend with the screen off. When that
+  /// happens (and the user did not press Disconnect), connect again on our own, a few times only:
+  /// every new window reserves quota.
+  void _scheduleAutoReconnect(int version) {
+    final now = _clock.elapsedMilliseconds;
+    _autoReconnectAt.removeWhere((t) => now - t > 600000);
+    if (autoReconnectDelay == null || _autoReconnectAt.length >= 4) return;
+    _autoReconnectAt.add(now);
+    Future<void>.delayed(autoReconnectDelay!, () {
+      if (_dead ||
+          _version != version ||
+          phase != ConnectionPhase.failed ||
+          error != 'lease_expired') {
+        return;
+      }
+      unawaited(connect());
+    });
   }
 
   bool _establishedStatusConfirmed(NativeSnapshot snapshot) {

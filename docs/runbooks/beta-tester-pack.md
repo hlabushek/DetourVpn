@@ -1,4 +1,4 @@
-# Комплект для тестера беты (актуально для 0.1.0-beta.24)
+# Комплект для тестера беты (актуально для 0.1.0-beta.25)
 
 Заменяет устаревшую памятку `beta-tester-quickstart.md` (она описывает beta.1 и запрет включать
 VPN). Для каждого тестера нужно три вещи: **APK**, **сообщение ниже**, **приглашение в админке**.
@@ -7,7 +7,7 @@ VPN). Для каждого тестера нужно три вещи: **APK**, 
 
 - Файл APK: `apps/client/build/app/outputs/flutter-apk/app-release.apk` (отправлять в Telegram как
   **файл**, не как фото). Только подписанная сборка из `scripts/release_beta.ps1`.
-- SHA-256 и версию: `0.1.0-beta.24`, package `com.detourvpn.client`. Хеш актуального файла:
+- SHA-256 и версию: `0.1.0-beta.25`, package `com.detourvpn.client`. Хеш актуального файла:
   `Get-FileHash apps\client\build\app\outputs\flutter-apk\app-release.apk -Algorithm SHA256`.
 - Ссылку на бота (она подставляется в готовый текст на вкладке «Приглашения» в админке).
 
