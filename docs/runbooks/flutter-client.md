@@ -1,115 +1,115 @@
 # Flutter Android client — I-013
 
-Scope и ограничения: ADR-025; acceptance: `docs/issues/I-013.md`.
-Установленный application ID beta-клиента — `com.detourvpn.client`; старый I-011
-harness не заменяется. Внутренний Android namespace остаётся `org.example.vpnclient`.
-Нельзя одновременно держать другой VPN и измерять этот тестовый туннель.
+Scope and limitations: ADR-025; acceptance: `docs/issues/I-013.md`.
+The installed application ID of the beta client is `com.detourvpn.client`; the old I-011
+harness is not replaced. The internal Android namespace remains `org.example.vpnclient`.
+You must not keep another VPN active while measuring this test tunnel.
 
-## Локальная сборка
+## Local build
 
-Нужны Windows/PowerShell, JDK Android Studio, Android SDK 36/build-tools 36,
-upstream GoBackend-only native libraries из runbook `android-poc.md`.
-Flutter 3.47.7 (BSD-3-Clause), revision/archive SHA256 закреплены в
-`apps/client/toolchain.json`; Dart dependencies — `pubspec.lock` (hashes).
-App и tunnel dependency graphs нового Flutter host фиксируются в
-`android/app/gradle.lockfile` и `android/tunnel-gradle.lockfile`; самостоятельный
-I-011 lockfile не изменяется Flutter-сборкой.
-Flutter engine ABI artifacts закреплены engine hash из SDK, а не требованием
-присутствия всех ABI в lockfile: физический Pixel собирается только для arm64.
-Обычный debug также включает штатный native plugin `integration_test` из SDK
-(dev dependency); его зависимости фиксируются в debug lock configurations.
-Release исключает dev plugin; это дополнительно проверяется APK audit.
-Gradle 8.14.3 (Apache-2.0) и Kotlin build plugin 2.4.21 (Apache-2.0) фиксированы.
-Kotlin 2.4.21 заменяет затронутый build plugin 2.2.20 (GHSA-r937-wjx7-w2jp);
-совместимость с AGP 8.13.0 и Gradle 8.14.3 подтверждена официальной матрицей.
-Закреплённый Flutter SDK 3.47.7 всё ещё использует KGP 2.2.20 во внутреннем
-Gradle-проекте Flutter tools; не патчить SDK в месте установки. До проверенного
-upstream stable SDK update этот build-tool advisory остаётся открытым.
-AGP 8.13.0 выбран для совместимости с проверенным native module; Flutter выдаёт
-предупреждения о будущем прекращении поддержки этих версий. Проверка требований
-SDK не отключается; переход на AGP 9 — отдельное совместимое обновление tooling.
+Requires Windows/PowerShell, the Android Studio JDK, Android SDK 36/build-tools 36,
+and the upstream GoBackend-only native libraries from the `android-poc.md` runbook.
+Flutter 3.47.7 (BSD-3-Clause), revision/archive SHA256 are pinned in
+`apps/client/toolchain.json`; Dart dependencies are pinned in `pubspec.lock` (hashes).
+The app and tunnel dependency graphs of the new Flutter host are pinned in
+`android/app/gradle.lockfile` and `android/tunnel-gradle.lockfile`; the standalone
+I-011 lockfile is not changed by the Flutter build.
+Flutter engine ABI artifacts are pinned by the engine hash from the SDK, not by a requirement
+that all ABIs be present in the lockfile: the physical Pixel is built for arm64 only.
+A regular debug build also includes the SDK's standard native plugin `integration_test`
+(a dev dependency); its dependencies are pinned in the debug lock configurations.
+Release excludes the dev plugin; this is additionally verified by the APK audit.
+Gradle 8.14.3 (Apache-2.0) and Kotlin build plugin 2.4.21 (Apache-2.0) are pinned.
+Kotlin 2.4.21 replaces the affected build plugin 2.2.20 (GHSA-r937-wjx7-w2jp);
+compatibility with AGP 8.13.0 and Gradle 8.14.3 is confirmed by the official matrix.
+The pinned Flutter SDK 3.47.7 still uses KGP 2.2.20 in the internal
+Gradle project of the Flutter tools; do not patch the SDK in place. Until a verified
+upstream stable SDK update, this build-tool advisory remains open.
+AGP 8.13.0 was chosen for compatibility with the verified native module; Flutter emits
+warnings about the future end of support for these versions. The SDK requirement
+check is not disabled; moving to AGP 9 is a separate, compatible tooling update.
 
 ```powershell
 .\scripts\install_flutter.ps1
 .\scripts\build_flutter_client.ps1
 ```
 
-Скрипт создаёт свежий snapshot разрешённых исходников в
+The script creates a fresh snapshot of the allowed sources in
 `%LOCALAPPDATA%\ProjectVpn\i013-builds\<random-id>`: client, native app sources,
-tunnel build/lockfile и подготовленный SDK. Private API/staging configuration,
-local.properties и старые build trees не копируются. Проверки работают там;
-обычные APK и reports возвращаются в исходный `apps/client/build/app`.
-Это устраняет падение Dart LSP на кириллице и отказ Dart stat() на cloud reparse
-points OneDrive. Исходники редактировать только в основном checkout; локальный
-snapshot остаётся для диагностики, не является рабочим исходным проектом.
-Никакие ключи или сессии для этой сборки не нужны. NDK 27.0.12077973 может быть
-установлен Android Gradle tooling, если отсутствует. Никакие PATH/system
-environment настройки не сохраняются. Сборка устанавливает зависимости локально,
-запускает analyze/tests и Android unit/lint/release checks. Unsigned release APK
-не является публичным выпуском; signing/publication этим этапом не выполняются.
-Проверка 2026-10-29 показала, что release-вариант не был подписан; последний
-owner beta install был debug APK. Gradle теперь поддерживает отдельный beta key,
-поданный только через переменные окружения процесса сборки. Если заданы не все
-четыре переменные, release signing не конфигурируется; при частичном наборе
-Gradle отказывает с перечислением только отсутствующих имён переменных. Штатный
-build script требует существующий keystore по абсолютному пути вне checkout.
-Gradle запрещает включить release signing, пока application ID равен
-временному placeholder `org.example.vpnclient`.
-Конфигурация и проверка описаны в ADR-066 и
+tunnel build/lockfile and the prepared SDK. Private API/staging configuration,
+local.properties and old build trees are not copied. Checks run there;
+regular APKs and reports are returned to the original `apps/client/build/app`.
+This eliminates the Dart LSP crash on Cyrillic and the Dart stat() failure on OneDrive cloud reparse
+points. Edit the sources only in the main checkout; the local
+snapshot is kept for diagnostics and is not a working source project.
+No keys or sessions are needed for this build. NDK 27.0.12077973 may be
+installed by the Android Gradle tooling if it is missing. No PATH/system
+environment settings are persisted. The build installs dependencies locally,
+runs analyze/tests and the Android unit/lint/release checks. An unsigned release APK
+is not a public release; signing/publication are not performed at this stage.
+The 2026-10-29 check showed that the release variant was not signed; the last
+owner beta install was a debug APK. Gradle now supports a separate beta key,
+supplied only via environment variables of the build process. If not all
+four variables are set, release signing is not configured; with a partial set,
+Gradle fails, listing only the names of the missing variables. The standard
+build script requires an existing keystore at an absolute path outside the checkout.
+Gradle forbids enabling release signing while the application ID is the
+temporary placeholder `org.example.vpnclient`.
+Configuration and verification are described in ADR-066 and
 `docs/evidence/i-030-beta-signing-config-20261029.json`.
 
-Перед сборкой signed beta APK владелец должен вне репозитория создать/выбрать
-beta signing key, организовать закрытое хранение и резервное восстановление
-ключа. `com.detourvpn.client` — постоянный beta ID;
-его смена после первой раздачи нарушит совместимость обновлений. Не отправлять
-ключ, пароли или переменные с ними в чат и не записывать их в репозиторий.
-Перед передачей APK тестерам требуется проверить подпись, application ID,
-версию, SHA-256 и непрерывность обновления с предыдущей beta-версии.
+Before building a signed beta APK, the owner must create/select, outside the repository, the
+beta signing key and arrange closed storage and backup recovery of the
+key. `com.detourvpn.client` is the permanent beta ID;
+changing it after the first distribution would break update compatibility. Do not send the
+key, passwords or variables containing them to chat and do not write them into the repository.
+Before handing the APK to testers, verify the signature, application ID,
+version, SHA-256 and update continuity from the previous beta version.
 
-`scripts/build_beta_apk.ps1` выполняет release build с этим ключом и всегда
-включает v3 window-tunnel API/controller; signed beta APK не должен обращаться
-к закрытому v2 tunnel-admission endpoint. Для старых локальных сценариев v2
-используйте нижнеуровневый `scripts/build_flutter_client.ps1` без `-WindowTunnels`.
-При первом
-запуске скрипт предлагает создать JKS в `%LOCALAPPDATA%\ProjectVpn\beta-signing`
-и продолжает только после локального ввода `CREATE`. `keytool` запрашивает
-пароль JKS и пароль ключа в терминале; путь вводить не надо. Выбрать пароли не
-короче 16 символов и сохранить у владельца. При запросе пароля ключа Enter
-повторно использует пароль хранилища. Перед build скрипт повторно запрашивает
-оба пароля скрытыми полями, временно передаёт их только процессу сборки и
-очищает переменные после проверки APK. Установки на устройство и передачи APK
-скрипт не выполняет.
-Ключ и пароли нужно отдельно сохранить в контролируемом владельцем резерве;
-локальный каталог сам по себе не является backup.
+`scripts/build_beta_apk.ps1` performs a release build with this key and always
+enables the v3 window-tunnel API/controller; a signed beta APK must not call
+the closed v2 tunnel-admission endpoint. For old local v2 scenarios,
+use the lower-level `scripts/build_flutter_client.ps1` without `-WindowTunnels`.
+On first
+run the script offers to create a JKS in `%LOCALAPPDATA%\ProjectVpn\beta-signing`
+and continues only after a local `CREATE` is entered. `keytool` asks for the
+JKS password and the key password in the terminal; you do not need to enter the path. Choose passwords of
+at least 16 characters and keep them with the owner. When the key password is requested, Enter
+reuses the keystore password. Before the build, the script asks for
+both passwords again in hidden fields, passes them temporarily only to the build process and
+clears the variables after the APK is verified. The script does not install onto a device or hand
+the APK over.
+The key and passwords must be stored separately in an owner-controlled backup;
+the local directory by itself is not a backup.
 
-### Резервная копия signing JKS на BitLocker USB
+### Backup of the signing JKS on a BitLocker USB drive
 
-Для `GERFFINSUSB (E:)` сначала завершить BitLocker To Go и убедиться, что диск
-разблокирован. Сохранить пароль разблокировки и recovery key BitLocker в
-менеджере паролей; оба пароля JKS хранить там же как отдельные секреты. Не
-класть recovery key только на зашифрованный USB и не передавать значения в чат.
+For `GERFFINSUSB (E:)`, first finish BitLocker To Go and make sure the drive
+is unlocked. Save the BitLocker unlock password and recovery key in a
+password manager; keep both JKS passwords there as separate secrets. Do not
+put the recovery key only on the encrypted USB drive and do not pass the values to chat.
 
-Из PowerShell, запущенного с повышенными правами под той же учётной записью
-JetGame, выполнить:
+From a PowerShell launched with elevated rights under the same JetGame
+account, run:
 
 ```powershell
 .\scripts\backup_beta_signing_keystore.ps1 -DriveLetter E:
 ```
 
-Скрипт сверяет метку и съёмный тип диска, требует полностью завершённое
-BitLocker-шифрование и включённую защиту, отказывается перезаписывать готовую
-или оставшуюся частичную копию и сравнивает SHA-256 исходного JKS с копией.
-Успешный вывод `code=beta_signing_keystore_backup_verified` подтверждает точную
-копию на зашифрованном диске; он не подтверждает, что recovery key BitLocker
-или пароли JKS сохранены. Хранить сам JKS и любые резервные ключи вне checkout.
+The script checks the label and removable drive type, requires fully completed
+BitLocker encryption and enabled protection, refuses to overwrite a finished
+or leftover partial copy, and compares the SHA-256 of the source JKS with the copy.
+A successful output `code=beta_signing_keystore_backup_verified` confirms an exact
+copy on the encrypted drive; it does not confirm that the BitLocker recovery key
+or the JKS passwords have been saved. Keep the JKS itself and any backup keys outside the checkout.
 
-### Проверка восстановления signing JKS
+### Verifying restoration of the signing JKS
 
-Перед проверкой локально убедиться в менеджере паролей, что там сохранены пароль
-разблокировки и recovery key BitLocker, а также оба пароля JKS. Значения никуда не
-копировать и не отправлять. Разблокировать `GERFFINSUSB (E:)` и выполнить из
-обычного PowerShell под владельцем; тестовая копия создаётся в уже защищённом
-каталоге `%LOCALAPPDATA%\ProjectVpn\beta-signing` вне checkout:
+Before the check, confirm locally in the password manager that the unlock password
+and the BitLocker recovery key, as well as both JKS passwords, are saved there. Do not
+copy or send the values anywhere. Unlock `GERFFINSUSB (E:)` and run from a
+regular PowerShell under the owner; the test copy is created in the already protected
+directory `%LOCALAPPDATA%\ProjectVpn\beta-signing` outside the checkout:
 
 ```powershell
 $restoreCopy = Join-Path $env:LOCALAPPDATA ('ProjectVpn\beta-signing\detourvpn-beta-restore-' + (Get-Date -Format 'yyyyMMdd-HHmmss') + '.jks')
@@ -123,23 +123,23 @@ if ($sourceHash -ne $restoreHash) { throw 'Restore-copy SHA-256 mismatch.' }
 .\scripts\build_beta_apk.ps1 -KeystorePath $restoreCopy -ApiOrigin 'https://193.68.88.239'
 ```
 
-Сборка запросит оба пароля JKS скрыто и подпишет локальный beta APK восстановленной
-копией. До очистки тестовой копии сверить fingerprint в новом receipt с предыдущим
-beta receipt. После успешной сверки удалить только файл из `$restoreCopy`; исходный
-JKS и резерв на USB не трогать. Если сборка или сверка не удалась, сохранить
-тестовую копию до выяснения причины. Эта проверка не заменяет естественный запуск
-ежедневного backup task и не доказывает хранение BitLocker recovery key в менеджере
-паролей.
+The build asks for both JKS passwords in hidden fields and signs the local beta APK with the restored
+copy. Before cleaning up the test copy, compare the fingerprint in the new receipt with the previous
+beta receipt. After a successful comparison, delete only the file at `$restoreCopy`; do not touch the original
+JKS and the backup on the USB drive. If the build or comparison failed, keep the
+test copy until the cause is found. This check does not replace the natural run of the
+daily backup task and does not prove that the BitLocker recovery key is stored in the
+password manager.
 
 ```powershell
 .\scripts\build_beta_apk.ps1 -ApiOrigin 'https://YOUR_APPROVED_API_HOST'
 ```
 
-Для beta сборки `-ApiOrigin` обязателен. Скрипт принимает только HTTPS origin
-без credentials, пути, query или fragment и передаёт его в debug и release
-сборки как `VPN_API_ORIGIN`.
+For the beta build, `-ApiOrigin` is required. The script accepts only an HTTPS origin
+without credentials, path, query or fragment and passes it to the debug and release
+builds as `VPN_API_ORIGIN`.
 
-Для локальной проверки уже подписанного APK создать отдельный receipt:
+To verify an already signed APK locally, create a separate receipt:
 
 ```powershell
 uv run --frozen python scripts/verify_beta_apk.py `
@@ -150,150 +150,150 @@ uv run --frozen python scripts/verify_beta_apk.py `
   --java-home 'C:\Program Files\Android\Android Studio\jbr'
 ```
 
-Владельцем выбран `com.detourvpn.client`. Для каждого следующего receipt укажите
-новый путь, чтобы не перезаписывать прежнее evidence. Receipt содержит ID,
-версию, SHA-256 APK и fingerprint сертификата, но не путь к APK. Скрипт
-использует `aapt` и `apksigner` из Android
-SDK/JDK без вызова Windows batch wrapper, не устанавливает APK и оставляет `update_install: not_verified` и
-`distribution: not_accepted`. Физическую установку поверх предыдущей beta-версии
-и фактическую передачу тестерам надо принять отдельно.
+The owner chose `com.detourvpn.client`. For each subsequent receipt specify a
+new path so as not to overwrite earlier evidence. The receipt contains the ID,
+version, APK SHA-256 and certificate fingerprint, but not the APK path. The script
+uses `aapt` and `apksigner` from the Android
+SDK/JDK without calling a Windows batch wrapper, does not install the APK and leaves `update_install: not_verified` and
+`distribution: not_accepted`. Physical installation over the previous beta version
+and the actual hand-off to testers must be accepted separately.
 
-Debug и release собираются последовательно через `flutter build apk` с явным
-`--target lib/main.dart`. Между ними Gradle выполняет только debug unit/lint.
-Не объединять debug и `:app:assembleRelease` в одном прямом Gradle-вызове:
-Flutter должен заново сгенерировать native plugin registrant для release,
-исключив `integration_test`. Иначе javac получает ссылку на отсутствующий dev plugin.
-В закреплённом SDK `--no-pub` также пропускает эту регенерацию, поэтому release
-запускается без него после `pub get --enforce-lockfile`; перед экспортом скрипт
-проверяет, что SHA256 `pubspec.lock` не изменился.
-`-ApiOrigin`, если задан, применяется к обеим сборкам.
+Debug and release are built sequentially via `flutter build apk` with an explicit
+`--target lib/main.dart`. Between them Gradle runs only the debug unit/lint.
+Do not combine debug and `:app:assembleRelease` in a single direct Gradle call:
+Flutter must regenerate the native plugin registrant for release,
+excluding `integration_test`. Otherwise javac receives a reference to the missing dev plugin.
+In the pinned SDK, `--no-pub` also skips this regeneration, so release
+is run without it after `pub get --enforce-lockfile`; before export the script
+checks that the SHA256 of `pubspec.lock` has not changed.
+`-ApiOrigin`, if set, applies to both builds.
 
-По умолчанию нативный AAR включает arm64-v8a и x86_64. Если цель Flutter —
-только `android-arm64`, для physical-test APK собирается arm64-only AAR, что
-уменьшает временный расход диска компилятором. Gradle выбирает AAR по
-`target-platform`; сборки с несколькими ABI продолжают использовать прежний
-двухABI AAR.
+By default the native AAR includes arm64-v8a and x86_64. If the Flutter target is
+only `android-arm64`, an arm64-only AAR is built for the physical-test APK, which
+reduces the compiler's temporary disk use. Gradle selects the AAR by
+`target-platform`; multi-ABI builds continue to use the previous
+two-ABI AAR.
 
 APK: `apps/client/build/app/outputs/flutter-apk/app-debug.apk`.
-Для установки обычного debug APK после сборки и открытия на единственном
-подключённом Android-телефоне:
+To install a regular debug APK after the build and open it on the only
+connected Android phone:
 
 ```powershell
 & "$env:LOCALAPPDATA\Android\Sdk\platform-tools\adb.exe" install -r apps/client/build/app/outputs/flutter-apk/app-debug.apk
 & "$env:LOCALAPPDATA\Android\Sdk\platform-tools\adb.exe" shell am start -W -n com.detourvpn.client/org.example.vpnpoc.ClientActivity
 ```
 
-Без API origin приложение честно показывает setup screen. Для настоящего API:
+Without an API origin the app honestly shows a setup screen. For a real API:
 
 ```powershell
 .\scripts\build_flutter_client.ps1 -ApiOrigin 'https://YOUR_APPROVED_API_HOST'
 ```
 
-Не включать токены/credentials в origin или dart-define. Release разрешает только
-HTTPS с системной проверкой сертификатов. Локальный debug-only transport:
-`http://127.0.0.1:18766` через ADB reverse; plaintext remote hosts запрещены.
-Исключение Android network security config существует только в debug source set.
+Do not include tokens/credentials in the origin or dart-define. Release allows only
+HTTPS with the system certificate verification. Local debug-only transport:
+`http://127.0.0.1:18766` via ADB reverse; plaintext remote hosts are forbidden.
+The Android network security config exception exists only in the debug source set.
 
-## Диагностика по согласию
+## Diagnostics by consent
 
-При ошибке подключения кнопка «Поделиться диагностикой» открывает предпросмотр.
-Проверьте код и этап; отмена закрывает диалог без вызова Android share API.
-После подтверждения Android показывает системный Sharesheet, а текст попадёт
-только в выбранное пользователем приложение. Отчёт содержит фиксированный код
-ошибки и этап; неизвестные значения заменяются на `unknown_error`/`unknown`.
-Аккаунт, ключи, адреса, список приложений, DNS, история трафика и содержимое
-туннеля не включаются. Автоматической отправки и crash reporting нет.
+On a connection error, the button «Поделиться диагностикой» ("Share diagnostics") opens a preview.
+Check the code and stage; cancel closes the dialog without calling the Android share API.
+After confirmation, Android shows the system Sharesheet, and the text goes
+only to the app chosen by the user. The report contains a fixed error code
+and stage; unknown values are replaced with `unknown_error`/`unknown`.
+The account, keys, addresses, app list, DNS, traffic history and tunnel contents
+are not included. There is no automatic sending and no crash reporting.
 
-Постоянный контакт поддержки пока не настроен. Тестер выбирает получателя
-самостоятельно; до отправки следует сверить предпросмотр и не дополнять его
-секретами, профилем, OTP или пользовательским трафиком. Физическая проверка
-Sharesheet и инструкции на beta APK остаётся открытой.
+A permanent support contact is not yet configured. The tester chooses the recipient
+independently; before sending, check the preview and do not add secrets,
+a profile, an OTP or user traffic to it. Physical verification of the
+Sharesheet and the instructions on the beta APK remains open.
 
-## Проверки телефона без внешнего endpoint
+## Phone checks without an external endpoint
 
-Подключить и разблокировать ровно один телефон, разрешить USB debugging.
-Для permission cancellation test приложение должно ещё не иметь VPN approval:
+Connect and unlock exactly one phone, allow USB debugging.
+For the permission cancellation test the app must not yet have VPN approval:
 
 ```powershell
 .\scripts\build_flutter_client.ps1 -DeviceChecks
 .\scripts\run_i013_android.ps1
 ```
 
-Первый тест использует настоящий upstream core/key/channel: native DOWN,
-invalid profile/proof/TTL rejection, отмена незавершённого системного permission.
-Туннель к внешнему endpoint не создаётся. Второй тест использует disposable real
-PostgreSQL + loopback FastAPI + настоящий Flutter UI/native. Telegram sender
-**TEST FAKE ONLY**, код передаётся через test-only loopback route; пользовательский
-Telegram и production API не затрагиваются. Native permission заранее разрешается
-через app-op только для этого тестового package, после прогона возвращается default.
-Проверяются login UI, device/key proof, admission closed и отсутствие ложного
-connected; API tunnel intent удаляется, приложение останавливается, reverse
-удаляется, API/PostgreSQL останавливаются и временная БД удаляется.
-Санитизированный receipt: `docs/evidence/i-013-local-android.json`.
+The first test uses the real upstream core/key/channel: native DOWN,
+invalid profile/proof/TTL rejection, cancellation of an unfinished system permission.
+No tunnel to an external endpoint is created. The second test uses a disposable real
+PostgreSQL + loopback FastAPI + the real Flutter UI/native. The Telegram sender is
+**TEST FAKE ONLY**, the code is passed via a test-only loopback route; the user's
+Telegram and the production API are not affected. The native permission is granted in advance
+via app-op only for this test package and is returned to default after the run.
+The login UI, device/key proof, admission closed and the absence of a false
+connected are verified; the API tunnel intent is deleted, the app is stopped, the reverse
+is removed, API/PostgreSQL are stopped and the temporary DB is deleted.
+Sanitized receipt: `docs/evidence/i-013-local-android.json`.
 
-Integration entrypoints находятся только в integration_test, test server routes
-только в pytest-модуле. Они не включаются в обычный main.dart/release API.
-После integration test пересобрать обычный APK: `build_flutter_client.ps1`.
-Не распространять APK, собранный с test entrypoint. Raw Flutter failure output
-хранится только в памяти runner и не показывается, потому что widget diagnostics
-могут содержать код входа. Receipt содержит только фиксированные flags/stage.
+Integration entrypoints are located only in integration_test, test server routes
+only in the pytest module. They are not included in the regular main.dart/release API.
+After the integration test, rebuild the regular APK: `build_flutter_client.ps1`.
+Do not distribute an APK built with a test entrypoint. Raw Flutter failure output
+is kept only in the runner's memory and is not shown, because widget diagnostics
+may contain the login code. The receipt contains only fixed flags/stage.
 
-## Новый bounded staging прогон — отдельное разрешение
+## New bounded staging run — separate permission
 
-I-013 уже технически принят 2026-10-21: собственный physical Flutter receipt
+I-013 was already technically accepted on 2026-10-21: its own physical Flutter receipt
 `docs/evidence/i-013-staging.json`, `passed=true`; 1 passed / 391 deselected.
-Ниже — процедура воспроизведения нового прогона. Для просмотра интерфейса
-повторять staging не требуется. Реальная Telegram delivery, DNS/IPv6 и смена
-Wi-Fi/mobile для этого APK не проверены; release gates остаются открыты.
+Below is the procedure for reproducing a new run. Repeating staging is not required
+to view the interface. Real Telegram delivery, DNS/IPv6 and a Wi-Fi/mobile
+switch have not been verified for this APK; release gates remain open.
 
-Требует явного согласия на один ограниченный прогон на `45.10.166.106` в рамках
-неизменённого ADR-024 controller. Существующие VPN/containers/routes не менять.
-Endpoint и agent до 600s, expiring grant до 45m; 3 независимых client lease до
-60s/1 MiB, без продления. Production operations не входят в разрешение.
+Requires explicit consent for one bounded run on `45.10.166.106` within the
+unchanged ADR-024 controller. Do not change existing VPNs/containers/routes.
+Endpoint and agent up to 600s, expiring grant up to 45m; 3 independent client leases up to
+60s/1 MiB, without extension. Production operations are not covered by the permission.
 
-После согласия пользователь запускает локально (пароль только в Ansible prompt):
+After consent, the user runs locally (password only in the Ansible prompt):
 
 ```powershell
 .\scripts\run_i013_android.ps1 -Staging
 ```
 
-Для уже выданного свежего grant, после проверки причины предыдущего сбоя:
-`-Staging -UseExistingGrant`. Не повторять провалившийся прогон вслепую.
-Пароль, SSH key, profiles и access/refresh/code не отправлять в чат.
+For an already issued fresh grant, after checking the cause of the previous failure:
+`-Staging -UseExistingGrant`. Do not blindly repeat a failed run.
+Do not send the password, SSH key, profiles or access/refresh/code to chat.
 
-Runner использует проверенный I-012 controller без нового remote shell surface.
-До запроса sudo/grant выполняется локальная компиляция точной integration test
-точки входа и ABI подключённого телефона; при ошибке VPS не затрагивается.
-API остаётся loopback, агент получает его через SSH reverse, Android — через ADB
-reverse. Header protection profile хранится вне checkout под user-only ACL.
-Telegram delivery остаётся TEST FAKE; real auth/API/node/Android/egress — actual.
-Сценарии: UI login → create → node ACK → native handshake → staging egress;
-background/foreground; Disconnect → revoked/settled → восстановление сети;
-server revoke → UI/native DOWN; новый lease → expiry → local DOWN/settlement.
-Receipt `docs/evidence/i-013-staging.json` не заменяет raw assumptions:
-`passed=true` допустим только после всех facts и cleanup.
+The runner uses the verified I-012 controller without a new remote shell surface.
+Before the sudo/grant request, a local compilation of the exact integration test
+entry point and a check of the connected phone's ABI are performed; on error the VPS is not touched.
+The API stays loopback, the agent reaches it via SSH reverse, Android via ADB
+reverse. The header protection profile is stored outside the checkout under a user-only ACL.
+Telegram delivery remains TEST FAKE; real auth/API/node/Android/egress are actual.
+Scenarios: UI login → create → node ACK → native handshake → staging egress;
+background/foreground; Disconnect → revoked/settled → network restore;
+server revoke → UI/native DOWN; new lease → expiry → local DOWN/settlement.
+The receipt `docs/evidence/i-013-staging.json` does not replace raw assumptions:
+`passed=true` is permissible only after all facts and cleanup.
 
-Cleanup: remote expire/семь baseline checks + grant removal; SSH transport close;
+Cleanup: remote expire/seven baseline checks + grant removal; SSH transport close;
 stop phone/reset own app-op/remove reverse; secret profile/key removal; stop local
-API/PostgreSQL. Runner не оставляет действующий peer или постоянно работающий API.
-Неуспешный cleanup должен быть устранён до нового staging прогона.
+API/PostgreSQL. The runner leaves no active peer or permanently running API.
+An unsuccessful cleanup must be resolved before a new staging run.
 
-## Ручной acceptance checklist
+## Manual acceptance checklist
 
-- Отказ в Android VPN permission: нет connected и реального native UP.
-- Connect/Disconnect меняет системный VPN; native UP без handshake не connected.
-- Wi-Fi/mobile loss и возврат: reconnecting, без автоматического нового peer;
-  состояние пересчитывается при возврате экрана. До согласованного теста не
-  переключать пользовательские radios автоматически.
-- Проверить реальный IPv4/IPv6/DNS и возврат обычной сети; свежий handshake сам
-  по себе не доказывает отсутствие утечек. I-011 sample не заменяет новый APK test.
-- Theme/font scaling/screen reader; token/key/profile не показываются/не логируются.
-- При API failure cached quota имеет отметку о давности; bytes всегда integer.
+- Denial of the Android VPN permission: no connected and no real native UP.
+- Connect/Disconnect changes the system VPN; native UP without a handshake is not connected.
+- Wi-Fi/mobile loss and return: reconnecting, without an automatic new peer;
+  the state is recomputed when the screen returns. Do not switch the user's radios
+  automatically before an agreed test.
+- Verify real IPv4/IPv6/DNS and the return of the normal network; a fresh handshake
+  alone does not prove the absence of leaks. The I-011 sample does not replace a new APK test.
+- Theme/font scaling/screen reader; token/key/profile are not shown/not logged.
+- On API failure, cached quota carries a staleness mark; bytes are always integer.
 
-Known limitations: ephemeral key/session, ручной новый вход после process death,
-device-limit cleanup через существующий device API/account tooling; один staging
-endpoint; нет auto renewal/region selection/full history. После утраты сессии
-можно войти снова для завершения pending revoke; intent остаётся только в RAM.
-При смене аккаунта/смерти процесса server kernel lease остаётся последним gate;
-клиент не обещает подтверждённый remote revoke без node ACK.
-Public release требует licence/supply-chain/SBOM/security/privacy gates.
+Known limitations: ephemeral key/session, manual new sign-in after process death,
+device-limit cleanup via the existing device API/account tooling; one staging
+endpoint; no auto renewal/region selection/full history. After the session is lost,
+one can sign in again to complete a pending revoke; the intent remains only in RAM.
+On account change/process death, the server kernel lease remains the last gate;
+the client does not promise a confirmed remote revoke without a node ACK.
+Public release requires licence/supply-chain/SBOM/security/privacy gates.

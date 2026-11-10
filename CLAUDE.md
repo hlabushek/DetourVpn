@@ -12,4 +12,4 @@
 - Do not expose identifiers, credentials, IP addresses, endpoints, raw logs, traffic, or account details in evidence or responses. Save only the minimum sanitized evidence needed for the assigned issue.
 - Make the smallest reviewable change. Before editing, state the files to change, relevant checks, and security risks. Run only checks needed for the change or acceptance criteria; do not launch a broad test suite by default.
 - Do not treat a build, mock, local VPN state, UI message, ping, or quota debit as proof of tunnel handshake, source-bound egress, server attribution, or beta readiness.
-- Explain results and tradeoffs in Russian. Distinguish verified facts, owner reports, and unresolved questions.
+- Explain results and tradeoffs in English. Distinguish verified facts, owner reports, and unresolved questions.

@@ -18,7 +18,7 @@ does not implement and could send traffic through the wrong path.
 ## Product semantics for the requested UI
 
 - Keep one split on/off switch and one direction selector shared by two
-  horizontally swipeable tabs: **Домены** and **Приложения**.
+  horizontally swipeable tabs: **Домены** (Domains) and **Приложения** (Apps).
 - A selected app or selected domain uses the same direction. In `exclude`
   mode, either match bypasses the VPN and unmatched traffic uses the VPN. In
   `include` mode, either match uses the VPN and unmatched traffic goes direct.

@@ -63,4 +63,4 @@ You are developing a privacy-preserving, modular VPN service. This is a real inf
 - Summary: changes, files, test commands, failures, and recommended next issue.
 
 ## Response language
-- Explain decisions and tradeoffs in Russian; code and identifiers in English.
+- Work, reason, and report in English (docs, ADRs, issues, plans, chat). Keep user-facing product text in Russian: app UI strings, Telegram bot messages, tester materials and channel posts.

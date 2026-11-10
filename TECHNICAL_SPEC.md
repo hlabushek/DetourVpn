@@ -1,71 +1,71 @@
-# VPN-сервис: техническое задание (PRD + SRS)
+# VPN Service: Technical Specification (PRD + SRS)
 
-**Версия:** 0.2  
-**Дата:** 2026-10-18  
-**Статус:** проект для обсуждения и реализации через Codex  
-**Название:** DetourVpn (согласовано владельцем 2026-10-21)
+**Version:** 0.2  
+**Date:** 2026-10-18  
+**Status:** draft for discussion and implementation via Codex  
+**Name:** DetourVpn (approved by the owner on 2026-10-21)
 
-Изменение 0.2: по прямому уточнению владельца от 2026-10-18 основной вход —
-по одноразовому коду, сгенерированному в Telegram-боте. AUTH и контракт начала
-входа уточнены; прежний выбор email/OIDC больше не является текущим планом.
-Подробности и ещё предлагаемые технические параметры: `docs/adr/001-authentication.md`.
+Change 0.2: per the owner's direct clarification of 2026-10-18, the primary login
+is by a one-time code generated in the Telegram bot. AUTH and the login-start
+contract are refined; the earlier email/OIDC choice is no longer the current plan.
+Details and further proposed technical parameters: `docs/adr/001-authentication.md`.
 
-> Это инженерное ТЗ, а не юридическое заключение и не гарантия обхода сетевых ограничений. Все юридические, лицензионные и платёжные решения перед публичным запуском проверяются по стране ведения деятельности и рынку распространения.
+> This is an engineering specification, not a legal opinion and not a guarantee of bypassing network restrictions. All legal, licensing, and payment decisions must be verified for the country of operation and the distribution market before public launch.
 
-## 1. Видение продукта
+## 1. Product vision
 
-Создать независимый VPN-сервис с собственным клиентским приложением, коммерческими тарифами, бесплатной квотой трафика за полезную активность и проверенными транспортными реализациями. Проект должен быть модульным: замена узла, транспорта, системы начислений или провайдера платежей не должна требовать переписывать основное приложение.
+Create an independent VPN service with its own client application, commercial plans, a free traffic quota for useful activity, and verified transport implementations. The project must be modular: replacing a node, transport, reward system, or payment provider must not require rewriting the core application.
 
-### 1.1. Продуктовые принципы
-- **Безопасность и доверие:** не перехватывать пользовательские сессии, не продавать сетевую активность, не использовать VPN-трафик для рекламной монетизации.
-- **Прозрачность:** честно описывать ограничения, хранение данных, регионы подключения, стоимость и правила начисления трафика.
-- **Отказоустойчивость:** отказ конкретного узла или управляющего API не должен автоматически разрушать уже установленное соединение.
-- **Расширяемость:** новые сетевые движки добавляются адаптерами с отдельными тестами совместимости.
-- **Измеримость:** решения принимаются после измерения стоимости 1 ГБ, удержания пользователей, антифрода и качества связи.
-- **Юридическая осмотрительность:** бренд отделён от личных аккаунтов; законные требования к регистрации, платежам и отчётности не обходятся.
+### 1.1. Product principles
+- **Security and trust:** do not intercept user sessions, do not sell network activity, do not use VPN traffic for advertising monetization.
+- **Transparency:** honestly describe limitations, data retention, connection regions, pricing, and traffic reward rules.
+- **Resilience:** failure of a specific node or of the management API must not automatically break an already established connection.
+- **Extensibility:** new network engines are added via adapters with separate compatibility tests.
+- **Measurability:** decisions are made after measuring the cost of 1 GB, user retention, anti-fraud, and connection quality.
+- **Legal prudence:** the brand is separated from personal accounts; legal requirements for registration, payments, and reporting are not circumvented.
 
-### 1.2. Аудитория
-- Частные пользователи Android, нуждающиеся в защищённом соединении и простом интерфейсе.
-- Пользователи, выбирающие ограниченную бесплатную квоту за активность.
-- Пользователи платной подписки, которым важны стабильность и отсутствие рекламных заданий.
+### 1.2. Audience
+- Private Android users who need a protected connection and a simple interface.
+- Users who choose a limited free quota earned through activity.
+- Paid-subscription users who value stability and the absence of advertising tasks.
 
-### 1.3. Что **не** обещаем
-- Гарантированный доступ в интернет при строгом allowlist, когда внешний IP VPN-узла недоступен.
-- 100% неуязвимость к DPI, блокировкам IP или DDoS.
-- Абсолютную анонимность владельца перед провайдерами, банками и компетентными органами.
-- Политику «никаких логов» без архитектурной и независимой проверки.
+### 1.3. What we do **not** promise
+- Guaranteed internet access under a strict allowlist when the external IP of the VPN node is unreachable.
+- 100% immunity to DPI, IP blocking, or DDoS.
+- Absolute anonymity of the owner with respect to providers, banks, and competent authorities.
+- A "no logs" policy without an architectural and independent audit.
 
-## 2. Границы MVP и будущих релизов
+## 2. MVP and future release boundaries
 
 ### MVP (P0)
-1. Android-клиент: регистрация, вход, домашний экран, баланс трафика, каталог узлов, подключение/отключение, понятные ошибки.
-2. Backend: пользователи, устройства, аутентификация, каталог узлов, конфигурации, агрегированный трафик, тарифные ограничения.
-3. Один рабочий VPN-узел с проверенным движком и ручной сменой узла при неполадке.
-4. Начальная бесплатная квота + ежедневная награда + кликер с серверными лимитами.
-5. Админ-интерфейс для просмотра состояния узлов и корректировки пользовательских лимитов с аудитом изменений.
-6. Мониторинг, резервные копии, шифрование секретов, автоматические тесты и минимальная документация.
-7. Закрытое тестирование; без публичных платежей и закупки рекламы до юридической проверки.
+1. Android client: registration, login, home screen, traffic balance, node catalog, connect/disconnect, clear errors.
+2. Backend: users, devices, authentication, node catalog, configurations, aggregated traffic, plan limits.
+3. One working VPN node with a verified engine and manual node switching on failure.
+4. Initial free quota + daily reward + clicker with server-side limits.
+5. Admin interface for viewing node status and adjusting user limits with an audit of changes.
+6. Monitoring, backups, secret encryption, automated tests, and minimal documentation.
+7. Closed testing; no public payments and no ad purchasing until legal review.
 
 ### Release 1 (P1)
-- Telegram Mini App, проверяемые задания, промокоды, рефералы.
-- Интеграция реальных платежей и подписок **только после** юридического и платёжного согласования.
-- Второй независимый узел; ручное и автоматическое переключение с учётом качества.
-- Несколько типов туннелей через одинаковый контракт адаптеров.
-- Политика квот/приоритетов; поддержка обращения пользователей и удаления аккаунта.
+- Telegram Mini App, verifiable tasks, promo codes, referrals.
+- Integration of real payments and subscriptions **only after** legal and payment approval.
+- Second independent node; manual and automatic switching with quality awareness.
+- Several tunnel types through the same adapter contract.
+- Quota/priority policy; user support requests and account deletion.
 
 ### Release 2 (P2)
-- Windows/Linux, далее iOS после подтверждения прав, лицензий и требований App Store.
-- Расширенные транспортные тесты; исследование поведения в ограниченных сетях без обещаний универсального обхода.
-- Развитая геймификация: уровни, достижения, сезонные события, задания партнёров.
-- Панель метрик CAC, LTV, удержания и валовой маржи.
+- Windows/Linux, then iOS after confirmation of rights, licenses, and App Store requirements.
+- Extended transport tests; research into behavior in restricted networks without promises of universal bypass.
+- Advanced gamification: levels, achievements, seasonal events, partner tasks.
+- Dashboard of CAC, LTV, retention, and gross margin metrics.
 
-### Вне объёма MVP
-- Собственная криптография; общефедеральная рекламная кампания; гарантированный обход allowlist; контейнерный оркестратор Kubernetes; специализированная защита корпоративного уровня; собственного финансового посредника/платёжной системы.
+### Out of MVP scope
+- Custom cryptography; a nationwide advertising campaign; guaranteed allowlist bypass; the Kubernetes container orchestrator; specialized enterprise-grade protection; a proprietary financial intermediary/payment system.
 
-## 3. Архитектура
+## 3. Architecture
 
 ```text
- [Android Flutter]           [Telegram Mini App / позже]
+ [Android Flutter]           [Telegram Mini App / later]
        |                                   |
        +------- HTTPS / REST --------------+
                        |
@@ -88,108 +88,108 @@
           +----- encrypted user data tunnels -- [Android OS VPN/TUN]
 ```
 
-**Критично:** пользовательский туннельный трафик идёт напрямую между устройством и VPN-узлом. Backend не находится на пути данных и не получает историю посещённых сайтов. Web API, админ-интерфейс и доступ управления узлами имеют отдельные политики безопасности.
+**Critical:** user tunnel traffic goes directly between the device and the VPN node. The backend is not on the data path and does not receive the history of visited sites. The web API, the admin interface, and node management access have separate security policies.
 
-### 3.1. Выбор технологий
-- Клиент: **Flutter/Dart**, нативная часть Android **Kotlin + VpnService**, интеграция проверенного tunnel SDK/библиотеки с соблюдением лицензий; Flutter не заменяет нативный VPN-движок.
-- Backend: **Python 3.x + FastAPI + Pydantic + SQLAlchemy 2 + Alembic**; версии закрепить lock-файлами после проверки совместимости.
-- PostgreSQL: финансово-подобный журнал операций, аккаунты, узлы, лимиты, платежи.
-- Redis: rate limits, блокировки коротких операций, очереди заданий; **не** источник истины для баланса.
-- Фоновые задачи: лёгкий worker; Celery/RQ/другое выбрать после измерений, в MVP достаточно одного понятного решения.
-- Infra: Linux LTS на VPS, Docker Compose (API/DB/metrics), Ansible/Terraform по необходимости. Узлы при необходимости запускают VPN-движок на хосте (не всё обязано быть в Docker).
-- CI: GitHub Actions (lint, type check, tests, dependency audit, build verification), ветки и код-ревью.
-- Observability: Prometheus/Grafana, минимизированные структурированные логи, алерты.
+### 3.1. Technology choices
+- Client: **Flutter/Dart**, native Android part **Kotlin + VpnService**, integration of a proven tunnel SDK/library in compliance with licenses; Flutter does not replace the native VPN engine.
+- Backend: **Python 3.x + FastAPI + Pydantic + SQLAlchemy 2 + Alembic**; pin versions with lock files after compatibility verification.
+- PostgreSQL: ledger-like operation journal, accounts, nodes, limits, payments.
+- Redis: rate limits, short-operation locks, task queues; **not** the source of truth for balance.
+- Background tasks: a lightweight worker; choose Celery/RQ/other after measurements; in the MVP one clear solution is sufficient.
+- Infra: Linux LTS on a VPS, Docker Compose (API/DB/metrics), Ansible/Terraform as needed. Nodes may run the VPN engine on the host if necessary (not everything has to be in Docker).
+- CI: GitHub Actions (lint, type check, tests, dependency audit, build verification), branches and code review.
+- Observability: Prometheus/Grafana, minimized structured logs, alerts.
 
-### 3.2. VPN-движки и совместимость
-- `TunnelEngineAdapter` с методами `validate_capabilities`, `provision_peer`, `revoke_peer`, `read_counters`, `health`, `rotate_config`.
-- Для Android клиент реализует совместимый `TunnelProvider` с контрактом `connect`, `disconnect`, `get_status`, `network_changed`.
-- Базовый кандидат: AmneziaWG, **версию выбирать после проверки стабильности, поддерживаемых клиентских библиотек и матрицы совместимости**. Не привязываться по умолчанию к AWG 2.0: документация уже описывает AWG 3.1.
-- Дополнительный кандидат: Xray-core, MPL-2.0. Исследовать, нужен ли отдельный TUN-провайдер / userspace backend, последствия для батареи и лицензирования.
-- Не копировать готовый клиент AmneziaVPN без учёта GPL-3.0, в том числе требований при распространении модификаций; сделать отдельную лицензионную экспертизу каждой встроенной библиотеки.
-- Матрица `engine × version × OS × client version × IPv4/IPv6 × DNS × suspend/resume` обязательна.
+### 3.2. VPN engines and compatibility
+- `TunnelEngineAdapter` with methods `validate_capabilities`, `provision_peer`, `revoke_peer`, `read_counters`, `health`, `rotate_config`.
+- For Android, the client implements a compatible `TunnelProvider` with the contract `connect`, `disconnect`, `get_status`, `network_changed`.
+- Baseline candidate: AmneziaWG; **choose the version after verifying stability, supported client libraries, and the compatibility matrix**. Do not default to AWG 2.0: the documentation already describes AWG 3.1.
+- Additional candidate: Xray-core, MPL-2.0. Investigate whether a separate TUN provider / userspace backend is needed, and the implications for battery and licensing.
+- Do not copy the ready-made AmneziaVPN client without accounting for GPL-3.0, including the requirements when distributing modifications; perform a separate license review of every embedded library.
+- The matrix `engine × version × OS × client version × IPv4/IPv6 × DNS × suspend/resume` is mandatory.
 
-### 3.3. Протокол управления узлами
-- Агент на узле устанавливает исходящее аутентифицированное соединение с сервером управления либо принимает mTLS-команды по строго ограниченному каналу.
-- Node Agent может выдавать/отзывать конфигурации и отдавать только агрегированные счётчики и состояние узла; не принимает произвольные shell-команды из публичного API.
-- Все операции имеют `operation_id`, TTL и идемпотентность; административные изменения фиксируются в audit log.
-- При потере управляющего API действующие сессии продолжают работать, насколько это позволяет транспорт и узел.
+### 3.3. Node management protocol
+- The node agent either establishes an outgoing authenticated connection to the management server or accepts mTLS commands over a strictly restricted channel.
+- The Node Agent may issue/revoke configurations and expose only aggregated counters and node state; it does not accept arbitrary shell commands from the public API.
+- All operations have an `operation_id`, a TTL, and idempotency; administrative changes are recorded in the audit log.
+- If the management API is lost, active sessions continue to work as far as the transport and the node allow.
 
-## 4. Роли и сценарии использования
+## 4. Roles and use cases
 
-### Роли
-- **Гость:** просматривает описание тарифов/возможностей, без подключения.
-- **Пользователь Free:** выдача начальной квоты, VPN и игровые задания в установленных лимитах.
-- **Пользователь Premium:** коммерческие лимиты/приоритет без рекламных заданий (после введения платежей).
-- **Оператор:** статус узлов, обращения, ограниченные действия без доступа к секретам.
-- **Администратор:** развёртывание и выпуск конфигураций по RBAC + MFA, с полным аудитом.
+### Roles
+- **Guest:** views the description of plans/features, without connecting.
+- **Free user:** receives the initial quota; VPN and game tasks within the established limits.
+- **Premium user:** commercial limits/priority without advertising tasks (after payments are introduced).
+- **Operator:** node status, support requests, limited actions without access to secrets.
+- **Administrator:** deployment and configuration issuance under RBAC + MFA, with full audit.
 
-### Основные пользовательские истории
-- US-01: После регистрации пользователь получает стартовую квоту **строго один раз**.
-- US-02: Нажав «Подключить», пользователь видит `connecting/connected/failed`, регион и текущий статус.
-- US-03: При отсутствии свободной квоты подключение прекращается/ограничивается согласно опубликованной политике с допустимой задержкой измерения.
-- US-04: Клики начисляют награду, пока есть дневной лимит; повторная отправка запроса не даёт второй награды.
-- US-05: Бонус раз в сутки доступен только после серверной проверки.
-- US-06: Изменение региона не сбрасывает баланс и не дублирует устройство.
-- US-07: При отключении узла интерфейс объясняет причину и предлагает доступные альтернативы.
-- US-08: Пользователь может выйти со всех устройств, удалить аккаунт и запросить сведения о хранящихся данных.
-- US-09: Оператор видит состояние инфраструктуры, но не интернет-историю пользователя.
-- US-10: Для платёжных сценариев изменение доступа происходит только после проверенного webhook от платёжного провайдера.
+### Main user stories
+- US-01: After registration the user receives the starting quota **strictly once**.
+- US-02: After pressing «Подключить» (Connect), the user sees `connecting/connected/failed`, the region, and the current status.
+- US-03: When there is no free quota left, the connection is stopped/restricted according to the published policy, with an acceptable measurement delay.
+- US-04: Clicks earn rewards while the daily limit remains; resending a request does not yield a second reward.
+- US-05: The once-a-day bonus is available only after server-side verification.
+- US-06: Changing the region does not reset the balance and does not duplicate the device.
+- US-07: When a node is down, the interface explains the reason and offers available alternatives.
+- US-08: The user can sign out of all devices, delete the account, and request information about stored data.
+- US-09: The operator sees the infrastructure state but not the user's internet history.
+- US-10: For payment scenarios, access changes only after a verified webhook from the payment provider.
 
-## 5. Функциональные требования
+## 5. Functional requirements
 
 ### AUTH
-- AUTH-01: На MVP — одноразовый код, сгенерированный сервисом нашего Telegram-бота и выданный пользователю в личном чате; пользователь вводит код в приложении. Аккаунт связан с Telegram user ID из доверенного Bot API Update. Email/OIDC не являются выбранным способом. Независимый резервный вход/восстановление пока не определён и требует отдельного решения.
-- AUTH-02: Пароли (если есть) хранить через Argon2id; MFA обязателен для администраторов.
-- AUTH-03: Сессии и refresh-токены отзываются, rate limiting на вход и восстановление, защита от enumeration.
-- AUTH-04: Устройства имеют отдельный `device_id` и ключи туннеля; запрет шаринга конфигураций в коммерческой версии нужно проектировать через ограничения устройств/сессий, без инвазивного fingerprinting.
-- AUTH-05: Код ограничен по времени, одноразовый, привязан к попытке входа и Telegram identity; ограничение перебора, безопасное хранение и атомарное погашение обязательны. Точные TTL/формат/лимиты определяются ADR-001; короткий код без привязки к попытке не принимается.
-- AUTH-06: Выпуск кодов доступен только доверенному bot adapter. Проверять источник Updates и идемпотентность update_id; не принимать Telegram ID из публичного клиента, username или forwarded content. Код, bot token и клиентский verifier не попадают в логи. Для самого входа Mini App не требуется.
+- AUTH-01: In the MVP, a one-time code generated by our Telegram bot service and delivered to the user in a private chat; the user enters the code in the app. The account is linked to the Telegram user ID from a trusted Bot API Update. Email/OIDC is not the selected method. An independent fallback login/recovery is not yet defined and requires a separate decision.
+- AUTH-02: Passwords (if any) must be stored using Argon2id; MFA is mandatory for administrators.
+- AUTH-03: Sessions and refresh tokens are revocable; rate limiting on login and recovery; protection against enumeration.
+- AUTH-04: Devices have a separate `device_id` and tunnel keys; the ban on sharing configurations in the commercial version must be designed through device/session limits, without invasive fingerprinting.
+- AUTH-05: The code is time-limited, single-use, bound to the login attempt and the Telegram identity; brute-force limiting, safe storage, and atomic redemption are mandatory. The exact TTL/format/limits are determined by ADR-001; a short code without binding to the attempt is not accepted.
+- AUTH-06: Code issuance is available only to the trusted bot adapter. Verify the source of Updates and the idempotency of update_id; do not accept a Telegram ID from the public client, a username, or forwarded content. The code, the bot token, and the client verifier must not appear in logs. The Mini App is not required for login itself.
 
 ### VPN
-- VPN-01: Список доступных регионов и узлов с честным индикатором состояния (не обещать «доступен у любого оператора»).
-- VPN-02: Создать/отозвать peer на узле без экспонирования приватного ключа устройства в API; по возможности приватный ключ генерируется локально.
-- VPN-03: Выдать конфигурацию только владельцу устройства, с проверкой доступа и expiry.
-- VPN-04: Полный туннель и корректный DNS по умолчанию; защита от DNS/IPv6 утечек тестируется на реальных сетях. Не включать «kill switch» в маркетинг до проверки поведения ОС.
-- VPN-05: Корректно обрабатывать смену Wi-Fi/LTE, sleep/resume, потерю разрешения VpnService, переключение региона.
-- VPN-06: Счётчики исходящих/входящих байтов собираются с узла; фиксировать правило тарификации (например, `rx + tx`), не использовать показания клиента как источник истины.
-- VPN-07: При недоступности API работа уже настроенного туннеля не зависит от интерфейса кликера/платежей.
+- VPN-01: A list of available regions and nodes with an honest status indicator (do not promise "available at any operator").
+- VPN-02: Create/revoke a peer on a node without exposing the device's private key in the API; where possible, the private key is generated locally.
+- VPN-03: Issue a configuration only to the device owner, with access checks and expiry.
+- VPN-04: Full tunnel and correct DNS by default; protection against DNS/IPv6 leaks is tested on real networks. Do not include a "kill switch" in marketing until the OS behavior has been verified.
+- VPN-05: Correctly handle Wi-Fi/LTE switching, sleep/resume, loss of the VpnService permission, and region switching.
+- VPN-06: Outgoing/incoming byte counters are collected from the node; fix the billing rule (for example, `rx + tx`); do not use client readings as the source of truth.
+- VPN-07: When the API is unavailable, the operation of an already configured tunnel does not depend on the clicker/payments interface.
 
 ### TRAFFIC / QUOTA
-- Q-01: Количество байт в единицах `bytes BIGINT` — единственный источник истины для подсчёта объёма, преобразование в МБ/ГБ только при выводе.
-- Q-02: Учёт трафика — идемпотентное потребление монотонных счётчиков узлов. При рестарте счётчика новая `counter_epoch`, отрицательные дельты не списывать.
-- Q-03: Для каждого пакета измерений сохранять `node_id/peer_id/epoch/sequence/timestamp/counters`; отдельный журнал списаний.
-- Q-04: В учёте учитывать задержки отправки метрик и явно документировать погрешность enforcement (hard cutoff на байт в распределённой сети не гарантирован).
-- Q-05: Безопасный резерв при приближении к нулю; лимиты на использование и верхняя граница допускаемой перерасходованной квоты.
-- Q-06: Действие корректировки оператором — отдельная операция ledger, а не прямая замена поля `balance`.
+- Q-01: The number of bytes as `bytes BIGINT` is the only source of truth for volume accounting; conversion to MB/GB only on display.
+- Q-02: Traffic accounting is idempotent consumption of monotonic node counters. On a counter restart a new `counter_epoch` applies; negative deltas must not be debited.
+- Q-03: For each measurement batch store `node_id/peer_id/epoch/sequence/timestamp/counters`; keep a separate debit journal.
+- Q-04: Accounting must account for metric delivery delays and explicitly document the enforcement error margin (a hard cutoff at a single byte is not guaranteed in a distributed network).
+- Q-05: A safe reserve as the balance approaches zero; limits on usage and an upper bound on the permitted over-consumed quota.
+- Q-06: An operator adjustment is a separate ledger operation, not a direct replacement of the `balance` field.
 
 ### REWARDS / GAMIFICATION
-- G-01: Правило награды находится на сервере: `reward_type`, `reward_bytes`, `daily_cap`, `cooldown`, `eligibility`, `campaign_window`.
-- G-02: Один клик = фиксированная квота (примерно 1–2 МБ), максимум X кликов и Y МБ в сутки; параметры конфигурируемые, не хардкодить.
-- G-03: Награды обрабатываются транзакционно; уникальный `idempotency_key` + `user_id`, ledger credit only once.
-- G-04: Ежедневный бонус определяется серверным календарным днём с документированным часовым поясом.
-- G-05: Задания на вступление в Telegram-канал начисляются только если членство может быть надёжно проверено; проверки требуют подходящих прав бота.
-- G-06: Не выдавать вознаграждение только за нажатие кнопки «Я подписался» без проверки, если рекламодатель ожидает подтверждённого участника.
-- G-07: Реферальный бонус только после определённого валидного события; защита от саморефералов и ограничение ущерба от ферм аккаунтов. Для I-018 (ADR-030): подтверждённый активный аккаунт + созданный после привязки завершённый managed tunnel с положительными observed counters и соответствующим applied quota debit. Только пригласившему, один раз, в пределах окна/cap/бюджета кампании. Кампании по умолчанию отсутствуют; проверка запрашивается вручную в Mini App.
-- G-08: Прозрачная публикация условий заданий, реклама маркируется там, где требуется; не создавать искусственно оплачиваемые подписки вопреки правилам площадок и рекламодателей.
-- G-09: При аномалиях — ограничение начислений и ручная проверка; не применять неразъяснённые постоянные блокировки.
+- G-01: The reward rule lives on the server: `reward_type`, `reward_bytes`, `daily_cap`, `cooldown`, `eligibility`, `campaign_window`.
+- G-02: One click = a fixed quota (approximately 1–2 MB), at most X clicks and Y MB per day; the parameters are configurable, not hardcoded.
+- G-03: Rewards are processed transactionally; unique `idempotency_key` + `user_id`, ledger credit only once.
+- G-04: The daily bonus is determined by the server calendar day with a documented time zone.
+- G-05: Tasks for joining a Telegram channel are credited only if membership can be reliably verified; the checks require appropriate bot permissions.
+- G-06: Do not grant a reward merely for pressing the «Я подписался» (I have subscribed) button without verification if the advertiser expects a confirmed participant.
+- G-07: The referral bonus only after a defined valid event; protection against self-referrals and limiting the damage from account farms. For I-018 (ADR-030): a confirmed active account + a completed managed tunnel created after binding, with positive observed counters and a corresponding applied quota debit. Only to the inviter, once, within the campaign window/cap/budget. There are no campaigns by default; the check is requested manually in the Mini App.
+- G-08: Transparent publication of task terms; advertising is labeled where required; do not create artificially paid subscriptions contrary to the rules of platforms and advertisers.
+- G-09: On anomalies, limit credits and review manually; do not apply unexplained permanent bans.
 
-### PAYMENTS (после юридического gate)
-- P-01: Абстракция `PaymentProvider` для одного интегрированного процессора.
-- P-02: Проверять подпись webhook, replay protection, уникальность provider_transaction_id, фиксировать статус: created, pending, paid, failed, refunded, chargeback.
-- P-03: Подписка и права доступа задаются отдельной таблицей entitlements; не считать приход денег окончательно подтверждённым по редиректу на success URL.
-- P-04: Обработка возвратов, ошибок, отмены продления, налоговых документов и поддержки.
-- P-05: Не хранить номера банковских карт; использовать токены авторизованного провайдера.
-- P-06: Требования App Store/Google Play и Telegram к продаже цифровых услуг проверять до интеграции.
+### PAYMENTS (after the legal gate)
+- P-01: A `PaymentProvider` abstraction for one integrated processor.
+- P-02: Verify the webhook signature, replay protection, uniqueness of provider_transaction_id; record the status: created, pending, paid, failed, refunded, chargeback.
+- P-03: The subscription and access rights are defined by a separate entitlements table; do not consider the receipt of money as finally confirmed by a redirect to the success URL.
+- P-04: Handling of refunds, errors, renewal cancellation, tax documents, and support.
+- P-05: Do not store bank card numbers; use tokens of an authorized provider.
+- P-06: App Store/Google Play and Telegram requirements for selling digital services must be checked before integration.
 
 ### ADMIN
-- A-01: Раздельные роли по принципу наименьших привилегий и MFA.
-- A-02: Список узлов, процент ошибок, истощение диска, загрузка CPU, объём трафика, очередь неуспешных выдач.
-- A-03: Изменение квот и тарифов требует причины и аудита.
-- A-04: Экспорт агрегированных метрик без PII, аварийное отключение выдачи новых конфигураций.
+- A-01: Separate roles under the principle of least privilege, and MFA.
+- A-02: List of nodes, error rate, disk exhaustion, CPU load, traffic volume, queue of failed issuances.
+- A-03: Changing quotas and plans requires a reason and an audit.
+- A-04: Export of aggregated metrics without PII; emergency shutdown of issuing new configurations.
 
-## 6. Предварительная модель данных
+## 6. Preliminary data model
 
-| Таблица | Ключевые поля |
+| Table | Key fields |
 |---|---|
 | `users` | id, status, created_at, verified_at, locale |
 | `auth_identities` | id, user_id, provider, provider_subject, verified_at |
@@ -211,40 +211,40 @@
 | `payments` | id, user_id, provider, external_id, amount_minor, currency, state, created_at |
 | `audit_events` | id, actor_id, action, resource_id, reason, created_at |
 
-Требования: UUID идентификаторы, миграции Alembic, ограничения уникальности, индексы по `user_id` и временному периоду, внешний ключ для всех ссылок, конкурентные операции баланса — в транзакциях. Не выполнять списание при простом обновлении UI.
+Requirements: UUID identifiers, Alembic migrations, uniqueness constraints, indexes on `user_id` and time period, a foreign key for all references, concurrent balance operations in transactions. Do not perform a debit on a simple UI update.
 
-## 7. API v1: первоначальные контракты
+## 7. API v1: initial contracts
 
-Базовый префикс: `/api/v1`; все пользовательские методы под HTTPS. Методы с пользовательскими данными требуют аутентификацию и контроль владения ресурсом; начало/проверка входа доступны без существующей сессии, но защищены pairing, лимитами и валидацией согласно ADR-001. Все возвращаемые ошибки: `{ "error": {"code": "...", "message": "...", "request_id": "..."} }`.
+Base prefix: `/api/v1`; all user methods over HTTPS. Methods with user data require authentication and resource ownership control; login start/verification are available without an existing session but are protected by pairing, limits, and validation according to ADR-001. All returned errors: `{ "error": {"code": "...", "message": "...", "request_id": "..."} }`.
 
-| Метод | Маршрут | Назначение |
+| Method | Route | Purpose |
 |---|---|---|
-| POST | `/auth/start` | Создать попытку входа и ссылку на бота; не выдаёт код по произвольному Telegram ID |
-| POST | `/auth/verify` | Проверить код из бота и привязку к попытке, атомарно создать сессию |
-| POST | `/auth/mini-app` | I-017: одноразовый обмен проверенного Telegram initData на ограниченную сессию кабинета (ADR-029); по умолчанию выключен |
-| POST | `/auth/refresh` | Обновление сессии |
-| GET | `/me` | Профиль/статус |
-| DELETE | `/me` | Запрос удаления аккаунта |
-| GET | `/regions` | Список регионов |
-| GET | `/nodes` | Разрешённые узлы и их актуальный статус |
-| POST | `/devices` | Регистрация устройства и публичного ключа |
-| POST | `/tunnels` | Выдать конфигурацию для устройства и узла |
-| DELETE | `/tunnels/{id}` | Отозвать конфигурацию |
-| GET | `/quota` | Выдано, использовано, доступно в байтах |
-| GET | `/quota/history` | Журнал начислений/расхода |
-| GET | `/rewards/rules` | Активные игровые правила |
-| POST | `/rewards/claim` | Попытка начисления: только после серверной проверки |
-| GET | `/tasks` | Доступные задания |
-| POST | `/tasks/{id}/verify` | Проверка выполнения и зачисление |
-| GET | `/referrals` | Собственные счётчики, записи и условия кампаний; cursor pagination |
-| POST | `/referrals/code` | Создать или повторно получить свой публичный код |
-| POST | `/referrals/resolve` | Неизменяемая привязка приглашения |
-| POST | `/referrals/claim` | Серверная проверка события и атомарный бонус пригласившему |
-| GET | `/health/public` | Безопасный агрегированный статус системы |
+| POST | `/auth/start` | Create a login attempt and a bot link; does not issue a code for an arbitrary Telegram ID |
+| POST | `/auth/verify` | Verify the code from the bot and the binding to the attempt, atomically create a session |
+| POST | `/auth/mini-app` | I-017: one-time exchange of verified Telegram initData for a limited cabinet session (ADR-029); disabled by default |
+| POST | `/auth/refresh` | Session refresh |
+| GET | `/me` | Profile/status |
+| DELETE | `/me` | Account deletion request |
+| GET | `/regions` | List of regions |
+| GET | `/nodes` | Permitted nodes and their current status |
+| POST | `/devices` | Device and public key registration |
+| POST | `/tunnels` | Issue a configuration for a device and node |
+| DELETE | `/tunnels/{id}` | Revoke a configuration |
+| GET | `/quota` | Granted, used, available in bytes |
+| GET | `/quota/history` | Journal of credits/consumption |
+| GET | `/rewards/rules` | Active game rules |
+| POST | `/rewards/claim` | Credit attempt: only after server-side verification |
+| GET | `/tasks` | Available tasks |
+| POST | `/tasks/{id}/verify` | Completion check and crediting |
+| GET | `/referrals` | Own counters, records, and campaign terms; cursor pagination |
+| POST | `/referrals/code` | Create or re-retrieve own public code |
+| POST | `/referrals/resolve` | Immutable binding of the invitation |
+| POST | `/referrals/claim` | Server-side event verification and atomic bonus to the inviter |
+| GET | `/health/public` | Safe aggregated system status |
 
-Административные и агентские endpoints располагаются отдельно; перечисление их в публичном API запрещено. Контракты оформлять OpenAPI + схемы ошибок + versioning.
+Administrative and agent endpoints are located separately; listing them in the public API is prohibited. Contracts must be formalized with OpenAPI + error schemas + versioning.
 
-### 7.1. Пример ответа по балансу
+### 7.1. Example balance response
 ```json
 {
   "granted_bytes": 2097152000,
@@ -255,112 +255,112 @@
 }
 ```
 
-## 8. Требования к Android-приложению
+## 8. Android application requirements
 
-### 8.1. Экранная карта
-1. Welcome / onboarding: что делает VPN, необходимое разрешение ОС, ссылка на политику данных.
-2. Авторизация / восстановление доступа.
-3. Главный экран: большая кнопка Connect; статус, выбранный регион, остаток трафика, ошибка + решение.
-4. Выбор региона: доступность, состояние и ручной выбор; latency только если реально измерена.
-5. Бесплатный трафик: кликер, ежедневные награды, подтверждаемые задания.
-6. История начислений и расходов; раздельный учёт для прозрачности.
-7. Тарифы, подписки и платежи (скрыты до legal/payment gate).
-8. Настройки: запуск, уведомления, диагностика, поддержка, удаление аккаунта.
+### 8.1. Screen map
+1. Welcome / onboarding: what the VPN does, the required OS permission, a link to the data policy.
+2. Authorization / access recovery.
+3. Main screen: a large Connect button; status, selected region, remaining traffic, error + solution.
+4. Region selection: availability, status, and manual choice; latency only if actually measured.
+5. Free traffic: clicker, daily rewards, verifiable tasks.
+6. History of credits and expenses; separate accounting for transparency.
+7. Plans, subscriptions, and payments (hidden until the legal/payment gate).
+8. Settings: launch, notifications, diagnostics, support, account deletion.
 
-### 8.2. Принципы UX
-- Визуальное направление Soft Orbit: сливовые поверхности, мягкие линии маршрутов,
-  округлые карточки, спокойная типографика, light/dark. Акцент по умолчанию коралл;
-  theme palette допускает лаванду, бирюзу, золото. Error/warning цвета независимы
-  от акцента; контраст текста обязателен. Значения из референса демонстрационные.
-- Приложение управляет VPN, регионами, состоянием, трафиком и настройками. Mini App
-  — отдельный интерфейс кабинета/баланса/бонусов/заданий/рефералов/устройств/поддержки
-  в I-017. I-015 готовит серверные награды; обычный клиент лишь отображает их
-  в истории трафика. Экран бонусов в обычное приложение не добавляется.
-- Статусы `disconnected`, `connecting`, `connected`, `reconnecting`, `failed`.
-- Разрешение `VpnService` запрашивать только после объяснения и действия пользователя; не вводить в заблуждение.
-- Выводить реалистичные причины ошибок: недоступность узла, истекший доступ, ошибка сети, конфликт VPN, отсутствует разрешение ОС.
-- При сбое API показывать сохранённый баланс с отметкой о давности обновления, а не придумывать актуальное значение.
-- Не запрашивать разрешения на контакты/геолокацию без реальной необходимости.
-- Темная и светлая темы; доступность: масштабирование шрифта, контраст, screen-reader labels.
+### 8.2. UX principles
+- Visual direction Soft Orbit: plum surfaces, soft route lines,
+  rounded cards, calm typography, light/dark. The default accent is coral;
+  the theme palette allows lavender, turquoise, gold. Error/warning colors are independent
+  of the accent; text contrast is mandatory. Values from the reference are demonstrative.
+- The app manages the VPN, regions, status, traffic, and settings. The Mini App
+  is a separate interface for the cabinet/balance/bonuses/tasks/referrals/devices/support
+  in I-017. I-015 prepares server-side rewards; the regular client only displays them
+  in the traffic history. A bonuses screen is not added to the regular app.
+- Statuses `disconnected`, `connecting`, `connected`, `reconnecting`, `failed`.
+- Request the `VpnService` permission only after an explanation and a user action; do not mislead.
+- Show realistic error causes: node unavailability, expired access, network error, VPN conflict, missing OS permission.
+- On an API failure show the stored balance with a note of how stale the update is, and do not invent a current value.
+- Do not request contacts/geolocation permissions without real necessity.
+- Dark and light themes; accessibility: font scaling, contrast, screen-reader labels.
 
-### 8.3. Нативная VPN-часть
-- Kotlin-модуль поверх Android `VpnService` с явным управлением жизненным циклом.
-- Flutter вызывает нативный слой через платформенный канал/FFI адаптер; ни один секрет не печатается в debug log.
-- Интеграция штатного системного разрешения VPN.
-- Фоновая работа, сеть, IPv6 и DNS проверяются на целевых версиях Android; не подменять рабочее подключение анимацией.
+### 8.3. Native VPN part
+- A Kotlin module on top of the Android `VpnService` with explicit lifecycle management.
+- Flutter calls the native layer through a platform channel/FFI adapter; no secret is printed to the debug log.
+- Integration of the standard system VPN permission.
+- Background operation, network, IPv6, and DNS are verified on the target Android versions; do not substitute a working connection with an animation.
 
-## 9. Threat model / информационная безопасность
+## 9. Threat model / information security
 
-### Активы
-- Аккаунты, токены, служебные ключи, конфигурации туннелей, балансы/платежи, доступ к VPS, репутация бренда.
+### Assets
+- Accounts, tokens, service keys, tunnel configurations, balances/payments, VPS access, brand reputation.
 
-### Угрозы и контрмеры
-| Угроза | Контроль |
+### Threats and countermeasures
+| Threat | Control |
 |---|---|
-| Утечка токенов/API-ключей | Secret manager, отсутствие секретов в Git/логах, ротация, короткие токены |
-| Подмена начислений кликером | Серверное время/правила, транзакции, идемпотентность, лимиты, антибот-сигналы |
-| Повтор платежного webhook | Подпись, timestamp, уникальная транзакция, идемпотентность |
-| Вывод узла из строя | Разные провайдеры, резерв, IaC, health checks, план замены |
-| DDoS против API | CDN/WAF, rate limits, origin lockdown, квоты ресурсов |
-| DDoS против VPN UDP/TCP | L3/L4-фильтрация на стороне провайдера, capacity planning, резервные узлы |
-| Доступ к БД | Сетевая сегментация, least privilege, шифрование бэкапов, MFA админов |
-| Утечки DNS / IPv6 | E2E тесты и безопасное поведение при разрыве туннеля |
-| Слежение/преследование оператора | Публичная приватность бренда, отделение рабочих аккаунтов; соблюдение обязательных идентификационных/платёжных требований |
-| Злоупотребление услугой | Прозрачные правила, ограничение ресурсов, поддержка и abuse handling |
+| Leakage of tokens/API keys | Secret manager, no secrets in Git/logs, rotation, short-lived tokens |
+| Forged credits via the clicker | Server time/rules, transactions, idempotency, limits, anti-bot signals |
+| Replay of a payment webhook | Signature, timestamp, unique transaction, idempotency |
+| Node taken out of service | Different providers, standby, IaC, health checks, replacement plan |
+| DDoS against the API | CDN/WAF, rate limits, origin lockdown, resource quotas |
+| DDoS against VPN UDP/TCP | L3/L4 filtering on the provider side, capacity planning, standby nodes |
+| Database access | Network segmentation, least privilege, backup encryption, admin MFA |
+| DNS / IPv6 leaks | E2E tests and safe behavior on tunnel drop |
+| Tracking/harassment of the operator | Public brand privacy, separation of work accounts; compliance with mandatory identification/payment requirements |
+| Abuse of the service | Transparent rules, resource limits, support and abuse handling |
 
 ### Data privacy
-- Хранить только то, что необходимо для работы и биллинга: идентификатор аккаунта, конфигурацию устройств (без приватных ключей при возможности), агрегированные байты, финансовые транзакции, диагностические события.
-- **Не собирать историю URL, DNS-запросы и содержимое туннеля** для аналитики/рекламы.
-- Временные security-логи без IP по умолчанию, если возможно; если IP необходим для защиты от злоупотреблений, явный срок хранения/доступы/маскирование и юридическое основание.
-- Разделить телеметрию приложения и маршрутизацию пользовательского трафика.
-- Сроки хранения и удаление данных утвердить после анализа применимого права; предусмотреть удаление/выгрузку на уровне модели.
-- Не делать заявления «100% анонимно», «не оставляем следов», «никто не сможет идентифицировать».
+- Store only what is necessary for operation and billing: account identifier, device configuration (without private keys where possible), aggregated bytes, financial transactions, diagnostic events.
+- **Do not collect URL history, DNS queries, or tunnel content** for analytics/advertising.
+- Temporary security logs without IPs by default, if possible; if an IP is necessary for abuse protection, an explicit retention period/access/masking and a legal basis are required.
+- Separate application telemetry from user traffic routing.
+- Retention periods and data deletion are approved after analysis of the applicable law; provide for deletion/export at the model level.
+- Do not make claims such as "100% anonymous", "we leave no traces", "no one will be able to identify".
 
-## 10. Операционная безопасность, наблюдаемость, восстановление
+## 10. Operational security, observability, recovery
 
-- Разные пространства секретов staging и production.
-- Доступ к VPS по SSH-ключам, без постоянного root-доступа из CI, системные обновления, минимизация открытых портов.
-- Нельзя давать Codex или CI доступ к рабочей инфраструктуре на раннем этапе; сначала тестовый стенд, затем ограниченные scoped-учётные данные.
-- Разделить control-plane и data-plane. Админку не размещать открытой без MFA/VPN/ACL.
-- Бэкапы PostgreSQL с шифрованием и проверкой восстановления; желательно отдельный провайдер хранения.
-- Runbook: недоступен API; недоступен узел; утекли ключи; повреждён ledger; превышен объём трафика; DDoS.
-- Метрики: успешные подключения, частота ошибок, handshake latency (если доступно), bandwidth/дисковая ёмкость узлов, usage ingestion lag, доля ошибочных rewards/payment events.
-- Не путать CDN-защиту API с защитой VPN-узлов на уровне L3/L4.
+- Separate secret spaces for staging and production.
+- VPS access via SSH keys, without permanent root access from CI, system updates, minimization of open ports.
+- Codex or CI must not be given access to working infrastructure at an early stage; first a test environment, then limited scoped credentials.
+- Separate the control plane and the data plane. Do not host the admin panel openly without MFA/VPN/ACL.
+- PostgreSQL backups with encryption and restore verification; a separate storage provider is preferable.
+- Runbooks: API unavailable; node unavailable; keys leaked; ledger corrupted; traffic volume exceeded; DDoS.
+- Metrics: successful connections, error rate, handshake latency (if available), bandwidth/disk capacity of nodes, usage ingestion lag, share of erroneous rewards/payment events.
+- Do not confuse CDN protection of the API with protection of VPN nodes at the L3/L4 level.
 
-## 11. Начальные показатели качества (SLO — цели, а не обещания)
+## 11. Initial quality indicators (SLOs: targets, not promises)
 
-| Показатель | Цель MVP |
+| Indicator | MVP target |
 |---|---|
-| API availability | 99.5% в месяц на ограниченном тесте |
-| p95 API latency | < 500 мс без операций на внешних провайдерах |
-| Дубли начислений при replay | 0 при повторении `idempotency_key` |
-| Дубли списаний при replay usage | 0 |
-| Утечка приватных ключей в логи | 0 |
-| Доставка агрегированного usage | 95% записей не старше 120 сек при здоровой сети |
-| Обнаружение отказа узла | < 2 мин при исправном мониторинге |
-| Смена на рабочий узел | целевой UX < 2 мин; зависит от сети и исправности маршрутов |
-| RPO / RTO control-plane | ≤24 часа / ≤2 часа в тестовом контуре (уточнить после drill) |
-| Автоматизированные тесты | все критичные пути баланса, платежей, авторизации и выдачи ключей |
+| API availability | 99.5% per month in the limited test |
+| p95 API latency | < 500 ms without operations on external providers |
+| Duplicate credits on replay | 0 when `idempotency_key` is repeated |
+| Duplicate debits on usage replay | 0 |
+| Leakage of private keys into logs | 0 |
+| Delivery of aggregated usage | 95% of records not older than 120 sec on a healthy network |
+| Node failure detection | < 2 min with working monitoring |
+| Switch to a working node | target UX < 2 min; depends on the network and route health |
+| RPO / RTO control-plane | ≤24 hours / ≤2 hours in the test environment (to be refined after a drill) |
+| Automated tests | all critical paths of balance, payments, authorization, and key issuance |
 
-Тестирование пропускной способности, расхода батареи, скорости переподключения — на реальных Android-устройствах; результаты протоколировать по версии ОС и сети.
+Testing of throughput, battery consumption, and reconnection speed must be done on real Android devices; results are recorded by OS version and network.
 
-## 12. Экспериментальная совместимость с ограниченными сетями
+## 12. Experimental compatibility with restricted networks
 
-- Отделить **DPI-фильтрацию** (распознавание протокола), **IP/порт-фильтрацию** и **строгий allowlist** (доступ к заданным конечным адресам).
-- Обфускация может улучшать устойчивость к DPI, **но не создаёт доступ к произвольному IP, запрещённому allowlist**.
-- Экспериментальный режим реализовать как набор сертифицированных в QA транспортов. Каждому назначить supported versions и реальные наблюдения по типу сети.
-- Ввести `capability matrix`, метрики подключения и контролируемые полевые тесты в сетях, к которым есть разрешённый доступ.
-- Не строить функциональность на подмене чужих доменов, несанкционированном использовании allowlisted-сервисов или обещании гарантированного обхода.
-- Если технически надёжного маршрута нет — честная индикация `unavailable` и функционал офлайн-поддержки/диагностики.
+- Separate **DPI filtering** (protocol recognition), **IP/port filtering**, and a **strict allowlist** (access to specified endpoints).
+- Obfuscation may improve resistance to DPI, **but does not create access to an arbitrary IP prohibited by an allowlist**.
+- Implement the experimental mode as a set of QA-certified transports. Assign each supported versions and real observations by network type.
+- Introduce a `capability matrix`, connection metrics, and controlled field tests in networks to which authorized access exists.
+- Do not build functionality on spoofing other people's domains, unauthorized use of allowlisted services, or a promise of guaranteed bypass.
+- If there is no technically reliable route, show an honest `unavailable` indication and offline support/diagnostics functionality.
 
-## 13. Монетизация и антифрод
+## 13. Monetization and anti-fraud
 
-### Базовая бизнес-модель
-- Free: ограниченная базовая квота + ежедневное начисление/кликер/проверенные задания.
-- Premium: оплата доступа с опубликованной fair-use policy и ограничением устройств; выражение «безлимит» использовать только с прозрачным описанием ограничений.
-- Партнёрские задания: оплата подтверждённых событий, а не любых переходов по ссылке. Условия, маркировку рекламы и правила площадок согласовать заранее.
+### Base business model
+- Free: a limited base quota + daily credit/clicker/verified tasks.
+- Premium: payment for access with a published fair-use policy and a device limit; use the word "unlimited" only with a transparent description of the restrictions.
+- Partner tasks: payment for confirmed events, not for any link click-throughs. Terms, ad labeling, and platform rules must be agreed in advance.
 
-### Формулы для модели
+### Model formulas
 ```text
 Gross margin = SubscriptionRevenue + ValidatedSponsorRevenue
                - Hosting - PaidTraffic - PaymentFees - Support - Refunds
@@ -369,71 +369,71 @@ Contribution per free user = SponsorRevenuePerFreeUser
 AllowedRewardBytes = min(DailyCap, AvailableCampaignBudget / RealCostPerByte)
 ```
 
-Не привязывать стоимость к фиксированной «цене за ГБ» без учёта включённого трафика VPS, портовой скорости, 95-го перцентиля, перерасхода и фрода. Настройку кликера принимать после пилотных замеров фактической себестоимости трафика.
+Do not tie the cost to a fixed "price per GB" without accounting for the VPS's included traffic, port speed, the 95th percentile, overage, and fraud. The clicker configuration must be accepted after pilot measurements of the actual traffic cost.
 
 ### KPI
 - Day-1/Day-7/Day-30 retention, DAU/MAU, trial→paid conversion, ARPPU, CAC, churn.
-- Средний и p95 расход трафика Free/Premium, cost per active user, доля подозрительных reward_claims.
-- Connection success rate по версии приложения, узлу, типу сети и движку (без хранения сайтов пользователя).
+- Average and p95 traffic consumption for Free/Premium, cost per active user, share of suspicious reward_claims.
+- Connection success rate by app version, node, network type, and engine (without storing the user's sites).
 
-## 14. Юридические и публикационные точки контроля
+## 14. Legal and publication control points
 
-**До публичного запуска:**
-1. Проверить допустимость предоставления VPN и рекламы в странах оператора, хостинга, распространения и платёжного провайдера; отдельно — нормы о персональных данных, санкции и требования к регистрации бизнеса.
-2. Возраст владельца: условия заключения контрактов, регистрации разработчика и процессинга; при необходимости законное участие взрослого лица, а не фиктивный номинальный владелец.
-3. Google Play: политика `VpnService`, явное раскрытие назначения и данных, системное разрешение; не перенаправлять рекламный трафик сторонних приложений ради дохода.
-4. Apple: для VPN действуют специальные правила App Review (включая организационный developer account, обработку данных и местные лицензии) и соответствующие Network Extension механизмы; отдельный iOS gate.
-5. Telegram: правила цифровых услуг и Stars, доступ бота к проверке членства в канале, условия рекламного инвентаря и корректность заданий.
-6. Лицензии сторонних компонентов: SPDX/SBOM, GPL-3.0 для полного Amnezia клиента, MPL-2.0 Xray, лицензии конкретных embeddable SDK.
-7. Политика конфиденциальности, условия сервиса, возвраты/платежи и процедура уведомлений об инцидентах.
+**Before public launch:**
+1. Verify the permissibility of providing a VPN and advertising in the countries of the operator, hosting, distribution, and the payment provider; separately, the rules on personal data, sanctions, and business registration requirements.
+2. The age of the owner: conditions for concluding contracts, developer registration, and processing; where necessary, lawful participation of an adult, not a fictitious nominal owner.
+3. Google Play: the `VpnService` policy, explicit disclosure of the purpose and data, system permission; do not redirect third-party apps' advertising traffic for revenue.
+4. Apple: special App Review rules apply to VPNs (including an organizational developer account, data handling, and local licenses) and the corresponding Network Extension mechanisms; a separate iOS gate.
+5. Telegram: rules for digital services and Stars, bot access for verifying channel membership, advertising inventory terms, and correctness of tasks.
+6. Third-party component licenses: SPDX/SBOM, GPL-3.0 for the full Amnezia client, MPL-2.0 for Xray, licenses of specific embeddable SDKs.
+7. Privacy policy, terms of service, refunds/payments, and an incident notification procedure.
 
-## 15. Тест-план и критерии приёмки
+## 15. Test plan and acceptance criteria
 
-### Критический backend
-- Две одинаковые операции `reward_claim` с одним ключом дают **ровно одно** начисление.
-- Параллельные claim requests не превышают дневной лимит.
-- Повторно полученный usage sample не расходует квоту повторно.
-- Сброс счётчика на узле не создаёт отрицательное списание/кредит.
-- Пользователь А не может получить конфигурацию пользователя Б.
-- Отозванное устройство теряет право на новые конфигурации; отзыв применяется узлом.
-- Неуспешный или неподтверждённый платеж не включает Premium.
-- Атакующий без MFA не получает административный доступ.
+### Critical backend
+- Two identical `reward_claim` operations with the same key produce **exactly one** credit.
+- Parallel claim requests do not exceed the daily limit.
+- A re-received usage sample does not consume quota again.
+- A counter reset on the node does not create a negative debit/credit.
+- User A cannot obtain user B's configuration.
+- A revoked device loses the right to new configurations; the revocation is applied by the node.
+- A failed or unconfirmed payment does not enable Premium.
+- An attacker without MFA does not obtain administrative access.
 
-### Клиент
-- Connect/disconnect реально меняет системный VPN-статус.
-- При включении и отключении Wi-Fi/мобильного интернета приложение не зависает и показывает корректную ошибку/повтор подключения.
-- Отсутствие разрешения VPN объясняется без ложного статуса «Подключено».
-- Проверить IPv4, IPv6, DNS, утечки, app background/foreground, split tunnel только если реализован.
-- Приложение не содержит рабочих секретов/API admin keys.
+### Client
+- Connect/disconnect actually changes the system VPN status.
+- When Wi-Fi/mobile internet is turned on and off, the app does not hang and shows a correct error/connection retry.
+- A missing VPN permission is explained without a false "Connected" status.
+- Verify IPv4, IPv6, DNS, leaks, app background/foreground, split tunnel only if implemented.
+- The app does not contain working secrets/admin API keys.
 
 ### Infra
-- Восстановление базы из резервной копии подтверждено автоматизированным или ручным drill.
-- Новый тестовый узел можно развернуть по воспроизводимому playbook.
-- Недоступность одного узла не повреждает пользователей/балансы; отказ control-plane не завершает уже живые сессии без отдельной причины.
+- Database restoration from a backup is confirmed by an automated or manual drill.
+- A new test node can be deployed from a reproducible playbook.
+- Unavailability of one node does not corrupt users/balances; a control-plane failure does not terminate already live sessions without a separate cause.
 
-## 16. Открытые решения (ADR backlog)
+## 16. Open decisions (ADR backlog)
 
-- ADR-001: Вход по одноразовому коду из Telegram-бота; pairing, trusted updates, сессии и восстановление. Основной способ выбран владельцем; технический контракт уточняется.
-- ADR-002: Собственный клиент на Flutter + native SDK vs GPL-форк существующего клиента.
-- ADR-003: Базовый туннельный движок и совместимые версии Android.
-- ADR-004: Адаптер счётчиков, период списания и защита от перерасхода.
+- ADR-001: Login by a one-time code from the Telegram bot; pairing, trusted updates, sessions, and recovery. The primary method was chosen by the owner; the technical contract is being refined.
+- ADR-002: Own client on Flutter + native SDK vs a GPL fork of an existing client.
+- ADR-003: Base tunnel engine and compatible Android versions.
+- ADR-004: Counter adapter, debit period, and over-consumption protection.
 - ADR-005: Free quota per device vs per verified user.
-- ADR-006: Дизайн рекламных заданий: какие действия подтверждаем и какие допускаются условиями площадок.
-- ADR-007: Юридически допустимые платежи и публикационные регионы.
-- ADR-008: Контракт Node Agent: polling/mTLS и управление ключами.
-- ADR-009: Сроки хранения security/abuse logs.
-- ADR-010: Вариант восстановления при сетевых блокировках/недоступности API.
+- ADR-006: Design of advertising tasks: which actions we verify and which are permitted by platform terms.
+- ADR-007: Legally permissible payments and publication regions.
+- ADR-008: Node Agent contract: polling/mTLS and key management.
+- ADR-009: Retention periods for security/abuse logs.
+- ADR-010: Recovery option for network blocking/API unavailability.
 
-## 17. Реализация с Codex: принципы
+## 17. Implementation with Codex: principles
 
-- Сначала проектная документация/схемы и работающие тесты, затем инфраструктурный код.
-- Не выдавать AI полный production root-доступ; при необходимости песочница/тестовый VPS и ручное одобрение изменений.
-- Одна задача = одна issue/ветка/PR, малые ревьюируемые изменения.
-- Каждый PR должен содержать: описание, миграцию (если нужно), unit/integration tests, команды локального запуска, обновление документации.
-- Запрещены фиктивные API или UI, выдающий mock за рабочий VPN. Заглушки маркируются `MOCK/DEV ONLY`.
-- Работы над платежами, транспортом, обработкой ключей и публикацией требуют отдельного security review.
+- First design documentation/schemas and working tests, then infrastructure code.
+- Do not give the AI full production root access; where necessary a sandbox/test VPS and manual approval of changes.
+- One task = one issue/branch/PR, small reviewable changes.
+- Every PR must contain: a description, a migration (if needed), unit/integration tests, local run commands, documentation updates.
+- Fake APIs or a UI that passes a mock off as a working VPN are prohibited. Stubs are labeled `MOCK/DEV ONLY`.
+- Work on payments, transport, key handling, and publication requires a separate security review.
 
-## 18. Первичные источники для проверки в процессе разработки
+## 18. Primary sources to verify during development
 
 - AmneziaWG: https://docs.amnezia.org/documentation/amnezia-wg/
 - AmneziaVPN client / GPL: https://github.com/amnezia-vpn/amnezia-client

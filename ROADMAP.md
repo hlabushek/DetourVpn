@@ -1,182 +1,182 @@
-# Дорожная карта разработки VPN-сервиса через Codex
+# VPN service development roadmap with Codex
 
-**Дата:** 2026-10-15  
-**Уточнение авторизации:** 2026-10-18, по прямому решению владельца — код из Telegram-бота,
-см. TECHNICAL_SPEC v0.2 и ADR-001. Это меняет способ входа, не является выполненной интеграцией.  
-**Базовый режим:** один разработчик + Codex, работа спринтами.  
-**Оценка:** ориентир 12–20 двухнедельных спринтов до уверенного коммерческого продукта; это не срок, обещанный Codex. Реальный темп зависит от освоения Android VPN API, тестов и внешних юридических ограничений.
+**Date:** 2026-10-15  
+**Authorization clarification:** 2026-10-18, by direct owner decision — sign-in code from the Telegram bot,
+see TECHNICAL_SPEC v0.2 and ADR-001. This changes the sign-in method; it is not a completed integration.  
+**Baseline mode:** one developer + Codex, working in sprints.  
+**Estimate:** a guideline of 12–20 two-week sprints to a confident commercial product; this is not a deadline promised by Codex. The actual pace depends on mastering the Android VPN API, testing, and external legal constraints.
 
-## Правила перехода между этапами
-- Каждый этап имеет демонстрацию (**demo**), измеримые критерии приёмки (**DoD**) и явное решение **go / no-go**.
-- Не начинать продажи, пока не закрыты security-, legal-, payment- и reliability-gates.
-- Продуктовые мокапы не считать работающим туннелем, а локальную учётную систему — готовым биллингом.
-- Не трогать продуктивные VPS автоматически: все production-операции с ручным подтверждением.
+## Stage transition rules
+- Each stage has a demonstration (**demo**), measurable acceptance criteria (**DoD**), and an explicit **go / no-go** decision.
+- Do not start sales until the security, legal, payment, and reliability gates are closed.
+- Do not treat product mockups as a working tunnel, or a local accounting system as finished billing.
+- Do not touch production VPS automatically: all production operations require manual confirmation.
 
-## 0. Foundation: подготовка репозитория (спринт 0)
-**Цель:** сформировать управляемый проект, а не хаотичную папку с кодом.
+## 0. Foundation: repository preparation (sprint 0)
+**Goal:** form a managed project, not a chaotic folder of code.
 
-**Задачи:**
-- Создать приватный репозиторий, добавить `AGENTS.md`, `TECHNICAL_SPEC.md`, `ROADMAP.md`, `docs/adr/`, `docs/runbooks/`.
-- Определить соглашения по именованию, версиям API, PR, issue labels, тестам и миграциям.
-- Создать `.gitignore`, `.env.example`, pre-commit и базовый GitHub Actions CI.
-- Сделать dev/staging/prod матрицу без выдачи production credentials.
-- Приоритизировать ADR-001/002/003 до разработки реального туннеля.
+**Tasks:**
+- Create a private repository, add `AGENTS.md`, `TECHNICAL_SPEC.md`, `ROADMAP.md`, `docs/adr/`, `docs/runbooks/`.
+- Define conventions for naming, API versions, PRs, issue labels, tests, and migrations.
+- Create `.gitignore`, `.env.example`, pre-commit, and a basic GitHub Actions CI.
+- Build a dev/staging/prod matrix without issuing production credentials.
+- Prioritize ADR-001/002/003 before developing the real tunnel.
 
-**DoD:** CI выполняется, проект стартует локально одной документированной командой; секретов в репозитории нет.
+**DoD:** CI runs, the project starts locally with one documented command; there are no secrets in the repository.
 
-## 1. Backend skeleton и идентичность (спринты 1–2)
-**Поставляемый результат:** API + PostgreSQL + Redis, тестовая авторизация.
+## 1. Backend skeleton and identity (sprints 1–2)
+**Deliverable:** API + PostgreSQL + Redis, test authorization.
 
-**Задачи:**
-- FastAPI app factory, Pydantic конфигурация, SQLAlchemy модели, Alembic миграции.
-- Таблицы users, auth_identities, devices; вход по одноразовому коду из Telegram-бота согласно ADR-001.
-- Минимальный auth bot adapter необходим уже в I-005: доверенные Updates, код для pairing, rate limits и replay protection. Telegram Mini App остаётся отдельной I-017; она для входа не требуется.
-- Сессионная модель, refresh token revocation, rate limits, user-scoped access.
-- RBAC и отдельный доступ администратора с MFA.
-- OpenAPI, requests IDs, минимальные healthchecks, pytest тесты.
+**Tasks:**
+- FastAPI app factory, Pydantic configuration, SQLAlchemy models, Alembic migrations.
+- Tables users, auth_identities, devices; sign-in by a one-time code from the Telegram bot per ADR-001.
+- A minimal auth bot adapter is already required in I-005: trusted Updates, a pairing code, rate limits, and replay protection. The Telegram Mini App remains a separate I-017; it is not required for sign-in.
+- Session model, refresh token revocation, rate limits, user-scoped access.
+- RBAC and separate administrator access with MFA.
+- OpenAPI, request IDs, minimal healthchecks, pytest tests.
 
-**DoD:** пользователь не может прочитать/изменить данные другого; повторный логин/отзыв токена тестируются; миграции применяются с пустой БД.
+**DoD:** a user cannot read/modify another user's data; repeated login/token revocation are tested; migrations apply from an empty DB.
 
-## 2. Quota ledger — сердце экономики (спринты 3–4)
-**Результат:** баланс и списания без кликера и VPN — полностью протестированная бизнес-логика.
+## 2. Quota ledger — the heart of the economy (sprints 3–4)
+**Result:** balance and debits without the clicker and without VPN — fully tested business logic.
 
-**Задачи:**
-- `quota_ledger`, credit/debit, idempotency key, уникальные индексы, транзакции.
-- Демо-модель usage samples с node/peer/epoch/sequence, защитой от replay.
-- Разрешение reset счётчика, упорядочивание отложенных образцов.
-- API `/quota`, `/quota/history`, единицы bytes без плавающих точек.
-- Property/concurrency testing: несколько параллельных начислений/списаний.
+**Tasks:**
+- `quota_ledger`, credit/debit, idempotency key, unique indexes, transactions.
+- Demo usage-samples model with node/peer/epoch/sequence, replay protection.
+- Counter reset resolution, ordering of delayed samples.
+- API `/quota`, `/quota/history`, units in bytes without floating point.
+- Property/concurrency testing: several parallel credits/debits.
 
-**DoD:** повтор запроса и гонки не изменяют баланс дважды; есть ручная процедура сверки баланса и ledger.
+**DoD:** a repeated request and races do not change the balance twice; there is a manual procedure for reconciling the balance and the ledger.
 
-## 3. Проверяемая VPN-песочница (спринты 5–6)
-**Результат:** реальный туннель на Android через тестовый узел; отдельная простая test harness утилита допустима.
+## 3. Verifiable VPN sandbox (sprints 5–6)
+**Result:** a real tunnel on Android through a test node; a separate simple test harness utility is acceptable.
 
-**Задачи:**
-- Провести лицензионный и совместимостный spike: базовая версия движка, SDK/биндинги, IPv6/DNS, требования Android.
-- Один тестовый VPS, ограниченные SSH-права, воспроизводимый Ansible playbook.
-- Node Agent: выдача/отзыв одного peer, read-only traffic counters, status/health.
-- Backend provisioning orchestration, сохранение public keys/peer states.
-- Android-native proof-of-concept на `VpnService`, настоящий connect/disconnect.
-- Тесты DNS/IP leak, сетевых переключений, перезагрузки VPN узла.
+**Tasks:**
+- Run a licence and compatibility spike: base engine version, SDK/bindings, IPv6/DNS, Android requirements.
+- One test VPS, restricted SSH rights, a reproducible Ansible playbook.
+- Node Agent: issuing/revoking a single peer, read-only traffic counters, status/health.
+- Backend provisioning orchestration, storing public keys/peer states.
+- Android-native proof-of-concept on `VpnService`, a real connect/disconnect.
+- Tests for DNS/IP leaks, network switching, VPN node reboot.
 
-**DoD:** на физическом телефоне устанавливается реальный VPN и подтверждённый новый egress IP; конфигурация отзывается; client secrets не лежат в логе. Без этого UI не объявляется готовым.
+**DoD:** on a physical phone a real VPN is established with a confirmed new egress IP; the configuration is revoked; client secrets are not in the log. Without this the UI is not declared ready.
 
-## 4. Мобильное приложение MVP (спринты 7–8)
-**Результат:** Flutter UI поверх реально работающей нативной VPN-интеграции.
+## 4. Mobile app MVP (sprints 7–8)
+**Result:** Flutter UI on top of a really working native VPN integration.
 
-**Задачи:**
-- Design tokens, light/dark, onboarding, login, home/connect, регионы, квота, ошибки.
-- Flutter ↔ Kotlin bridge со state machine.
-- Обработка network change, foreground/background, denial `VpnService`, logout/revoke.
-- Клиентское кэширование без секретов в plaintext; encrypted storage для чувствительных данных.
-- Android integration tests и базовая доступность интерфейса.
+**Tasks:**
+- Design tokens, light/dark, onboarding, login, home/connect, regions, quota, errors.
+- Flutter ↔ Kotlin bridge with a state machine.
+- Handling of network change, foreground/background, `VpnService` denial, logout/revoke.
+- Client-side caching without plaintext secrets; encrypted storage for sensitive data.
+- Android integration tests and basic interface accessibility.
 
-**DoD:** полный сценарий пользователь→регистрация→VPN→отключение→выход; нативный статус синхронизирован с UI.
+**DoD:** the full scenario user→registration→VPN→disconnect→logout; the native status is synchronized with the UI.
 
-## 5. Геймификация MVP (спринты 9–10)
-**Результат:** реальные балансы и награды, без фиктивного локального увеличения мегабайт.
+## 5. Gamification MVP (sprints 9–10)
+**Result:** real balances and rewards, without fictitious local increase of megabytes.
 
-**Задачи:**
-- Таблицы reward_rules/claims, server-driven configuration.
-- `POST /rewards/claim`: проверка eligible / daily cap / cooldown / idempotency.
-- Ежедневный бонус, кликер с максимальным числом начислений; антибот-ограничения.
-- История начислений, автоматический тест replay и параллельных запросов.
-- Экономический конфиг: reward bytes задаются после реальных замеров расходов.
+**Tasks:**
+- Tables reward_rules/claims, server-driven configuration.
+- `POST /rewards/claim`: check eligible / daily cap / cooldown / idempotency.
+- Daily bonus, clicker with a maximum number of credits; anti-bot restrictions.
+- Credit history, automated replay test and parallel-request test.
+- Economic config: reward bytes are set after real measurements of costs.
 
-**DoD:** десять параллельных повторов одного claim дают одну награду; лимиты не превышаются; данные совпадают на телефоне и в БД.
+**DoD:** ten parallel repeats of one claim yield one reward; limits are not exceeded; data match on the phone and in the DB.
 
-## 6. Ограниченный альфа-тест и поддержка (спринты 11–12)
-**Результат:** закрытая группа пользователей и проверяемые наблюдения о качестве.
+## 6. Limited alpha test and support (sprints 11–12)
+**Result:** a closed group of users and verifiable observations about quality.
 
-**Задачи:**
-- Приватная выдача тестовой APK, crash reporting без избыточного сбора данных.
-- Инструкция для пользователя, доступный канал поддержки, механика отправки диагностического отчёта по согласию.
-- Нагрузочные тесты API и VPS, измерение задержек сбора usage, расхода памяти и батареи.
-- Мониторинг, backup+restore drill, runbooks, аварийная ротация узлов.
-- Корректировка бесплатных квот по реальной себестоимости.
+**Tasks:**
+- Private distribution of a test APK, crash reporting without excessive data collection.
+- User instructions, an accessible support channel, a mechanism for sending a diagnostic report with consent.
+- Load tests of the API and VPS, measurement of usage-collection delays, memory and battery consumption.
+- Monitoring, backup+restore drill, runbooks, emergency node rotation.
+- Adjusting free quotas to the real cost.
 
-**DoD:** базовые SLO измерены, инциденты воспроизводятся, восстановление проверено, нет критических уязвимостей.
+**DoD:** baseline SLOs are measured, incidents are reproducible, recovery is verified, no critical vulnerabilities.
 
-## 7. Telegram Mini App и рефералы (спринты 13–14)
-**Результат:** второй интерфейс для наград, единый backend.
+## 7. Telegram Mini App and referrals (sprints 13–14)
+**Result:** a second interface for rewards, a single backend.
 
-**Задачи:**
-- React/TypeScript Mini App, валидация Telegram initData на сервере.
-- Задания с честной проверкой; `getChatMember` только там, где права бота позволяют.
-- Referral codes, qualification event, бюджет кампании, простая аналитика.
-- Антифрод: повторное использование ссылок/задач, лимиты, добровольные апелляции.
-- Юридическое решение о допустимости стимулированных подписок и рекламы.
+**Tasks:**
+- React/TypeScript Mini App, server-side validation of Telegram initData.
+- Tasks with honest verification; `getChatMember` only where the bot's rights allow.
+- Referral codes, qualification event, campaign budget, simple analytics.
+- Anti-fraud: reuse of links/tasks, limits, voluntary appeals.
+- Legal decision on the admissibility of incentivized subscriptions and advertising.
 
-**DoD:** отсутствие подделки Telegram payload; повторные награды не начисляются; партнёрская статистика не раскрывает лишние персональные данные.
+**DoD:** the Telegram payload cannot be forged; repeated rewards are not credited; partner statistics do not disclose excess personal data.
 
-## 8. Multi-node, failover, second engine (спринты 15–17)
-**Результат:** готовность к отказу одного узла.
+## 8. Multi-node, failover, second engine (sprints 15–17)
+**Result:** readiness for the failure of one node.
 
-**Задачи:**
-- Второй VPS у независимого провайдера, совместимость версии движка.
-- Node registry, health checks, capacity thresholds, signed available-node metadata по необходимости.
-- Автоматическое предложение альтернативного узла после ошибки; диагностические причины.
-- Абстракция второго транспорта после успешного acceptance spike.
-- Анти-DDoS: оценка L3/L4 mitigation провайдера; WAF/rate-limit только для API.
-- Регламент переноса пользователей без утери начисленной квоты.
+**Tasks:**
+- A second VPS at an independent provider, engine version compatibility.
+- Node registry, health checks, capacity thresholds, signed available-node metadata where needed.
+- Automatic suggestion of an alternative node after an error; diagnostic reasons.
+- Abstraction of a second transport after a successful acceptance spike.
+- Anti-DDoS: assessment of the provider's L3/L4 mitigation; WAF/rate-limit for the API only.
+- A procedure for moving users without losing accrued quota.
 
-I-031: для закрытой beta сначала свести в операторский inventory уже имеющиеся
-VPN data nodes и включать их по одному. Текущий client/API уже поддерживает
-ручной выбор узла через root-owned window manifest; heartbeat/slot capacity
-задают честный статус каталога. Это не включает новые host/provider changes,
-автоматический failover или публичную доступность.
+I-031: for the closed beta, first consolidate the already available
+VPN data nodes into an operator inventory and enable them one at a time. The current client/API already supports
+manual node selection through a root-owned window manifest; heartbeat/slot capacity
+determine the honest catalog status. This does not enable new host/provider changes,
+automatic failover, or public availability.
 
-**DoD:** физическое выключение узла А не портит баланс; узел Б продолжает обслуживать новые подключения; происходит ясное информирование пользователя.
+**DoD:** physically powering off node A does not corrupt the balance; node B continues serving new connections; the user is clearly informed.
 
-## 9. Legal/payment/commercial gate (спринты 18–19; только после подтверждения)
-**Результат:** законный путь к коммерческому тесту.
+## 9. Legal/payment/commercial gate (sprints 18–19; only after confirmation)
+**Result:** a lawful path to a commercial test.
 
-**Задачи:**
-- Юридическая оценка географии бизнеса/клиентов, возраста владельца, рекламы VPN, договора оферты, политики обработки данных.
-- Выбрать одного провайдера платежей с законным KYC/возвратами/отчётностью.
+**Tasks:**
+- Legal assessment of the business/customer geography, the owner's age, VPN advertising, the offer agreement, the data processing policy.
+- Choose one payment provider with lawful KYC/refunds/reporting.
 - PaymentAdapter, signing/replay validation, refunds/chargebacks, subscription lifecycle.
-- Тесты: дубль webhook, rollback, отмена подписки, провал продления.
-- Проверка App Store/Google Play/Telegram правил для конкретных каналов дистрибуции.
+- Tests: duplicate webhook, rollback, subscription cancellation, renewal failure.
+- Check App Store/Google Play/Telegram rules for the specific distribution channels.
 
-**DoD:** положительное решение legal gate, работающая sandbox-интеграция, все критические payment tests зелёные, подготовлена поддержка возвратов.
+**DoD:** a positive legal gate decision, a working sandbox integration, all critical payment tests green, refund support prepared.
 
-## 10. Controlled beta → public release (спринт 20+)
-**Результат:** контролируемая эксплуатация с бюджетными лимитами.
+## 10. Controlled beta → public release (sprint 20+)
+**Result:** controlled operation with budget limits.
 
-**Задачи:**
-- Security review сторонними глазами, dependency/SBOM audit, ключи ротации, disaster recovery drill.
-- Бюджетные лимиты провайдеров VPS и спонсорских кампаний.
-- Закрытая платная beta, затем расширение аудитории после стабильных метрик.
-- Маркетинговые тесты только разрешёнными форматами в целевых юрисдикциях.
-- Мониторинг churn, себестоимости трафика, chargeback, штрафных и правовых рисков.
+**Tasks:**
+- Security review by third parties, dependency/SBOM audit, key rotation, disaster recovery drill.
+- Budget limits for VPS providers and sponsored campaigns.
+- Closed paid beta, then audience expansion after stable metrics.
+- Marketing tests only in permitted formats in the target jurisdictions.
+- Monitoring of churn, traffic cost, chargebacks, penalty and legal risks.
 
-**DoD:** нет блокирующих security/legal проблем; есть реальная маржа на пилотной когорте; пользователи могут удалить аккаунт и получить поддержку.
+**DoD:** no blocking security/legal problems; there is a real margin on the pilot cohort; users can delete their account and get support.
 
-## 11. Отдельный R&D поток: качество транспорта и ограниченные сети
+## 11. Separate R&D track: transport quality and restricted networks
 
-Это **исследовательский поток**, не блокирующий основной релиз:
-- Составить матрицу сетевых ограничений: распознавание протоколов/DPI, фильтрация IP, strict allowlist, потеря DNS/IPv6.
-- Документировать для каждого движка: версия, ОС, тип сети, оператор, исход, причины отказа, оценка стабильности.
-- Тестировать только в сетях/на инфраструктуре, на которую есть полномочия.
-- Не включать непроверенный experimental transport в глобальную настройку по умолчанию.
-- Если строгий allowlist исключает адреса узлов, **не заявлять о работающем универсальном обходе**. Обфускация не исправляет недоступность конечного IP.
+This is a **research track** that does not block the main release:
+- Build a matrix of network restrictions: protocol recognition/DPI, IP filtering, strict allowlist, loss of DNS/IPv6.
+- Document for each engine: version, OS, network type, operator, outcome, failure causes, stability assessment.
+- Test only on networks/infrastructure for which there is authority.
+- Do not enable an unverified experimental transport in the global default setting.
+- If a strict allowlist excludes the node addresses, **do not claim a working universal bypass**. Obfuscation does not fix the unreachability of the final IP.
 
-## 12. Первые GitHub Issues (порядок исполнения)
+## 12. First GitHub Issues (execution order)
 
-| ID | Приоритет | Issue | Зависимость | Критерий готовности |
+| ID | Priority | Issue | Dependency | Acceptance criterion |
 |---|---|---|---|---|
-| I-001 | P0 | Init monorepo + AGENTS/CI | — | Локальный запуск/CI |
-| I-002 | P0 | ADR авторизации и VPN SDK | I-001 | ADR accepted, licencing checklist |
+| I-001 | P0 | Init monorepo + AGENTS/CI | — | Local run/CI |
+| I-002 | P0 | ADR for authorization and VPN SDK | I-001 | ADR accepted, licencing checklist |
 | I-003 | P0 | FastAPI skeleton + health | I-001 | `/health` + tests |
-| I-004 | P0 | Postgres + Alembic | I-003 | Миграции без ошибок |
-| I-005 | P0 | Authentication + RBAC | I-004 | IDOR и auth tests |
+| I-004 | P0 | Postgres + Alembic | I-003 | Migrations without errors |
+| I-005 | P0 | Authentication + RBAC | I-004 | IDOR and auth tests |
 | I-006 | P0 | Devices public keys | I-005 | Device ownership tests |
 | I-007 | P0 | Quota ledger | I-004 | Replay/concurrency tests |
 | I-008 | P0 | Usage sample ingestion | I-007 | Restart/replay tests |
 | I-009 | P0 | Node registry + agent contract | I-004 | Idempotent provisioning tests |
 | I-010 | P0 | One test node deploy | I-009 | Repeatable provisioning |
-| I-011 | P0 | Android native tunnel POC | I-002/I-010 | Реальный egress IP |
+| I-011 | P0 | Android native tunnel POC | I-002/I-010 | Real egress IP |
 | I-012 | P0 | Tunnel API + revoke | I-006/I-009/I-011 | Revocation tests |
 | I-013 | P0 | Flutter connect UI | I-011/I-012 | End-to-end Android |
 | I-014 | P0 | Quota UI/history | I-007/I-013 | Consistent amounts |
@@ -188,393 +188,394 @@ VPN data nodes и включать их по одному. Текущий client
 | I-020 | P1 | Payment provider sandbox | Legal gate | Signed webhooks + refunds |
 | I-021 | P1 | Security review | I-019/I-020 | High/critical resolved |
 | I-022 | P2 | Windows/Linux clients | Stable mobile core | E2E smoke tests |
+| I-032 | P1 | Windows beta client (full tunnel, app exclusion, domain routing); see `docs/issues/I-032-windows-beta.md`. Supersedes the Windows part of the I-022 row above, whose ID clashes with the `docs/issues/I-022.md` file (manual subscriptions) | Android beta core, ADR-079 | Owner-run physical Connect on Windows with server-side peer status |
 | I-023 | P2 | iOS feasibility | Organization/licence gate | Apple-compliant native POC |
 
-### Локальный статус 2026-10-18
+### Local status 2026-10-18
 
-- I-003 skeleton/health выполнен в рамках стартового I-001; повторная реализация не нужна.
-- I-004 реализован и проверен на изолированном PostgreSQL: connection layer,
-  account schema, Alembic и tests. Команды/результаты — docs/verification-i-004.md.
-- CI workflow подготовлен, удалённый GitHub run этим статусом не подтверждается.
-- I-005 реализован локально: Telegram webhook adapter, pairing/code verification,
-  opaque access/refresh, revoke/logout-all, shared PostgreSQL rate limits и RBAC gate.
-- I-006 реализован локально: public keys Android devices, owner-only read/list/revoke,
-  session binding, concurrent device limit и DB ownership FK. Общий проверяемый путь:
-  auth → своё устройство → refresh → revoke/logout. Отчёт: docs/verification-identity-stage.md.
-- Это функциональный milestone внутри phase 1, **не полное закрытие phase 1**:
-  admin identity/MFA enrollment ещё отсутствует (admin operations закрыты), Redis
-  не подключён (локальный limiter PostgreSQL, ADR-012), live Telegram не проверен.
-  До реальных пользователей нужны account deletion/recovery/privacy/backup gates.
-- I-007 реализован локально: immutable quota ledger/receipts, exact integer bytes,
-  credit/debit и durable accepted/rejected replay, owner-only quota/history,
-  once-only initial grant и reconciliation. Размер старта не выбран: default 0;
-  настройка VPN_INITIAL_QUOTA_BYTES. Результаты: docs/verification-i-007.md.
-- I-008 реализован локально: internal usage bindings/epochs/receipts, node/peer/
+- I-003 skeleton/health was completed as part of the starting I-001; re-implementation is not needed.
+- I-004 is implemented and verified on an isolated PostgreSQL: connection layer,
+  account schema, Alembic, and tests. Commands/results — docs/verification-i-004.md.
+- The CI workflow is prepared; this status does not confirm a remote GitHub run.
+- I-005 is implemented locally: Telegram webhook adapter, pairing/code verification,
+  opaque access/refresh, revoke/logout-all, shared PostgreSQL rate limits, and an RBAC gate.
+- I-006 is implemented locally: public keys of Android devices, owner-only read/list/revoke,
+  session binding, concurrent device limit, and a DB ownership FK. Common verifiable
+  path: auth → own device → refresh → revoke/logout. Report: docs/verification-identity-stage.md.
+- This is a functional milestone within phase 1, **not the full closure of phase 1**:
+  admin identity/MFA enrollment is still missing (admin operations are closed), Redis
+  is not connected (the local limiter is PostgreSQL, ADR-012), live Telegram is not verified.
+  Before real users, account deletion/recovery/privacy/backup gates are needed.
+- I-007 is implemented locally: immutable quota ledger/receipts, exact integer bytes,
+  credit/debit and durable accepted/rejected replay, owner-only quota/history,
+  once-only initial grant, and reconciliation. The starting size is not chosen: default 0;
+  setting VPN_INITIAL_QUOTA_BYTES. Results: docs/verification-i-007.md.
+- I-008 is implemented locally: internal usage bindings/epochs/receipts, node/peer/
   epoch/sequence, replay/reset/late reports, rx+tx delta, received/charged watermarks,
-  pending и atomic quota debit. Исторические receipts сохраняют epoch boundary;
-  отдельная read-only сверка. Отчёт: docs/verification-i-008.md.
-- Локальные accounting задачи phase 2 доступны для review/демонстрации на synthetic
-  reports. Настоящий collector/доставка и bounded traffic enforcement не доказаны.
-- I-009 реализован локально: node registry с одноразовым credential, versioned
-  authenticated usage endpoint v1, timestamp/nonce replay protection и атомарная
-  транзакция credential nonce + I-008 receipt/debit. Проверка: 224 tests passed на
-  disposable PostgreSQL; `docs/verification-i-009.md`. Реального daemon/VPS/TLS
-  ingress и credential rotation нет.
-- **I-010 завершён 2026-10-19 в границе bounded staging test-node acceptance.**
-  На одобренном VPS установлены pinned binaries/licenses; установка и повтор
-  проверены. После исправления noexec `/run` заключительный run дал `ok=48
-  changed=2 unreachable=0 failed=0`. Два реальных namespace exchanges подтвердили
-  handshake, двусторонние пакеты и peer removal; два injected-failure runs —
-  cleanup. Existing containers, firewall/routes/links/namespaces сохранены,
-  transient units удалены. `docs/evidence/i-010-staging-acceptance.json` проверен.
-  Checklist — `docs/issues/I-010.md`, граница — ADR-018. Release остаётся
-  установленным, test runtime убран; публичный endpoint/Android/egress не проверены.
-  Linux binary scan: 0 symbol/package findings; release/native gates остаются.
-- I-011: 2026-10-19 на физическом Pixel 8 Pro подтверждены native UP, свежий
-  handshake и HTTPS IPv4 egress через согласованный staging endpoint. Private key
-  остаётся в памяти телефона. Проверены Wi-Fi → cellular, возврат Wi-Fi,
-  включение/выключение экрана, нормальное отключение и отсечение трафика при
-  остановке узла. IPv6-проба блокируется внутри VPN и проходит после отключения;
-  выборка из трёх DNS-запросов показала только ожидаемые Cloudflare resolvers.
-  Это ограниченные измерения, не доказательство отсутствия всех утечек.
-  Исправления sandbox/container routes и snapshot v2 проверены на staging:
-  forced-stop и реальный deadline 600s восстановили все семь baseline checks.
-  Тестовый узел остановлен, ресурсы очищены, временный sudo grant отозван;
-  instrumentation APK удалён, POC остановлен. 174 Python tests passed,
-  166 database tests skipped без VPN_TEST_DATABASE_URL; Android build/lint и
-  7 unit tests прошли. **Технический I-011 принят (ADR-022):** исправленный direct
-  UAPI revoke реально удаляет peer при работающем движке и прекращает трафик
-  Pixel, повтор успешен. После потери узла disconnect вернул IPv4/IPv6.
-  Forced deep Doze IDLE/resume пройден; естественный hardware suspend и активный
-  system permission revoke не измерены. Release licence/SBOM gates остаются.
+  pending and atomic quota debit. Historical receipts preserve the epoch boundary;
+  a separate read-only reconciliation. Report: docs/verification-i-008.md.
+- The local accounting tasks of phase 2 are available for review/demonstration on synthetic
+  reports. A real collector/delivery and bounded traffic enforcement are not proven.
+- I-009 is implemented locally: node registry with a one-time credential, versioned
+  authenticated usage endpoint v1, timestamp/nonce replay protection, and an atomic
+  transaction of credential nonce + I-008 receipt/debit. Verification: 224 tests passed on
+  a disposable PostgreSQL; `docs/verification-i-009.md`. There is no real daemon/VPS/TLS
+  ingress and no credential rotation.
+- **I-010 completed 2026-10-19 within the bounded staging test-node acceptance.**
+  Pinned binaries/licenses were installed on the approved VPS; the installation and a repeat
+  were verified. After fixing the noexec `/run`, the final run gave `ok=48
+  changed=2 unreachable=0 failed=0`. Two real namespace exchanges confirmed
+  handshake, bidirectional packets, and peer removal; two injected-failure runs —
+  cleanup. Existing containers, firewall/routes/links/namespaces were preserved,
+  transient units were removed. `docs/evidence/i-010-staging-acceptance.json` was verified.
+  Checklist — `docs/issues/I-010.md`, boundary — ADR-018. The release remains
+  installed, the test runtime was removed; public endpoint/Android/egress were not verified.
+  Linux binary scan: 0 symbol/package findings; release/native gates remain.
+- I-011: on 2026-10-19 on a physical Pixel 8 Pro, native UP, a fresh
+  handshake, and HTTPS IPv4 egress through the agreed staging endpoint were confirmed. The private key
+  stays in the phone's memory. Verified: Wi-Fi → cellular, return to Wi-Fi,
+  screen on/off, normal disconnect, and traffic cutoff when the
+  node is stopped. The IPv6 probe is blocked inside the VPN and passes after disconnect;
+  a sample of three DNS queries showed only the expected Cloudflare resolvers.
+  These are bounded measurements, not proof of the absence of all leaks.
+  Fixes to sandbox/container routes and snapshot v2 were verified on staging:
+  forced-stop and a real 600s deadline restored all seven baseline checks.
+  The test node was stopped, resources cleaned up, the temporary sudo grant revoked;
+  the instrumentation APK was removed, the POC stopped. 174 Python tests passed,
+  166 database tests skipped without VPN_TEST_DATABASE_URL; Android build/lint and
+  7 unit tests passed. **Technical I-011 accepted (ADR-022):** the fixed direct
+  UAPI revoke really removes the peer while the engine is running and stops the Pixel's
+  traffic, the repeat succeeded. After loss of the node, disconnect restored IPv4/IPv6.
+  Forced deep Doze IDLE/resume passed; natural hardware suspend and active
+  system permission revoke were not measured. Release licence/SBOM gates remain.
   Evidence: `docs/verification-i-011.md`,
   `docs/evidence/i-011-revoke-staging.json`; ADR-019/020/021/022.
-- I-012: **технически принят 2026-10-20 в bounded staging scope ADR-024**: migration 0007/0008, owner-only
+- I-012: **technically accepted 2026-10-20 in the bounded staging scope of ADR-024**: migration 0007/0008, owner-only
   requests, key confirmation, quota reservations, native daemon add/remove,
-  config после ACK, kernel UDP budget/expiry и inventory/restart reconciliation.
-  Локальный настоящий AWG test подтвердил handshake/packets/remove/replay и оба
-  cutoff. Без trusted profile admission закрыт. Финальный live gate пройден:
-  реальный API → node ACK → Pixel handshake/staging egress; API revoke/cutoff;
+  config after ACK, kernel UDP budget/expiry, and inventory/restart reconciliation.
+  A local real AWG test confirmed handshake/packets/remove/replay and both
+  cutoffs. Without a trusted profile, admission is closed. The final live gate passed:
+  real API → node ACK → Pixel handshake/staging egress; API revoke/cutoff;
   actual agent restart/reconciliation; transport loss → expiry/cutoff → recovery.
-  Во всех трёх сценариях settlement и обычная сеть после disconnect подтверждены.
-  Семь restored checks true, grant/timer/test APK/private files удалены, endpoint,
-  agent, forwarding, local API и disposable PostgreSQL остановлены.
+  In all three scenarios settlement and the normal network after disconnect were confirmed.
+  Seven restored checks true, grant/timer/test APK/private files removed, endpoint,
+  agent, forwarding, local API, and disposable PostgreSQL stopped.
   Evidence: `docs/evidence/i-012-staging-lifecycle.json` (passed=true).
-  Код и запуск — ADR-024, `docs/verification-i-012-admission.md`,
-  `docs/runbooks/tunnel-lifecycle-staging.md`. Следующий issue — I-013 (отдельно
-  назначен пользователем 2026-10-20, статус ниже). Production/release gates сохраняются.
-- I-013: назначен 2026-10-20, технически принят 2026-10-21 в bounded staging.
-  Локальные 22 Flutter tests, 10 native unit tests и физические native/API checks
-  на Pixel 8 Pro прошли (Telegram delivery TEST FAKE ONLY).
-  Lint и debug/unsigned release builds прошли. Новый Flutter client в `apps/client`
-  использует existing AWG adapter и API I-012; scope/ограничения —
-  ADR-025. Собственный Flutter/Android receipt `docs/evidence/i-013-staging.json`
-  подтверждает handshake/egress, background/foreground, Disconnect/restore,
-  remote revoke, expiry, settlement и семь cleanup checks. Ограничения:
-  один узел, три отдельных lease до 60s/1 MiB; DNS/IPv6 и смена Wi-Fi/mobile
-  для нового APK не проверены; production/release gates открыты.
-  Рекомендуемый следующий issue — I-014; в I-013 он не реализовывался.
-- I-014: реализован 2026-10-21 — экран «Трафик и история» с точными integer bytes,
-  granted/used/reserved/available, стабильной revision/cursor пагинацией,
-  loading/empty/error/stale/retry и очисткой RAM при выходе. ADR-026.
-  На физическом Pixel 8 Pro через локальные реальные API/PostgreSQL проверены
-  сумма больше 2^53, 20+5 записей истории, refresh и повтор без двойного credit.
-  Ledger events синтетические, Telegram delivery TEST FAKE ONLY; VPS не менялся.
+  Code and launch — ADR-024, `docs/verification-i-012-admission.md`,
+  `docs/runbooks/tunnel-lifecycle-staging.md`. The next issue is I-013 (separately
+  assigned by the user on 2026-10-20, status below). Production/release gates remain.
+- I-013: assigned 2026-10-20, technically accepted 2026-10-21 in bounded staging.
+  Local 22 Flutter tests, 10 native unit tests, and physical native/API checks
+  on the Pixel 8 Pro passed (Telegram delivery TEST FAKE ONLY).
+  Lint and debug/unsigned release builds passed. The new Flutter client in `apps/client`
+  uses the existing AWG adapter and the I-012 API; scope/limitations —
+  ADR-025. The own Flutter/Android receipt `docs/evidence/i-013-staging.json`
+  confirms handshake/egress, background/foreground, Disconnect/restore,
+  remote revoke, expiry, settlement, and seven cleanup checks. Limitations:
+  one node, three separate leases of up to 60s/1 MiB; DNS/IPv6 and Wi-Fi/mobile switching
+  were not verified for the new APK; production/release gates are open.
+  The recommended next issue is I-014; it was not implemented in I-013.
+- I-014: implemented 2026-10-21 — the «Трафик и история» (Traffic and history) screen with exact integer bytes,
+  granted/used/reserved/available, stable revision/cursor pagination,
+  loading/empty/error/stale/retry, and RAM clearing on logout. ADR-026.
+  On a physical Pixel 8 Pro through the local real API/PostgreSQL, an
+  amount greater than 2^53, 20+5 history records, refresh, and a repeat without double credit were verified.
+  Ledger events are synthetic, Telegram delivery TEST FAKE ONLY; the VPS was not changed.
   Receipt `docs/evidence/i-014-local-android.json` (`passed=true`),
-  технически принят в локальном scope ADR-026: 36 Flutter, 69 PostgreSQL,
-  10 Android unit tests, lint/debug/unsigned release и APK audit прошли.
-  результаты сборок и тестов — `docs/verification-i-014.md`.
-  Это quota/history acceptance, не новая проверка реального VPN usage/egress.
-  Следующий issue — I-015 (clicker + daily reward); в I-014 не реализовывался.
-- I-015: **принята и закрыта 2026-10-21**. Server-only daily/clicker rules,
-  UTC cap/count/cooldown/window, idempotency, atomic claim/ledger и reward history.
-  Backend: 417 passed, 2 skipped (отдельные I-012 staging/I-013 physical).
+  technically accepted in the local scope of ADR-026: 36 Flutter, 69 PostgreSQL,
+  10 Android unit tests, lint/debug/unsigned release, and APK audit passed.
+  Build and test results — `docs/verification-i-014.md`.
+  This is quota/history acceptance, not a new verification of real VPN usage/egress.
+  The next issue is I-015 (clicker + daily reward); it was not implemented in I-014.
+- I-015: **accepted and closed 2026-10-21**. Server-only daily/clicker rules,
+  UTC cap/count/cooldown/window, idempotency, atomic claim/ledger, and reward history.
+  Backend: 417 passed, 2 skipped (separate I-012 staging/I-013 physical).
   Flutter: 38 passed, format/analyze; Android: 10 unit tests, lint clean,
-  debug/release APK — passed. Финальный I-015 physical runner в обычном
-  PowerShell: **1 passed, 418 deselected, 42.31s**; реальный Pixel/API/PostgreSQL,
-  reward history/replay и DB reconciliation подтверждены. Временный API/БД
-  остановлены, ADB reverse снят, обычный APK восстановлен. Receipts проверены.
-  Production rules выключены; Mini App rewards UI остаётся I-017.
-  Следующий по плану — I-016 (актуальный статус ниже). Удаление временных копий SDK/cache
-  остаётся заблокировано платформой и не является открытым gate I-015.
-  Подробности: docs/verification-i-015.md, docs/evidence/i-015-acceptance.json,
+  debug/release APK — passed. The final I-015 physical runner in a regular
+  PowerShell: **1 passed, 418 deselected, 42.31s**; the real Pixel/API/PostgreSQL,
+  reward history/replay, and DB reconciliation were confirmed. The temporary API/DB
+  were stopped, ADB reverse removed, the regular APK restored. Receipts verified.
+  Production rules are disabled; the Mini App rewards UI remains I-017.
+  Next in the plan — I-016 (current status below). Deletion of temporary SDK/cache copies
+  remains blocked by the platform and is not an open I-015 gate.
+  Details: docs/verification-i-015.md, docs/evidence/i-015-acceptance.json,
   docs/runbooks/rewards.md.
-- I-016: **реализован и технически принят локально 2026-10-21** (ADR-028).
-  Зашифрованный Fernet/pg_dump backup без plaintext файла, единый snapshot
-  dump/manifest, restore в новую случайную БД, сверка всех public tables и
-  ledger/rewards, cleanup success/failure и параллельные drills. Read-only
+- I-016: **implemented and technically accepted locally 2026-10-21** (ADR-028).
+  Encrypted Fernet/pg_dump backup without a plaintext file, a single snapshot
+  dump/manifest, restore into a new random DB, reconciliation of all public tables and
+  ledger/rewards, cleanup on success/failure, and parallel drills. Read-only
   alert codes: DB/schema, node heartbeat, pending peer ACK, backup age/source/
-  integrity и локальный диск. Лимит custom dump 32 MiB, local retention 7 дней.
-  **443 passed, 2 skipped**, включая 26 I-016 tests на настоящем PostgreSQL 17.11;
-  Ruff format/check, mypy (91 files), OpenAPI current. Disposable cluster удалён,
-  закрытие TCP listener проверено. Receipt: docs/evidence/i-016-local-acceptance.json.
-  VPS/Android/VPN не менялись. **Deployment gate открыт:** off-host storage,
-  scheduler, независимая доставка/supervisor, эксплуатационные RPO/RTO и privacy
-  policy не подтверждены. Статус не означает работающие внешние alerts или
-  production disaster recovery. Команды/ручные шаги: docs/runbooks/operations.md;
-  полный отчёт: docs/verification-i-016.md. Следующий функциональный issue — I-017,
-  в этой задаче не начат.
+  integrity, and local disk. Custom dump limit 32 MiB, local retention 7 days.
+  **443 passed, 2 skipped**, including 26 I-016 tests on a real PostgreSQL 17.11;
+  Ruff format/check, mypy (91 files), OpenAPI current. The disposable cluster was removed,
+  closure of the TCP listener was verified. Receipt: docs/evidence/i-016-local-acceptance.json.
+  The VPS/Android/VPN were not changed. **The deployment gate is open:** off-host storage,
+  scheduler, independent delivery/supervisor, operational RPO/RTO, and privacy
+  policy are not confirmed. The status does not mean working external alerts or
+  production disaster recovery. Commands/manual steps: docs/runbooks/operations.md;
+  full report: docs/verification-i-016.md. The next functional issue is I-017,
+  not started in this task.
 
-- I-017: **реализован локально 2026-10-21** (ADR-029). React/TypeScript Mini App
-  в стиле Soft Orbit: точный баланс bytes, daily/clicker через I-015 API,
-  устройства read-only, последние 20 операций, light/dark и logout.
-  Серверный HMAC initData exchange, пяти-минутное окно, durable replay protection,
-  общий аккаунт/initial grant с Android и ограниченная сессия без VPN capabilities.
-  Локальные API/PostgreSQL и browser QA подтверждены; настоящий Telegram SDK,
-  HTTPS и menu button остаются отдельным ручным gate. Никакой публикации/изменения
-  бота или VPS не выполнялось. Production rewards выключены. Партнёрские задания
-  не предлагаются без проверяющего провайдера/прав бота; рефералы — I-018.
-  Команды и фактические результаты: docs/verification-i-017.md,
-  docs/runbooks/telegram-mini-app.md. Следующий функциональный issue — I-018.
+- I-017: **implemented locally 2026-10-21** (ADR-029). A React/TypeScript Mini App
+  in the Soft Orbit style: exact bytes balance, daily/clicker via the I-015 API,
+  devices read-only, the last 20 operations, light/dark, and logout.
+  Server-side HMAC initData exchange, a five-minute window, durable replay protection,
+  a shared account/initial grant with Android, and a restricted session without VPN capabilities.
+  Local API/PostgreSQL and browser QA are confirmed; the real Telegram SDK,
+  HTTPS, and menu button remain a separate manual gate. No publication/modification of the
+  bot or VPS was performed. Production rewards are disabled. Partner tasks
+  are not offered without a verifying provider/bot rights; referrals — I-018.
+  Commands and actual results: docs/verification-i-017.md,
+  docs/runbooks/telegram-mini-app.md. The next functional issue is I-018.
 
-- I-018: **реализован и технически принят локально 2026-10-22** (ADR-030).
-  Кампании/codes, неизменяемая привязка, server-side qualification по final
-  observed counters и matching applied lease debit. Бонус только пригласившему,
-  один раз, в пределах campaign budget/cap/window; default кампаний нет.
-  Mini App: код/условия, binding, counts, cursor list и явная кнопка проверки.
-  **498 passed, 3 skipped** в полном PostgreSQL regression; 5 client tests,
-  TypeScript/Vite build, Ruff, mypy (103 files), OpenAPI current. Отдельный
-  browser harness: **1 passed**, реальные local API/PostgreSQL и TEST ONLY
-  Telegram/node data; binding, +17 bytes, counts, themes/390/320 и logout.
-  Encrypted backup/restore с referral awards подтверждён. Созданные disposable
-  clusters остановлены/удалены, порты 50535/18767 закрыты. VPS/Android не менялись.
-  **Публичная кампания — no-go:** нужны экономика/условия, retention/privacy/legal,
-  поддержка и live Telegram/staging acceptance. Фермы разных аккаунтов полностью
-  не решены; начисление pull-based, коды вводятся вручную, автоматических банов нет.
-  Команды/ручные gates: docs/runbooks/referrals.md; фактические результаты:
+- I-018: **implemented and technically accepted locally 2026-10-22** (ADR-030).
+  Campaigns/codes, immutable binding, server-side qualification by final
+  observed counters and a matching applied lease debit. The bonus goes only to the inviter,
+  once, within the campaign budget/cap/window; there are no default campaigns.
+  Mini App: code/terms, binding, counts, cursor list, and an explicit check button.
+  **498 passed, 3 skipped** in the full PostgreSQL regression; 5 client tests,
+  TypeScript/Vite build, Ruff, mypy (103 files), OpenAPI current. A separate
+  browser harness: **1 passed**, real local API/PostgreSQL and TEST ONLY
+  Telegram/node data; binding, +17 bytes, counts, themes/390/320, and logout.
+  Encrypted backup/restore with referral awards confirmed. The created disposable
+  clusters were stopped/removed, ports 50535/18767 closed. The VPS/Android were not changed.
+  **A public campaign is no-go:** economics/terms, retention/privacy/legal,
+  support, and live Telegram/staging acceptance are needed. Farms of different accounts are not
+  fully solved; accrual is pull-based, codes are entered manually, there are no automatic bans.
+  Commands/manual gates: docs/runbooks/referrals.md; actual results:
   docs/verification-i-018.md, docs/evidence/i-018-local-acceptance.json.
-  Следующий функциональный issue — I-019 (second node/failover); актуальный статус ниже.
+  The next functional issue is I-019 (second node/failover); current status below.
 
-- I-019: **принят 2026-10-23: bounded same-provider node-failure drill (ADR-033)**.
-  ADR-031: до двух private operator profiles, каталог heartbeat/runtime/capacity,
-  explicit node selection и отдельные конфиги/agent credentials; один peer/узел.
-  Flutter показывает выбор, причины и время проверки, не переключает живой lease.
-  Явное owner recovery только после deadline+10s и stale heartbeat: полный
-  reservation debit с counters_lost, observed_bytes=NULL и version fencing.
-  Это не измеренный usage/ACK и не referral qualification. Старый intent
-  завершён прежде нового; stalled alert учитывает только текущие commands.
-  PostgreSQL полный regression: 506 passed, 3 opt-in skipped; Flutter 44,
-  native Android 10, analyze/lint/debug/unsigned release и OpenAPI — passed.
-  После финальной правки grace затронутый набор: 63 passed, 446 deselected.
-  Это результаты первоначальных локальных проверок;
-  фактические результаты: docs/verification-i-019.md и
+- I-019: **accepted 2026-10-23: bounded same-provider node-failure drill (ADR-033)**.
+  ADR-031: up to two private operator profiles, a heartbeat/runtime/capacity catalog,
+  explicit node selection, and separate configs/agent credentials; one peer per node.
+  Flutter shows the selection, reasons, and check time, and does not switch a live lease.
+  Explicit owner recovery only after deadline+10s and a stale heartbeat: a full
+  reservation debit with counters_lost, observed_bytes=NULL, and version fencing.
+  This is not a measured usage/ACK and not a referral qualification. The old intent
+  is completed before a new one; the stalled alert counts only current commands.
+  Full PostgreSQL regression: 506 passed, 3 opt-in skipped; Flutter 44,
+  native Android 10, analyze/lint/debug/unsigned release, and OpenAPI — passed.
+  After the final grace fix, the affected set: 63 passed, 446 deselected.
+  These are the results of the initial local checks;
+  actual results: docs/verification-i-019.md and
   docs/evidence/i-019-local-acceptance.json.
-  Полный physical Android drill: 1 passed, 552 deselected, 238.22s; все 15 facts,
-  fresh HTTPS egress B/A/A/B, cutoff/expiry без agent/API, два recovery,
-  возврат A без оживления старого peer, восстановление обычной сети.
-  Ledger: четыре settlement, два full lost-counter debit, reserved_bytes=0.
-  Оба runtime очищены, grants удалены; независимый post-check passed.
-  Receipts: docs/evidence/i-019-staging.json и i-019-session-post-cleanup.json.
-  Финальные targeted synthetic: 43 Python, 49 Flutter; mypy 113 files passed.
-  Production fleet и seamless/automatic failover не являются этим результатом.
-  I-020 payment sandbox не начат; требует отдельного legal gate.
-  Уточнение владельца 2026-10-22, ADR-033: текущий drill разрешён на двух
-  существующих серверах одного провайдера (45.10.166.106 / 85.209.132.205).
-  Это был отдельный same-provider gate. Read-only SSH preflight
-  выполнен; pinned artifacts на B установлены и проверены (ok=14, failed=0).
-  Bounded runner завершил drill и отозвал временные grants.
-  История подготовки: docs/evidence/i-019-drill-preparation.json.
+  Full physical Android drill: 1 passed, 552 deselected, 238.22s; all 15 facts,
+  fresh HTTPS egress B/A/A/B, cutoff/expiry without agent/API, two recoveries,
+  return to A without reviving the old peer, restoration of the normal network.
+  Ledger: four settlements, two full lost-counter debits, reserved_bytes=0.
+  Both runtimes cleaned up, grants removed; the independent post-check passed.
+  Receipts: docs/evidence/i-019-staging.json and i-019-session-post-cleanup.json.
+  Final targeted synthetic: 43 Python, 49 Flutter; mypy 113 files passed.
+  A production fleet and seamless/automatic failover are not this result.
+  The I-020 payment sandbox has not started; it requires a separate legal gate.
+  Owner clarification 2026-10-22, ADR-033: the current drill is permitted on two
+  existing servers of the same provider (45.10.166.106 / 85.209.132.205).
+  That was a separate same-provider gate. The read-only SSH preflight
+  was performed; the pinned artifacts on B were installed and verified (ok=14, failed=0).
+  The bounded runner completed the drill and revoked the temporary grants.
+  Preparation history: docs/evidence/i-019-drill-preparation.json.
 
-- I-019 independent-provider gate: **принят 2026-11-01** по ADR-073/ADR-076.
-  Physical Android drill на A `45.10.166.106` и B `150.241.99.227` прошёл:
-  свежие egress A/B/A/B, expiry/recovery/cutoff, четыре settlement,
-  `reserved_bytes=0`, cleanup обоих hosts и удаление grants. Разные origin ASN
-  подтверждают ограниченную provider separation; полная upstream независимость
-  и automatic failover не проверялись. Receipt:
+- I-019 independent-provider gate: **accepted 2026-11-01** per ADR-073/ADR-076.
+  The physical Android drill on A `45.10.166.106` and B `150.241.99.227` passed:
+  fresh egress A/B/A/B, expiry/recovery/cutoff, four settlements,
+  `reserved_bytes=0`, cleanup of both hosts, and removal of grants. Different origin ASNs
+  confirm a limited provider separation; full upstream independence
+  and automatic failover were not verified. Receipt:
   `docs/evidence/i-019-attempt-2df6394bc51e41e3b1fb066a1ba7e395.json`.
 
-### Отдельная UI-задача владельца — Android Soft Orbit, 2026-10-22
+### Separate owner UI task — Android Soft Orbit, 2026-10-22
 
-Android-интерфейс приведён к предоставленному Soft Orbit reference: единая тема,
-вкладки VPN/Трафик/Профиль, отдельный выбор узла, орбитальная карточка и история.
-Telegram/Mini App и tunnel controller не менялись. Это UI-итерация поверх I-019,
-не закрытие двухузлового live gate. Проверки и ограничения:
+The Android interface was brought in line with the provided Soft Orbit reference: a single theme,
+tabs VPN/Трафик/Профиль (VPN/Traffic/Profile), a separate node selection, an orbital card, and history.
+Telegram/Mini App and the tunnel controller were not changed. This is a UI iteration on top of I-019,
+not the closure of the two-node live gate. Checks and limitations:
 `docs/verification-android-soft-orbit.md`.
 
-### Отдельная задача владельца — Telegram Serverless bot, 2026-10-22
+### Separate owner task — Telegram Serverless bot, 2026-10-22
 
 Telegram Serverless bot navigation
-реализирована локально (`apps/telegram-bot`, ADR-032), 44 tests passed. Публичные
-ссылки, hosted acceptance и защищённый auth relay открыты. Нельзя переключать
-webhook текущего Android auth-бота до relay acceptance. Факты:
-`docs/verification-telegram-bot.md`; это не новый статус завершения I-017/I-019.
+is implemented locally (`apps/telegram-bot`, ADR-032), 44 tests passed. Public
+links, hosted acceptance, and a protected auth relay are open. The webhook of the current Android auth bot
+must not be switched before relay acceptance. Facts:
+`docs/verification-telegram-bot.md`; this is not a new completion status for I-017/I-019.
 
-После явного одобрения владельца menu bot опубликован 2026-10-22:
-@DetourVpnBot, revision 2, 7 modules, две operational tables/indexes и шесть
-private-chat commands. Hosted V8/SQLite probe и webhook sync подтверждены.
-OTP relay, публичные ссылки и user-chat `/start` acceptance ещё открыты;
+After explicit owner approval, the menu bot was published on 2026-10-22:
+@DetourVpnBot, revision 2, 7 modules, two operational tables/indexes, and six
+private-chat commands. The hosted V8/SQLite probe and webhook sync are confirmed.
+OTP relay, public links, and user-chat `/start` acceptance are still open;
 receipt `docs/evidence/telegram-bot-deployment.json`.
 
-## 13. Как работать с Codex по каждому issue
+## 13. How to work with Codex on each issue
 
-### Закрытая бесплатная эксплуатация — назначение 2026-10-23
+### Closed free operation — assignment 2026-10-23
 
-Владелец разрешил последовательную реализацию I-021–I-028 без платежей.
-Пробелы, зависимости и acceptance: `docs/issues/I-021.md`.
-Текущая точка: **I-024 реализован и принят локально**, см.
-`docs/issues/I-024.md`, `docs/verification-i-024.md` и `docs/runbooks/peer-windows-v3.md`.
-Backend/agent/Linux: 719 passed, 5 opt-in skipped; два настоящих изолированных
-AWG-туннеля, 105 секунд передачи, четыре продления на каждый и crash recovery.
-Это не VPS rollout и не physical/daily acceptance; они остаются I-028.
-I-025 назначен владельцем 2026-10-23: **реализован и проверен локально**;
-телефон подключат позже. Финальные 70 Flutter tests, 17 native unit tests,
-format/analyze/lint/debug/unsigned release — passed. Ключ/refresh сохраняются
-зашифрованно через Android Keystore, v3 renewal требует active ACK, native
-monotonic deadline/fencing; локальные split apps, IPv4 DNS и IPv6 blocking policy.
-Физические native Keystore/corruption/process/permission-denial проверки прошли
-(10 фаз, 11 фактов); local Flutter/API/PostgreSQL session/refresh/logout/lost-reply
-прошёл (1 passed, 68.84s). Реальный v3 tunnel/lifecycle/Doze/network/DNS/IPv6/split
-routing остаётся открыт: на обоих узлах нет v3 slots. Remote изменений не было.
-Подробности: `docs/verification-i-025-physical.md`.
-См. `docs/issues/I-025.md`, `docs/verification-i-025.md`, ADR-040 и local receipt.
-Одна попытка была остановлена C: full; финальный повтор в existing snapshot прошёл.
-I-026: owner-only live Mini App → Android OTP acceptance пройдена 2026-10-26;
-друзья и VPN data-plane этим не приняты. I-027: 2026-10-26 на beta API развёрнут
-backup-only service; зашифрованный архив скачан на ПК и восстановлен из него в
-disposable PostgreSQL. Windows-задача зарегистрирована на 07:00 ежедневно, первый
-плановый запуск ожидается 2026-10-27. S3, независимый монитор и автоудаление
-архивов отложены. I-030: отдельные control-plane/node
-  templates, invite gate, closed AWG bootstrap и scoped beta packet path прошли
-  локальную проверку; TEST ONLY AWG client и HTTP flow подтверждены в disposable
-  WSL namespaces. Beta host, provider firewall, reboot recovery и hosted deployment
-  не приняты. См.
-`docs/issues/I-027.md` и `docs/issues/I-030.md`.
-Update 2026-10-26 к I-030: две новые изолированные beta VM прошли частичную
-hosted acceptance. API/DB пережили container restart и reboot, оставаясь
-loopback-only. Отдельная VPN-нода прошла закрытый slot start/stop/start и reboot
-recovery; gate закрыт, у агента нет credential, provider ingress/client traffic
-не проверялись. На API VM развёрнут trusted shortlived IP TLS с challenge-only
-HTTP, renewal dry-run и custom timer; HTTPS пока отвечает 404 и API не открыт.
-Independent certificate alerting и I-027/I-028 acceptance открыты; I-026
-owner-only live OTP gate принят, без публичного запуска.
-I-030 остаётся открытым; receipts находятся в `docs/evidence/`.
-I-029: локально реализована headless Always-on lease revalidation с protected
-relay; debug manifest включает support только для контролируемой acceptance,
-release manifest выключает. Android callback/Lockdown и восстановление ещё не
-приняты физически; I-029 и kill-switch claim остаются открытыми. См.
+The owner authorized sequential implementation of I-021–I-028 without payments.
+Gaps, dependencies, and acceptance: `docs/issues/I-021.md`.
+Current point: **I-024 implemented and accepted locally**, see
+`docs/issues/I-024.md`, `docs/verification-i-024.md`, and `docs/runbooks/peer-windows-v3.md`.
+Backend/agent/Linux: 719 passed, 5 opt-in skipped; two real isolated
+AWG tunnels, 105 seconds of transfer, four renewals on each, and crash recovery.
+This is not a VPS rollout and not physical/daily acceptance; they remain I-028.
+I-025 was assigned by the owner on 2026-10-23: **implemented and verified locally**;
+the phone will be connected later. Final 70 Flutter tests, 17 native unit tests,
+format/analyze/lint/debug/unsigned release — passed. The key/refresh are stored
+encrypted via Android Keystore, v3 renewal requires an active ACK, native
+monotonic deadline/fencing; local split apps, IPv4 DNS, and an IPv6 blocking policy.
+Physical native Keystore/corruption/process/permission-denial checks passed
+(10 phases, 11 facts); the local Flutter/API/PostgreSQL session/refresh/logout/lost-reply
+passed (1 passed, 68.84s). The real v3 tunnel/lifecycle/Doze/network/DNS/IPv6/split
+routing remains open: neither node has v3 slots. There were no remote changes.
+Details: `docs/verification-i-025-physical.md`.
+See `docs/issues/I-025.md`, `docs/verification-i-025.md`, ADR-040, and the local receipt.
+One attempt was stopped by C: full; the final repeat in the existing snapshot passed.
+I-026: the owner-only live Mini App → Android OTP acceptance passed 2026-10-26;
+friends and the VPN data plane are not accepted by this. I-027: on 2026-10-26 a
+backup-only service was deployed on the beta API; the encrypted archive was downloaded to the PC and restored from it into a
+disposable PostgreSQL. The Windows task is registered for 07:00 daily, the first
+scheduled run is expected 2026-10-27. S3, an independent monitor, and automatic deletion of
+archives are deferred. I-030: separate control-plane/node
+  templates, invite gate, closed AWG bootstrap, and the scoped beta packet path passed
+  local verification; the TEST ONLY AWG client and HTTP flow were confirmed in disposable
+  WSL namespaces. The beta host, provider firewall, reboot recovery, and hosted deployment
+  are not accepted. See
+`docs/issues/I-027.md` and `docs/issues/I-030.md`.
+Update 2026-10-26 to I-030: two new isolated beta VMs passed a partial
+hosted acceptance. The API/DB survived a container restart and reboot, staying
+loopback-only. A separate VPN node passed a closed slot start/stop/start and reboot
+recovery; the gate is closed, the agent has no credential, provider ingress/client traffic
+was not verified. On the API VM a trusted short-lived IP TLS was deployed with a challenge-only
+HTTP, a renewal dry-run, and a custom timer; HTTPS currently answers 404 and the API is not
+open. Independent certificate alerting and I-027/I-028 acceptance are open; the I-026
+owner-only live OTP gate is accepted, without a public launch.
+I-030 remains open; receipts are in `docs/evidence/`.
+I-029: a headless Always-on lease revalidation with a protected
+relay is implemented locally; the debug manifest enables support only for controlled acceptance,
+the release manifest disables it. The Android callback/Lockdown and recovery are not yet
+accepted physically; I-029 and the kill-switch claim remain open. See
 `docs/verification-i-029.md`.
-Владелец 2026-10-23 разрешил ограниченный временный I-028
-staging на A и physical-проверки: подготовка идёт по ADR-041 и
-`docs/runbooks/v3-android-staging.md`; локальные receipts не означают remote
-acceptance. На 2026-10-24 выполнен реальный Android-сценарий I-028: IPv4/DNS,
-продления до поколения 7, split routing, Disconnect/remote revoke, потеря
-API/агента с закрытием по сроку и восстановление; 4 189 203 измеренных байта
-сошлись в ledger. Общий runner сохранил false из-за ошибки проверки уже
-остановленного таймера. Исправление отдельно проверено на A с успешной очисткой
-и независимым post-check; это два отдельных receipt, не один успешный прогон.
-На тот момент Doze, смена сети, системный отзыв и другие случаи I-028 ещё
-оставались открыты; дальнейшие записи ниже обновляют их по отдельным receipts.
-Новый единый основной прогон I-028 прошёл 2026-10-24: 1 passed за 474.23s,
-включая Disconnect с задержанным renewal/реальным ACK и исправленную очистку.
-13 квитанций, 1 810 465 измеренных байт, ноль резервов/unknown/open/нарушений;
-`docs/evidence/i-028-main-success.json`. Старые failed receipts сохранены.
-Отдельный NetworkRevoke run прошёл 2026-10-24: 1 passed за 277.73s,
-реальные Wi-Fi/сотовая связь/потеря обеих сетей/возврат Wi-Fi и системный
-отзыв разрешения без самоподключения; 5 квитанций, 31 799 704 байта,
-ноль резервов/unknown/open/нарушений, полная очистка A/Pixel и независимая
-проверка. `docs/evidence/i-028-network-revoke-success.json`; более ранние
-ошибки сохранены. Lifecycle runner зафиксировал background, screen-off и
-forced Doze, но весь прогон failed из-за потери ADB/USB при восстановлении;
-отдельный follow-up подтвердил последующее восстановление телефона.
-На момент этой записи естественный сон, полный успешный lifecycle-прогон,
-comprehensive DNS/IPv6 leak capture, два физических устройства и независимый
-провайдер оставались обязательными. Следующая запись ниже фиксирует последующие
-Lifecycle и NaturalSleep passes; открытые ворота перечислены в матрице. I-028
-не закрыт.
-Продолжение 2026-10-25: отдельный NaturalSleep run подтвердил новый unforced
-deep-idle при 412 секундах без USB и ноль live slots/peers на A во время сна,
-но этот конкретный прогон завершился `passed=false` до проверки native down и
-нового egress после пробуждения; ранняя попытка остановилась на Play Protect.
-Полный повторный
-Lifecycle прошёл одной квитанцией за 659.47s: background, screen-off, forced
-Doze, Wi-Fi/mobile/loss/Wi-Fi, системный отзыв, 20 точных receipts на
-1 172 946 байт, полная очистка телефона и A. На тот момент NaturalSleep,
-comprehensive DNS/IPv6 leak capture, два физических устройства и независимый
-провайдер оставались открыты; более поздняя запись закрывает NaturalSleep.
-Staging не означает production-ready.
-NaturalSleep harness усилен bounded app-private lifecycle/native timeline;
-source-bound Android test build прошёл. Staging A install preflight остановился
-на минимуме свободного диска до создания VPN ресурсов; receipt в I-028.
-См. `docs/verification-i-028.md`. I-020 payment
-не активирован.
+The owner on 2026-10-23 authorized a bounded temporary I-028
+staging on A and physical checks: preparation proceeds per ADR-041 and
+`docs/runbooks/v3-android-staging.md`; local receipts do not mean remote
+acceptance. On 2026-10-24 a real Android I-028 scenario was executed: IPv4/DNS,
+renewals up to generation 7, split routing, Disconnect/remote revoke, loss of
+API/agent with closure by deadline, and recovery; 4 189 203 measured bytes
+reconciled in the ledger. The common runner saved false because of an error checking the already
+stopped timer. The fix was separately verified on A with a successful cleanup
+and an independent post-check; these are two separate receipts, not one successful run.
+At that time Doze, network change, system revoke, and other I-028 cases still
+remained open; the entries below update them via separate receipts.
+A new single main I-028 run passed on 2026-10-24: 1 passed in 474.23s,
+including Disconnect with a delayed renewal/real ACK and the fixed cleanup.
+13 receipts, 1 810 465 measured bytes, zero reservations/unknown/open/violations;
+`docs/evidence/i-028-main-success.json`. The old failed receipts are preserved.
+A separate NetworkRevoke run passed on 2026-10-24: 1 passed in 277.73s,
+real Wi-Fi/cellular/loss of both networks/return to Wi-Fi and system
+permission revoke without self-connecting; 5 receipts, 31 799 704 bytes,
+zero reservations/unknown/open/violations, full cleanup of A/Pixel and an independent
+check. `docs/evidence/i-028-network-revoke-success.json`; the earlier
+errors are preserved. The Lifecycle runner recorded background, screen-off, and
+forced Doze, but the whole run failed due to loss of ADB/USB during recovery;
+a separate follow-up confirmed the subsequent recovery of the phone.
+At the time of this entry, natural sleep, a full successful lifecycle run,
+a comprehensive DNS/IPv6 leak capture, two physical devices, and an independent
+provider remained mandatory. The next entry below records the subsequent
+Lifecycle and NaturalSleep passes; the open gates are listed in the matrix. I-028
+is not closed.
+Continuation 2026-10-25: a separate NaturalSleep run confirmed a new unforced
+deep-idle at 412 seconds without USB and zero live slots/peers on A during sleep,
+but this specific run finished `passed=false` before checking native down and
+a new egress after wake-up; an early attempt stopped at Play Protect.
+A full repeat
+Lifecycle passed with one receipt in 659.47s: background, screen-off, forced
+Doze, Wi-Fi/mobile/loss/Wi-Fi, system revoke, 20 exact receipts for
+1 172 946 bytes, full cleanup of the phone and A. At that time NaturalSleep,
+a comprehensive DNS/IPv6 leak capture, two physical devices, and an independent
+provider remained open; a later entry closes NaturalSleep.
+Staging does not mean production-ready.
+The NaturalSleep harness was hardened with a bounded app-private lifecycle/native timeline;
+the source-bound Android test build passed. The staging A install preflight stopped
+at the minimum free disk before creating VPN resources; receipt in I-028.
+See `docs/verification-i-028.md`. I-020 payment
+is not activated.
 
-Актуализация 2026-10-25: source-bound NaturalSleep прошёл на одном Pixel за
-11:37. Подтверждены 392 секунды без USB, естественный deep-idle, native tunnel
-down после пробуждения, новый staging egress и восстановление окна; 29 662 774
-байта сошлись, телефон/A cleanup и независимая проверка прошли. Квитанция:
+Update 2026-10-25: the source-bound NaturalSleep passed on one Pixel in
+11:37. Confirmed: 392 seconds without USB, natural deep-idle, native tunnel
+down after wake-up, new staging egress, and window recovery; 29 662 774
+bytes reconciled, phone/A cleanup and an independent check passed. Receipt:
 `docs/evidence/i-028-natural-sleep-staging-20261025T192620Z-286a330b.json`.
-Это закрывает только NaturalSleep. В I-028 остаются полный packet-level
-DNS/IPv6 аудит, два физических устройства и отказ независимого провайдера;
-I-028 не закрыт. Временный staging A очищен, но свободного места ниже порога
-повторной установки; он не является beta-площадкой для друзей.
+This closes only NaturalSleep. I-028 still has a full packet-level
+DNS/IPv6 audit, two physical devices, and an independent provider failure;
+I-028 is not closed. The temporary staging A is cleaned up, but its free space is below the threshold for
+reinstallation; it is not a beta site for friends.
 
-Актуализация 2026-10-29: двухустройственный I-028 staging acceptance прошёл,
+Update 2026-10-29: the two-device I-028 staging acceptance passed,
 receipt `docs/evidence/i-028-two-device-staging-20261029T101845Z-b0085c2a.json`.
-Pixel 8 Pro cellular и 25040RP0AG Wi-Fi использовали разные windows/slots и
-реальный staging egress; cross-owner revoke isolation, продолжение B после
-отключения A, точная сверка трафика и cleanup прошли. Ложный failed receipt
-предыдущего запуска сохранён без изменений. I-028 всё ещё открыт для полного
-packet-level DNS/IPv6 аудита и отказа независимого провайдера; независимая
-площадка пока не выбрана/не разрешена. Результат staging не означает готовность
-к production.
+The Pixel 8 Pro on cellular and the 25040RP0AG on Wi-Fi used different windows/slots and
+real staging egress; cross-owner revoke isolation, B continuing after
+A's disconnect, exact traffic reconciliation, and cleanup passed. The false failed receipt
+of the previous run is preserved unchanged. I-028 is still open for the full
+packet-level DNS/IPv6 audit and independent provider failure; the independent
+site is not yet chosen/authorized. The staging result does not mean readiness
+for production.
 
-Актуализация 2026-10-26, I-026: на собственном Android устройстве владелец
-прошёл live Telegram Mini App → OTP → Android sign-in happy path на отдельном
-beta-боте; Telegram работал через включённый владельцем Sota Connect. Telegram
-webview и авторизованный Android кабинет наблюдались; OTP и `initData` не
-сохранялись. Privacy-minimal квитанция развернута на beta API; migration 0017,
-backup, readiness/health и Mini App route проверены. На момент той записи hosted
-OTP receipt, replay/duplicate rejection и pairing ещё не были подтверждены.
-Дополнение 2026-10-26: владелец прошёл debug-only live probe; UI сообщил, что
-сервер отклонил точный повтор OTP. Read-only сверка beta API дала одну consumed
-попытку с `api_accepted` и временем доставки, одну native-сессию с точным
-совпадением `consumed_at`/`created_at` и одну активную device row у аккаунта.
-Raw IDs, OTP и `initData` не читались; текущая сессия не получила `device_id`,
-так как VPN не запускали. I-026 принят только для owner-only login/replay scope;
-друзья и data plane не проверялись. Подробности: `docs/issues/I-026.md` и
+Update 2026-10-26, I-026: on his own Android device the owner
+completed the live Telegram Mini App → OTP → Android sign-in happy path on a separate
+beta bot; Telegram worked through a Sota Connect enabled by the owner. The Telegram
+webview and the authorized Android cabinet were observed; OTP and `initData` were not
+stored. A privacy-minimal receipt was deployed to the beta API; migration 0017,
+backup, readiness/health, and the Mini App route were verified. At the time of that entry the hosted
+OTP receipt, replay/duplicate rejection, and pairing were not yet confirmed.
+Addition 2026-10-26: the owner completed a debug-only live probe; the UI reported that the
+server rejected an exact OTP repeat. A read-only reconciliation of the beta API showed one consumed
+attempt with `api_accepted` and a delivery time, one native session with an exact
+match of `consumed_at`/`created_at`, and one active device row for the account.
+Raw IDs, OTP, and `initData` were not read; the current session did not get a `device_id`,
+since the VPN was not started. I-026 is accepted only for the owner-only login/replay scope;
+friends and the data plane were not verified. Details: `docs/issues/I-026.md` and
 `docs/evidence/i-026-beta-live-delivery-receipt-20261026.json`.
-Актуальный статус на 2026-10-29: ручная передача зашифрованной копии и restore
-I-027 прошли. После ошибки доступа scheduled task исправлен: он использует
-текущего интерактивного пользователя с ограниченными правами, action и principal
-проверены повторной идемпотентной регистрацией. Исправленный плановый запуск ещё
-не подтверждён. См. `docs/evidence/i-027-beta-task-principal-20261029.json`. В I-028 отдельный
-двухустройственный физический критерий прошёл, но полный DNS/IPv6 packet audit и
-независимый-provider failure остаются открытыми по acceptance matrix. Эти остатки
-нельзя подменять старыми формулировками о непроверенном втором устройстве или
-провозглашать выполненными. См. `docs/beta-readiness-20261029.md` и evidence
-I-026: `docs/evidence/i-026-live-miniapp-otp-20261026.json`.
+Current status as of 2026-10-29: the manual transfer of the encrypted copy and the restore of
+I-027 passed. After an access error the scheduled task was fixed: it uses
+the current interactive user with limited rights, and the action and principal
+were verified by a repeated idempotent registration. The fixed scheduled run is not yet
+confirmed. See `docs/evidence/i-027-beta-task-principal-20261029.json`. In I-028 the separate
+two-device physical criterion passed, but the full DNS/IPv6 packet audit and
+the independent-provider failure remain open per the acceptance matrix. These leftovers
+must not be replaced by old wording about an unverified second device or
+declared complete. See `docs/beta-readiness-20261029.md` and the I-026
+evidence: `docs/evidence/i-026-live-miniapp-otp-20261026.json`.
 
-1. Передать контекст (`TECHNICAL_SPEC.md`, ADR, `AGENTS.md`) и **одну** issue.
-2. Попросить 3–8 конкретных шагов, затрагиваемые файлы, риски, тесты; без немедленного огромного изменения.
-3. Поручить реализацию исключительно этой issue в отдельной ветке.
-4. Запустить formatter, linter, mypy/pyright и тесты; на Android — Gradle/Flutter tests.
-5. Codex должен вернуть: что изменено, какие команды запускались, результаты, нерешённые вопросы и список ручных проверок.
-6. Самостоятельно проверить diff (особенно IAM, ключи, SQL, платежи), затем merge.
-7. После каждого этапа пройти DoD и обновить ROADMAP и ADR.
+1. Pass the context (`TECHNICAL_SPEC.md`, ADR, `AGENTS.md`) and **one** issue.
+2. Ask for 3–8 concrete steps, the affected files, risks, tests; without an immediate huge change.
+3. Assign implementation exclusively of this issue in a separate branch.
+4. Run the formatter, linter, mypy/pyright, and tests; on Android — Gradle/Flutter tests.
+5. Codex must return: what changed, which commands were run, results, unresolved questions, and a list of manual checks.
+6. Verify the diff yourself (especially IAM, keys, SQL, payments), then merge.
+7. After each stage, go through the DoD and update ROADMAP and ADR.
 
-## 14. Матрица рисков
+## 14. Risk matrix
 
-| Риск | Вероятность / ущерб | Тактика |
+| Risk | Probability / impact | Tactic |
 |---|---|---|
-| Нативная интеграция VPN сложнее Flutter UI | Высокая / высокая | Прототип туннеля до большого UI |
-| Жёсткие блокировки узлов | Высокая / высокая | Диверсификация, честные статусы, R&D без гарантии |
-| Неопределённость закона о рекламе | Высокая / высокая | Legal gate до рекламных закупок |
-| Блокировка продавца платежным провайдером | Средняя / высокая | Due diligence, не скрывать бизнес-модель от провайдера |
-| Накрутка кликера | Высокая / средняя | Server ledger, daily cap, idempotency, antiabuse |
-| Себестоимость бесплатного трафика | Высокая / высокая | Квоты, бюджетные лимиты, unit economics |
-| License incompatibility | Средняя / высокая | SBOM, проверка лицензии по библиотекам |
-| DDoS узла/панели | Средняя / высокая | L3/L4 hosting mitigation, API WAF, резервирование |
-| Утечка пользовательских данных | Средняя / очень высокая | Data minimization, secret lifecycle, external audit |
-| AI-generated false sense of completeness | Высокая / высокая | Acceptance по измеренным тестам, no mock in release |
+| Native VPN integration is harder than the Flutter UI | High / high | Tunnel prototype before a large UI |
+| Hard blocking of nodes | High / high | Diversification, honest statuses, R&D without a guarantee |
+| Uncertainty of advertising law | High / high | Legal gate before ad purchases |
+| Payment provider blocking the seller | Medium / high | Due diligence, do not hide the business model from the provider |
+| Clicker abuse | High / medium | Server ledger, daily cap, idempotency, antiabuse |
+| Cost of free traffic | High / high | Quotas, budget limits, unit economics |
+| License incompatibility | Medium / high | SBOM, licence check per library |
+| DDoS of a node/panel | Medium / high | L3/L4 hosting mitigation, API WAF, redundancy |
+| Leak of user data | Medium / very high | Data minimization, secret lifecycle, external audit |
+| AI-generated false sense of completeness | High / high | Acceptance by measured tests, no mock in release |
 
-## 15. Ближайшая точка принятия решения
+## 15. Nearest decision point
 
-Первые 3 технические неизвестные:
-1. Какую нативную Android VPN-библиотеку можно безопасно и лицензионно корректно использовать с Flutter?
-2. Как организовать счётчики и enforcement квоты на конкретном движке без двойного списания при рестарте?
-3. Какой способ входа обеспечивает надёжную идентичность без избыточных персональных данных и соответствует правилам платформ?
+The first 3 technical unknowns:
+1. Which native Android VPN library can be used safely and in a licence-compliant way with Flutter?
+2. How to organize counters and quota enforcement on a specific engine without double debit on restart?
+3. Which sign-in method provides reliable identity without excessive personal data and complies with platform rules?
 
-Не начинать красивую геймификацию до завершения базового backend ledger и рабочего туннеля.
+Do not start attractive gamification until the base backend ledger and a working tunnel are complete.
 
 Historical I-019 attempt `docs/evidence/i-019-attempt-5b914fde876e4c0e866bcce4729835f8.json`
 failed at B reconnect with four `dns` probe results and no fresh handshake
@@ -613,7 +614,7 @@ failed receipts remain preserved. Evidence:
 `docs/evidence/i-019-b-reuse-diagnostic.json`, and
 `docs/evidence/i-019-session-cleanup.json`.
 
-- Закрытая бета: **ADR-090 предложен 2026-11-08** (границы 5–20 тестеров, stop-критерии,
-  go/no-go по открытым пунктам `docs/beta-readiness-20261029.md`). Квота 512 MiB, срок
-  4 недели, награды выключены — согласовано владельцем «пока что»; открыт бюджет VPS
-  (тариф и лимит трафика). Это определение, не готовность к запуску.
+- Closed beta: **ADR-090 proposed 2026-11-08** (boundaries of 5–20 testers, stop criteria,
+  go/no-go on the open items of `docs/beta-readiness-20261029.md`). Quota 512 MiB, duration
+  4 weeks, rewards disabled — agreed by the owner "for now"; the VPS budget is open
+  (plan and traffic limit). This is a definition, not launch readiness.

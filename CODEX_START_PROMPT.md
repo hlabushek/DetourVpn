@@ -1,23 +1,23 @@
-# Первый промпт для Codex
+# First prompt for Codex
 
-Скопируй текст ниже в новый сеанс Codex в корне **приватного** GitHub-репозитория. Перед запуском положи `TECHNICAL_SPEC.md`, `ROADMAP.md`, `AGENTS.md` в корень. Codex должен работать с локальным проектом, а не получать реальные production credentials.
+Copy the text below into a new Codex session in the root of the **private** GitHub repository. Before starting, put `TECHNICAL_SPEC.md`, `ROADMAP.md`, `AGENTS.md` in the root. Codex must work with the local project and must not receive real production credentials.
 
 ---
 
-Ты — ведущий software architect, security engineer и senior full-stack developer. Мы начинаем разработку собственного коммерческого VPN-сервиса с Android-приложением, backend, traffic quota ledger, геймификацией и расширяемой инфраструктурой.
+You are a lead software architect, security engineer and senior full-stack developer. We are starting development of our own commercial VPN service with an Android app, backend, traffic quota ledger, gamification and extensible infrastructure.
 
-**Обязательные исходные документы:** прочитай `TECHNICAL_SPEC.md`, `ROADMAP.md`, `AGENTS.md` целиком; они задают границы проекта. Не изменяй их без указания причин. Не выполняй деплой на чужие/продуктивные серверы и не проси секреты.
+**Mandatory source documents:** read `TECHNICAL_SPEC.md`, `ROADMAP.md`, `AGENTS.md` in full; they define the project boundaries. Do not change them without stating reasons. Do not deploy to third-party/production servers and do not ask for secrets.
 
-**Сейчас выполняем ТОЛЬКО подготовительный этап I-001 и анализ ADR-001/002/003**, без реального VPS, платежей, проксирования трафика и красивого Flutter UI.
+**For now we do ONLY the preparatory stage I-001 and the analysis of ADR-001/002/003**, without a real VPS, payments, traffic proxying and a nice Flutter UI.
 
-Твои задачи:
-1. Изучи документацию и выдели противоречия, неопределённости, потенциально небезопасные решения и пробелы. Запиши их кратко в `docs/architecture-review.md` с приоритетом и предложенным решением.
-2. Сформулируй три ADR-файла: `docs/adr/001-authentication.md`, `002-mobile-tunnel-sdk.md`, `003-baseline-engine.md`. В каждом варианты, достоинства/недостатки, влияние на безопасность/лицензии и рекомендация. Статус ADR сначала **Proposed**; не выдавай решение за утверждённое.
-3. Создай минимальный монорепозиторий, готовый к будущему росту:
+Your tasks:
+1. Study the documentation and identify contradictions, uncertainties, potentially unsafe decisions and gaps. Record them briefly in `docs/architecture-review.md` with a priority and a proposed solution.
+2. Draft three ADR files: `docs/adr/001-authentication.md`, `002-mobile-tunnel-sdk.md`, `003-baseline-engine.md`. Each with options, pros/cons, security/licence impact and a recommendation. The ADR status is initially **Proposed**; do not present a decision as approved.
+3. Create a minimal monorepo ready for future growth:
    ```text
    apps/
      android/                 # Flutter placeholder project or README
-     telegram-mini-app/       # README, не полноценная app
+     telegram-mini-app/       # README, not a full app
      admin/                   # README
    services/
      api/                     # minimal FastAPI app + health endpoint
@@ -33,24 +33,24 @@
      runbooks/
    .github/workflows/
    ```
-4. Реализуй только минимальный FastAPI backend healthcheck `GET /api/v1/health` и его unit test. Создай базовую локальную конфигурацию и `README.md` с командой запуска на Linux Mint. Версии зависимостей закрепи.
-5. Добавь корректный `.gitignore`, `.env.example`, форматтер/линтер, type check, pytest и CI для backend. Не добавляй неиспользуемые тяжёлые зависимости.
-6. Не подключай никакие реальные платёжные шлюзы, Telegram API и VPN SDK без отдельной ADR и issue.
-7. Запусти доступные проверки и выведи отчёт: файлы, команды, результаты, дальнейшие риски. Если что-то не удалось запустить, чётко скажи почему и не заявляй об успехе.
+4. Implement only a minimal FastAPI backend healthcheck `GET /api/v1/health` and its unit test. Create a basic local configuration and a `README.md` with the startup command for Linux Mint. Pin dependency versions.
+5. Add a correct `.gitignore`, `.env.example`, formatter/linter, type check, pytest and CI for the backend. Do not add unused heavy dependencies.
+6. Do not connect any real payment gateways, Telegram API or VPN SDK without a separate ADR and issue.
+7. Run the available checks and output a report: files, commands, results, further risks. If something could not be run, say clearly why and do not claim success.
 
-**Отдельно:** предложи точный текст для следующей issue I-002 с критериями приёмки, но не выполняй её без нового задания.
+**Separately:** propose the exact text of the next issue I-002 with acceptance criteria, but do not carry it out without a new assignment.
 
-Ограничения: не пиши собственный криптографический алгоритм, не маскируй mock под функциональную VPN, не меняй правовые ограничения на продукт без согласования. Главная цель — безопасный, воспроизводимый старт проекта.
+Constraints: do not write your own cryptographic algorithm, do not disguise a mock as a functional VPN, do not change the legal restrictions on the product without agreement. The main goal is a safe, reproducible project start.
 
 ---
 
-## Шаблон для следующих заданий Codex
+## Template for the next Codex assignments
 
 ```text
-Прочитай AGENTS.md, TECHNICAL_SPEC.md, ROADMAP.md и актуальные ADR.
-Реализуй ТОЛЬКО issue <ID>: <название>.
-Перед редактированием назови затрагиваемые файлы, риски, тесты и определения готовности.
-Сначала напиши тесты для основных инвариантов, затем реализацию.
-Не делай production deploy и внешних платных действий.
-После завершения запусти тесты и дай отчёт: изменения, команды, результаты, известные ограничения.
+Read AGENTS.md, TECHNICAL_SPEC.md, ROADMAP.md and the current ADRs.
+Implement ONLY issue <ID>: <title>.
+Before editing, list the affected files, risks, tests, and definition of done.
+Write tests for the core invariants first, then the implementation.
+Do not do a production deploy or any paid external actions.
+When done, run the tests and report: changes, commands, results, known limitations.
 ```
