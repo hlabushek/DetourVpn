@@ -588,6 +588,23 @@ void main() {
     expect(api.creates, greaterThanOrEqualTo(2));
     await auto.disconnect();
   });
+  test('a window the server stopped treating as active reconnects', () async {
+    final auto = WindowConnectionController(
+      api,
+      native,
+      pollInterval: const Duration(days: 1),
+      renewBeforeMs: 1000,
+      autoReconnectDelay: const Duration(milliseconds: 20),
+    )..selectedNode = node;
+    addTearDown(auto.dispose);
+    await auto.connect();
+    api.state = 'revoke_pending';
+    await auto.refresh();
+    expect(auto.error, 'window_not_active');
+    await Future<void>.delayed(const Duration(milliseconds: 300));
+    expect(api.creates, greaterThanOrEqualTo(2));
+    await auto.disconnect();
+  });
   test('user disconnect is never undone by auto reconnect', () async {
     final auto = WindowConnectionController(
       api,

@@ -20,7 +20,7 @@ String messageFor(String code) => switch (code) {
   'window_tunnels_unavailable' || 'window_node_unavailable' =>
     'Сервис продлеваемых подключений пока недоступен. Повторите после подготовки узла.',
   'window_not_active' || 'window_generation_conflict' =>
-    'Продление не подтверждено. VPN остановлен; дождитесь закрытия соединения.',
+    'Сервер не подтвердил продление подключения. VPN остановлен; приложение пробует подключиться заново, если не вышло, нажмите «Подключить».',
   'session_storage_failed' =>
     'Не удалось сохранить защищённую сессию. Повторите вход.',
   'session_erasure_failed' =>

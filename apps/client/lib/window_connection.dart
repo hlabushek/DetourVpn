@@ -592,11 +592,15 @@ class WindowConnectionController extends ConnectionController {
           (_grant != null && _clock.elapsedMilliseconds >= _deadline)) {
         phase = ConnectionPhase.failed;
         await _cleanup();
-        if (code == 'lease_expired' && !hasLease)
+        if (_autoReconnectCodes.contains(code) && !hasLease)
           _scheduleAutoReconnect(version);
       }
     }
   }
+
+  /// Window ran out, or the server no longer treats it as active (a late renewal): reconnecting
+  /// is the only recovery.
+  static const _autoReconnectCodes = {'lease_expired', 'window_not_active'};
 
   /// Why the tunnel is gone. Only a window that really ran out is 'lease_expired'; if the phone
   /// stopped the VPN while time was left (another VPN, system toggle, service restart) say so.
@@ -619,7 +623,7 @@ class WindowConnectionController extends ConnectionController {
       if (_dead ||
           _version != version ||
           phase != ConnectionPhase.failed ||
-          error != 'lease_expired') {
+          !_autoReconnectCodes.contains(error)) {
         return;
       }
       unawaited(connect());
