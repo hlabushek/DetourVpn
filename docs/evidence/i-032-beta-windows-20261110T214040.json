@@ -1,0 +1,31 @@
+{
+  "observed_at": "2026-11-10T18:40:41+00:00",
+  "scope": "local unsigned Windows zip layout, pinned component hashes and PE metadata",
+  "platform": "windows-x64",
+  "application": "DetourVpn.exe",
+  "version_name": "0.1.0-beta.26",
+  "artifact_sha256": "43442841d383108a4fe8db1ea6779b52bd5742e5a6b05d6adbba2987a81d7e8b",
+  "components": {
+    "DetourVpn.exe": "14a34cb1ababf29c286ca4fed35060c06b54443bc186b930c4d24bcc2392b786",
+    "detour-engine.exe": "f28da9845d35f2c7bb92d14c5d33dd677f933587e62e673242784af477a5664c",
+    "wintun.dll": "e5da8447dc2c320edc0fc52fa01885c103de8c118481f683643cacc3220dafce"
+  },
+  "engine_upstream": "v1.260910.0",
+  "source_files_shipped": [
+    "amnezia-box-v1.260910.0-src.zip",
+    "peer-stats.patch",
+    "source-lock.json",
+    "windows-peer-stats-stdout.patch"
+  ],
+  "signature": "unsigned",
+  "elevation": "requireAdministrator",
+  "verification": {
+    "archive_layout": "passed",
+    "pinned_component_hashes": "passed",
+    "pe_metadata": "passed",
+    "corresponding_source": "passed"
+  },
+  "runtime_verified": false,
+  "tunnel_handshake": "not_verified",
+  "distribution": "not_accepted"
+}
