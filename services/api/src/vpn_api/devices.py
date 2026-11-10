@@ -55,7 +55,7 @@ def link_code_digest(auth: AuthService, code: str) -> str:
 
 
 class DeviceInput(Input):
-    platform: Literal["android"]
+    platform: Literal["android", "windows"]
     key_type: Literal["x25519"]
     public_key: str
 

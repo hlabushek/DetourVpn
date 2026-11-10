@@ -8,7 +8,7 @@ from uuid import UUID, uuid4
 
 import pytest
 from alembic import command
-from sqlalchemy import func, select, update
+from sqlalchemy import func, select, text, update
 from sqlalchemy.exc import DBAPIError, IntegrityError
 from test_authentication import Harness, harness, headers, login
 from test_migrations import migration_config
@@ -45,6 +45,41 @@ def test_identity_device_logout_scenario(harness: Harness) -> None:
     assert h.client.get("/api/v1/devices/" + device_id, headers=headers(tokens)).status_code == 200
     assert h.client.post("/api/v1/auth/logout", headers=headers(tokens)).status_code == 204
     assert h.client.get("/api/v1/devices", headers=headers(tokens)).status_code == 401
+
+
+def test_windows_platform_is_accepted_and_other_platforms_are_not(harness: Harness) -> None:
+    h = harness
+    tokens = login(h)
+    windows = key_input().model_dump() | {"platform": "windows"}
+    created = h.client.post("/api/v1/devices", headers=headers(tokens), json=windows)
+    assert created.status_code == 200 and created.json()["platform"] == "windows"
+    # Same key again is idempotent and keeps the platform.
+    repeated = h.client.post("/api/v1/devices", headers=headers(tokens), json=windows)
+    assert repeated.status_code == 200 and repeated.json()["id"] == created.json()["id"]
+    # Android keeps working: a device-bound session cannot change device, so use its own login.
+    other = login(h)
+    android = key_input().model_dump()
+    created_android = h.client.post("/api/v1/devices", headers=headers(other), json=android)
+    assert created_android.status_code == 200 and created_android.json()["platform"] == "android"
+    with transaction(h.engine) as session:
+        platforms = sorted(session.scalars(select(Device.platform)))
+    assert platforms == ["android", "windows"]
+    # Everything else, including case and whitespace variants, is a validation error.
+    for platform in ("ios", "linux", "macos", "Windows", "WINDOWS", "windows ", ""):
+        body = key_input().model_dump() | {"platform": platform}
+        response = h.client.post("/api/v1/devices", headers=headers(tokens), json=body)
+        assert response.status_code == 422, platform
+
+
+def test_database_constraint_allows_only_android_and_windows(harness: Harness) -> None:
+    h = harness
+    tokens = login(h)
+    register_device(h.auth, tokens.access_token, key_input())
+    for platform in ("ios", "Windows", ""):
+        with pytest.raises(IntegrityError), transaction(h.engine) as session:
+            session.execute(text("UPDATE devices SET platform = :platform"), {"platform": platform})
+    with transaction(h.engine) as session:
+        session.execute(text("UPDATE devices SET platform = 'windows'"))
 
 
 def test_other_account_cannot_list_read_revoke_or_claim_key(harness: Harness) -> None:

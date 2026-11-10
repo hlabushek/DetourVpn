@@ -199,7 +199,7 @@ class MiniAppExchange(Base):
 class Device(Base):
     __tablename__ = "devices"
     __table_args__ = (
-        CheckConstraint("platform = 'android'", name="ck_devices_platform"),
+        CheckConstraint("platform IN ('android', 'windows')", name="ck_devices_platform"),
         CheckConstraint("key_type = 'x25519'", name="ck_devices_key_type"),
         CheckConstraint("role IN ('owner', 'guest')", name="ck_devices_role"),
         CheckConstraint("length(label) BETWEEN 1 AND 40", name="ck_devices_label"),

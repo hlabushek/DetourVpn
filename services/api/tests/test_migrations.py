@@ -10,11 +10,11 @@ from uuid import uuid4
 import pytest
 from alembic import command
 from alembic.config import Config
-from sqlalchemy import Engine, func, inspect, select, text
+from sqlalchemy import Engine, delete, func, inspect, select, text
 from sqlalchemy.exc import DBAPIError, IntegrityError
 
 from vpn_api.db.connection import transaction
-from vpn_api.db.models import AdminIdentity, AuthIdentity, BetaInvite, User
+from vpn_api.db.models import AdminIdentity, AuthIdentity, BetaInvite, Device, User
 
 pytestmark = pytest.mark.postgres
 ROOT = Path(__file__).resolve().parents[3]
@@ -176,9 +176,49 @@ def test_account_deletion_migration_constraints_and_rollback(engine: Engine) -> 
     with transaction(engine) as session:
         assert (
             session.scalar(text("SELECT version_num FROM alembic_version"))
-            == "0021_device_link_codes"
+            == "0022_device_platform_windows"
         )
         assert session.scalar(text("SELECT count(*) FROM users WHERE status = 'deleted'")) == 1
+
+
+def test_device_platform_migration_constraint_and_guarded_rollback(engine: Engine) -> None:
+    config = upgrade(engine)
+
+    def add_device(platform: str) -> None:
+        with transaction(engine) as session:
+            user = User()
+            session.add(user)
+            session.flush()
+            session.add(
+                Device(
+                    user_id=user.id,
+                    platform=platform,
+                    key_type="x25519",
+                    public_key="A" * 43 + "=",  # synthetic, not a real key
+                    created_at=datetime.now(UTC),
+                )
+            )
+
+    add_device("windows")
+    with pytest.raises(IntegrityError):
+        add_device("ios")
+    # A Windows device blocks the rollback and leaves data and revision untouched.
+    with pytest.raises(DBAPIError, match="Refusing downgrade: windows devices exist"):
+        command.downgrade(config, "0021_device_link_codes")
+    with transaction(engine) as session:
+        assert (
+            session.scalar(text("SELECT version_num FROM alembic_version"))
+            == "0022_device_platform_windows"
+        )
+        assert session.scalar(select(func.count()).select_from(Device)) == 1
+        session.execute(delete(Device))
+    # With only Android data (here: none) the rollback works and restores the old constraint.
+    command.downgrade(config, "0021_device_link_codes")
+    with pytest.raises(IntegrityError):
+        add_device("windows")
+    command.upgrade(config, "head")
+    command.check(config)
+    add_device("windows")
 
 
 def test_downgrade_with_data_fails_without_losing_rows_or_revision(engine: Engine) -> None:
@@ -191,7 +231,7 @@ def test_downgrade_with_data_fails_without_losing_rows_or_revision(engine: Engin
         assert session.scalar(select(func.count()).select_from(User)) == 1
         assert (
             session.scalar(text("SELECT version_num FROM alembic_version"))
-            == "0021_device_link_codes"
+            == "0022_device_platform_windows"
         )
 
 
@@ -228,7 +268,7 @@ def test_downgrade_cannot_delete_a_concurrently_committing_account(engine: Engin
         assert session.scalar(select(func.count()).select_from(User)) == 1
         assert (
             session.scalar(text("SELECT version_num FROM alembic_version"))
-            == "0021_device_link_codes"
+            == "0022_device_platform_windows"
         )
 
 
