@@ -49,8 +49,11 @@ test "$(hostname -s)" = __EXPECTED_HOST__
 systemctl is-active --quiet detourvpn-beta-api.service
 test "$(ready)" = 200
 test "$(grep -c '^VPN_MINI_APP_STATIC_DIR=' "$envfile")" = 1
-test "$(grep '^VPN_MINI_APP_STATIC_DIR=' "$envfile")" = "VPN_MINI_APP_STATIC_DIR=$releases/__CURRENT__"
-test -d "$releases/__CURRENT__"
+# The current release is whatever the host serves now (a previous deploy moved it); it must be a
+# content-hash directory under $releases that exists. The old one is kept for rollback.
+current_line="$(grep '^VPN_MINI_APP_STATIC_DIR=' "$envfile")"
+[[ "$current_line" =~ ^VPN_MINI_APP_STATIC_DIR=$releases/[0-9a-f]{32}$ ]]
+test -d "${current_line#VPN_MINI_APP_STATIC_DIR=}"
 test ! -e "$releases/$release"; test ! -e "$releases/.incoming-$rid"; test ! -e "$envbak"
 test "$(sha256sum "$stage/release.tar.gz" | cut -d ' ' -f1)" = __TARSHA__
 phase=extract
