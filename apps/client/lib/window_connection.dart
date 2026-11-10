@@ -476,7 +476,7 @@ class WindowConnectionController extends ConnectionController {
       if (_clock.elapsedMilliseconds >= _deadline ||
           !snapshot.up ||
           snapshot.remainingMs <= 0)
-        throw const ClientError('lease_expired');
+        throw ClientError(_stopCode(snapshot));
       _inboundTraffic.observe(
         snapshot.receivedBytes,
         _clock.elapsedMilliseconds,
@@ -561,7 +561,7 @@ class WindowConnectionController extends ConnectionController {
       if (!snapshot.up ||
           snapshot.remainingMs <= 0 ||
           _clock.elapsedMilliseconds >= _deadline)
-        throw const ClientError('lease_expired');
+        throw ClientError(_stopCode(snapshot));
       error = null;
       final confirmed = _establishedStatusConfirmed(snapshot);
       phase = confirmed
@@ -597,6 +597,15 @@ class WindowConnectionController extends ConnectionController {
       }
     }
   }
+
+  /// Why the tunnel is gone. Only a window that really ran out is 'lease_expired'; if the phone
+  /// stopped the VPN while time was left (another VPN, system toggle, service restart) say so.
+  String _stopCode(NativeSnapshot snapshot) =>
+      !snapshot.up &&
+          snapshot.reason != 'lease_expired' &&
+          _clock.elapsedMilliseconds < _deadline - 1000
+      ? 'native_down'
+      : 'lease_expired';
 
   /// The 90 s window is renewed by a timer that Android may suspend with the screen off. When that
   /// happens (and the user did not press Disconnect), connect again on our own, a few times only:

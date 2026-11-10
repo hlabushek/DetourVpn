@@ -608,6 +608,8 @@ void main() {
     await c.connect();
     native.up = false;
     await c.refresh();
+    // The phone stopped the VPN while the window still had time: not an expired window.
+    expect(c.error, 'native_down');
     expect(native.advances, 0);
     expect(api.renewKeys, isEmpty);
     expect(api.deletes, 1);
