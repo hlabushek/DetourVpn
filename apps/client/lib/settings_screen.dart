@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 
 import 'connection.dart';
 import 'orbit_widgets.dart';
+import 'platform_info.dart';
 import 'split_apps.dart';
 import 'ui/components.dart';
 import 'ui/motion.dart';
@@ -106,56 +107,62 @@ class SettingsScreen extends StatelessWidget {
             enabled: !c.busy,
             onTap: () => _openSplitApps(context, c),
           ),
+          // Android battery optimisation: not applicable on Windows (ADR-095).
+          if (!isWindowsClient) ...[
+            const SizedBox(height: 12),
+            NavRow(
+              icon: Icons.battery_saver_outlined,
+              title: 'Работа в фоне',
+              subtitle:
+                  'Если VPN отключается при выключенном экране, разрешите DetourVPN работать без ограничений батареи',
+              onTap: () async {
+                try {
+                  await _vpnSettings.invokeMethod<void>('openBatterySettings');
+                } on PlatformException {
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text(
+                          'Откройте настройки Android → Приложения → DetourVPN → Батарея',
+                        ),
+                      ),
+                    );
+                  }
+                }
+              },
+            ),
+          ],
+        ],
+        // Android system VPN settings and Lockdown: no Always-on on Windows (ADR-095).
+        if (!isWindowsClient) ...[
           const SizedBox(height: 12),
           NavRow(
-            icon: Icons.battery_saver_outlined,
-            title: 'Работа в фоне',
-            subtitle:
-                'Если VPN отключается при выключенном экране, разрешите DetourVPN работать без ограничений батареи',
+            icon: Icons.settings_outlined,
+            title: 'Системные настройки VPN',
+            subtitle: 'Always-on и блокировка соединений в Android',
             onTap: () async {
               try {
-                await _vpnSettings.invokeMethod<void>('openBatterySettings');
+                await _vpnSettings.invokeMethod<void>('openVpnSettings');
               } on PlatformException {
                 if (context.mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
-                      content: Text(
-                        'Откройте настройки Android → Приложения → DetourVPN → Батарея',
-                      ),
+                      content: Text('Не удалось открыть настройки VPN Android'),
                     ),
                   );
                 }
               }
             },
           ),
-        ],
-        const SizedBox(height: 12),
-        NavRow(
-          icon: Icons.settings_outlined,
-          title: 'Системные настройки VPN',
-          subtitle: 'Always-on и блокировка соединений в Android',
-          onTap: () async {
-            try {
-              await _vpnSettings.invokeMethod<void>('openVpnSettings');
-            } on PlatformException {
-              if (context.mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Не удалось открыть настройки VPN Android'),
-                  ),
-                );
-              }
-            }
-          },
-        ),
-        Padding(
-          padding: const EdgeInsets.fromLTRB(8, 8, 8, 0),
-          child: Text(
-            'Восстановление проверяется только в debug-сборке и ещё не принято на устройстве. '
-            'С Lockdown Android может блокировать исключённые приложения; при сбое VPN доступ останется заблокированным.',
-            style: text.bodySmall,
+          Padding(
+            padding: const EdgeInsets.fromLTRB(8, 8, 8, 0),
+            child: Text(
+              'Восстановление проверяется только в debug-сборке и ещё не принято на устройстве. '
+              'С Lockdown Android может блокировать исключённые приложения; при сбое VPN доступ останется заблокированным.',
+              style: text.bodySmall,
+            ),
           ),
-        ),
+        ],
         const SizedBox(height: 24),
         OrbitPanel(
           child: Column(
@@ -180,6 +187,13 @@ class SettingsScreen extends StatelessWidget {
                 'Просмотренные сайты и DNS-запросы не отправляются в API приложения.',
                 style: text.bodySmall,
               ),
+              if (isWindowsClient) ...[
+                const SizedBox(height: 8),
+                Text(
+                  'Windows-версия: нужны права администратора. Аварийной блокировки нет — если VPN остановится, трафик пойдёт напрямую. Always-on не поддерживается.',
+                  style: text.bodySmall,
+                ),
+              ],
             ],
           ),
         ),

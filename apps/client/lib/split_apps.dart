@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import 'native_tunnel.dart';
+import 'platform_info.dart';
+
 class SplitAppsScreen extends StatefulWidget {
   const SplitAppsScreen({super.key});
 
@@ -54,6 +57,7 @@ class _SplitAppsState extends State<SplitAppsScreen>
   String lastSplitMode = 'exclude';
   String searchQuery = '';
   String domainSearchQuery = '';
+  bool domainRouting = false;
   bool loading = true;
   bool saving = false;
   String? error;
@@ -78,8 +82,15 @@ class _SplitAppsState extends State<SplitAppsScreen>
     try {
       final listed = await channel.invokeListMethod<Object?>('apps') ?? [];
       final saved = await channel.invokeListMethod<String>('splitRead') ?? [];
-      // ADR-084: the beta engine has no domain routing; domain rules are never loaded.
-      const savedDomains = <String>[];
+      // ADR-084 / ADR-095: domain rules exist only when the engine proves `domain-routing.v1`
+      // (hidden on Android/GoBackend, available on the Windows engine).
+      final supportsDomains = (await readNativeCapabilities()).contains(
+        'domain-routing.v1',
+      );
+      final savedDomains = supportsDomains
+          ? await channel.invokeListMethod<String>('splitDomainsRead') ??
+                <String>[]
+          : <String>[];
       final savedMode =
           await channel.invokeMethod<String>('splitModeRead') ?? 'exclude';
       final savedLastMode =
@@ -92,7 +103,10 @@ class _SplitAppsState extends State<SplitAppsScreen>
       for (final packageName in saved) {
         byPackage.putIfAbsent(
           packageName,
-          () => _InstalledApp(packageName: packageName, label: packageName),
+          () => _InstalledApp(
+            packageName: packageName,
+            label: displayName(packageName),
+          ),
         );
       }
       final sortedApps = byPackage.values.toList()
@@ -107,6 +121,7 @@ class _SplitAppsState extends State<SplitAppsScreen>
       if (!mounted) return;
       setState(() {
         apps = sortedApps;
+        domainRouting = supportsDomains;
         selected = saved.toSet();
         domains = savedDomains;
         mode = const {'all', 'exclude', 'include'}.contains(savedMode)
@@ -126,7 +141,7 @@ class _SplitAppsState extends State<SplitAppsScreen>
       if (!mounted) return;
       setState(() {
         loading = false;
-        error = 'Не удалось прочитать настройки на телефоне';
+        error = 'Не удалось прочитать настройки $deviceWord';
       });
     }
   }
@@ -187,8 +202,45 @@ class _SplitAppsState extends State<SplitAppsScreen>
         selected = previousSelected;
         domains = previousDomains;
         saving = false;
-        error = 'Не удалось сохранить настройки на этом телефоне.';
+        error = 'Не удалось сохранить настройки $deviceWord.';
       });
+    }
+  }
+
+  /// Windows entries are executable paths: show the file name without `.exe`.
+  static String displayName(String id) {
+    if (!isWindowsClient) return id;
+    final name = id.split(RegExp(r'[\\/]')).last;
+    return name.toLowerCase().endsWith('.exe')
+        ? name.substring(0, name.length - 4)
+        : name;
+  }
+
+  /// Windows only: choose a program that is not in the Start menu list.
+  Future<void> pickApp() async {
+    if (loading || saving) return;
+    try {
+      final path = await channel.invokeMethod<String>('pickApp');
+      if (!mounted || path == null || path.isEmpty) return;
+      final lower = path.toLowerCase();
+      final known = apps.where((app) => app.packageName.toLowerCase() == lower);
+      final key = known.isEmpty ? path : known.first.packageName;
+      if (known.isEmpty) {
+        setState(
+          () => apps = [
+            ...apps,
+            _InstalledApp(packageName: path, label: displayName(path)),
+          ],
+        );
+      }
+      await saveChange(
+        nextMode: mode,
+        nextSelected: {...selected, key},
+        nextDomains: domains,
+      );
+    } on PlatformException {
+      if (!mounted) return;
+      setState(() => error = 'Не удалось выбрать программу.');
     }
   }
 
@@ -316,8 +368,8 @@ class _SplitAppsState extends State<SplitAppsScreen>
         ? Icons.check_circle_outline
         : Icons.error_outline;
     final message = saving
-        ? 'Сохраняю на телефоне…'
-        : currentError ?? 'Настройки сохраняются автоматически на телефоне.';
+        ? 'Сохраняю $deviceWord…'
+        : currentError ?? 'Настройки сохраняются автоматически $deviceWord.';
     return SafeArea(
       top: false,
       child: Padding(
@@ -425,7 +477,9 @@ class _SplitAppsState extends State<SplitAppsScreen>
           onChanged: (value) => setState(() => searchQuery = value),
           decoration: InputDecoration(
             prefixIcon: const Icon(Icons.search),
-            hintText: 'Название или код Android',
+            hintText: isWindowsClient
+                ? 'Название или путь к программе'
+                : 'Название или код Android',
             suffixIcon: searchQuery.isEmpty
                 ? null
                 : IconButton(
@@ -461,11 +515,26 @@ class _SplitAppsState extends State<SplitAppsScreen>
                 },
               ),
       ),
-      if (mode == 'include' && selected.isEmpty)
-        const Padding(
-          padding: EdgeInsets.fromLTRB(20, 0, 20, 12),
+      if (isWindowsClient)
+        Padding(
+          padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
+          child: SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              key: const ValueKey('pick-app'),
+              onPressed: pickApp,
+              icon: const Icon(Icons.folder_open),
+              label: const Text('Добавить программу…'),
+            ),
+          ),
+        ),
+      if (mode == 'include' && selected.isEmpty && domains.isEmpty)
+        Padding(
+          padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
           child: Text(
-            'Добавь хотя бы одно приложение, чтобы подключиться в этом режиме.',
+            domainRouting
+                ? 'Добавь хотя бы одно приложение или домен, чтобы подключиться в этом режиме.'
+                : 'Добавь хотя бы одно приложение, чтобы подключиться в этом режиме.',
           ),
         ),
     ],
@@ -521,14 +590,30 @@ class _SplitAppsState extends State<SplitAppsScreen>
                 Padding(
                   padding: const EdgeInsets.fromLTRB(20, 4, 20, 8),
                   child: Text(
-                    'Правила действуют для приложений. В режиме «только выбранное» выбери хотя бы одно приложение. Маршрутизация по доменам в этой бете недоступна.',
+                    domainRouting
+                        ? 'Правила действуют для приложений и доменов. В режиме «только выбранное» выбери хотя бы одно приложение или домен. Домен определяется по имени в соединении и DNS-запросе: если программа использует зашифрованный DNS, ECH или кеш, правило может не сработать.'
+                        : 'Правила действуют для приложений. В режиме «только выбранное» выбери хотя бы одно приложение. Маршрутизация по доменам в этой бете недоступна.',
                     style: Theme.of(context).textTheme.bodySmall,
                   ),
                 ),
                 if (mode != 'all') ...[
-                  // ADR-084: the beta engine has no domain routing, so the
-                  // domain tab is hidden instead of accepting rules it cannot enforce.
-                  Expanded(child: buildAppsTab()),
+                  // ADR-084 / ADR-095: the domain tab exists only with `domain-routing.v1`.
+                  if (domainRouting)
+                    TabBar(
+                      controller: tabController,
+                      tabs: const [
+                        Tab(text: 'Домены'),
+                        Tab(text: 'Приложения'),
+                      ],
+                    ),
+                  Expanded(
+                    child: domainRouting
+                        ? TabBarView(
+                            controller: tabController,
+                            children: [buildDomainTab(), buildAppsTab()],
+                          )
+                        : buildAppsTab(),
+                  ),
                 ] else
                   const Expanded(
                     child: Center(

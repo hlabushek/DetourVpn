@@ -5,9 +5,57 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:vpn_client/diagnostic_report.dart';
 import 'package:vpn_client/native_tunnel.dart';
+import 'package:vpn_client/platform_info.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+
+  testWidgets(
+    'Windows copies the fixed-category report to the clipboard only',
+    (tester) async {
+      debugIsWindowsOverride = true;
+      addTearDown(() => debugIsWindowsOverride = false);
+      final calls = <MethodCall>[];
+      String? clipboard;
+      final messenger =
+          TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+      messenger.setMockMethodCallHandler(SystemChannels.platform, (call) async {
+        if (call.method == 'Clipboard.setData') {
+          clipboard = (call.arguments as Map)['text'] as String;
+        }
+        return null;
+      });
+      messenger.setMockMethodCallHandler(PlatformTunnel.channel, (call) async {
+        calls.add(call);
+        return null;
+      });
+      addTearDown(() {
+        messenger.setMockMethodCallHandler(SystemChannels.platform, null);
+        messenger.setMockMethodCallHandler(PlatformTunnel.channel, null);
+      });
+
+      await tester.pumpWidget(
+        const MaterialApp(
+          home: Scaffold(
+            body: DiagnosticReportButton(
+              error: 'invalid_response',
+              stage: 'lease_create',
+            ),
+          ),
+        ),
+      );
+      await tester.tap(find.byKey(const Key('diagnostic-share-button')));
+      await tester.pumpAndSettle();
+      expect(find.textContaining('буфер обмена'), findsOneWidget);
+      expect(clipboard, isNull);
+      await tester.tap(find.text('Скопировать'));
+      await tester.pumpAndSettle();
+
+      expect(calls, isEmpty); // there is no share sheet on Windows
+      expect(clipboard, contains('Код: invalid_response'));
+      expect(clipboard, contains('Этап: lease_create'));
+    },
+  );
 
   test('Dart and Android diagnostic allowlists stay synchronized', () {
     final dartSource = File('lib/diagnostic_report.dart').readAsStringSync();

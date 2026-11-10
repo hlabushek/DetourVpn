@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'api.dart';
 import 'country_flag.dart';
 import 'native_tunnel.dart';
+import 'platform_info.dart';
 import 'quota.dart';
 
 enum ConnectionPhase {
@@ -28,7 +29,9 @@ String messageFor(String code) => switch (code) {
   'account_delete_failed' =>
     'Не удалось удалить аккаунт. Ничего не изменено; проверьте сеть и повторите.',
   'permission_denied' =>
-    'Разрешение VPN не выдано. Нажмите «Подключить» и подтвердите запрос Android.',
+    isWindowsClient
+        ? 'Нужны права администратора. Закройте DetourVPN и запустите снова, подтвердив запрос Windows (UAC).'
+        : 'Разрешение VPN не выдано. Нажмите «Подключить» и подтвердите запрос Android.',
   'insufficient_quota' || 'insufficient_window_funding' =>
     'Недостаточно тестового трафика для нового окна подключения. Дождитесь пополнения баланса.',
   'device_revoked' ||
@@ -337,7 +340,7 @@ class ConnectionController extends ChangeNotifier {
       detail = 'Проверка устройства и доступа';
       _emit();
       final device = await api.call('POST', '/api/v1/devices', {
-        'platform': 'android',
+        'platform': devicePlatform,
         'key_type': 'x25519',
         'public_key': await native.publicKey(),
       });

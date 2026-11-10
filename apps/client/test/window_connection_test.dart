@@ -1,12 +1,15 @@
 import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:vpn_client/api.dart';
 import 'package:vpn_client/connection.dart';
 import 'package:vpn_client/native_tunnel.dart';
+import 'package:vpn_client/platform_info.dart';
 import 'package:vpn_client/settings_screen.dart';
 import 'package:vpn_client/split_apps.dart';
 import 'package:vpn_client/window_connection.dart';
+
 import 'connection_test.dart' show FakeNative;
 
 // TEST ONLY simulated API/native. No Android, node, DNS or egress evidence.
@@ -70,6 +73,7 @@ class WindowsApi implements TunnelApi {
   bool oldConnection = false;
   bool failDeletes = false;
   bool deviceBound = false;
+  final devicePlatforms = <Object?>[];
   String? invalidResponsePath;
   int creates = 0;
   int grantBudget = 1048576;
@@ -114,6 +118,7 @@ class WindowsApi implements TunnelApi {
     }
     if (path.endsWith('/quota') || path.contains('/quota/history')) return {};
     if (path.endsWith('/devices')) {
+      devicePlatforms.add(body?['platform']);
       deviceBound = true;
       return {'id': device};
     }
@@ -332,6 +337,40 @@ void main() {
       );
     },
   );
+  test('device registration sends the Android platform by default', () async {
+    await c.connect();
+    expect(api.devicePlatforms, ['android']);
+  });
+  test('Windows client registers its device as windows', () async {
+    debugIsWindowsOverride = true;
+    addTearDown(() => debugIsWindowsOverride = false);
+    await c.connect();
+    expect(api.devicePlatforms, ['windows']);
+  });
+  testWidgets('settings hide Android-only rows on Windows', (tester) async {
+    debugIsWindowsOverride = true;
+    addTearDown(() => debugIsWindowsOverride = false);
+    tester.view.physicalSize = const Size(800, 1600);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    await tester.pumpWidget(settingsHost());
+    await settle(tester);
+    expect(find.text('Приложения вне VPN'), findsOneWidget);
+    expect(find.text('Работа в фоне'), findsNothing);
+    expect(find.text('Системные настройки VPN'), findsNothing);
+    expect(find.textContaining('Always-on не поддерживается'), findsOneWidget);
+  });
+  testWidgets('settings keep the Android rows on Android', (tester) async {
+    tester.view.physicalSize = const Size(800, 1600);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    await tester.pumpWidget(settingsHost());
+    await settle(tester);
+    expect(find.text('Работа в фоне'), findsOneWidget);
+    expect(find.text('Системные настройки VPN'), findsOneWidget);
+  });
   test('active ACK starts native; confirmed handshake drives status', () async {
     await c.connect();
     expect(api.budgets, [WindowConnectionController.budgetBytes]);

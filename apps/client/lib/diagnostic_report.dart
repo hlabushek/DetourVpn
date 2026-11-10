@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import 'native_tunnel.dart';
+import 'platform_info.dart';
 
 const _reportableErrors = <String>{
   'admission_closed',
@@ -97,10 +98,10 @@ class DiagnosticReportButton extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
+            Text(
               'В отчёте только код ошибки и этап. Он не содержит данных '
-              'аккаунта, ключей, адресов или истории трафика. Отправка '
-              'начнётся только после выбора приложения Android.',
+              'аккаунта, ключей, адресов или истории трафика. '
+              '${isWindowsClient ? 'Отчёт будет скопирован в буфер обмена, ничего не отправляется автоматически.' : 'Отправка начнётся только после выбора приложения Android.'}',
             ),
             const SizedBox(height: 12),
             SelectableText(report.text),
@@ -113,12 +114,24 @@ class DiagnosticReportButton extends StatelessWidget {
           ),
           FilledButton(
             onPressed: () => Navigator.pop(dialogContext, true),
-            child: const Text('Выбрать приложение'),
+            child: Text(isWindowsClient ? 'Скопировать' : 'Выбрать приложение'),
           ),
         ],
       ),
     );
     if (confirmed != true || !context.mounted) return;
+
+    if (isWindowsClient) {
+      // Windows has no share sheet (ADR-095): the fixed-category report goes to the clipboard only.
+      await Clipboard.setData(ClipboardData(text: report.text));
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Отчёт скопирован. Отправьте его в чат поддержки.'),
+        ),
+      );
+      return;
+    }
 
     try {
       await PlatformTunnel.channel.invokeMethod<void>('shareDiagnosticReport', {

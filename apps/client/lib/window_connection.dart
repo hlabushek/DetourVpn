@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:math';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 
@@ -7,6 +8,7 @@ import 'api.dart';
 import 'country_flag.dart';
 import 'connection.dart';
 import 'native_tunnel.dart';
+import 'platform_info.dart';
 
 /// Explicit v3 selection, never falls back to the bounded v2 protocol.
 class WindowConnectionController extends ConnectionController {
@@ -154,7 +156,7 @@ class WindowConnectionController extends ConnectionController {
     _key ??= await native.publicKey();
     diagnosticStage = 'device_registration';
     final device = await api.call('POST', '/api/v1/devices', {
-      'platform': 'android',
+      'platform': devicePlatform,
       'key_type': 'x25519',
       'public_key': _key,
     });

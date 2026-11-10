@@ -1,5 +1,18 @@
 import 'package:flutter/services.dart';
 
+/// Capabilities reported by the native engine (Windows only). Android has no such method, and any
+/// failure means "none": features are shown only when the engine proves it can enforce them.
+Future<Set<String>> readNativeCapabilities() async {
+  try {
+    final value = await const MethodChannel(
+      'project.vpn/tunnel.v1',
+    ).invokeListMethod<String>('capabilities');
+    return (value ?? const <String>[]).toSet();
+  } catch (_) {
+    return const <String>{};
+  }
+}
+
 class NativeSnapshot {
   const NativeSnapshot({
     required this.up,
