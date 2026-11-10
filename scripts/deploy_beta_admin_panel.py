@@ -64,7 +64,7 @@ ready() { curl -sS -o /dev/null -w '%{http_code}' http://127.0.0.1:28000/api/v1/
 restore() {
   while read -r rel old; do
     [ -z "$rel" ] && continue
-    if [ "$old" = absent ]; then rm -f -- "$root/$rel"; else cp -a "$backup/$(echo "$rel" | tr / _)" "$root/$rel"; fi
+    if [ -e "$backup/$(echo "$rel" | tr / _).absent" ]; then rm -f -- "$root/$rel"; else cp -a "$backup/$(echo "$rel" | tr / _)" "$root/$rel"; fi
   done <<'LIST'
 __RESTORE__
 LIST
@@ -88,7 +88,9 @@ test "$(df -Pk / | awk 'NR==2{print $4}')" -gt 500000
 phase=verify_baselines
 while read -r rel allowed; do
   [ -z "$rel" ] && continue
-  if [ "$allowed" = absent ]; then test ! -e "$root/$rel"; echo "baseline_ok=$rel"; continue; fi
+  if [ ! -e "$root/$rel" ]; then
+    case ",$allowed," in *",absent,"*) echo "baseline_ok=$rel"; continue ;; *) echo "baseline_missing=$rel"; false ;; esac
+  fi
   have="$(sed 's/\r$//' "$root/$rel" | sha256sum | cut -d ' ' -f1)"
   case ",$allowed," in *",$have,"*) echo "baseline_ok=$rel" ;; *) echo "baseline_mismatch=$rel"; false ;; esac
 done <<'LIST'
@@ -102,7 +104,10 @@ LIST
 phase=backup
 umask 077
 install -d -o root -g root -m 0700 "$backup"
-while read -r rel old; do [ -z "$rel" ] && continue; [ "$old" = absent ] || cp -a "$root/$rel" "$backup/$(echo "$rel" | tr / _)"; done <<'LIST'
+while read -r rel old; do
+  [ -z "$rel" ] && continue
+  if [ -e "$root/$rel" ]; then cp -a "$root/$rel" "$backup/$(echo "$rel" | tr / _)"; else : > "$backup/$(echo "$rel" | tr / _).absent"; fi
+done <<'LIST'
 __RESTORE__
 LIST
 changed=1
@@ -140,7 +145,7 @@ def build(execute: bool) -> int:
     files = {p: blob(p) for p in FILES}
     names = {p: p.replace("/", "_") for p in files}
     baselines = "\n".join(
-        f"{p} {'absent' if p in NEW_FILES else ','.join(history(p))}" for p in FILES
+        f"{p} {','.join((['absent'] if p in NEW_FILES else []) + history(p))}" for p in FILES
     )
     restore = "\n".join(f"{p} {'absent' if p in NEW_FILES else 'present'}" for p in FILES)
     program = (
