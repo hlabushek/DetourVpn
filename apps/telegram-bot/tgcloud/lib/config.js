@@ -4,6 +4,6 @@ export const config = Object.freeze({
   botUsername: 'uysdgyfudf_bot',
   miniAppUrl: 'https://193.68.88.239/mini-app/',
   androidUrl: '',
-  supportUrl: '',
+  supportUrl: 'https://t.me/DetourVpnHelper',
   privacyUrl: '',
 });

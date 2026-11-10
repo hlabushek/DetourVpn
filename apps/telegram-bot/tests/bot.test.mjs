@@ -14,7 +14,7 @@ const input = (text = '/start', id = 1, user = 123) => {
   const payload = { message_id: 1, date: now(), from: { id: user, is_bot: false }, chat: { id: user, type: 'private' }, text };
   return [payload, { update: { update_id: id, message: payload } }];
 };
-const withoutMiniApp = { ...config, miniAppUrl: '' };
+const withoutMiniApp = { ...config, miniAppUrl: '', supportUrl: '' };
 const button = (data = 'detour:connect', id = 1, user = 123) => {
   const payload = { id: 'test-only-query', from: { id: user, is_bot: false }, data, message: { message_id: 1, date: now() - 86400, from: { id: 456, is_bot: true }, chat: { id: user, type: 'private' } } };
   return [payload, { update: { update_id: id, callback_query: payload } }];
