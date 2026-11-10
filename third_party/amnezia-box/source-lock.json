@@ -5,6 +5,29 @@
   "archive": "amnezia-box-v1.260910.0-src.zip",
   "archive_sha256": "2c7563405aa61cd973a7bd43aef0e22e1ed3ee74e6724a18244a641b8bbfe152",
   "license": "GPL-3.0-or-later; see upstream LICENSE for additional restriction",
-  "android_tags": ["with_awg", "with_gvisor"],
-  "android_abis": ["arm64-v8a", "x86_64"]
+  "android_tags": [
+    "with_awg",
+    "with_gvisor"
+  ],
+  "android_abis": [
+    "arm64-v8a",
+    "x86_64"
+  ],
+  "windows_tags": [
+    "with_awg",
+    "with_gvisor"
+  ],
+  "windows_patches": [
+    "peer-stats.patch",
+    "windows-peer-stats-stdout.patch"
+  ],
+  "windows_wintun": {
+    "version": "0.14.1",
+    "url": "https://www.wintun.net/builds/wintun-0.14.1.zip",
+    "zip_sha256": "07c256185d6ee3652e09fa55c0b673e2624b565e02c4b9091c79ca7d2f24ef51",
+    "dll_path_in_zip": "wintun/bin/amd64/wintun.dll",
+    "dll_sha256": "e5da8447dc2c320edc0fc52fa01885c103de8c118481f683643cacc3220dafce",
+    "signer": "WireGuard LLC",
+    "note": "zip pin and Authenticode signer verified by a download on 2026-11-10"
+  }
 }

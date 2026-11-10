@@ -1,0 +1,55 @@
+diff --git a/cmd/sing-box/cmd_run.go b/cmd/sing-box/cmd_run.go
+index f31db9d..32f8a10 100644
+--- a/cmd/sing-box/cmd_run.go
++++ b/cmd/sing-box/cmd_run.go
+@@ -176,6 +176,7 @@ func run() error {
+ 			return err
+ 		}
+ 		runtimeDebug.FreeOSMemory()
++		peerStatsStdout(instance)
+ 		for {
+ 			osSignal := <-osSignals
+ 			if osSignal == syscall.SIGHUP {
+diff --git a/cmd/sing-box/peer_stats_stdout.go b/cmd/sing-box/peer_stats_stdout.go
+new file mode 100644
+index 0000000..19012c6
+--- /dev/null
++++ b/cmd/sing-box/peer_stats_stdout.go
+@@ -0,0 +1,37 @@
++package main
++
++import (
++	"fmt"
++	"os"
++	"time"
++
++	box "github.com/sagernet/sing-box"
++)
++
++// peerStatsStdout is a DetourVpn Windows addition. When DETOUR_PEER_STATS=1 the engine prints one
++// line per second, "PEER_STATS {json}", on stdout: only the peer accounting tuple from
++// PeerStatsJSON (peer count, last handshake time, rx/tx bytes). It never prints key material.
++// The parent process reads these lines over its private stdout pipe; no port is opened.
++func peerStatsStdout(instance *box.Box) {
++	if os.Getenv("DETOUR_PEER_STATS") != "1" {
++		return
++	}
++	go func() {
++		ticker := time.NewTicker(time.Second)
++		defer ticker.Stop()
++		for range ticker.C {
++			for _, endpoint := range instance.Endpoint().Endpoints() {
++				stats, ok := endpoint.(interface {
++					PeerStatsJSON() (string, error)
++				})
++				if !ok {
++					continue
++				}
++				if line, err := stats.PeerStatsJSON(); err == nil {
++					fmt.Fprintln(os.Stdout, "PEER_STATS "+line)
++				}
++				break
++			}
++		}
++	}()
++}

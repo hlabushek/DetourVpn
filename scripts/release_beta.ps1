@@ -6,6 +6,8 @@ param(
     [switch]$NoApk,
     # After a successful build, install over the connected phone with adb (keeps app data).
     [switch]$Install,
+    # Also build and verify the unsigned Windows zip (I-032). Combine with -NoDeploy -NoApk for Windows only.
+    [switch]$Windows,
     [string]$ApiOrigin = 'https://193.68.88.239',
     # Each APK build leaves a ~1.6 GB source snapshot behind. Keep this many newest, delete older.
     [int]$KeepBuilds = 3,
@@ -16,6 +18,7 @@ param(
 #   1. checks (Mini App tests + build, admin tests, admin contract tests)
 #   2. deploy: admin panel + API (restarts only the beta API, rolls back by itself) and the Mini App
 #   3. signed APK: build, verify (receipt in docs/evidence), optional adb install
+#   4. with -Windows: unsigned Windows zip (engine + wintun + GPL source), verify, receipt
 # Stops at the first failure. Passwords are typed only into the build step's hidden prompts.
 $ErrorActionPreference = 'Stop'
 $PSNativeCommandUseErrorActionPreference = $false
@@ -28,8 +31,10 @@ function Run([string]$Name, [scriptblock]$Block) {
 }
 
 function Prune-Builds {
-    # Only the build script's own snapshot folders (32 hex characters) under ProjectVpn\i013-builds.
-    $dir = Join-Path $env:LOCALAPPDATA 'ProjectVpn\i013-builds'
+    # Only the build scripts' own snapshot folders (32 hex characters) under ProjectVpn.
+    foreach ($name in @('i013-builds', 'windows-builds')) { Prune-BuildDir (Join-Path $env:LOCALAPPDATA "ProjectVpn\$name") }
+}
+function Prune-BuildDir([string]$dir) {
     if (-not (Test-Path -LiteralPath $dir)) { return }
     $old = @(Get-ChildItem -LiteralPath $dir -Directory | Where-Object { $_.Name -match '^[0-9a-f]{32}$' } |
         Sort-Object LastWriteTime -Descending | Select-Object -Skip $KeepBuilds)
@@ -88,6 +93,25 @@ if (-not $NoApk) {
         $adb = Join-Path $env:LOCALAPPDATA 'Android\Sdk\platform-tools\adb.exe'
         Run 'adb install' { & $adb install -r $apk }
     }
+}
+
+if ($Windows) {
+    Step 'Windows zip (unsigned; no password prompts)'
+    & (Join-Path $root 'scripts\build_windows_client.ps1') -ApiOrigin $ApiOrigin -BuildEngine
+    if (-not $?) { throw 'FAILED: Windows build' }
+    $zipDir = Join-Path $root 'apps\client\build\windows-zip'
+    $zip = Get-ChildItem -LiteralPath $zipDir -Filter 'DetourVpn-windows-x64-*.zip' | Sort-Object LastWriteTime -Descending | Select-Object -First 1
+    if (-not $zip) { throw 'Windows zip was not produced.' }
+    $winVersion = $zip.BaseName.Substring('DetourVpn-windows-x64-'.Length)
+    $winStamp = Get-Date -Format 'yyyyMMddTHHmmss'
+    $winReceipt = Join-Path $root "docs\evidence\i-032-beta-windows-$winStamp.json"
+    Run 'Windows zip verification' {
+        uv run --frozen python scripts/verify_windows_zip.py --zip $zip.FullName --expected-version $winVersion --output $winReceipt
+    }
+    Write-Host "windows_zip=$($zip.FullName)"
+    Write-Host "windows_zip_sha256=$((Get-FileHash -LiteralPath $zip.FullName -Algorithm SHA256).Hash.ToLowerInvariant())"
+    Write-Host "windows_size_mb=$([math]::Round($zip.Length / 1MB, 1))"
+    Write-Host 'The Windows build is unsigned and its tunnel is not verified until the owner checks it on a PC.'
 }
 
 Prune-Builds
