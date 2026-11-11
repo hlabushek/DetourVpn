@@ -41,8 +41,18 @@ REMOTE_DB = (
 )
 NODE_REMOTE = (
     "for u in detourvpn-beta-node-agent.service detourvpn-beta-slot-bootstrap.service; do "
-    "echo unit=$u state=$(systemctl is-active $u); "
-    "journalctl -u $u --since '{minutes} min ago' --no-pager -o cat | tail -n 25; done"
+    "echo unit=$u state=$(systemctl is-active $u); done; "
+    "journalctl -u 'detourvpn-beta-*' --since '{minutes} min ago' --no-pager -o cat | tail -n 60"
+)
+REMOTE_DB2 = (
+    "docker exec detourvpn-beta-postgres-1 sh -c 'PGPASSWORD=\"$(cat /run/secrets/pg_runtime)\" "
+    "psql -h 127.0.0.1 -U vpn_api -d detourvpn_beta -Atqc "
+    "\"SELECT to_char(c.created_at AT TIME ZONE 0, 'HH24:MI:SS') AS started, c.state, "
+    "count(h.*) AS windows, max(h.generation) AS last_gen, "
+    "round(extract(epoch FROM max(h.created_at) - min(h.created_at))) AS span_s "
+    "FROM peer_connections c LEFT JOIN peer_window_holds h ON h.connection_id = c.id "
+    "WHERE c.created_at > now() - make_interval(hours => 3) "
+    "GROUP BY c.id, c.state, c.created_at ORDER BY c.created_at DESC LIMIT 25\"'"
 )
 MASKS = [
     (re.compile(r"\b(?:\d{1,3}\.){3}\d{1,3}\b"), "<ip>"),
@@ -64,7 +74,10 @@ def ssh_run(target: str, identity: Path, port: str, remote: str) -> list[str]:
         "-o", "ServerAliveCountMax=3", "-o", "StrictHostKeyChecking=yes",
         "-o", "IdentitiesOnly=yes", "-i", str(identity), "-p", port, target, remote,
     ]  # fmt: skip
-    result = subprocess.run(command, capture_output=True, text=True, check=False, timeout=90)  # noqa: S603
+    for _attempt in range(3):  # the link to the host drops now and then (exit 255)
+        result = subprocess.run(command, capture_output=True, text=True, check=False, timeout=90)  # noqa: S603
+        if result.returncode != 255:
+            break
     lines = [mask(x)[:300] for x in result.stdout.splitlines()]
     if result.returncode not in (0, 1):
         lines.append(f"ssh_exit_code={result.returncode}")
@@ -91,6 +104,8 @@ def main() -> int:
     )
     print("== DB: connections by state in the last hour (state|count|newest)")
     print(chr(10).join(ssh_run(f"root@{HOST}", identity, "22", REMOTE_DB)))
+    print("== DB: per connection, last 3 h (started UTC|state|windows|last generation|seconds first-to-last window)")
+    print(chr(10).join(ssh_run(f"root@{HOST}", identity, "22", REMOTE_DB2)))
     if args.node:
         from scripts.beta_nodes import load_inventory
         from scripts.update_beta_node_agent import DEFAULT_INVENTORY
