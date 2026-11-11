@@ -7,6 +7,7 @@ import 'connection.dart';
 import 'country_flag.dart';
 import 'diagnostic_report.dart';
 import 'orbit_widgets.dart';
+import 'primary_action.dart';
 import 'quota.dart';
 import 'quota_screen.dart';
 import 'region_picker.dart';
@@ -82,40 +83,55 @@ class ConnectionScreen extends StatelessWidget {
           ? 'VPN активен на этом устройстве'
           : c.detail;
 
+      // One decision for both controls: the bottom button and the orbit share
+      // `primary`, `runPrimary` and the same gate, so they cannot disagree or double-fire.
+      final primary = resolvePrimaryAction(
+        waitingForServerClose: waitingForServerClose,
+        busy: c.busy,
+        mustDisconnect: mustDisconnect,
+      );
+      void runPrimary() => PrimaryActionGate.shared.dispatch(
+        primary,
+        connect: c.connect,
+        disconnect: c.disconnect,
+        cancel: c.disconnect,
+      );
+
       final Widget action;
       final String actionKey;
-      if (waitingForServerClose) {
-        actionKey = 'wait';
-        action = FilledButton(
-          onPressed: null,
-          child: Text(
-            failedAttemptWaitingForServerClose
-                ? 'Ожидание закрытия попытки'
-                : 'Ожидание подтверждения сервера',
-            textAlign: TextAlign.center,
-          ),
-        );
-      } else if (c.busy) {
-        actionKey = 'cancel';
-        action = OutlinedButton(
-          style: dangerOutlined(context),
-          onPressed: c.disconnect,
-          child: const Text('Отменить подключение'),
-        );
-      } else if (mustDisconnect) {
-        actionKey = 'disconnect';
-        action = FilledButton(
-          onPressed: c.disconnect,
-          child: const Text('Отключить VPN'),
-        );
-      } else {
-        actionKey = 'connect';
-        action = FilledButton(
-          onPressed: c.connect,
-          child: Text(
-            c.phase == ConnectionPhase.failed ? 'Повторить' : 'Подключить',
-          ),
-        );
+      switch (primary) {
+        case PrimaryAction.none:
+          actionKey = 'wait';
+          action = FilledButton(
+            onPressed: null,
+            child: Text(
+              failedAttemptWaitingForServerClose
+                  ? 'Ожидание закрытия попытки'
+                  : 'Ожидание подтверждения сервера',
+              textAlign: TextAlign.center,
+            ),
+          );
+        case PrimaryAction.cancel:
+          actionKey = 'cancel';
+          action = OutlinedButton(
+            style: dangerOutlined(context),
+            onPressed: runPrimary,
+            child: const Text('Отменить подключение'),
+          );
+        case PrimaryAction.disconnect:
+          actionKey = 'disconnect';
+          action = FilledButton(
+            onPressed: runPrimary,
+            child: const Text('Отключить VPN'),
+          );
+        case PrimaryAction.connect:
+          actionKey = 'connect';
+          action = FilledButton(
+            onPressed: runPrimary,
+            child: Text(
+              c.phase == ConnectionPhase.failed ? 'Повторить' : 'Подключить',
+            ),
+          );
       }
 
       return RefreshIndicator(
@@ -155,7 +171,13 @@ class ConnectionScreen extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 8),
-            OrbitBlob(state: orbit, height: 290),
+            // Second tap target for the same action as the bottom button. No ripple,
+            // no label: the artwork looks the same. Disabled when the button is disabled.
+            GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: primary == PrimaryAction.none ? null : runPrimary,
+              child: OrbitBlob(state: orbit, height: 290),
+            ),
             const SizedBox(height: 16),
             OrbitSwitcher(
               duration: OrbitMotion.fast,
@@ -182,6 +204,26 @@ class ConnectionScreen extends StatelessWidget {
                     : nodeTitles(c.nodes)[chosen.id]!,
                 subtitle: 'Сменить регион',
                 onTap: () => RegionPickerScreen.open(context, c),
+                trailing: chosen?.probeHost == null
+                    ? null
+                    : Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          LatencyLabel(
+                            ms: c.latencyMs[chosen!.id],
+                            measuring:
+                                c.latencyMeasuring &&
+                                !c.latencyMs.containsKey(chosen.id),
+                          ),
+                          IconButton(
+                            tooltip: 'Обновить пинг',
+                            onPressed: c.latencyMeasuring
+                                ? null
+                                : c.measureLatency,
+                            icon: const Icon(Icons.refresh_rounded),
+                          ),
+                        ],
+                      ),
               ),
             ),
             const SizedBox(height: 12),
@@ -270,6 +312,7 @@ class ConnectionScreen extends StatelessWidget {
                     DiagnosticReportButton(
                       error: c.error!,
                       stage: c.diagnosticStage,
+                      handshake: c.diagnosticHandshake,
                     ),
                   ],
                 ),
