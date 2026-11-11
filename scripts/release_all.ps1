@@ -80,6 +80,11 @@ if (-not $SkipApi) {
 if (-not $SkipPool) {
     foreach ($n in $nodes) {
         Step "Pool mode: $n"
+        if ($DryRunOnly) {
+            # The pool dry run needs the new agent code and API on the host, so it cannot pass before steps 2-3 ran.
+            Write-Host 'skipped in a dry run: needs the updated agent and API first (it is checked right before the real change)'
+            continue
+        }
         Server "pool $n" @('-m', 'scripts.convert_beta_node_pool', '--node', $n)
     }
 }
