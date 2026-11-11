@@ -1,4 +1,4 @@
-"""Read-only: print the last minutes of window/renew errors from the beta API host, redacted.
+"""Read-only: print recent API/node logs and connection states from the beta hosts, redacted.
 
 Runs one fixed `journalctl | grep` over SSH with the same key and host as the deploy scripts.
 Changes nothing. IPv4 addresses, long hex/base64 tokens and e-mail-like strings are masked
@@ -14,7 +14,9 @@ import subprocess
 import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))  # allow `python scripts/beta_diag_logs.py`
+sys.path.insert(
+    0, str(Path(__file__).resolve().parents[1])
+)  # allow `python scripts/beta_diag_logs.py`
 
 from scripts.deploy_beta_api_latest import HOST, IDENTITY  # noqa: E402
 
@@ -23,6 +25,24 @@ REMOTE = (
     "journalctl -u detourvpn-beta-api.service --since '{minutes} min ago' --no-pager -o cat "
     "| grep -i -E 'window|renew|peer|pool|node_|error|exception|traceback|409|422|500|503' "
     "| tail -n 80"
+)
+REMOTE_ALL = (
+    "echo api_unit=$(systemctl is-active detourvpn-beta-api.service); "
+    "echo api_lines_last_window=$(journalctl -u detourvpn-beta-api.service --since '{minutes} min ago' "
+    "--no-pager -o cat | wc -l); "
+    "journalctl -u detourvpn-beta-api.service --since '{minutes} min ago' --no-pager -o cat | tail -n 40"
+)
+# Counts only, no identifiers: connection states of the last hour.
+REMOTE_DB = (
+    'docker exec detourvpn-beta-postgres-1 sh -c \'PGPASSWORD="$(cat /run/secrets/pg_runtime)" '
+    "psql -h 127.0.0.1 -U vpn_api -d detourvpn_beta -Atqc "
+    '"SELECT state, count(*), max(created_at) FROM peer_connections '
+    "WHERE created_at > now() - make_interval(hours => 1) GROUP BY state ORDER BY 3 DESC\"'"
+)
+NODE_REMOTE = (
+    "for u in detourvpn-beta-node-agent.service detourvpn-beta-slot-bootstrap.service; do "
+    "echo unit=$u state=$(systemctl is-active $u); "
+    "journalctl -u $u --since '{minutes} min ago' --no-pager -o cat | tail -n 25; done"
 )
 MASKS = [
     (re.compile(r"\b(?:\d{1,3}\.){3}\d{1,3}\b"), "<ip>"),
@@ -38,24 +58,49 @@ def mask(line: str) -> str:
     return line
 
 
+def ssh_run(target: str, identity: Path, port: str, remote: str) -> list[str]:
+    command = [
+        "ssh", "-o", "BatchMode=yes", "-o", "ConnectTimeout=10", "-o", "ServerAliveInterval=10",
+        "-o", "ServerAliveCountMax=3", "-o", "StrictHostKeyChecking=yes",
+        "-o", "IdentitiesOnly=yes", "-i", str(identity), "-p", port, target, remote,
+    ]  # fmt: skip
+    result = subprocess.run(command, capture_output=True, text=True, check=False, timeout=90)  # noqa: S603
+    lines = [mask(x)[:300] for x in result.stdout.splitlines()]
+    if result.returncode not in (0, 1):
+        lines.append(f"ssh_exit_code={result.returncode}")
+    return lines
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--minutes", type=int, default=20)
+    parser.add_argument("--node", help="also read this node's agent logs (name from the inventory)")
     args = parser.parse_args()
     if not 1 <= args.minutes <= 240:
         raise SystemExit("minutes must be 1..240")
     identity = Path(os.environ.get("USERPROFILE", str(Path.home()))) / ".ssh" / IDENTITY.name
-    command = [
-        "ssh", "-o", "BatchMode=yes", "-o", "ConnectTimeout=10", "-o", "ServerAliveInterval=10",
-        "-o", "ServerAliveCountMax=3", "-o", "StrictHostKeyChecking=yes",
-        "-o", "IdentitiesOnly=yes", "-i", str(identity), f"root@{HOST}",
-        REMOTE.format(minutes=args.minutes),
-    ]  # fmt: skip
-    result = subprocess.run(command, capture_output=True, text=True, check=False, timeout=90)  # noqa: S603
-    for line in result.stdout.splitlines():
-        print(mask(line)[:300])
-    if result.returncode not in (0, 1):  # grep exits 1 when nothing matched
-        print(f"ssh_exit_code={result.returncode}", file=sys.stderr)
+    print("== API: filtered errors")
+    print(
+        chr(10).join(ssh_run(f"root@{HOST}", identity, "22", REMOTE.format(minutes=args.minutes)))
+    )
+    print("== API: unit state, line count, last 40 lines")
+    print(
+        chr(10).join(
+            ssh_run(f"root@{HOST}", identity, "22", REMOTE_ALL.format(minutes=args.minutes))
+        )
+    )
+    print("== DB: connections by state in the last hour (state|count|newest)")
+    print(chr(10).join(ssh_run(f"root@{HOST}", identity, "22", REMOTE_DB)))
+    if args.node:
+        from scripts.beta_nodes import load_inventory
+        from scripts.update_beta_node_agent import DEFAULT_INVENTORY
+
+        node = load_inventory(DEFAULT_INVENTORY)[args.node]
+        print(f"== NODE {args.node}: agent and bootstrap")
+        print(chr(10).join(ssh_run(
+            f"{node.ssh_user}@{node.host}", node.ssh_key, str(node.ssh_port),
+            NODE_REMOTE.format(minutes=args.minutes),
+        )))  # fmt: skip
     return 0
 
 
