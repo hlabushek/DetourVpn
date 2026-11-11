@@ -240,11 +240,11 @@ def main() -> int:
         )
         return 0
     ssh = [
-        "ssh", "-o", "BatchMode=yes", "-o", "ConnectTimeout=10", "-o", "StrictHostKeyChecking=yes",
+        "ssh", "-o", "BatchMode=yes", "-o", "ServerAliveInterval=10", "-o", "ServerAliveCountMax=3", "-o", "ConnectTimeout=10", "-o", "StrictHostKeyChecking=yes",
         "-o", "IdentitiesOnly=yes", "-i", str(IDENTITY), f"root@{HOST}",
     ]  # fmt: skip
     scp = [
-        "scp", "-o", "BatchMode=yes", "-o", "StrictHostKeyChecking=yes",
+        "scp", "-o", "BatchMode=yes", "-o", "ServerAliveInterval=10", "-o", "ServerAliveCountMax=3", "-o", "StrictHostKeyChecking=yes",
         "-o", "IdentitiesOnly=yes", "-i", str(IDENTITY),
     ]  # fmt: skip
     stage = f"/run/detourvpn-dev0022-{run_id}"

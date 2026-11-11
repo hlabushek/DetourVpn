@@ -160,11 +160,11 @@ def main() -> int:
         return 0
     run_id = uuid.uuid4().hex
     ssh = [
-        "ssh", "-o", "BatchMode=yes", "-o", "ConnectTimeout=10", "-o", "StrictHostKeyChecking=yes",
+        "ssh", "-o", "BatchMode=yes", "-o", "ServerAliveInterval=10", "-o", "ServerAliveCountMax=3", "-o", "ConnectTimeout=10", "-o", "StrictHostKeyChecking=yes",
         "-o", "IdentitiesOnly=yes", "-i", str(IDENTITY), f"root@{HOST}",
     ]
     scp = [
-        "scp", "-o", "BatchMode=yes", "-o", "StrictHostKeyChecking=yes", "-o", "IdentitiesOnly=yes",
+        "scp", "-o", "BatchMode=yes", "-o", "ServerAliveInterval=10", "-o", "ServerAliveCountMax=3", "-o", "StrictHostKeyChecking=yes", "-o", "IdentitiesOnly=yes",
         "-i", str(IDENTITY),
     ]
     stage = f"/run/detourvpn-mini-{run_id}"

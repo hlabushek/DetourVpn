@@ -159,7 +159,7 @@ def build(execute: bool) -> int:
     ssh = [
         "ssh",
         "-o",
-        "BatchMode=yes",
+        "BatchMode=yes", "-o", "ServerAliveInterval=10", "-o", "ServerAliveCountMax=3",
         "-o",
         "ConnectTimeout=10",
         "-o",
@@ -173,7 +173,7 @@ def build(execute: bool) -> int:
     scp = [
         "scp",
         "-o",
-        "BatchMode=yes",
+        "BatchMode=yes", "-o", "ServerAliveInterval=10", "-o", "ServerAliveCountMax=3",
         "-o",
         "StrictHostKeyChecking=yes",
         "-o",
