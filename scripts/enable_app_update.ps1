@@ -96,7 +96,7 @@ $outDir = Join-Path $env:LOCALAPPDATA 'ProjectVpn\update-out'
 if ([string]::IsNullOrWhiteSpace($NotesFile)) {
     $NotesFile = Join-Path $outDir 'notes.txt'
     New-Item -ItemType Directory -Force -Path $outDir | Out-Null
-    [IO.File]::WriteAllText($NotesFile, "Обновление DetourVpn $versionName: исправления и улучшения.", (New-Object System.Text.UTF8Encoding($false)))
+    [IO.File]::WriteAllText($NotesFile, "Обновление DetourVpn ${versionName}: исправления и улучшения.", (New-Object System.Text.UTF8Encoding($false)))
 }
 Write-Host "version=$versionName code=$versionCode min_supported=$MinSupportedVersionCode"
 Write-Host 'The key passphrase is asked next (hidden).'
@@ -104,7 +104,7 @@ Run 'prepare manifest' {
     uv run --frozen python scripts/prepare_app_update.py --apk $apk --version-code $versionCode --version-name $versionName --min-supported-version-code $MinSupportedVersionCode --apk-url $ApkUrl --notes-file $NotesFile --out $outDir --signing-key $KeyPath
 }
 Step 'What is left (server side, not automated)'
-Write-Host "1. Upload the APK so that it is downloadable at: $ApkUrl"
+Write-Host "1. Upload the APK so that it is downloadable at: ${ApkUrl}"
 Write-Host "   APK:      $apk"
 Write-Host "2. Put the manifest on the API host: $(Join-Path $outDir 'app-update.json')"
 Write-Host '   and set VPN_APP_UPDATE_MANIFEST_FILE in the API environment to its path there, then restart the API.'
