@@ -7,6 +7,19 @@ them and has no server access in this task.
 logs, or full IDs. Shorten every ID to its first 8 characters, for example `3f2a9c1e…`. Times and
 states are enough.
 
+## Easiest: one command
+On your PC, in the repository folder (branch `claude/connection-reliability`):
+
+```powershell
+.\scripts\reliability_owner_run.ps1 -Stage logs -Hours 48
+```
+
+It runs `scripts/beta_reliability_logs.py`: fixed `SELECT` queries in a read-only database session
+and a read of the API journal, over the same SSH key as the deploy scripts. IDs are cut to 8
+characters and addresses are masked before anything is shown. The result is saved as
+`server-data.txt` in `%LOCALAPPDATA%\ProjectVpn\reliability\<time>\`. Use `-Hours` (1 to 72) so
+the period covers the drops you saw. The manual steps below do the same by hand.
+
 ## What we want to learn
 For the affected phone (one device), around the time the VPN dropped or a connect failed:
 1. Each connection: when it was created, its state now (`pending`, `active`, `revoke_pending`,
@@ -18,18 +31,14 @@ For the affected phone (one device), around the time the VPN dropped or a connec
    renewal during sleep (root cause §3).
 
 ## Step 1 — open a read-only database session
-On the API server, in the install folder (normally `/opt/detourvpn`):
+On the beta API server (the names below are the ones the beta scripts use):
 
 ```bash
-cd /opt/detourvpn
+docker exec -it -e PGOPTIONS='-c default_transaction_read_only=on' detourvpn-beta-postgres-1 sh -c 'PGPASSWORD="$(cat /run/secrets/pg_runtime)" psql -h 127.0.0.1 -U vpn_api -d detourvpn_beta'
 ```
 
-```bash
-sudo docker compose -f infra/closed/compose.yaml exec postgres psql -U vpn_bootstrap -d detourvpn
-```
-
-`psql` asks for the password itself; type it only there, never in chat. If your database user or
-names are different, use yours. As the first command inside `psql`, make the session read-only:
+The password is read from the container's secret file; nothing is typed or shown. As the first
+command inside `psql`, also open a read-only transaction:
 
 ```sql
 BEGIN READ ONLY;
@@ -99,7 +108,7 @@ This prints only the time, the request type and the HTTP status for window reque
 addresses and IDs. Replace the time if needed.
 
 ```bash
-sudo journalctl -u detourvpn-api.service --since '2 days ago' --no-pager -o short-iso | grep -oE '^[0-9T:+-]+|"(GET|POST|DELETE) /api/v1/window-tunnels[^"]*" [0-9]{3}' | paste - - | sed -E 's#/[0-9a-f-]{36}#/<id>#g' | grep window-tunnels | tail -n 300
+journalctl -u detourvpn-beta-api.service --since '2 days ago' --no-pager -o short-iso | grep -oE '^[0-9T:+-]+|"(GET|POST|DELETE) /api/v1/window-tunnels[^"]*" [0-9]{3}' | paste - - | sed -E 's#/[0-9a-f-]{36}#/<id>#g' | grep window-tunnels | tail -n 300
 ```
 
 If the output is empty, the API may not log requests; say so, that is also useful.

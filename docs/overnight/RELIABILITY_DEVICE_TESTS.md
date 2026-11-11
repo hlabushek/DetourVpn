@@ -4,6 +4,18 @@ Use an APK built from branch `claude/connection-reliability` with 15-minute wind
 scripts pass `-WindowSeconds 900`). Use the same phone as before. Nothing here has been run on a
 phone yet.
 
+## The script
+`scripts\reliability_owner_run.ps1` runs everything in order and asks before each stage:
+build the signed APK, publish it as an in-app update (only after you type YES in the publish
+script), walk you through these tests while recording your answers, then read the server data.
+
+```powershell
+.\scripts\reliability_owner_run.ps1
+```
+
+Single stages: `-Stage build -Install`, `-Stage publish`, `-Stage phone -Tests 1,3`,
+`-Stage logs -Hours 24`. Pass `-RunDir <folder>` to add results to an earlier run's folder.
+
 ## Before you start
 1. Install the new build over the old one.
 2. Android settings → Apps → DetourVPN → Battery → **Unrestricted** (or "Don't optimize"). On
