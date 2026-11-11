@@ -53,7 +53,7 @@ function Prune-BuildDir([string]$dir) {
 
 Step 'Preflight'
 $branch = (git rev-parse --abbrev-ref HEAD).Trim()
-$dirty = @(git status --porcelain | Where-Object { $_ -notmatch '^\?\? \.claude/' })
+$dirty = @(git status --porcelain | Where-Object { $_ -notmatch '^\?\? (\.claude/|docs/evidence/)' })
 if ($dirty.Count -gt 0) { throw 'There are uncommitted changes; commit or stash them first so the build matches git.' }
 Prune-Builds
 $free = [math]::Round((Get-PSDrive -Name ($root.Substring(0, 1))).Free / 1GB, 1)
