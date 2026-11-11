@@ -58,10 +58,10 @@ def changed_files(baseline: str, source: str) -> tuple[list[str], list[str]]:
     return sorted(modified), sorted(added)
 
 
-def target_revision(source: str, added: list[str]) -> str:
+def target_revision(source: str, added: list[str], before: str) -> str:
     migrations = sorted(p for p in added if "/migrations/versions/" in p)
     if not migrations:
-        raise SystemExit("no_new_migrations")
+        return before
     text = git_blob(source, migrations[-1]).decode()
     match = re.search(r'(?m)^revision\s*(?::\s*str\s*)?=\s*"([^"]+)"', text)
     if not match:
@@ -213,19 +213,24 @@ WANTED = {
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--execute", action="store_true")
+    parser.add_argument(
+        "--before-revision",
+        default=BEFORE,
+        help="alembic revision the host is at now (default: the pre-overnight 0022)",
+    )
     parser.add_argument("--source-rev", default="HEAD", help="committed revision to deploy")
     parser.add_argument("--baseline-rev", default="ddf1320", help="revision the host runs now")
     args = parser.parse_args()
     run_id = uuid.uuid4().hex
     CHANGED, NEW = changed_files(args.baseline_rev, args.source_rev)
-    AFTER = target_revision(args.source_rev, NEW)
+    AFTER = target_revision(args.source_rev, NEW, args.before_revision)
     MIGS = [p for p in NEW if "/migrations/versions/" in p]
     files = {p: git_blob(args.source_rev, p) for p in CHANGED + NEW}
     names = {p: p.replace("/", "_") for p in files}
     baselines = "\n".join(f"{sha(git_blob(args.baseline_rev, p))} {p}" for p in CHANGED)
     script = (
         SCRIPT.replace("__EXPECTED_HOST__", EXPECTED_HOST)
-        .replace("__BEFORE__", BEFORE)
+        .replace("__BEFORE__", args.before_revision)
         .replace("__AFTER__", AFTER)
         .replace("__NEW_NAMES__", " ".join(Path(p).name for p in MIGS))
         .replace("__NEWFILES__", chr(10).join(NEW))
