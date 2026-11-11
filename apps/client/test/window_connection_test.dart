@@ -94,6 +94,34 @@ class RenewingNative extends Native implements NativeRenewalHost {
   );
 }
 
+/// TEST ONLY: a tunnel restored by the headless restore engine (ADR-121), which the UI can take
+/// over. It renews from Dart there, so native renewal is off until the UI starts it.
+class HandoverNative extends RenewingNative implements RestoreHandover {
+  bool restoreActive = true;
+  bool handoverWorks = true;
+  int handovers = 0;
+  @override
+  Future<bool> adoptRestore() async {
+    handovers++;
+    if (!handoverWorks) return false;
+    restoreActive = false;
+    return up;
+  }
+
+  @override
+  Future<NativeSnapshot> snapshot() async => NativeSnapshot(
+    up: up,
+    network: network,
+    handshakeAge: age,
+    remainingMs: remaining,
+    reason: reason,
+    nativeRenewal: renewing && up,
+    connectionId: up ? heldConnection : null,
+    windowGeneration: up ? heldGeneration : null,
+    restoreActive: restoreActive,
+  );
+}
+
 /// TEST ONLY: an engine whose channel has no native renewal (the headless restore engine before
 /// ADR-117 answered notImplemented, which Flutter raises as MissingPluginException).
 class NoRenewalChannelNative extends Native implements NativeRenewalHost {
@@ -493,6 +521,91 @@ void main() {
         expect(c.error, isNull);
         expect(c.hasLease, isTrue);
         expect(plain.up, isTrue);
+      },
+    );
+  });
+
+  group('ADR-121 hand-over of a restored tunnel to the UI', () {
+    late HandoverNative restored;
+    WindowConnectionController reopened() {
+      c.dispose();
+      restored = HandoverNative()
+        ..age = 0
+        ..up = true
+        ..heldConnection = connection
+        ..heldGeneration = 1
+        ..remaining = 500000;
+      api.oldConnection = true;
+      return c = WindowConnectionController(
+        api,
+        restored,
+        pollInterval: const Duration(days: 1),
+        windowSeconds: 900,
+        renewalOrigin: Uri.parse('https://api.example.invalid'),
+      );
+    }
+
+    test(
+      'the UI takes over the restored tunnel and starts native renewal',
+      () async {
+        reopened();
+        await c.refresh();
+        expect(restored.handovers, 1);
+        expect(restored.stops, 0);
+        expect(api.deletes, 0);
+        expect(api.creates, 0);
+        expect(restored.handoffs, hasLength(1));
+        expect(restored.handoffs.single['connection'], connection);
+        expect(c.hasLease, isTrue);
+        expect(c.selectedNode, node);
+        expect(c.error, isNull);
+      },
+    );
+
+    test(
+      'a renewal the restore engine finished during hand-over is applied',
+      () async {
+        reopened();
+        // Native still holds generation 1 with little time left; the server already issued 2.
+        restored.remaining = 30000;
+        api.generation = 2;
+        api.window = '66666666-6666-4666-8666-666666666666';
+        await c.refresh();
+        expect(restored.advances, 1);
+        expect(restored.stops, 0);
+        expect(c.hasLease, isTrue);
+      },
+    );
+
+    test('a server two generations ahead is not taken over', () async {
+      reopened();
+      api.generation = 3;
+      api.window = '66666666-6666-4666-8666-666666666666';
+      await c.refresh();
+      expect(restored.handovers, 0);
+      expect(restored.stops, greaterThanOrEqualTo(1));
+      expect(c.hasLease, isFalse);
+    });
+
+    test('a failed hand-over falls back to the fail-closed stop', () async {
+      reopened();
+      restored.handoverWorks = false;
+      await c.refresh();
+      expect(restored.handovers, 1);
+      expect(restored.stops, greaterThanOrEqualTo(1));
+      expect(api.deletes, 1);
+      expect(c.hasLease, isFalse);
+    });
+
+    test(
+      'a native window that does not match the server is never taken over',
+      () async {
+        reopened();
+        restored.heldConnection = '99999999-9999-4999-8999-999999999999';
+        await c.refresh();
+        expect(restored.handovers, 0);
+        expect(restored.stops, greaterThanOrEqualTo(1));
+        expect(c.hasLease, isFalse);
       },
     );
   });

@@ -7,10 +7,15 @@ import android.content.Intent;
 /** Doze-safe wake-up for {@link NativeRenewer}; not exported, carries no data. */
 public final class RenewAlarmReceiver extends BroadcastReceiver {
     @Override public void onReceive(Context context, Intent intent) {
-        if (intent == null || !NativeRenewer.ACTION.equals(intent.getAction())) return;
+        if (intent == null) return;
         if (!(context.getApplicationContext() instanceof ClientApplication)) return;
         ClientApplication app = (ClientApplication) context.getApplicationContext();
-        PendingResult pending = goAsync();
-        app.renewer.wake(pending::finish);
+        if (NativeRenewer.ACTION.equals(intent.getAction())) {
+            PendingResult pending = goAsync();
+            app.renewer.wake(pending::finish);
+        } else if (ClientApplication.WAKE_RESTORE.equals(intent.getAction())) {
+            PendingResult pending = goAsync();
+            app.wakeRestore(pending::finish); // ADR-121
+        }
     }
 }

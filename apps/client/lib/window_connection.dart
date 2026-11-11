@@ -237,9 +237,9 @@ class WindowConnectionController extends ConnectionController {
     _deviceId = _uuid(device['id']);
   }
 
-  /// After a UI restart: adopt the natively renewed tunnel still running in this process
-  /// (ADR-117). Otherwise stop native and revoke this device's old connections before admission.
-  /// Returns true if a running tunnel was adopted.
+  /// After a UI restart: adopt the tunnel still running in this process, renewed natively
+  /// (ADR-117) or by the restore engine (ADR-121). Otherwise stop native and revoke this device's
+  /// old connections before admission. Returns true if a running tunnel was adopted.
   Future<bool> _reconcile() async {
     if (_synced) return false;
     NativeSnapshot? live;
@@ -251,7 +251,8 @@ class WindowConnectionController extends ConnectionController {
     final adoptable =
         live != null &&
         live.up &&
-        live.nativeRenewal &&
+        (live.nativeRenewal ||
+            (live.restoreActive && native is RestoreHandover)) &&
         live.remainingMs > 0 &&
         live.connectionId != null &&
         live.windowGeneration != null;
@@ -270,7 +271,7 @@ class WindowConnectionController extends ConnectionController {
       final match = rows
           .where((row) => row['id'] == live!.connectionId)
           .firstOrNull;
-      if (match is Map<String, dynamic> && _adopt(match, live)) {
+      if (match is Map<String, dynamic> && await _adopt(match, live)) {
         for (final row in rows) {
           if (identical(row, match) || row['state'] == 'closed') continue;
           try {
@@ -300,7 +301,7 @@ class WindowConnectionController extends ConnectionController {
 
   /// ADR-117: take over a running tunnel only if the server's view of this device's connection
   /// matches what native holds; the same checks as [_validate] for a first grant.
-  bool _adopt(Map<String, dynamic> value, NativeSnapshot live) {
+  Future<bool> _adopt(Map<String, dynamic> value, NativeSnapshot live) async {
     final raw = value['window'];
     if (value['state'] != 'active' ||
         raw is! Map<String, dynamic> ||
@@ -342,13 +343,32 @@ class WindowConnectionController extends ConnectionController {
         slot < 1 ||
         slot > maxSlotId)
       return false;
+    // ADR-121: a restored tunnel is renewed by the restore engine; end that engine first. A
+    // renewal it finished during the hand-over (one generation ahead) is applied below.
+    final nativeGeneration = live.windowGeneration!;
+    final handover = !live.nativeRenewal;
+    if (handover) {
+      if (generation > nativeGeneration + 1) return false;
+      if (!await (native as RestoreHandover).adoptRestore()) return false;
+    }
     final now = _clock.elapsedMilliseconds;
+    _intentAt = now;
+    var deadline = now + live.remainingMs;
+    if (handover && generation == nativeGeneration + 1) {
+      try {
+        final end = _bound(raw);
+        if (end <= deadline) return false;
+        await _native.advanceWindow(raw, end - _clock.elapsedMilliseconds);
+        deadline = end;
+      } catch (_) {
+        return false;
+      }
+    }
     _id = value['id'] as String;
     _grant = raw;
     _config = value['client_config'] as String;
     selectedNode = value['node_id'] as String;
-    _deadline = now + live.remainingMs;
-    _intentAt = now;
+    _deadline = deadline;
     _renewIntent = null;
     _trafficBaseline = null;
     _lastTraffic = null;
@@ -362,6 +382,8 @@ class WindowConnectionController extends ConnectionController {
     diagnosticStage = null;
     phase = ConnectionPhase.reconnecting;
     detail = 'VPN продолжает работать, проверяется связь';
+    // ADR-121: renewal moves from the ended restore engine to native renewal (or to this UI).
+    if (handover) await _startNativeRenewal(raw);
     return true;
   }
 

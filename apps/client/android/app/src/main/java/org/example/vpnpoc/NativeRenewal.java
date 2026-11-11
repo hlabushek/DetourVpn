@@ -65,6 +65,15 @@ final class NativeRenewal {
         return Math.max(1000, remainingMs - renewBeforeMs());
     }
 
+    /** ADR-121: wake the restore engine every 4 minutes (Doze stretches it), never past the margin. */
+    static final long RESTORE_WAKE_MS = 240000;
+
+    /** Delay to the next restore-engine wake-up, or -1 when the window is about to end. */
+    static long restoreWakeDelayMs(long remainingMs) {
+        long delay = Math.min(RESTORE_WAKE_MS, remainingMs - SAFETY_MS);
+        return delay < 1000 ? -1 : delay;
+    }
+
     /**
      * ADR-118: delay before the next attempt in the same wake-up (2 s, 4 s, 8 s), or -1 once the
      * burst is spent. In Doze the next alarm can be about 9 minutes away, so a transient failure

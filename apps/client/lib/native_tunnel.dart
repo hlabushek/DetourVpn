@@ -26,7 +26,11 @@ class NativeSnapshot {
     this.handshakeSeen = false,
     this.connectionId,
     this.windowGeneration,
+    this.restoreActive = false,
   });
+
+  /// ADR-121: a headless restore engine (reboot or process-kill restore) owns the tunnel now.
+  final bool restoreActive;
 
   /// ADR-117: the connection and generation the native deadline fence holds right now, so a
   /// restarted UI can adopt a running tunnel. Null when no window is held or on older builds.
@@ -111,6 +115,12 @@ abstract interface class NativeRenewalHost {
   Future<bool> startNativeRenewal(Map<String, Object?> args);
 }
 
+/// ADR-121: end the restore engine and keep its running tunnel for the app UI.
+abstract interface class RestoreHandover {
+  /// True only if the restore engine was ended and the tunnel is still up.
+  Future<bool> adoptRestore();
+}
+
 abstract interface class WindowNative implements NativeTunnel {
   Future<void> connectWindow(
     String config,
@@ -137,8 +147,20 @@ class PlatformTunnel
         WindowNative,
         NodePreferenceStore,
         NativeRenewalHost,
+        RestoreHandover,
         VlessNative {
   static const channel = MethodChannel('project.vpn/tunnel.v1');
+  @override
+  Future<bool> adoptRestore() async {
+    try {
+      return await channel.invokeMethod<bool>('adoptRestore') ?? false;
+    } on PlatformException {
+      return false;
+    } on MissingPluginException {
+      return false;
+    }
+  }
+
   @override
   Future<void> connectVless(Map<String, Object> profile, int maxMs) =>
       channel.invokeMethod<void>('connectVless', {...profile, 'maxMs': maxMs});
@@ -225,6 +247,7 @@ class PlatformTunnel
               (value['windowGeneration'] as int) >= 1
           ? value['windowGeneration'] as int
           : null,
+      restoreActive: value['restoreActive'] == true,
     );
   }
 

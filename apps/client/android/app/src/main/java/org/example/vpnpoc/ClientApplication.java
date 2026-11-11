@@ -42,7 +42,13 @@ public final class ClientApplication extends Application implements Tunnel {
     private final Handler mainThread = new Handler(Looper.getMainLooper());
     private volatile VpnService recoveryService;
     private ProtectedApiRelay protectedRelay;
-    private FlutterEngine recoveryEngine;
+    private volatile FlutterEngine recoveryEngine;
+    /** ADR-121: the restore engine's channel, used to wake its Dart controller. */
+    private volatile MethodChannel recoveryChannel;
+    /** ADR-121: Lockdown seen on an Always-on start; native HTTPS cannot get out then. */
+    volatile boolean lockdown;
+    static final String WAKE_RESTORE = "org.example.vpnpoc.action.WAKE_RESTORE";
+    private static final long RESTORE_WAKE_LOCK_MS = 45_000L;
     long deadline;
     String reason = "";
     // Task 7: whether a handshake happened since the last connect, seen natively (Dart may sleep).
@@ -195,6 +201,7 @@ public final class ClientApplication extends Application implements Tunnel {
                         || provider == null) {
                     throw new IllegalStateException("recovery_unavailable");
                 }
+                if (android.os.Build.VERSION.SDK_INT >= 29) lockdown = service.isLockdownEnabled();
                 String saved = vault.read("session");
                 if (saved == null) throw new IllegalStateException("session_missing");
                 var session = new org.json.JSONObject(saved);
@@ -204,8 +211,10 @@ public final class ClientApplication extends Application implements Tunnel {
 
                 FlutterEngine engine = new FlutterEngine(this);
                 GeneratedPluginRegistrant.registerWith(engine);
-                new MethodChannel(engine.getDartExecutor().getBinaryMessenger(),
-                        "project.vpn/tunnel.v1").setMethodCallHandler(this::handleRecoveryCall);
+                MethodChannel channel = new MethodChannel(
+                        engine.getDartExecutor().getBinaryMessenger(), "project.vpn/tunnel.v1");
+                channel.setMethodCallHandler(this::handleRecoveryCall);
+                recoveryChannel = channel;
                 recoveryEngine = engine;
                 String bundle = FlutterInjector.instance().flutterLoader().findAppBundlePath();
                 engine.getDartExecutor().executeDartEntrypoint(
@@ -217,6 +226,12 @@ public final class ClientApplication extends Application implements Tunnel {
     }
 
     private void handleRecoveryCall(MethodCall call, MethodChannel.Result result) {
+        // ADR-121: after a hand-over to the UI, the old engine may still be finishing a call; it
+        // must not be able to stop or move the tunnel the UI now owns.
+        if (recoveryEngine == null) {
+            result.error("restore_detached", "Операция VPN не выполнена", null);
+            return;
+        }
         if (call.method.equals("bootstrapFailed")) {
             result.success(null);
             worker.execute(this::stopAlwaysOnRecovery);
@@ -292,6 +307,7 @@ public final class ClientApplication extends Application implements Tunnel {
                                 SystemClock.elapsedRealtime());
                         deadline = window.deadline;
                         holdCpu();
+                        scheduleRestoreWake();
                         break;
                     case "connectWindow":
                         Number duration = call.argument("remainingMs");
@@ -315,6 +331,7 @@ public final class ClientApplication extends Application implements Tunnel {
                             }
                             reason = "";
                             holdCpu();
+                            scheduleRestoreWake();
                         } catch (Exception failure) {
                             stop();
                             throw failure;
@@ -342,7 +359,81 @@ public final class ClientApplication extends Application implements Tunnel {
         return "native_start_failed";
     }
 
+    /**
+     * ADR-121: wake the restore engine's Dart controller while the phone dozes, so it can renew.
+     * Worker thread. Allow-while-idle alarm, no data, receiver not exported.
+     */
+    private void scheduleRestoreWake() {
+        if (recoveryEngine == null || deadline <= 0) { cancelRestoreWake(); return; }
+        long delay = NativeRenewal.restoreWakeDelayMs(deadline - SystemClock.elapsedRealtime());
+        if (delay < 0) { cancelRestoreWake(); return; }
+        try {
+            alarms().setAndAllowWhileIdle(android.app.AlarmManager.ELAPSED_REALTIME_WAKEUP,
+                    SystemClock.elapsedRealtime() + delay, restoreWakeIntent());
+        } catch (RuntimeException ignored) {
+            // Best effort; Dart timers still run whenever the CPU is awake.
+        }
+    }
+
+    private void cancelRestoreWake() {
+        try { alarms().cancel(restoreWakeIntent()); } catch (RuntimeException ignored) { }
+    }
+
+    private android.app.AlarmManager alarms() {
+        return (android.app.AlarmManager) getSystemService(ALARM_SERVICE);
+    }
+
+    private android.app.PendingIntent restoreWakeIntent() {
+        android.content.Intent intent = new android.content.Intent(this, RenewAlarmReceiver.class)
+                .setAction(WAKE_RESTORE);
+        return android.app.PendingIntent.getBroadcast(this, 1, intent,
+                android.app.PendingIntent.FLAG_UPDATE_CURRENT
+                        | android.app.PendingIntent.FLAG_IMMUTABLE);
+    }
+
+    /** Alarm receiver entry point (ADR-121). */
+    void wakeRestore(Runnable done) {
+        try {
+            PowerManager power = (PowerManager) getSystemService(POWER_SERVICE);
+            PowerManager.WakeLock lock =
+                    power.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "detourvpn:restore");
+            lock.setReferenceCounted(false);
+            lock.acquire(RESTORE_WAKE_LOCK_MS); // Released by its timeout.
+        } catch (RuntimeException ignored) {
+            // Best effort.
+        }
+        done.run();
+        worker.execute(() -> {
+            MethodChannel channel = recoveryChannel;
+            if (recoveryEngine == null || channel == null) return;
+            mainThread.post(() -> {
+                try { channel.invokeMethod("wake", null); }
+                catch (RuntimeException ignored) { /* Engine already gone. */ }
+            });
+            scheduleRestoreWake();
+        });
+    }
+
+    /**
+     * ADR-121: the UI takes over a restored tunnel. Ends the restore engine and its relay but
+     * keeps the tunnel and the VPN service. Worker thread. True if the tunnel is still up.
+     */
+    boolean detachRestoreForUi() {
+        cancelRestoreWake();
+        FlutterEngine engine = recoveryEngine;
+        if (engine == null) return false;
+        recoveryEngine = null;
+        recoveryChannel = null;
+        recoveryService = null;
+        ProtectedApiRelay relay = protectedRelay;
+        protectedRelay = null;
+        if (relay != null) relay.close();
+        mainThread.post(engine::destroy);
+        return provider != null && provider.isUp() && deadline > 0;
+    }
+
     private void stopAlwaysOnRecovery() {
+        cancelRestoreWake();
         try { stop(); } catch (Exception ignored) { reason = "native_disconnect_failed"; }
         ProtectedApiRelay relay = protectedRelay;
         protectedRelay = null;
@@ -351,6 +442,7 @@ public final class ClientApplication extends Application implements Tunnel {
         recoveryService = null;
         FlutterEngine engine = recoveryEngine;
         recoveryEngine = null;
+        recoveryChannel = null;
         if (engine != null) mainThread.post(engine::destroy);
         if (service != null) service.stopSelf();
     }
@@ -376,6 +468,8 @@ public final class ClientApplication extends Application implements Tunnel {
                 reason = "vpn_revoked";
             }
             if (service == null || recoveryService != service) return;
+            cancelRestoreWake();
+            recoveryChannel = null;
             generation.incrementAndGet();
             deadline = 0;
             window.clear();
@@ -453,6 +547,7 @@ public final class ClientApplication extends Application implements Tunnel {
 
     void stop() throws Exception {
         renewer.stop();
+        cancelRestoreWake();
         releaseCpu();
         if (provider != null) provider.disconnect();
         deadline = 0;
@@ -480,6 +575,7 @@ public final class ClientApplication extends Application implements Tunnel {
         value.put("reason", reason);
         value.put("nativeRenewal", renewer.active());
         value.put("handshakeSeen", handshakes.seen());
+        value.put("restoreActive", recoveryEngine != null);
         // ADR-117: the fenced window identity, so a restarted UI can adopt this tunnel. Values the
         // app already received from the API; no key or token.
         if (up && deadline > 0 && window.connection != null) {

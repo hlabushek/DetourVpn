@@ -202,7 +202,7 @@ public final class ClientActivity extends FlutterActivity {
                 "disconnect", "snapshot", "sessionRead", "sessionWrite", "pendingLoginRead",
                 "pendingLoginWrite", "splitRead", "splitModeRead", "splitLastModeRead",
                 "splitWrite", "splitDomainsRead", "apps", "nodeRead", "nodeWrite",
-                "startNativeRenewal", "dnsRead", "dnsWrite").contains(call.method)) {
+                "startNativeRenewal", "adoptRestore", "dnsRead", "dnsWrite").contains(call.method)) {
             result.notImplemented(); return;
         }
         ClientApplication app = owner();
@@ -343,8 +343,14 @@ public final class ClientActivity extends FlutterActivity {
                         // between bumps the generation and the renewer refuses to start.
                         if (generation != app.generation.get() || !app.provider.isUp()
                                 || app.deadline <= 0) throw new IllegalStateException();
+                        // ADR-121: under Lockdown native HTTPS cannot get out; Dart keeps renewing.
+                        if (app.lockdown) { value = false; break; }
                         app.renewer.start(call.arguments(), generation);
                         value = true;
+                        break;
+                    case "adoptRestore":
+                        // ADR-121: UI channel only; the restore engine's channel never offers it.
+                        value = app.detachRestoreForUi();
                         break;
                     case "publicKey": value = app.key.getPublicKey().toBase64(); break;
                     case "prove": value = KeyConfirmation.answer(app.key,

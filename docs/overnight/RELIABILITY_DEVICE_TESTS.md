@@ -69,9 +69,11 @@ Use a server you know is down, or turn its node off for this test (only if you c
 ## Test 8 — reboot with the VPN on
 1. Connected. Restart the phone and unlock it. Do not open the app.
 2. Wait 2 minutes and check whether the VPN key icon is shown.
-3. **Expected:** the VPN comes back by itself. Note: after a reboot the restored connection still
-   renews from the app's background engine, so a long sleep afterwards can still end it. This is a
-   known limit (ADR-098, ADR-117).
+3. **Expected:** the VPN comes back by itself.
+4. Lock the phone for 30 minutes without opening the app. **Expected:** still on (ADR-121 wakes the
+   background engine). This is the weakest case; note the result carefully.
+5. Then open DetourVPN. **Expected:** the VPN stays on; the app does not turn it off or create a new
+   connection (it takes over the restored one).
 
 ## What not to do
 - Do not send screenshots that show IP addresses, server names you consider private, or links.

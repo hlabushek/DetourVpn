@@ -302,6 +302,22 @@ void main() {
       expect(platformCalls, isNot(contains('bootstrapComplete')));
     },
   );
+  test('ADR-121 a native wake call refreshes the restore controller', () async {
+    var refreshes = 0;
+    registerRecoveryWake(channel, () async => refreshes++);
+    addTearDown(() => channel.setMethodCallHandler(null));
+    final messenger =
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+    Future<void> send(String method) => messenger.handlePlatformMessage(
+      channel.name,
+      const StandardMethodCodec().encodeMethodCall(MethodCall(method)),
+      (_) {},
+    );
+    await send('wake');
+    await send('somethingElse');
+    await send('wake');
+    expect(refreshes, 2);
+  });
 }
 
 class _EmptySessionStore implements SessionStore {

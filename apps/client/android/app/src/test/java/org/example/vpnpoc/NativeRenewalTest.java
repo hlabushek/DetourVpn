@@ -110,4 +110,14 @@ public class NativeRenewalTest {
         assertEquals(-1, NativeRenewal.burstDelayMs(0, 0, 600000));
         assertEquals(-1, NativeRenewal.burstDelayMs(1, -1, 600000));
     }
+
+    /** ADR-121: restore-engine wake-ups every 4 minutes, never into the window's safety margin. */
+    @Test public void restoreWakeUpsStayInsideTheWindow() {
+        assertEquals(240000, NativeRenewal.restoreWakeDelayMs(900000));
+        assertEquals(240000, NativeRenewal.restoreWakeDelayMs(246000));
+        assertEquals(100000, NativeRenewal.restoreWakeDelayMs(106000));
+        assertEquals(1000, NativeRenewal.restoreWakeDelayMs(7000));
+        assertEquals(-1, NativeRenewal.restoreWakeDelayMs(6999));
+        assertEquals(-1, NativeRenewal.restoreWakeDelayMs(0));
+    }
 }

@@ -85,6 +85,9 @@ Future<void> _runAlwaysOnRecovery({
       throw const ClientError('recovery_failed');
     }
     await _recoveryChannel.invokeMethod<void>('bootstrapComplete');
+    // ADR-121: native wakes this engine with an allow-while-idle alarm while the phone dozes;
+    // the normal refresh then renews the window while the CPU is held awake.
+    registerRecoveryWake(_recoveryChannel, controller.refresh);
 
     // Keep the controller alive to renew the lease and enforce its monotonic deadline.
     await Completer<void>().future;
@@ -102,4 +105,16 @@ Future<void> _runAlwaysOnRecovery({
     }
     api?.close();
   }
+}
+
+/// ADR-121: answers native `wake` calls with one refresh; any other incoming call is ignored.
+@visibleForTesting
+void registerRecoveryWake(
+  MethodChannel channel,
+  Future<void> Function() refresh,
+) {
+  channel.setMethodCallHandler((call) async {
+    if (call.method == 'wake') await refresh();
+    return null;
+  });
 }
