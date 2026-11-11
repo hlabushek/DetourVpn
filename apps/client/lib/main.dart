@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import 'api.dart';
+import 'app_update.dart';
 import 'connection.dart';
 import 'home_screen.dart';
 import 'login_screen.dart';
@@ -10,6 +11,7 @@ import 'native_tunnel.dart';
 import 'quota_screen.dart';
 import 'orbit_theme.dart';
 import 'orbit_widgets.dart';
+import 'platform_info.dart';
 import 'profile_screen.dart';
 import 'session_store.dart';
 import 'settings_screen.dart';
@@ -33,13 +35,31 @@ void main() {
   } catch (_) {
     /* Explicit setup screen. */
   }
-  runApp(VpnApp(api: api, native: PlatformTunnel()));
+  // ADR-107: the in-app updater exists only in the Android client.
+  const windowsBuild = bool.fromEnvironment('VPN_WINDOW_TUNNELS');
+  runApp(
+    VpnApp(
+      api: api,
+      native: PlatformTunnel(),
+      updates: isWindowsClient || windowsBuild
+          ? null
+          : const PlatformUpdateNative(),
+    ),
+  );
 }
 
 class VpnApp extends StatefulWidget {
-  const VpnApp({super.key, required this.api, required this.native});
+  const VpnApp({
+    super.key,
+    required this.api,
+    required this.native,
+    this.updates,
+  });
   final Api? api;
   final NativeTunnel native;
+
+  /// Null disables the start-up update check (tests, Windows).
+  final UpdateNative? updates;
   @override
   State<VpnApp> createState() => _VpnAppState();
 }
@@ -60,13 +80,48 @@ class _VpnAppState extends State<VpnApp> with WidgetsBindingObserver {
       restoring = true;
       unawaited(restore());
     }
+    if (widget.api != null && widget.updates != null) {
+      unawaited(_checkForUpdate(widget.api!, widget.updates!));
+    }
   }
 
+  final _navigator = GlobalKey<NavigatorState>();
+
+  /// ADR-107: once per launch; failures are silent and never block the app.
+  Future<void> _checkForUpdate(Api api, UpdateNative updates) async {
+    final offer = await checkForUpdate(api, updates);
+    if (offer == null || !mounted) return;
+    final context = _navigator.currentContext;
+    if (context == null || !context.mounted) return;
+    await showUpdateDialog(context, offer, updates);
+  }
+
+  /// ADR-100: no network at startup must not sign the user out. Temporary failures are retried
+  /// (about 30 s in total) and the saved session is kept for the next resume or launch; only a
+  /// refusal or invalid storage erases it.
+  bool _sessionKept = false;
+  static const _restoreDelays = [1, 2, 4, 8, 15];
   Future<void> restore() async {
     try {
-      await widget.api!.restoreSession();
-      if (mounted && widget.api!.authenticated) signedIn();
+      for (var attempt = 0; ; attempt++) {
+        try {
+          await widget.api!.restoreSession();
+          _sessionKept = false;
+          if (mounted && widget.api!.authenticated) signedIn();
+          return;
+        } on ClientError catch (e) {
+          if (!_transientRestore.contains(e.code)) rethrow;
+          if (attempt >= _restoreDelays.length || !mounted) {
+            _sessionKept = true;
+            return;
+          }
+          await Future<void>.delayed(
+            Duration(seconds: _restoreDelays[attempt]),
+          );
+        }
+      }
     } catch (_) {
+      _sessionKept = false;
       try {
         await widget.api!.forgetSession();
       } catch (_) {
@@ -77,8 +132,21 @@ class _VpnAppState extends State<VpnApp> with WidgetsBindingObserver {
     }
   }
 
+  static const _transientRestore = {
+    'network_unavailable',
+    'api_unavailable',
+    'rate_limited',
+  };
+
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed &&
+        showLogin &&
+        _sessionKept &&
+        !restoring) {
+      setState(() => restoring = true);
+      unawaited(restore());
+    }
     if (state == AppLifecycleState.resumed && !showLogin) {
       unawaited(connection?.refresh());
       unawaited(connection?.refreshQuota());
@@ -319,6 +387,7 @@ class _VpnAppState extends State<VpnApp> with WidgetsBindingObserver {
 
   @override
   Widget build(BuildContext context) => MaterialApp(
+    navigatorKey: _navigator,
     title: 'DetourVPN',
     debugShowCheckedModeBanner: false,
     themeMode: theme,

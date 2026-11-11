@@ -13,6 +13,7 @@ from starlette.exceptions import HTTPException
 from vpn_api.account import router as account_router
 from vpn_api.admin import AdminService
 from vpn_api.admin import router as admin_router
+from vpn_api.app_update import AppUpdateManifest, load_manifest
 from vpn_api.auth.mini_app import router as mini_app_router
 from vpn_api.auth.routes import router
 from vpn_api.auth.security import AuthError
@@ -228,5 +229,18 @@ def create_app(
         ):
             return error_response(request, 503, "dependencies_unavailable")
         return HealthResponse()
+
+    @app.get(
+        "/api/v1/app/update-manifest",
+        response_model=AppUpdateManifest,
+        tags=["app"],
+        responses={404: {"model": ErrorResponse, "description": "No valid manifest"}},
+        summary="Latest Android release manifest for the in-app updater (ADR-107)",
+    )
+    def update_manifest(request: Request) -> AppUpdateManifest | JSONResponse:
+        manifest = load_manifest(config.app_update_manifest_file)
+        if manifest is None:
+            return error_response(request, 404, "update_unavailable")
+        return manifest
 
     return app

@@ -38,6 +38,8 @@ class Settings(BaseSettings):
     # Active devices per account; a later plan entitlement may replace it (ADR-093).
     device_limit: int = Field(default=5, ge=1, le=50)
     tunnel_profile_file: Path | None = Field(default=None, repr=False)
+    # Latest-release manifest for the in-app updater (ADR-107). Unset = no update offered.
+    app_update_manifest_file: Path | None = Field(default=None, repr=False)
     enable_window_tunnels: bool = False
     window_manifest_file: Path | None = Field(default=None, repr=False)
 
