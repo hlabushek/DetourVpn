@@ -82,7 +82,7 @@ These are test builds. For the phone tests, build a signed APK with your usual r
 
 ## 7. What you need to do
 1. Review the 6 commits on `claude/connection-reliability` (nothing is pushed).
-2. Build a signed APK (version `0.1.0-beta.28`, code 29) with 15-minute windows, publish it as an in-app update with `scriptsenable_app_update.ps1 -Publish`, and run `RELIABILITY_DEVICE_TESTS.md` on the phone. Phones on code 28 or older are offered it (Android 13+ only).
+2. Build a signed APK (version `0.1.0-beta.28`, code 29) with 15-minute windows, publish it as an in-app update with `scripts\enable_app_update.ps1 -Publish`, and run `RELIABILITY_DEVICE_TESTS.md` on the phone. Phones on code 28 or older are offered it (Android 13+ only).
 3. Run the read-only steps in `RELIABILITY_OWNER_LOGS.md` for the times of the drops you already
    saw, and for any drop during the new tests. Send back the shortened rows.
 4. No server deploy is needed for these fixes: the API change is behaviour-neutral.
