@@ -15,7 +15,7 @@ from alembic import command
 from cryptography.fernet import Fernet
 from fastapi.testclient import TestClient
 from pydantic import SecretStr
-from sqlalchemy import Engine, func, select, text
+from sqlalchemy import Engine, func, select, text, update
 from sqlalchemy.exc import DBAPIError
 from test_authentication import Harness as UserHarness
 from test_authentication import harness, headers, login
@@ -36,6 +36,7 @@ from vpn_api.db.models import (
     AuthIdentity,
     BetaInvite,
     Device,
+    PanelServerSource,
     PeerCommand,
     PeerConnection,
     PeerRuntimeEpoch,
@@ -985,3 +986,184 @@ def test_beta_invite_list_requires_an_admin_session_and_reports_disabled(admin: 
     assert h.client.get("/api/admin/v1/beta-invites").status_code == 401
     disabled = h.client.get("/api/admin/v1/beta-invites", headers=authorization(h))
     assert disabled.json() == {"enabled": False, "bot_username": "", "items": []}
+
+
+def test_user_list_exposes_linked_telegram_id_as_decimal_string(
+    admin: Harness, harness: UserHarness
+) -> None:
+    h = admin
+    user = harness
+    subject = 555000333
+    h.service.settings.telegram_bot_username = "TestOnlyBot"
+    user.auth.settings.beta_invites_only = False
+    login(user, subject)
+    auth = authorization(h)
+    by_subject = h.client.get(f"/api/admin/v1/users?q={subject}", headers=auth).json()
+    assert len(by_subject) == 1
+    assert by_subject[0]["telegram_id"] == str(subject)
+    # Every row carries the key; absent links are null, never a missing field.
+    for row in h.client.get("/api/admin/v1/users", headers=auth).json():
+        assert "telegram_id" in row and "telegram_username" in row
+    # Bot code login carries no username (ADR-110).
+    assert by_subject[0]["telegram_username"] is None
+
+
+def test_user_list_searches_telegram_username_case_insensitively(
+    admin: Harness, harness: UserHarness
+) -> None:
+    h = admin
+    user = harness
+    subject = 555000444
+    h.service.settings.telegram_bot_username = "TestOnlyBot"
+    user.auth.settings.beta_invites_only = False
+    login(user, subject)
+    # Stands in for a Mini App login (covered in test_mini_app.py); synthetic test username.
+    with transaction(h.engine) as session:
+        session.execute(
+            update(AuthIdentity)
+            .where(AuthIdentity.provider_subject == subject)
+            .values(telegram_username="Tester_Example")
+        )
+    auth = authorization(h)
+    for q in ("@tester_example", "TESTER_EXAMPLE", "Tester_Example"):
+        rows = h.client.get("/api/admin/v1/users", params={"q": q}, headers=auth).json()
+        assert [row["telegram_id"] for row in rows] == [str(subject)]
+        assert rows[0]["telegram_username"] == "Tester_Example"
+    # Exact match only, and malformed input matches nothing instead of erroring.
+    for q in ("@tester", "tester_exampl", "bad-name", "@", "a b", "имя_тестера"):
+        response = h.client.get("/api/admin/v1/users", params={"q": q}, headers=auth)
+        assert response.status_code == 200 and response.json() == []
+
+
+def synthetic_panel_link() -> tuple[str, str, str]:
+    """TEST SYNTHETIC vless:// Reality link: random UUID/key, reserved test hostnames."""
+    uuid = str(uuid4())
+    pbk = base64.urlsafe_b64encode(secrets.token_bytes(32)).decode().rstrip("=")
+    link = (
+        f"vless://{uuid}@panel.example.test:443?type=tcp&security=reality&pbk={pbk}"
+        # Raw Unicode display name, as some panels export it; must be dropped, not stored.
+        "&fp=chrome&sni=www.example.test&sid=0a1b&flow=xtls-rprx-vision#Тест сервер 1"
+    )
+    return link, uuid, pbk
+
+
+def test_panel_server_import_encrypts_link_and_never_returns_it(admin: Harness) -> None:
+    # ADR-111: link stored as ciphertext only, list shows no link content, audit has no link.
+    h = admin
+    auth = authorization(h)
+    link, uuid, pbk = synthetic_panel_link()
+    body = {
+        "idempotency_key": str(uuid4()),
+        "reason": "Synthetic panel import",
+        "label": "Тестовая панель",
+        "panel_kind": "3x-ui",
+        "link": link,
+    }
+    created = h.client.post("/api/admin/v1/panel-servers", headers=auth, json=body)
+    assert created.status_code == 200
+    assert set(created.json()) == {"id", "label"}
+    # Same key and body replays the result; same key with another body conflicts.
+    assert h.client.post("/api/admin/v1/panel-servers", headers=auth, json=body).json() == (
+        created.json()
+    )
+    other, _, _ = synthetic_panel_link()
+    conflict = h.client.post(
+        "/api/admin/v1/panel-servers", headers=auth, json={**body, "link": other}
+    )
+    assert conflict.status_code == 409
+    assert conflict.json()["error"]["code"] == "admin_idempotency_conflict"
+
+    listed = h.client.get("/api/admin/v1/panel-servers", headers=auth)
+    assert listed.status_code == 200
+    rows = listed.json()
+    assert len(rows) == 1 and rows[0]["source"] == "panel" and rows[0]["panel_kind"] == "3x-ui"
+    assert rows[0]["android_supported"] is False and rows[0]["delivered_to_devices"] is False
+    for secret in (uuid, pbk, "panel.example.test", "www.example.test", "vless://"):
+        assert secret not in listed.text and secret not in created.text
+
+    with transaction(h.engine) as session:
+        source = session.scalar(select(PanelServerSource))
+        assert source is not None
+        assert uuid not in source.link_ciphertext and pbk not in source.link_ciphertext
+        stored = h.service.cipher.decrypt(source.link_ciphertext.encode()).decode()
+        assert stored == link.partition("#")[0] and "#" not in stored
+        action = session.scalar(
+            select(AdminAction).where(AdminAction.operation == "import_panel_server")
+        )
+        assert action is not None and uuid not in str(action.result) + action.reason
+    audit = h.client.get("/api/admin/v1/audit", headers=auth).text
+    assert uuid not in audit and pbk not in audit
+
+
+@pytest.mark.parametrize(
+    ("change_link", "expected"),
+    [
+        (lambda link: link.replace("security=reality", "security=tls"), "panel_link_security"),
+        (lambda link: link.replace("fp=chrome", "fp=netscape"), "panel_link_fingerprint"),
+        (lambda link: link + "&extra=1", "panel_link_unknown_field"),
+        (lambda link: link.replace("vless://", "vmess://"), "panel_link_scheme"),
+    ],
+)
+def test_panel_server_import_rejects_bad_links_without_echo(
+    admin: Harness, change_link: object, expected: str
+) -> None:
+    h = admin
+    auth = authorization(h)
+    link, uuid, _ = synthetic_panel_link()
+    assert callable(change_link)
+    bad = change_link(link.partition("#")[0])
+    response = h.client.post(
+        "/api/admin/v1/panel-servers",
+        headers=auth,
+        json={
+            "idempotency_key": str(uuid4()),
+            "reason": "Synthetic bad panel link",
+            "label": "bad",
+            "panel_kind": "remnawave",
+            "link": bad,
+        },
+    )
+    assert response.status_code == 422
+    assert response.json()["error"]["code"] == expected
+    assert uuid not in response.text
+    with transaction(h.engine) as session:
+        assert session.scalar(select(func.count()).select_from(PanelServerSource)) == 0
+
+
+def test_panel_server_import_needs_admin_role_and_valid_body(admin: Harness) -> None:
+    h = admin
+    auth = authorization(h)
+    link, uuid, _ = synthetic_panel_link()
+    body = {
+        "idempotency_key": str(uuid4()),
+        "reason": "Synthetic panel import",
+        "label": "x",
+        "panel_kind": "3x-ui",
+        "link": link,
+    }
+    for broken in ({**body, "panel_kind": "marzban"}, {**body, "label": "a\nb"}, {**body, "x": 1}):
+        response = h.client.post("/api/admin/v1/panel-servers", headers=auth, json=broken)
+        assert response.status_code == 422 and uuid not in response.text
+    with transaction(h.engine) as session:
+        identity = session.get(AdminIdentity, h.identity_id)
+        assert identity is not None
+        identity.role = "operator"
+    assert h.client.post("/api/admin/v1/panel-servers", headers=auth, json=body).status_code == 403
+    assert h.client.get("/api/admin/v1/panel-servers", headers=auth).status_code == 200
+    assert h.client.get("/api/admin/v1/panel-servers").status_code == 401
+
+
+def test_node_list_marks_own_servers_as_vps(admin: Harness) -> None:
+    h = admin
+    with transaction(h.engine) as session:
+        session.add(
+            VPNNode(
+                provisioning_key=uuid4(),
+                name="TEST ONLY source node",
+                region="test",
+                secret_digest=secrets.token_hex(32),
+                peer_protocol_version=3,
+            )
+        )
+    nodes = h.client.get("/api/admin/v1/nodes", headers=authorization(h)).json()
+    assert nodes and all(node["source"] == "vps" for node in nodes)

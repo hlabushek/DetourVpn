@@ -266,6 +266,139 @@ void ConfigRejections() {
   CHECK(!Has(Make(p), "example.ru"));
 }
 
+// ADR-106: the user's DNS choice replaces only the tunnel resolver address.
+void ConfigDnsChoice() {
+  auto p = Policy("all");
+  std::string base = Make(p);
+  CHECK(Has(base, R"("server":"192.0.2.53","detour":"awg")"));
+  for (const char* server : {"1.1.1.1", "8.8.8.8", "94.140.14.14", "9.9.9.9"}) {
+    CHECK(detour::IsDnsChoice(server));
+    p.dns_server = server;
+    std::string c = Make(p);
+    CHECK(Has(c, std::string(R"("server":")") + server + R"(","detour":"awg")"));
+    CHECK(!Has(c, "192.0.2.53"));
+    CHECK(Replace(c, server, "192.0.2.53") == base);  // nothing else changes
+  }
+  p = Policy("exclude");
+  p.domains = {"example.ru"};
+  p.dns_server = "1.1.1.1";
+  std::string ex = Make(p);
+  CHECK(Has(ex, R"("server":"1.1.1.1","detour":"awg")") && Has(ex, R"("type":"local","tag":"local-dns")"));
+  auto bad = [](const std::string& server) {
+    auto q = Policy("all");
+    q.dns_server = server;
+    return Throws("routing_policy_invalid", [&] { Make(q); });
+  };
+  CHECK(bad("10.0.0.1"));
+  CHECK(bad("1.1.1.1 "));
+  CHECK(bad("dns.example"));
+  CHECK(bad("1.1.1.1,8.8.8.8"));
+  CHECK(!detour::IsDnsChoice("") && !detour::IsDnsChoice("1.1.1.2"));
+}
+
+// ---- VLESS + Reality (ADR-112); obviously fake test values, reserved test hostnames ----------
+detour::VlessRealityProfile Vless() {
+  detour::VlessRealityProfile v;
+  v.server = "panel.example.test";
+  v.port = 443;
+  v.uuid = "00000000-0000-4000-8000-000000000001";
+  v.flow = "xtls-rprx-vision";
+  v.sni = "www.example.test";
+  v.public_key = std::string(42, 'r') + "A";
+  v.short_id = "0a1b";
+  v.fingerprint = "chrome";
+  return v;
+}
+
+std::string MakeVless(const detour::VlessRealityProfile& v, const detour::RoutingPolicy& p) {
+  return detour::CreateVlessEngineConfig(v, p);
+}
+
+void ConfigVlessReality() {
+  const std::string c = MakeVless(Vless(), Policy("all"));
+  CHECK(Has(c, R"({"type":"vless","tag":"proxy","server":"panel.example.test","server_port":443,)"
+               R"("uuid":"00000000-0000-4000-8000-000000000001","flow":"xtls-rprx-vision",)"
+               R"("packet_encoding":"xudp","domain_resolver":"local-dns",)"
+               R"("tls":{"enabled":true,"server_name":"www.example.test",)"
+               R"("utls":{"enabled":true,"fingerprint":"chrome"},)"
+               R"("reality":{"enabled":true,"public_key":")" + std::string(42, 'r') +
+                   R"(A","short_id":"0a1b"}}})"));
+  // Outbound, not endpoint; no AmneziaWG parts at all.
+  CHECK(!Has(c, "endpoints") && !Has(c, "awg") && !Has(c, "private_key"));
+  CHECK(Has(c, R"("outbounds":[{"type":"direct","tag":"direct"},{"type":"vless")"));
+  // Full tunnel: everything goes to the proxy; tunnel DNS 1.1.1.1 through it; the panel host
+  // name resolves with the system resolver.
+  CHECK(Has(c, R"("final":"proxy")"));
+  CHECK(Has(c, R"({"type":"udp","tag":"profile-dns","server":"1.1.1.1","detour":"proxy"})"));
+  CHECK(Has(c, R"({"type":"local","tag":"local-dns"})"));
+  CHECK(Has(c, R"("default_domain_resolver":"profile-dns")"));
+  CHECK(Has(c, R"("address":["172.19.0.1/30","fdfe:dcba:9876::1/126"])"));
+  // Same safety rules as the AWG config: sniff, hijack-dns, IPv6 reject, API bypass, in order.
+  CHECK(Pos(c, R"("action":"sniff")") < Pos(c, R"("action":"hijack-dns")"));
+  CHECK(Pos(c, R"("action":"hijack-dns")") < Pos(c, R"("ip_version":6,"action":"reject")"));
+  CHECK(Has(c, R"({"ip_cidr":["198.51.100.7/32"],"outbound":"direct"})"));
+  CHECK(Has(c, R"("strategy":"ipv4_only")"));
+
+  // DNS choice replaces only the tunnel resolver.
+  auto p = Policy("all");
+  p.dns_server = "9.9.9.9";
+  CHECK(Replace(MakeVless(Vless(), p), "9.9.9.9", "1.1.1.1") == c);
+
+  // Empty flow and IPv4 server; empty short id.
+  auto v = Vless();
+  v.flow = "";
+  v.server = "192.0.2.10";
+  v.short_id = "";
+  const std::string plain = MakeVless(v, Policy("all"));
+  CHECK(!Has(plain, R"("flow")") && Has(plain, R"("server":"192.0.2.10")"));
+  CHECK(Has(plain, R"("short_id":"")"));
+
+  // Split modes target the proxy tag.
+  auto ex = Policy("exclude");
+  ex.domains = {"example.ru"};
+  const std::string e = MakeVless(Vless(), ex);
+  CHECK(Has(e, R"({"domain":["example.ru"],"outbound":"direct"})") && Has(e, R"("final":"proxy")"));
+  auto in = Policy("include");
+  in.domains = {"example.ru"};
+  const std::string i = MakeVless(Vless(), in);
+  CHECK(Has(i, R"({"domain":["example.ru"],"outbound":"proxy"})") && Has(i, R"("final":"direct")"));
+  CHECK(Has(i, R"("default_domain_resolver":"local-dns")"));
+
+  // Every field is re-checked; a bad profile never reaches the engine.
+  auto bad = [](const std::function<void(detour::VlessRealityProfile&)>& change) {
+    auto w = Vless();
+    change(w);
+    return Throws("profile_invalid", [&] { MakeVless(w, Policy("all")); });
+  };
+  CHECK(bad([](auto& w) { w.server = ""; }));
+  CHECK(bad([](auto& w) { w.server = "localhost"; }));
+  CHECK(bad([](auto& w) { w.server = "Panel.example.test"; }));
+  CHECK(bad([](auto& w) { w.server = "panel.example.test:443"; }));
+  CHECK(bad([](auto& w) { w.server = "192.0.2.300"; }));
+  CHECK(bad([](auto& w) { w.server = "2001:db8::1"; }));
+  CHECK(bad([](auto& w) { w.port = 0; }));
+  CHECK(bad([](auto& w) { w.port = 65536; }));
+  CHECK(bad([](auto& w) { w.uuid = "00000000000040008000000000000001"; }));
+  CHECK(bad([](auto& w) { w.uuid = "00000000-0000-4000-8000-00000000000A"; }));
+  CHECK(bad([](auto& w) { w.flow = "xtls-rprx-direct"; }));
+  CHECK(bad([](auto& w) { w.sni = ""; }));
+  CHECK(bad([](auto& w) { w.sni = "192.0.2.10"; }));
+  CHECK(bad([](auto& w) { w.public_key = std::string(43, '+'); }));
+  CHECK(bad([](auto& w) { w.public_key = std::string(44, 'r'); }));
+  CHECK(bad([](auto& w) { w.short_id = "abc"; }));
+  CHECK(bad([](auto& w) { w.short_id = "0A1B"; }));
+  CHECK(bad([](auto& w) { w.short_id = std::string(18, 'a'); }));
+  CHECK(bad([](auto& w) { w.fingerprint = ""; }));
+  CHECK(bad([](auto& w) { w.fingerprint = "netscape"; }));
+  auto bad_policy = Policy("all");
+  bad_policy.dns_server = "10.0.0.1";
+  CHECK(Throws("routing_policy_invalid", [&] { MakeVless(Vless(), bad_policy); }));
+  CHECK(Throws("routing_policy_invalid", [&] { MakeVless(Vless(), Policy("tunnel")); }));
+
+  // The AmneziaWG config is unchanged by the VLESS path.
+  CHECK(!Has(Make(Policy("all")), "proxy") && !Has(Make(Policy("all")), "vless"));
+}
+
 void JsonEscaping() {
   detour::Json j;
   j.Put("k", std::string("a\"b\\c\n\x01"));
@@ -282,6 +415,8 @@ int main() {
   ConfigAllMode();
   ConfigExcludeAndInclude();
   ConfigRejections();
+  ConfigDnsChoice();
+  ConfigVlessReality();
   JsonEscaping();
   std::printf("%d checks, %d failures\n", g_checks, g_failures);
   return g_failures == 0 ? 0 : 1;

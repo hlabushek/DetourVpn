@@ -59,6 +59,7 @@ export const OPERATION_LABELS = {
   grant_beta_invite: 'Приглашён тестер',
   revoke_beta_invite: 'Отозван доступ тестера',
   resolve_unknown_window: 'Разбор неизвестного окна',
+  import_panel_server: 'Добавлен сервер из панели',
 };
 
 export const INVITE_STATES = {
@@ -84,6 +85,20 @@ export const ERROR_MESSAGES = {
   select_user: 'Сначала выберите пользователя.',
   admin_idempotency_conflict: 'Повтор операции отличается от предыдущей. Начните новую операцию.',
   network_error: 'Нет связи с сервером. Повторите: операция не дублируется.',
+  // Panel server link checks (ADR-111). The messages never repeat the link.
+  panel_link_format: 'Ссылка повреждена: вставьте одну ссылку vless:// целиком, без пробелов.',
+  panel_link_scheme: 'Нужна ссылка, которая начинается с vless://.',
+  panel_link_uuid: 'В ссылке нет корректного UUID клиента.',
+  panel_link_host: 'Адрес сервера в ссылке не подходит (нужно имя или IPv4).',
+  panel_link_port: 'Порт в ссылке не указан или неверен.',
+  panel_link_security: 'Поддерживается только security=reality.',
+  panel_link_public_key: 'Нет или неверен публичный ключ Reality (pbk).',
+  panel_link_sni: 'Нет или неверно имя сайта для Reality (sni).',
+  panel_link_short_id: 'Short ID (sid) должен быть шестнадцатеричным, до 16 символов.',
+  panel_link_fingerprint: 'Нет или неизвестен отпечаток TLS (fp).',
+  panel_link_flow: 'Поддерживается только flow=xtls-rprx-vision или пустой flow.',
+  panel_link_transport: 'Поддерживается только транспорт type=tcp.',
+  panel_link_unknown_field: 'В ссылке есть неизвестный параметр. Скопируйте ссылку из панели заново.',
 };
 
 export function errorText(code) {

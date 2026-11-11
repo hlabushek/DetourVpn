@@ -184,6 +184,59 @@
         "title": "AdminWindowStatus",
         "type": "object"
       },
+      "AppUpdateManifest": {
+        "additionalProperties": false,
+        "properties": {
+          "apk_sha256": {
+            "title": "Apk Sha256",
+            "type": "string"
+          },
+          "apk_size_bytes": {
+            "maximum": 536870912.0,
+            "minimum": 1.0,
+            "title": "Apk Size Bytes",
+            "type": "integer"
+          },
+          "apk_url": {
+            "maxLength": 512,
+            "minLength": 12,
+            "title": "Apk Url",
+            "type": "string"
+          },
+          "min_supported_version_code": {
+            "maximum": 2147483647.0,
+            "minimum": 1.0,
+            "title": "Min Supported Version Code",
+            "type": "integer"
+          },
+          "release_notes_ru": {
+            "maxLength": 2000,
+            "title": "Release Notes Ru",
+            "type": "string"
+          },
+          "version_code": {
+            "maximum": 2147483647.0,
+            "minimum": 1.0,
+            "title": "Version Code",
+            "type": "integer"
+          },
+          "version_name": {
+            "title": "Version Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "version_code",
+          "version_name",
+          "min_supported_version_code",
+          "apk_url",
+          "apk_sha256",
+          "apk_size_bytes",
+          "release_notes_ru"
+        ],
+        "title": "AppUpdateManifest",
+        "type": "object"
+      },
       "AwardResponse": {
         "properties": {
           "balance_after_bytes": {
@@ -363,6 +416,13 @@
             "title": "Proof Response",
             "type": "string",
             "writeOnly": true
+          },
+          "window_seconds": {
+            "default": 90,
+            "maximum": 900.0,
+            "minimum": 30.0,
+            "title": "Window Seconds",
+            "type": "integer"
           }
         },
         "required": [
@@ -400,8 +460,11 @@
             "type": "string"
           },
           "meter": {
-            "const": "kernel-outer-ip.v1",
             "default": "kernel-outer-ip.v1",
+            "enum": [
+              "kernel-outer-ip.v1",
+              "kernel-inner-ip.v1"
+            ],
             "title": "Meter",
             "type": "string"
           },
@@ -463,7 +526,10 @@
             "type": "string"
           },
           "platform": {
-            "const": "android",
+            "enum": [
+              "android",
+              "windows"
+            ],
             "title": "Platform",
             "type": "string"
           },
@@ -1085,6 +1151,36 @@
         "title": "MiniAppInput",
         "type": "object"
       },
+      "NativeWindowView": {
+        "description": "What the native renewer needs; no client configuration or other connections.",
+        "properties": {
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "state": {
+            "enum": [
+              "pending",
+              "active",
+              "revoke_pending",
+              "closed"
+            ],
+            "title": "State",
+            "type": "string"
+          },
+          "window": {
+            "$ref": "#/components/schemas/WindowGrant"
+          }
+        },
+        "required": [
+          "id",
+          "state",
+          "window"
+        ],
+        "title": "NativeWindowView",
+        "type": "object"
+      },
       "NodeCatalog": {
         "properties": {
           "checked_at": {
@@ -1227,6 +1323,55 @@
           "next_before_id"
         ],
         "title": "OverviewResponse",
+        "type": "object"
+      },
+      "PanelServerImport": {
+        "additionalProperties": false,
+        "description": "One panel server by its `vless://` Reality link (ADR-111). The link is a credential.",
+        "properties": {
+          "idempotency_key": {
+            "format": "uuid",
+            "title": "Idempotency Key",
+            "type": "string"
+          },
+          "label": {
+            "maxLength": 64,
+            "minLength": 1,
+            "pattern": "^[^\\x00-\\x1f\\x7f]+$",
+            "title": "Label",
+            "type": "string"
+          },
+          "link": {
+            "format": "password",
+            "maxLength": 4096,
+            "minLength": 1,
+            "title": "Link",
+            "type": "string",
+            "writeOnly": true
+          },
+          "panel_kind": {
+            "enum": [
+              "3x-ui",
+              "remnawave"
+            ],
+            "title": "Panel Kind",
+            "type": "string"
+          },
+          "reason": {
+            "maxLength": 500,
+            "minLength": 3,
+            "title": "Reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "idempotency_key",
+          "reason",
+          "label",
+          "panel_kind",
+          "link"
+        ],
+        "title": "PanelServerImport",
         "type": "object"
       },
       "PlanInput": {
@@ -1451,6 +1596,19 @@
         "title": "RefreshInput",
         "type": "object"
       },
+      "RenewTokenView": {
+        "properties": {
+          "renew_token": {
+            "title": "Renew Token",
+            "type": "string"
+          }
+        },
+        "required": [
+          "renew_token"
+        ],
+        "title": "RenewTokenView",
+        "type": "object"
+      },
       "RenewalInput": {
         "additionalProperties": false,
         "properties": {
@@ -1469,6 +1627,13 @@
             "format": "uuid",
             "title": "Previous Window Id",
             "type": "string"
+          },
+          "window_seconds": {
+            "default": 90,
+            "maximum": 900.0,
+            "minimum": 30.0,
+            "title": "Window Seconds",
+            "type": "integer"
           }
         },
         "required": [
@@ -2170,7 +2335,7 @@
             "type": "string"
           },
           "slot_id": {
-            "maximum": 16.0,
+            "maximum": 250.0,
             "minimum": 1.0,
             "title": "Slot Id",
             "type": "integer"
@@ -2236,6 +2401,28 @@
           "occupied": {
             "title": "Occupied",
             "type": "integer"
+          },
+          "probe_host": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Probe Host"
+          },
+          "probe_port": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Probe Port"
           },
           "region": {
             "title": "Region",
@@ -2945,6 +3132,214 @@
         ]
       }
     },
+    "/api/admin/v1/panel-servers": {
+      "get": {
+        "description": "Panel servers without any link content: no UUID, host, keys or short id (ADR-111).",
+        "operationId": "panel_servers_api_admin_v1_panel_servers_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "additionalProperties": true,
+                    "type": "object"
+                  },
+                  "title": "Response Panel Servers Api Admin V1 Panel Servers Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Panel Servers",
+        "tags": [
+          "administration"
+        ]
+      },
+      "post": {
+        "operationId": "import_panel_server_api_admin_v1_panel_servers_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PanelServerImport"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Import Panel Server Api Admin V1 Panel Servers Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Import Panel Server",
+        "tags": [
+          "administration"
+        ]
+      }
+    },
     "/api/admin/v1/plans": {
       "get": {
         "operationId": "plans_api_admin_v1_plans_get",
@@ -3387,6 +3782,37 @@
         "summary": "User Window Status",
         "tags": [
           "administration"
+        ]
+      }
+    },
+    "/api/v1/app/update-manifest": {
+      "get": {
+        "operationId": "update_manifest_api_v1_app_update_manifest_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AppUpdateManifest"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "No valid manifest"
+          }
+        },
+        "summary": "Latest Android release manifest for the in-app updater (ADR-107)",
+        "tags": [
+          "app"
         ]
       }
     },
@@ -7725,6 +8151,254 @@
         ]
       }
     },
+    "/api/v1/window-tunnels/{connection_id}/native": {
+      "get": {
+        "operationId": "native_status_api_v1_window_tunnels__connection_id__native_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "connection_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Connection Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Window-Renew-Token",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Window-Renew-Token"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NativeWindowView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Native Status",
+        "tags": [
+          "window-tunnels"
+        ]
+      }
+    },
+    "/api/v1/window-tunnels/{connection_id}/native-renew": {
+      "post": {
+        "operationId": "native_renew_api_v1_window_tunnels__connection_id__native_renew_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "connection_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Connection Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Window-Renew-Token",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Window-Renew-Token"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RenewalInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NativeWindowView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Native Renew",
+        "tags": [
+          "window-tunnels"
+        ]
+      }
+    },
     "/api/v1/window-tunnels/{connection_id}/renew": {
       "post": {
         "operationId": "renew_api_v1_window_tunnels__connection_id__renew_post",
@@ -7838,6 +8512,115 @@
           }
         ],
         "summary": "Renew",
+        "tags": [
+          "window-tunnels"
+        ]
+      }
+    },
+    "/api/v1/window-tunnels/{connection_id}/renew-token": {
+      "post": {
+        "description": "ADR-097: rotate the token the OS-level VPN service uses to renew this connection only.",
+        "operationId": "renew_token_api_v1_window_tunnels__connection_id__renew_token_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "connection_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Connection Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RenewTokenView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Renew Token",
         "tags": [
           "window-tunnels"
         ]

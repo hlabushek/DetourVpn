@@ -65,15 +65,39 @@ function showTab(name) {
 }
 for (const tab of document.querySelectorAll('#tabs [role=tab]')) tab.addEventListener('click', () => showTab(tab.dataset.tab));
 
-async function loadUsers(q = '') {
-  const rows = await request('users?q=' + encodeURIComponent(q));
-  table('users', rows, [
+// Sorting runs on the loaded page only (server returns at most 50 rows, newest first).
+// Users without a Telegram ID sort last for the Telegram sort.
+const telegramSortKey = r => r.telegram_id ? '0' + String(r.telegram_id).padStart(20, '0') : '1';
+// Users without a Telegram username sort last; case-insensitive like Telegram itself (ADR-110).
+const usernameSortKey = r => r.telegram_username ? '0' + String(r.telegram_username).toLowerCase() : '1';
+const USER_SORTS = {
+  created_desc: (a, b) => String(b.created_at).localeCompare(String(a.created_at)),
+  created_asc: (a, b) => String(a.created_at).localeCompare(String(b.created_at)),
+  telegram: (a, b) => telegramSortKey(a).localeCompare(telegramSortKey(b)),
+  username: (a, b) => usernameSortKey(a).localeCompare(usernameSortKey(b)),
+  status: (a, b) => String(a.status).localeCompare(String(b.status)) || String(b.created_at).localeCompare(String(a.created_at)),
+};
+let usersPage = [];
+function renderUsers() {
+  const sort = USER_SORTS[$('users-sort').value] || USER_SORTS.created_desc;
+  const rows = [...usersPage].sort(sort);
+  const columns = [
     ['Пользователь', r => button(shortId(r.id) + '…', () => run(() => openUser(r.id)), 'btn secondary small')],
     ['Статус', r => r.status === 'active' ? badge('Активен', 'ok') : badge(r.status === 'disabled' ? 'Отключён' : r.status, 'off')],
     ['Создан', r => formatTime(r.created_at)],
-  ], 'Пользователей не найдено');
-  return rows;
+  ];
+  // The Telegram column appears only when at least one listed user has a linked Telegram ID.
+  if (rows.some(r => r.telegram_id)) columns.splice(1, 0, ['Telegram ID', r => r.telegram_id || null]);
+  // Same rule for the username from the last Mini App login (admin-only, ADR-110).
+  if (rows.some(r => r.telegram_username)) columns.splice(1, 0, ['Telegram username', r => r.telegram_username ? '@' + r.telegram_username : null]);
+  table('users', rows, columns, 'Пользователей не найдено');
 }
+async function loadUsers(q = '') {
+  usersPage = await request('users?q=' + encodeURIComponent(q));
+  renderUsers();
+  return usersPage;
+}
+$('users-sort').addEventListener('change', renderUsers);
 async function openUser(id) { showTab('users'); await loadUser(id); }
 function chooseResource(operation, id) {
   const form = $('action-form'); form.elements.operation.value = operation; form.elements.resource_id.value = id; syncActionFields();
@@ -115,12 +139,21 @@ async function refresh() {
   const nodes = await request('nodes');
   table('nodes', nodes, [
     ['Сервер', r => r.name],
+    ['Источник', r => r.source === 'vps' ? 'VPS' : r.source],
     ['Состояние', r => r.status !== 'active' ? badge('Выключен', 'off') : nodeOnline(r) ? badge('На связи', 'ok') : badge('Нет связи', 'warn')],
     ['Последний ответ', r => withTitle(ago(r.last_seen_at), r.last_seen_at || '')],
     ['Занято / ёмкость', r => r.occupied + ' / ' + r.capacity_limit],
     ['Команды без ответа', r => r.unacknowledged_commands],
     ['Зависли дольше 90 с', r => r.stalled_commands],
   ], 'Серверов нет');
+  // Panel servers (ADR-111): the API never returns the link, host or keys.
+  table('panel-servers', await request('panel-servers'), [
+    ['Сервер', r => r.label],
+    ['Источник', r => 'Панель (' + (r.panel_kind === 'remnawave' ? 'Remnawave' : '3x-ui') + ')'],
+    ['Протокол', r => r.protocol === 'vless_reality' ? 'VLESS + Reality' : r.protocol],
+    ['Устройства', r => (r.delivered_to_devices ? 'Выдаётся' : 'Пока не выдаётся') + '; Android: ' + (r.android_supported ? 'да' : 'не поддерживается')],
+    ['Добавлен', r => formatTime(r.created_at)],
+  ], 'Серверов из панели нет');
   const online = nodes.filter(nodeOnline).length, active = nodes.filter(r => r.status === 'active').length;
   const summary = [stat('Серверы на связи', online + ' из ' + active)];
   if (role === 'admin') {
@@ -161,10 +194,21 @@ $('login-form').addEventListener('submit', e => { e.preventDefault(); run(async 
   const result = await request('login', body); access = result.access_token; role = result.role;
   form.reset(); $('workspace').hidden = false; $('session').hidden = false; $('login').hidden = true;
   const admin = role === 'admin';
-  for (const id of ['changes', 'tab-plans', 'tab-invites']) $(id).hidden = !admin;
+  for (const id of ['changes', 'tab-plans', 'tab-invites', 'panel-import']) $(id).hidden = !admin;
   syncActionFields();
   await refresh(); showTab(admin ? 'invites' : 'users');
   return 'Вы вошли как ' + (admin ? 'администратор' : 'оператор');
+}); });
+$('panel-form').addEventListener('submit', e => { e.preventDefault(); run(async () => {
+  const form = e.target, f = Object.fromEntries(new FormData(form));
+  const body = { label: String(f.label).trim(), panel_kind: f.panel_kind, link: String(f.link).trim(), reason: f.reason };
+  // Same retry rule as actions: a resubmitted identical form reuses its idempotency key.
+  const signature = 'panel:' + JSON.stringify(body); let key = pending.get(signature);
+  if (!key) { key = crypto.randomUUID(); pending.set(signature, key); }
+  await request('panel-servers', { ...body, idempotency_key: key });
+  form.reset(); // drop the link from the page as soon as it is stored
+  await refresh();
+  return 'Сервер из панели сохранён. Устройствам он пока не выдаётся.';
 }); });
 $('search-form').addEventListener('submit', e => { e.preventDefault(); run(async () => { const rows = await loadUsers(new FormData(e.target).get('q')); return rows.length ? 'Найдено: ' + rows.length : 'Никого не найдено'; }); });
 $('refresh').addEventListener('click', () => run(refresh, 'Обновлено'));

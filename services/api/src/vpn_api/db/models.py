@@ -15,6 +15,7 @@ from sqlalchemy import (
     Integer,
     MetaData,
     String,
+    Text,
     UniqueConstraint,
     func,
     text,
@@ -88,6 +89,29 @@ class AdminAction(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
 
 
+class PanelServerSource(Base):
+    """A 3x-ui/Remnawave server imported by a vless:// Reality link (ADR-111).
+
+    The link (it holds the panel client UUID, a credential) is stored only as Fernet ciphertext
+    under the admin encryption key and is never returned by the API.
+    """
+
+    __tablename__ = "panel_server_sources"
+    __table_args__ = (
+        CheckConstraint("length(label) BETWEEN 1 AND 64", name="ck_panel_server_label"),
+        CheckConstraint("panel_kind IN ('3x-ui', 'remnawave')", name="ck_panel_server_kind"),
+        CheckConstraint("protocol = 'vless_reality'", name="ck_panel_server_protocol"),
+        Index("ix_panel_server_sources_created", "created_at", "id"),
+    )
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    label: Mapped[str] = mapped_column(String(64))
+    panel_kind: Mapped[str] = mapped_column(String(16))
+    protocol: Mapped[str] = mapped_column(String(16))
+    link_ciphertext: Mapped[str] = mapped_column(Text)
+    created_by: Mapped[UUID] = mapped_column(ForeignKey("admin_identities.id", ondelete="RESTRICT"))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+
 class BetaInvite(Base):
     __tablename__ = "beta_invites"
     __table_args__ = (
@@ -118,6 +142,10 @@ class AuthIdentity(Base):
             "provider", "provider_subject", name="uq_auth_identities_provider_subject"
         ),
         UniqueConstraint("user_id", "provider", name="uq_auth_identities_user_provider"),
+        CheckConstraint(
+            "telegram_username IS NULL OR telegram_username ~ '^[A-Za-z0-9_]{4,32}$'",
+            name="ck_auth_identities_telegram_username",
+        ),
     )
 
     id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
@@ -128,6 +156,9 @@ class AuthIdentity(Base):
     provider_subject: Mapped[int] = mapped_column(BigInteger)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     verified_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # Admin-only support label from the last Mini App login (ADR-110). Never logged, never sent
+    # to client apps; deleted with the identity row on account deletion (ADR-091).
+    telegram_username: Mapped[str | None] = mapped_column(String(32))
 
 
 class LoginAttempt(Base):
@@ -257,6 +288,14 @@ class SessionCredential(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     access_expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     rotated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # ADR-100: the credential this one was rotated into, and when this access token was first
+    # used. Together they allow a bounded replay after a lost refresh response.
+    successor_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey(
+            "session_credentials.id", name="fk_session_credentials_successor", ondelete="SET NULL"
+        )
+    )
+    first_used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
 class BotUpdate(Base):
@@ -622,11 +661,15 @@ class PeerConnection(Base):
         ),
         UniqueConstraint("user_id", "idempotency_key", name="uq_peer_connection_key"),
         CheckConstraint(
-            "slot_id BETWEEN 1 AND 16 AND generation > 0", name="ck_peer_connection_slot"
+            "slot_id BETWEEN 1 AND 250 AND generation > 0", name="ck_peer_connection_slot"
         ),
         CheckConstraint(
             "state IN ('pending','active','revoke_pending','closed')",
             name="ck_peer_connection_state",
+        ),
+        CheckConstraint(
+            "renew_token_digest IS NULL OR renew_token_digest ~ '^[0-9a-f]{64}$'",
+            name="ck_peer_connection_renew_token_digest",
         ),
         Index(
             "uq_peer_connection_live_slot",
@@ -654,6 +697,8 @@ class PeerConnection(Base):
     state: Mapped[str] = mapped_column(String(24))
     idempotency_key: Mapped[UUID] = mapped_column()
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    # ADR-097: keyed digest of the connection-scoped native renewal token; never the token.
+    renew_token_digest: Mapped[str | None] = mapped_column(String(64))
 
 
 class PlanRevision(Base):

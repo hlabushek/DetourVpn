@@ -11,7 +11,7 @@ import pytest
 from alembic import command
 from alembic.config import Config
 from sqlalchemy import Engine, delete, func, inspect, select, text
-from sqlalchemy.exc import DBAPIError, IntegrityError
+from sqlalchemy.exc import DataError, DBAPIError, IntegrityError
 
 from vpn_api.db.connection import transaction
 from vpn_api.db.models import AdminIdentity, AuthIdentity, BetaInvite, Device, User
@@ -80,6 +80,7 @@ def test_empty_database_upgrade_repeat_and_no_schema_drift(engine: Engine) -> No
         "peer_window_resolutions",
         "peer_runtime_epochs",
         "peer_connections",
+        "panel_server_sources",
     }
     assert {item["name"] for item in inspect(engine).get_indexes("users")} == {
         "ix_users_created_at"
@@ -176,7 +177,7 @@ def test_account_deletion_migration_constraints_and_rollback(engine: Engine) -> 
     with transaction(engine) as session:
         assert (
             session.scalar(text("SELECT version_num FROM alembic_version"))
-            == "0022_device_platform_windows"
+            == "0027_panel_server_sources"
         )
         assert session.scalar(text("SELECT count(*) FROM users WHERE status = 'deleted'")) == 1
 
@@ -208,7 +209,7 @@ def test_device_platform_migration_constraint_and_guarded_rollback(engine: Engin
     with transaction(engine) as session:
         assert (
             session.scalar(text("SELECT version_num FROM alembic_version"))
-            == "0022_device_platform_windows"
+            == "0027_panel_server_sources"
         )
         assert session.scalar(select(func.count()).select_from(Device)) == 1
         session.execute(delete(Device))
@@ -231,7 +232,7 @@ def test_downgrade_with_data_fails_without_losing_rows_or_revision(engine: Engin
         assert session.scalar(select(func.count()).select_from(User)) == 1
         assert (
             session.scalar(text("SELECT version_num FROM alembic_version"))
-            == "0022_device_platform_windows"
+            == "0027_panel_server_sources"
         )
 
 
@@ -268,7 +269,7 @@ def test_downgrade_cannot_delete_a_concurrently_committing_account(engine: Engin
         assert session.scalar(select(func.count()).select_from(User)) == 1
         assert (
             session.scalar(text("SELECT version_num FROM alembic_version"))
-            == "0022_device_platform_windows"
+            == "0027_panel_server_sources"
         )
 
 
@@ -353,3 +354,70 @@ def test_duplicate_identity_is_rejected_under_concurrency(engine: Engine) -> Non
         assert sorted(pool.map(insert, range(2))) == ["duplicate", "inserted"]
     with transaction(engine) as session:
         assert session.scalar(select(func.count()).select_from(AuthIdentity)) == 1
+
+
+def test_telegram_username_constraint_and_rollback(engine: Engine) -> None:
+    # ADR-110: only Telegram-format usernames or NULL; rollback drops the column.
+    config = upgrade(engine)
+    with transaction(engine) as session:
+        user = User()
+        session.add(user)
+        session.flush()
+        session.add(
+            AuthIdentity(user_id=user.id, provider_subject=2**30, telegram_username="Synthetic_1")
+        )
+    # Too long fails on the column length (DataError), malformed on the check (IntegrityError).
+    for bad in ("abc", "bad-name", "a" * 33):
+        with pytest.raises((IntegrityError, DataError)), transaction(engine) as session:
+            session.execute(
+                text("UPDATE auth_identities SET telegram_username = :name"), {"name": bad}
+            )
+    command.downgrade(config, "0025_pool_peer_slots")
+    columns = {column["name"] for column in inspect(engine).get_columns("auth_identities")}
+    assert "telegram_username" not in columns
+    command.upgrade(config, "head")
+    command.check(config)
+
+
+def test_panel_server_rollback_refuses_while_rows_exist(engine: Engine) -> None:
+    # ADR-111: the ciphertext is the only copy of the imported link; never drop it silently.
+    config = upgrade(engine)
+    with transaction(engine) as session:
+        admin = AdminIdentity(
+            username="migration-test-admin",
+            password_hash="synthetic-not-a-hash",  # noqa: S106 - test placeholder, no login
+            totp_ciphertext="synthetic",
+            role="admin",
+            created_at=datetime.now(UTC),
+        )
+        session.add(admin)
+        session.flush()
+        session.execute(
+            text(
+                "INSERT INTO panel_server_sources (id, label, panel_kind, protocol,"
+                " link_ciphertext, created_by, created_at) VALUES (:id, 'test', '3x-ui',"
+                " 'vless_reality', 'synthetic-ciphertext', :admin, now())"
+            ),
+            {"id": uuid4(), "admin": admin.id},
+        )
+    for kind, protocol in (("other", "vless_reality"), ("3x-ui", "vmess")):
+        with pytest.raises(IntegrityError), transaction(engine) as session:
+            session.execute(
+                text(
+                    "INSERT INTO panel_server_sources (id, label, panel_kind, protocol,"
+                    " link_ciphertext, created_by, created_at) VALUES (:id, 'x', :kind,"
+                    " :protocol, 'c', :admin, now())"
+                ),
+                {"id": uuid4(), "kind": kind, "protocol": protocol, "admin": admin.id},
+            )
+    with pytest.raises(DBAPIError, match="Refusing downgrade: panel servers exist"):
+        command.downgrade(config, "0026_telegram_username")
+    with transaction(engine) as session:
+        assert (
+            session.scalar(text("SELECT version_num FROM alembic_version"))
+            == "0027_panel_server_sources"
+        )
+        session.execute(text("DELETE FROM panel_server_sources"))
+    command.downgrade(config, "0026_telegram_username")
+    assert "panel_server_sources" not in inspect(engine).get_table_names()
+    command.upgrade(config, "head")

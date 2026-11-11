@@ -14,7 +14,8 @@ def test_admin_only_sections_are_hidden_until_admin_login() -> None:
     assert 'id="tab-invites" hidden' in ADMIN_HTML
     assert '<section id="panel-invites" class="panel" role="tabpanel" hidden>' in ADMIN_HTML
     assert (
-        "for (const id of ['changes', 'tab-plans', 'tab-invites']) $(id).hidden = !admin;"
+        "for (const id of ['changes', 'tab-plans', 'tab-invites', 'panel-import'])"
+        " $(id).hidden = !admin;"
         in ADMIN_JS
     )
 
@@ -71,3 +72,54 @@ def test_page_works_under_the_admin_content_security_policy() -> None:
     assert 'type="module" src="admin.js"' in ADMIN_HTML
     assert "http://" not in ADMIN_JS + FORMAT_JS and "https://" not in ADMIN_JS + ADMIN_CSS
     assert "prefers-color-scheme:dark" in ADMIN_CSS
+
+
+def test_user_list_has_telegram_id_column_sort_and_hides_absent_values() -> None:
+    assert 'id="users-sort"' in ADMIN_HTML
+    for value in ("created_desc", "created_asc", "telegram", "username", "status"):
+        assert f'<option value="{value}">' in ADMIN_HTML
+    assert "r.telegram_id ? '0' + String(r.telegram_id)" in ADMIN_JS
+    assert "if (rows.some(r => r.telegram_id)) columns.splice(1, 0, ['Telegram ID'" in ADMIN_JS
+    assert "$('users-sort').addEventListener('change', renderUsers);" in ADMIN_JS
+
+
+def test_user_list_has_telegram_username_column_sort_and_search_hint() -> None:
+    # ADR-110 (supersedes ADR-109): username column only when a listed user has one, empty
+    # usernames sort last, and the page states that the value can be stale.
+    assert (
+        "if (rows.some(r => r.telegram_username)) columns.splice(1, 0, ['Telegram username'"
+        in ADMIN_JS
+    )
+    assert "r.telegram_username ? '0' + String(r.telegram_username).toLowerCase() : '1'" in ADMIN_JS
+    assert "Telegram ID или @username" in ADMIN_HTML
+    assert 'id="users-username-note"' in ADMIN_HTML
+    assert "Telegram username не хранится" not in ADMIN_HTML
+
+
+def test_panel_servers_show_source_and_link_input_is_masked() -> None:
+    # ADR-111: source column on both server lists; the link is typed into a masked input that
+    # is cleared after saving, and only admins see the import form.
+    assert "['Источник', r => r.source === 'vps' ? 'VPS' : r.source]" in ADMIN_JS
+    assert "table('panel-servers', await request('panel-servers')" in ADMIN_JS
+    assert '<input name="link" type="password"' in ADMIN_HTML
+    assert 'id="panel-import" class="card" hidden' in ADMIN_HTML
+    assert "'panel-import']) $(id).hidden = !admin" in ADMIN_JS
+    assert "form.reset(); // drop the link from the page" in ADMIN_JS
+    assert "Android: ' + (r.android_supported ? 'да' : 'не поддерживается')" in ADMIN_JS
+    # Every parser error code has a Russian message.
+    for code in (
+        "format",
+        "scheme",
+        "uuid",
+        "host",
+        "port",
+        "security",
+        "public_key",
+        "sni",
+        "short_id",
+        "fingerprint",
+        "flow",
+        "transport",
+        "unknown_field",
+    ):
+        assert f"panel_link_{code}:" in FORMAT_JS

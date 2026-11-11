@@ -1,5 +1,6 @@
 """Separate admin authentication and allowlisted transactional actions. No remote shell."""
 
+import re
 import secrets
 from datetime import timedelta
 from threading import BoundedSemaphore
@@ -31,6 +32,7 @@ from vpn_api.db.models import (
     AuthIdentity,
     BetaInvite,
     Device,
+    PanelServerSource,
     PeerCommand,
     PeerConnection,
     PlanRevision,
@@ -41,6 +43,7 @@ from vpn_api.db.models import (
     User,
     VPNNode,
 )
+from vpn_api.panel_sources import PanelLinkError, parse_vless_reality
 from vpn_api.quota.contracts import MAX_BYTES, LedgerCommand, QuotaError
 from vpn_api.quota.service import LedgerService
 from vpn_api.schemas import ErrorResponse
@@ -92,6 +95,17 @@ class AdminChange(BaseModel):
     evidence_digest: str | None = Field(default=None, pattern=r"^[0-9a-f]{64}$")
 
 
+class PanelServerImport(BaseModel):
+    """One panel server by its `vless://` Reality link (ADR-111). The link is a credential."""
+
+    model_config = ConfigDict(extra="forbid", hide_input_in_errors=True)
+    idempotency_key: UUID
+    reason: str = Field(min_length=3, max_length=500)
+    label: str = Field(min_length=1, max_length=64, pattern=r"^[^\x00-\x1f\x7f]+$")
+    panel_kind: Literal["3x-ui", "remnawave"]
+    link: SecretStr = Field(min_length=1, max_length=4096)
+
+
 class AdminWindowStatus(BaseModel):
     """Sanitized, read-only owner peer and reservation status for beta support."""
 
@@ -113,6 +127,63 @@ class AdminService:
         self.kdf_slot = BoundedSemaphore(1)
         # Equal KDF work for an unknown username, with a process-local random secret.
         self.dummy_hash = password_hash(token())
+
+    def import_panel_server(
+        self, session: Session, identity: AdminIdentity, body: PanelServerImport
+    ) -> dict[str, object]:
+        """Validate, encrypt and audit one panel server link; never contacts the panel."""
+        if identity.role != "admin":
+            raise AuthError("forbidden", 403)
+        EntitlementService.audit(str(identity.id), body.reason)
+        session.execute(
+            text("SELECT pg_advisory_xact_lock(:key)"), {"key": body.idempotency_key.int % (2**63)}
+        )
+        try:
+            parse_vless_reality(body.link.get_secret_value())
+        except PanelLinkError as error:
+            raise QuotaError(error.code, 422) from None
+        # Store exactly what the parser checked: the `#display name` (may hold personal text or
+        # raw Unicode) is dropped, so the stored link is plain ASCII.
+        link = body.link.get_secret_value().strip().partition("#")[0]
+        # The link UUID has 122 random bits, so this digest is not enumerable.
+        fingerprint = digest(
+            ":".join((str(identity.id), "panel", body.panel_kind, body.label, body.reason))
+            + ":"
+            + digest(link)
+        )
+        prior = session.scalar(
+            select(AdminAction).where(AdminAction.idempotency_key == body.idempotency_key)
+        )
+        if prior is not None:
+            if prior.request_digest != fingerprint:
+                raise QuotaError("admin_idempotency_conflict")
+            return prior.result
+        now = database_now(session)
+        source = PanelServerSource(
+            label=body.label,
+            panel_kind=body.panel_kind,
+            protocol="vless_reality",
+            link_ciphertext=self.cipher.encrypt(link.encode("ascii")).decode("ascii"),
+            created_by=identity.id,
+            created_at=now,
+        )
+        session.add(source)
+        session.flush()
+        result: dict[str, object] = {"id": str(source.id), "label": source.label}
+        session.add(
+            AdminAction(
+                admin_id=identity.id,
+                user_id=None,
+                operation="import_panel_server",
+                reason=body.reason,
+                idempotency_key=body.idempotency_key,
+                request_digest=fingerprint,
+                result=result,
+                created_at=now,
+            )
+        )
+        session.flush()
+        return result
 
     def rate(self, username: str, network: str) -> None:
         exceeded = False
@@ -547,14 +618,48 @@ def users(
                 id_ = UUID(q)
                 stmt = stmt.where(User.id == id_)
             except ValueError:
-                if not q.isascii() or not q.isdecimal() or not 0 < int(q) <= MAX_BYTES:
-                    return []
-                stmt = stmt.join(AuthIdentity, AuthIdentity.user_id == User.id).where(
-                    AuthIdentity.provider_subject == int(q)
-                )
+                identities = stmt.join(AuthIdentity, AuthIdentity.user_id == User.id)
+                if q.isascii() and q.isdecimal():
+                    if not 0 < int(q) <= MAX_BYTES:
+                        return []
+                    stmt = identities.where(AuthIdentity.provider_subject == int(q))
+                else:
+                    # Telegram username, with or without "@", exact and case-insensitive
+                    # (ADR-110). Anything else matches nothing.
+                    name = q.removeprefix("@")
+                    if not re.fullmatch(r"[A-Za-z0-9_]{4,32}", name):
+                        return []
+                    stmt = identities.where(
+                        func.lower(AuthIdentity.telegram_username) == name.lower()
+                    )
+        rows = list(session.scalars(stmt))
+        # One extra read for the page: Telegram numeric ID (bot linkage) and the username from
+        # the last Mini App login, per user. Admin-only; never sent to client apps.
+        telegram: dict[UUID, tuple[int, str | None]] = {}
+        if rows:
+            telegram = {
+                user_id: (subject, username)
+                for user_id, subject, username in session.execute(
+                    select(
+                        AuthIdentity.user_id,
+                        AuthIdentity.provider_subject,
+                        AuthIdentity.telegram_username,
+                    ).where(
+                        AuthIdentity.provider == "telegram_bot",
+                        AuthIdentity.user_id.in_([row.id for row in rows]),
+                    )
+                ).all()
+            }
         return [
-            {"id": str(row.id), "status": row.status, "created_at": row.created_at.isoformat()}
-            for row in session.scalars(stmt)
+            {
+                "id": str(row.id),
+                "status": row.status,
+                "created_at": row.created_at.isoformat(),
+                # Decimal string, same contract as the beta invite subject; null when absent.
+                "telegram_id": str(telegram[row.id][0]) if row.id in telegram else None,
+                "telegram_username": telegram[row.id][1] if row.id in telegram else None,
+            }
+            for row in rows
         ]
 
 
@@ -690,6 +795,8 @@ def nodes(admin: Admin, access: Access) -> list[dict[str, object]]:
         return [
             {
                 "id": str(node.id),
+                # Our own VPS node; panel servers are listed by /panel-servers (ADR-111).
+                "source": "vps",
                 "name": node.name,
                 "status": node.status,
                 "last_seen_at": node.last_seen_at.isoformat() if node.last_seen_at else None,
@@ -711,6 +818,38 @@ def nodes(admin: Admin, access: Access) -> list[dict[str, object]]:
                 ),
             }
             for node in session.scalars(select(VPNNode).order_by(VPNNode.id).limit(100))
+        ]
+
+
+@router.post("/panel-servers")
+def import_panel_server(body: PanelServerImport, admin: Admin, access: Access) -> dict[str, object]:
+    with transaction(admin.engine) as session:
+        identity = admin.authenticate(session, access, write=True)
+        return admin.import_panel_server(session, identity, body)
+
+
+@router.get("/panel-servers")
+def panel_servers(admin: Admin, access: Access) -> list[dict[str, object]]:
+    """Panel servers without any link content: no UUID, host, keys or short id (ADR-111)."""
+    with transaction(admin.engine) as session:
+        admin.authenticate(session, access)
+        return [
+            {
+                "id": str(row.id),
+                "source": "panel",
+                "label": row.label,
+                "panel_kind": row.panel_kind,
+                "protocol": row.protocol,
+                "created_at": row.created_at.isoformat(),
+                # Not delivered to devices yet (ADR-112); Android has no VLESS core (ADR-113).
+                "delivered_to_devices": False,
+                "android_supported": False,
+            }
+            for row in session.scalars(
+                select(PanelServerSource)
+                .order_by(PanelServerSource.created_at.desc(), PanelServerSource.id)
+                .limit(100)
+            )
         ]
 
 
