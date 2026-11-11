@@ -92,4 +92,22 @@ public class NativeRenewalTest {
         assertThrows(IllegalArgumentException.class,
                 () -> new NativeRenewal(C, R, W, 1, 16777216, 901));
     }
+
+    /** ADR-118: retries inside one wake-up, bounded by count, time and the window margin. */
+    @Test public void burstRetriesStayInsideTheWakeUp() {
+        assertEquals(2000, NativeRenewal.burstDelayMs(1, 0, 600000));
+        assertEquals(4000, NativeRenewal.burstDelayMs(2, 5000, 600000));
+        assertEquals(8000, NativeRenewal.burstDelayMs(3, 15000, 600000));
+        // Fourth attempt was the last one.
+        assertEquals(-1, NativeRenewal.burstDelayMs(4, 20000, 600000));
+        // No attempt may start at or after the 30 s budget.
+        assertEquals(-1, NativeRenewal.burstDelayMs(1, 28000, 600000));
+        assertEquals(2000, NativeRenewal.burstDelayMs(1, 27999, 600000));
+        // Never sleep into the 6 s safety margin of the window.
+        assertEquals(-1, NativeRenewal.burstDelayMs(1, 0, 8000));
+        assertEquals(2000, NativeRenewal.burstDelayMs(1, 0, 8001));
+        // Nonsense input never yields a retry.
+        assertEquals(-1, NativeRenewal.burstDelayMs(0, 0, 600000));
+        assertEquals(-1, NativeRenewal.burstDelayMs(1, -1, 600000));
+    }
 }

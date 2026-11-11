@@ -33,6 +33,8 @@ final class NativeRenewer {
     private static final int TIMEOUT_MS = 10000;
     private static final int PENDING_POLLS = 15;
     private static final long PENDING_POLL_MS = 2000;
+    /** No new pending poll this long after a wake-up began, so attempts fit the 60 s lock. */
+    private static final long PENDING_BUDGET_MS = 40000;
     private static final long LOCK_MS = 60000;
 
     private final ClientApplication app;
@@ -135,7 +137,27 @@ final class NativeRenewer {
         catch (RuntimeException ignored) { /* Released by its timeout. */ }
     }
 
+    /** One wake-up: up to {@link NativeRenewal#BURST_ATTEMPTS} attempts (ADR-118), then the alarm. */
     private void run(State s) {
+        long wakeStart = SystemClock.elapsedRealtime();
+        for (int attempts = 1; ; attempts++) {
+            long remaining = attempt(s, wakeStart);
+            if (remaining < 0 || state != s) return;
+            long delay = NativeRenewal.burstDelayMs(attempts,
+                    SystemClock.elapsedRealtime() - wakeStart, remaining);
+            if (delay < 0) { retry(s, remaining); return; }
+            try {
+                Thread.sleep(delay);
+            } catch (InterruptedException stopped) {
+                Thread.currentThread().interrupt();
+                return;
+            }
+            if (state != s) return;
+        }
+    }
+
+    /** Returns -1 when this wake-up is settled (renewed, idle, stopped), else the window time left. */
+    private long attempt(State s, long wakeStart) {
         long remaining;
         long traffic;
         try {
@@ -144,14 +166,14 @@ final class NativeRenewer {
             traffic = live[1];
         } catch (Exception gone) {
             finish(s, "tunnel_stopped");
-            return;
+            return -1;
         }
-        if (remaining <= 0) { finish(s, "lease_expired"); return; }
+        if (remaining <= 0) { finish(s, "lease_expired"); return -1; }
         NativeRenewal plan = s.plan;
         if (!plan.due(remaining, traffic)) {
             schedule(s, Math.min(plan.idleDelayMs(remaining), NativeRenewal.AWAKE_CHECK_MS),
                     plan.idleDelayMs(remaining));
-            return;
+            return -1;
         }
         String key = plan.beginIntent(SystemClock.elapsedRealtime());
         try {
@@ -161,11 +183,12 @@ final class NativeRenewer {
                     .put("budget_bytes", plan.budgetBytes)
                     .put("window_seconds", plan.windowSeconds);
             Response posted = call(s, "POST", "/native-renew", body);
-            if (refused(posted.status)) { finish(s, posted.code()); return; }
-            if (posted.status != 202) { retry(s, remaining); return; }
-            for (int poll = 0; poll < PENDING_POLLS && state == s; poll++) {
+            if (refused(posted.status)) { finish(s, posted.code()); return -1; }
+            if (posted.status != 202) return remaining;
+            for (int poll = 0; poll < PENDING_POLLS && state == s
+                    && SystemClock.elapsedRealtime() - wakeStart < PENDING_BUDGET_MS; poll++) {
                 Response status = call(s, "GET", "/native", null);
-                if (refused(status.status)) { finish(s, status.code()); return; }
+                if (refused(status.status)) { finish(s, status.code()); return -1; }
                 if (status.status == 200 && "active".equals(status.json.optString("state"))) {
                     JSONObject window = status.json.getJSONObject("window");
                     long generation = window.getLong("generation");
@@ -179,22 +202,28 @@ final class NativeRenewer {
                                 generation, end);
                         plan.adopted(generation, window.getString("window_id"), traffic);
                         run(s);
-                        return;
+                        return -1;
                     }
-                    if (generation != plan.generation) { finish(s, "window_generation_conflict"); return; }
+                    if (generation != plan.generation) {
+                        finish(s, "window_generation_conflict");
+                        return -1;
+                    }
                 } else if (status.status != 200) {
                     break;
                 }
                 Thread.sleep(PENDING_POLL_MS);
             }
-            retry(s, remaining);
+            // Accepted but not yet acknowledged by the node: the same key is re-sent next time.
+            return remaining;
         } catch (InterruptedException stopped) {
             Thread.currentThread().interrupt();
+            return -1;
         } catch (IllegalStateException conflict) {
             finish(s, "window_validation_failed");
+            return -1;
         } catch (Exception transientFailure) {
             // Network loss, DNS, TLS or malformed JSON: retry inside the window.
-            retry(s, remaining);
+            return remaining;
         }
     }
 

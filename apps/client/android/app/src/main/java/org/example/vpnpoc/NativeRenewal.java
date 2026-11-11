@@ -17,6 +17,9 @@ final class NativeRenewal {
     static final long MIN_BACKOFF_MS = 2000;
     static final long MAX_BACKOFF_MS = 60000;
     static final long AWAKE_CHECK_MS = 30000;
+    /** ADR-118: attempts inside one wake-up, and the time from wake-up after which none starts. */
+    static final int BURST_ATTEMPTS = 4;
+    static final long BURST_BUDGET_MS = 30000;
 
     final String connection;
     final String runtime;
@@ -60,6 +63,20 @@ final class NativeRenewal {
     /** Delay until the next check while nothing is due; the alarm uses the time-based part. */
     long idleDelayMs(long remainingMs) {
         return Math.max(1000, remainingMs - renewBeforeMs());
+    }
+
+    /**
+     * ADR-118: delay before the next attempt in the same wake-up (2 s, 4 s, 8 s), or -1 once the
+     * burst is spent. In Doze the next alarm can be about 9 minutes away, so a transient failure
+     * at wake-up is retried while the wake lock is still held. {@code attempts} counts attempts
+     * already made in this wake-up; {@code elapsedMs} is the time since it began.
+     */
+    static long burstDelayMs(int attempts, long elapsedMs, long remainingMs) {
+        if (attempts < 1 || attempts >= BURST_ATTEMPTS || elapsedMs < 0) return -1;
+        long delay = MIN_BACKOFF_MS << (attempts - 1);
+        if (elapsedMs + delay >= BURST_BUDGET_MS) return -1;
+        if (remainingMs - delay <= SAFETY_MS) return -1;
+        return delay;
     }
 
     String beginIntent(long nowElapsed) {
