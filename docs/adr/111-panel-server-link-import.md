@@ -12,7 +12,7 @@ the panel servers. We need a way to register such a server in our control plane.
 1. **Input:** the admin pastes a single `vless://` share link (exported by the panel for one
    client). The app never receives panel logins, passwords or API tokens, and never calls a panel
    API (no read, no write).
-2. **Subscription links are not implemented in this run.** The Remnawave and 3x-ui subscription
+2. **Subscription links are not implemented in this run** (body format since verified and parsed, ADR-116). The Remnawave and 3x-ui subscription
    formats (base64 list of links, JSON/Clash output, headers) could not be verified offline: no
    official sample is in the repo and no live panel may be contacted. Open question for the owner;
    the subscription body would be parsed by the same `vless://` parser once its format is pinned.

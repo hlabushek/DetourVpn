@@ -2,8 +2,10 @@
 
 Pure function: no DNS lookup, no network, no logging. The link carries a panel client UUID, which
 is a credential; the parsed value hides credential fields from `repr`.
-Subscription bodies (base64 lists, JSON/Clash) are NOT parsed here: their formats were not
-verified offline (open question in ADR-111).
+`parse_subscription_body` reads the one subscription body format verified from official
+sources (ADR-116): newline-joined share links, optionally standard-base64 encoded (3x-ui raw
+`subPath` with `subEncrypt`; Remnawave `XRAY_BASE64`). JSON, Clash/Mihomo YAML and encrypted
+bodies are refused. Nothing here fetches a subscription URL.
 """
 
 import base64
@@ -162,3 +164,63 @@ def parse_vless_reality(raw: str) -> VlessRealityLink:
         flow=flow,
         transport=query["type"],
     )
+
+
+MAX_SUBSCRIPTION_BYTES = 256 * 1024
+MAX_SUBSCRIPTION_LINKS = 200
+
+
+@dataclass(frozen=True)
+class SubscriptionParse:
+    """VLESS + Reality links that passed the strict parser, and counts of what was skipped."""
+
+    links: list[VlessRealityLink] = field(repr=False)
+    skipped_other_protocol: int
+    skipped_invalid: dict[str, int]
+
+
+def _subscription_text(body: bytes) -> str:
+    if len(body) > MAX_SUBSCRIPTION_BYTES:
+        raise PanelLinkError("panel_subscription_too_large")
+    try:
+        text = body.decode("ascii").strip()
+    except UnicodeDecodeError:
+        raise PanelLinkError("panel_subscription_format") from None
+    if not text:
+        raise PanelLinkError("panel_subscription_empty")
+    if "://" in text:
+        return text
+    # Standard base64 (3x-ui docs; Node `Buffer.toString("base64")` in Remnawave). Some panels
+    # drop the padding, so it is restored; whitespace line breaks are allowed, nothing else.
+    compact = re.sub(r"\s+", "", text)
+    if not re.fullmatch(r"[A-Za-z0-9+/]+={0,2}", compact):
+        raise PanelLinkError("panel_subscription_format")
+    try:
+        decoded = base64.b64decode(compact + "=" * (-len(compact) % 4), validate=True)
+        plain = decoded.decode("ascii").strip()
+    except (binascii.Error, ValueError, UnicodeDecodeError):
+        raise PanelLinkError("panel_subscription_format") from None
+    if "://" not in plain:
+        raise PanelLinkError("panel_subscription_format")
+    return plain
+
+
+def parse_subscription_body(body: bytes) -> SubscriptionParse:
+    """Parse one subscription body (ADR-116) or raise `PanelLinkError` with a stable code."""
+    text = _subscription_text(body)
+    lines = [line.strip() for line in text.splitlines() if line.strip()]
+    if len(lines) > MAX_SUBSCRIPTION_LINKS:
+        raise PanelLinkError("panel_subscription_too_large")
+    links: list[VlessRealityLink] = []
+    other = 0
+    invalid: dict[str, int] = {}
+    for line in lines:
+        scheme = line.partition("://")[0].lower()
+        if scheme != "vless":
+            other += 1
+            continue
+        try:
+            links.append(parse_vless_reality(line))
+        except PanelLinkError as error:
+            invalid[error.code] = invalid.get(error.code, 0) + 1
+    return SubscriptionParse(links=links, skipped_other_protocol=other, skipped_invalid=invalid)
