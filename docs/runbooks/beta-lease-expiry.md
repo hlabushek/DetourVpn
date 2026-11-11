@@ -36,3 +36,31 @@
 3. Если всё ещё рвётся: единственное надёжное лечение — увеличить окно (например до 10–15 минут).
    Это изменение протокола: API, все три узла (`window_gate.py`, `window_daemon`), приложение
    (Dart и Java), тесты. Скрипта обновления узлов пока нет: сначала нужен он.
+
+## Update 2026-11-10: long windows (ADR-096)
+
+Code for windows of up to 900 s is in place but opt-in (`window_seconds`, `-WindowSeconds 900`).
+Rollout order: all node agents first, then the API, then a client built with `-WindowSeconds 900`.
+This alone does not keep the tunnel alive under Doze; that needs native renewal (plan step C2).
+
+## Update 2026-11-11: native renewal and service restore (ADR-097, ADR-098)
+
+- Builds with `-WindowSeconds 900` renew from the native VPN process (ADR-097).
+- The VPN service is sticky and restores itself after a process kill. After a reboot it restores
+  only if the user left it connected. Always-on is enabled in release (ADR-098).
+- Check on a device:
+  - screen off for 60 minutes or more;
+  - swipe the app away;
+  - `adb shell am kill` while the screen is off;
+  - reboot with the VPN on, then with it off.
+
+## Update 2026-11-11: network changes and stalls (ADR-099)
+
+- A Wi-Fi/mobile switch restarts the tunnel in place after 3 s. No handshake for 180 s with a
+  working network also restarts it.
+- The app reconnects with backoff and no hard limit, but never after VPN permission was revoked.
+- Check on a device:
+  - switch Wi-Fi and mobile 5 times;
+  - turn airplane mode on for 1 minute, then off;
+  - disable Wi-Fi on the router for 5 minutes while on mobile.
+  - each time, traffic must resume without opening the app.

@@ -21,6 +21,8 @@ secrets/
 credentials/
 .tgcloud/
 .codex-remote-attachments/
+# Machine-local Claude Code preview config
+.claude/launch.json
 
 # Python and tooling
 .venv/
