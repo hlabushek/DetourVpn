@@ -5,7 +5,12 @@ param(
     # Stage 2 (-Publish): sign an update manifest for the APK you already built.
     [switch]$Publish,
     # Where the APK will be downloadable from (HTTPS only), for example the beta host's download path.
+    # Optional override. Default: the API host serves it at <ApiOrigin>/api/v1/app/download/<file>.
     [string]$ApkUrl = '',
+    [string]$ApiOrigin = 'https://193.68.88.239',
+    # Commit whose API files the host runs now. Pass it only if the API code (download route) is not
+    # on the host yet; the script then deploys it first.
+    [string]$ApiBaselineRev = '',
     # Lowest version code that may still run. 1 = nobody is forced to update.
     [int]$MinSupportedVersionCode = 1,
     [string]$NotesFile = '',
@@ -87,26 +92,41 @@ if (-not $Publish) {
 
 Step 'Publish: signed manifest'
 if (-not (Test-Path -LiteralPath $apk)) { throw 'No APK found. Build it first (stage 1 or release_beta.ps1).' }
-if ($ApkUrl -notmatch '^https://[^\s]+\.apk$') { throw 'Pass -ApkUrl https://<host>/<path>/<file>.apk (HTTPS only).' }
 if (-not (Test-Path -LiteralPath $KeyPath)) { throw "Signing key not found at $KeyPath." }
 $pubspec = Get-Content -LiteralPath (Join-Path $root 'apps\client\pubspec.yaml') | Where-Object { $_ -match '^version:\s*(\S+)\+(\d+)\s*$' } | Select-Object -First 1
 if ($pubspec -notmatch '^version:\s*(\S+)\+(\d+)\s*$') { throw 'Could not read the version from pubspec.yaml.' }
 $versionName = $Matches[1]; $versionCode = [int]$Matches[2]
 $outDir = Join-Path $env:LOCALAPPDATA 'ProjectVpn\update-out'
+New-Item -ItemType Directory -Force -Path $outDir | Out-Null
+$apkName = "DetourVpn-$versionName.apk"
+if ([string]::IsNullOrWhiteSpace($ApkUrl)) { $ApkUrl = "$($ApiOrigin.TrimEnd('/'))/api/v1/app/download/$apkName" }
+if ($ApkUrl -notmatch '^https://[^\s]+\.apk$') { throw 'ApkUrl must be an HTTPS link ending in .apk.' }
+$apkCopy = Join-Path $outDir $apkName
+Copy-Item -LiteralPath $apk -Destination $apkCopy -Force
 if ([string]::IsNullOrWhiteSpace($NotesFile)) {
     $NotesFile = Join-Path $outDir 'notes.txt'
-    New-Item -ItemType Directory -Force -Path $outDir | Out-Null
     [IO.File]::WriteAllText($NotesFile, "Обновление DetourVpn ${versionName}: исправления и улучшения.", (New-Object System.Text.UTF8Encoding($false)))
 }
 Write-Host "version=$versionName code=$versionCode min_supported=$MinSupportedVersionCode"
 Write-Host 'The key passphrase is asked next (hidden).'
 Run 'prepare manifest' {
-    uv run --frozen python scripts/prepare_app_update.py --apk $apk --version-code $versionCode --version-name $versionName --min-supported-version-code $MinSupportedVersionCode --apk-url $ApkUrl --notes-file $NotesFile --out $outDir --signing-key $KeyPath
+    uv run --frozen python scripts/prepare_app_update.py --apk $apkCopy --version-code $versionCode --version-name $versionName --min-supported-version-code $MinSupportedVersionCode --apk-url $ApkUrl --notes-file $NotesFile --out $outDir --signing-key $KeyPath
 }
-Step 'What is left (server side, not automated)'
-Write-Host "1. Upload the APK so that it is downloadable at: ${ApkUrl}"
-Write-Host "   APK:      $apk"
-Write-Host "2. Put the manifest on the API host: $(Join-Path $outDir 'app-update.json')"
-Write-Host '   and set VPN_APP_UPDATE_MANIFEST_FILE in the API environment to its path there, then restart the API.'
-Write-Host '3. Check:  curl.exe -s https://<api-host>/api/v1/app/signed-update-manifest'
-Write-Host 'Only phones running a build that already contains the public key, on Android 13+, will see the update.'
+$manifest = Join-Path $outDir 'app-update.json'
+
+if (-not [string]::IsNullOrWhiteSpace($ApiBaselineRev)) {
+    Step 'API code with the download route (only if it is not on the host yet)'
+    Write-Host "baseline = $ApiBaselineRev (the commit whose API files the host runs now)"
+    Run 'API deploy (dry run)' { uv run --frozen python scripts/deploy_beta_api_latest.py --baseline-rev $ApiBaselineRev --before-revision 0027_panel_server_sources }
+    Run 'API deploy' { uv run --frozen python scripts/deploy_beta_api_latest.py --baseline-rev $ApiBaselineRev --before-revision 0027_panel_server_sources --execute }
+}
+
+Step 'Upload to the API host (dry run, then real)'
+Run 'publish (dry run)' { uv run --frozen python scripts/publish_beta_app_update.py --apk $apkCopy --manifest $manifest }
+$answer = Read-Host 'Type YES to upload the APK and manifest, set the API environment, restart the beta API and add one Caddy path line'
+if ($answer -cne 'YES') { throw 'Cancelled. Nothing was changed on the server.' }
+Run 'publish' { uv run --frozen python scripts/publish_beta_app_update.py --apk $apkCopy --manifest $manifest --execute }
+
+Step 'Done'
+Write-Host "Phones on a build that contains the public key (Android 13+) will now be offered $versionName."
+Write-Host 'To check from a PC:  curl.exe -sk <ApiOrigin>/api/v1/app/signed-update-manifest'
