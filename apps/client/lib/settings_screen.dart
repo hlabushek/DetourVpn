@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import 'connection.dart';
+import 'dns_choice.dart';
 import 'orbit_widgets.dart';
 import 'platform_info.dart';
 import 'split_apps.dart';
@@ -66,6 +67,66 @@ class SettingsScreen extends StatelessWidget {
     );
   }
 
+  /// Picks the tunnel DNS. The choice is stored natively and read at the next connect,
+  /// so an active tunnel keeps its DNS until it is reconnected (ADR-106).
+  Future<void> _openDnsChoice(BuildContext context) async {
+    final messenger = ScaffoldMessenger.of(context);
+    String? current;
+    try {
+      current = parseDnsChoice(
+        await _vpnSettings.invokeMethod<String>('dnsRead'),
+      );
+    } on PlatformException {
+      messenger.showSnackBar(
+        const SnackBar(content: Text('Не удалось прочитать настройку DNS')),
+      );
+      return;
+    }
+    if (!context.mounted) return;
+    final picked = await showDialog<({String? value})>(
+      context: context,
+      builder: (dialogContext) => SimpleDialog(
+        title: const Text('DNS для VPN'),
+        children: [
+          for (final option in <String?>[null, ...dnsChoiceServers])
+            SimpleDialogOption(
+              onPressed: () => Navigator.of(dialogContext).pop((value: option)),
+              child: Row(
+                children: [
+                  Icon(
+                    option == current
+                        ? Icons.radio_button_checked
+                        : Icons.radio_button_off,
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(child: Text(dnsChoiceLabel(option))),
+                ],
+              ),
+            ),
+        ],
+      ),
+    );
+    if (picked == null || picked.value == current) return;
+    try {
+      final saved = await _vpnSettings.invokeMethod<String>('dnsWrite', {
+        'server': dnsChoiceWire(picked.value),
+      });
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(
+            'DNS: ${dnsChoiceLabel(parseDnsChoice(saved))}. Применится при следующем подключении.',
+          ),
+        ),
+      );
+    } on PlatformException {
+      messenger.showSnackBar(
+        const SnackBar(
+          content: Text('Не удалось сохранить DNS. Выключите VPN и повторите.'),
+        ),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(title: const Text('Настройки')),
@@ -106,6 +167,17 @@ class SettingsScreen extends StatelessWidget {
                 : 'Исключённые приложения используют обычную сеть',
             enabled: !c.busy,
             onTap: () => _openSplitApps(context, c),
+          ),
+          // DNS for the tunnel (ADR-106): Android and Windows use the same channel methods.
+          const SizedBox(height: 12),
+          NavRow(
+            icon: Icons.dns_outlined,
+            title: 'DNS для VPN',
+            subtitle: c.busy || c.hasLease
+                ? 'Выберите после отключения VPN'
+                : 'Применяется при следующем подключении',
+            enabled: !c.busy && !c.hasLease,
+            onTap: () => _openDnsChoice(context),
           ),
           // Android battery optimisation: not applicable on Windows (ADR-095).
           if (!isWindowsClient) ...[

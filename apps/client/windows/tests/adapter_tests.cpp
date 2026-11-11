@@ -314,6 +314,14 @@ void ControllerTests() {
     CHECK(ThrowsCode("native_operation_failed", [&] { r.c->WriteNode("not-a-uuid"); }));
     r.c->WriteNode(std::nullopt);
     CHECK(!r.c->ReadNode());
+    // DNS choice (ADR-106): default "", listed resolvers only, survives with split settings
+    CHECK(r.c->Dns().empty());
+    CHECK(r.c->WriteDns("9.9.9.9") == "9.9.9.9" && r.c->Dns() == "9.9.9.9");
+    CHECK(ThrowsCode("native_operation_failed", [&] { r.c->WriteDns("10.0.0.1"); }));
+    CHECK(r.c->Dns() == "9.9.9.9");
+    r.c->WriteNode(std::nullopt);
+    CHECK(r.c->Dns() == "9.9.9.9");  // other prefs writes keep it
+    CHECK(r.c->WriteDns("").empty() && r.c->Dns().empty());
     // split settings
     CHECK(r.c->SplitMode() == "exclude" && r.c->SplitLastMode() == "exclude" && r.c->SplitApps().empty());
     fs::path app = r.dir / "tool.exe";
@@ -367,6 +375,7 @@ void ControllerTests() {
     CHECK(s.received_bytes == 1000 && s.traffic_bytes == 1500);
     CHECK(ThrowsCode("native_service_state_invalid", [&] { r.c->Connect(kProfile, 30000, grant); }));  // already up
     CHECK(ThrowsCode("native_operation_failed", [&] { r.c->WriteSplit("all", {}, {}); }));             // locked while up
+    CHECK(ThrowsCode("native_operation_failed", [&] { r.c->WriteDns("1.1.1.1"); }));                   // locked while up
     r.c->AdvanceWindow(WindowGrant{"conn-1", "run-1", 2}, 80000);
     CHECK(r.c->Snapshot().remaining_ms > 60000);
     CHECK(ThrowsCode("native_service_state_invalid", [&] { r.c->AdvanceWindow(WindowGrant{"other", "run-1", 3}, 80000); }));

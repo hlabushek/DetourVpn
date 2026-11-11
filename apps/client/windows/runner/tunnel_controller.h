@@ -93,10 +93,13 @@ class TunnelController {
   // Returns the canonical domain list. Throws NativeError (domain_invalid, domain_duplicate, ...).
   std::vector<std::string> WriteSplit(const std::string& mode, const std::vector<std::string>& apps,
                                       const std::vector<std::string>& domains);
+  // ADR-106: "" = profile DNS. WriteDns refuses while connected; applies at the next connect.
+  std::string Dns();
+  std::string WriteDns(const std::string& server);
 
  private:
   struct Prefs {
-    std::string node, mode = "exclude", last_mode;
+    std::string node, mode = "exclude", last_mode, dns;
     std::vector<std::string> apps, domains;
   };
 

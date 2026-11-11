@@ -194,6 +194,7 @@ TunnelController::Prefs TunnelController::LoadPrefs() const {
     else if (key == "app" && IsValidAppPath(value) && seen_apps.insert(Lower(value)).second)
       prefs.apps.push_back(value);
     else if (key == "domain" && seen_domains.insert(value).second) prefs.domains.push_back(value);
+    else if (key == "dns" && IsDnsChoice(value)) prefs.dns = value;  // anything else = default
   }
   return prefs;
 }
@@ -205,6 +206,7 @@ void TunnelController::SavePrefs(const Prefs& prefs) const {
   if (!prefs.last_mode.empty()) text += "last_mode\t" + prefs.last_mode + "\n";
   for (const auto& app : prefs.apps) text += "app\t" + app + "\n";
   for (const auto& domain : prefs.domains) text += "domain\t" + domain + "\n";
+  if (!prefs.dns.empty()) text += "dns\t" + prefs.dns + "\n";
   std::error_code ec;
   std::filesystem::create_directories(hooks_.prefs_path.parent_path(), ec);
   std::filesystem::path temp = hooks_.prefs_path;
@@ -291,6 +293,21 @@ std::vector<std::string> TunnelController::WriteSplit(const std::string& mode,
   return prefs.domains;
 }
 
+std::string TunnelController::Dns() {
+  std::lock_guard<std::mutex> lock(mutex_);
+  return LoadPrefs().dns;
+}
+
+std::string TunnelController::WriteDns(const std::string& server) {
+  std::lock_guard<std::mutex> lock(mutex_);
+  if (engine_started_ || deadline_ != 0) throw Generic();  // like split: never while connected
+  if (!server.empty() && !IsDnsChoice(server)) throw Generic();
+  Prefs prefs = LoadPrefs();
+  prefs.dns = server;
+  SavePrefs(prefs);
+  return prefs.dns;
+}
+
 // ---- connection -------------------------------------------------------------------------------------
 
 std::vector<std::string> TunnelController::ControlPlaneAddresses() {
@@ -339,6 +356,7 @@ void TunnelController::Connect(const std::string& config, int64_t remaining_ms,
     policy.app_paths = prefs.apps;
     policy.domains = prefs.domains;
     policy.api_ipv4 = ControlPlaneAddresses();
+    policy.dns_server = prefs.dns;
     engine_config = CreateEngineConfig(profile, policy);
   } catch (const NativeError&) {
     throw;

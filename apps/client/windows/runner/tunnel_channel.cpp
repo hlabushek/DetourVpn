@@ -118,7 +118,7 @@ void TunnelChannel::Handle(const flutter::MethodCall<EncodableValue>& call,
       "permission", "publicKey", "prove", "connect", "connectWindow", "advanceWindow", "disconnect",
       "snapshot", "sessionRead", "sessionWrite", "pendingLoginRead", "pendingLoginWrite", "splitRead",
       "splitModeRead", "splitLastModeRead", "splitWrite", "splitDomainsRead", "apps", "nodeRead",
-      "nodeWrite", "openLogin", "capabilities", "pickApp"};
+      "nodeWrite", "openLogin", "capabilities", "pickApp", "dnsRead", "dnsWrite"};
   const std::string& method = call.method_name();
   if (!controller_ || !kAllowed.count(method)) {
     result->NotImplemented();
@@ -178,6 +178,12 @@ void TunnelChannel::Handle(const flutter::MethodCall<EncodableValue>& call,
     } else if (method == "nodeWrite") {
       c.WriteNode(GetString(args, "id"));
       result->Success();
+    } else if (method == "dnsRead") {
+      result->Success(EncodableValue(c.Dns()));
+    } else if (method == "dnsWrite") {
+      auto server = GetString(args, "server");
+      if (!server) Bad();
+      result->Success(EncodableValue(c.WriteDns(*server)));
     } else if (method == "splitRead") {
       result->Success(StringList(c.SplitApps()));
     } else if (method == "splitDomainsRead") {
