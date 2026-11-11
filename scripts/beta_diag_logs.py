@@ -47,7 +47,7 @@ NODE_REMOTE = (
 REMOTE_DB2 = (
     "docker exec detourvpn-beta-postgres-1 sh -c 'PGPASSWORD=\"$(cat /run/secrets/pg_runtime)\" "
     "psql -h 127.0.0.1 -U vpn_api -d detourvpn_beta -Atqc "
-    "\"SELECT to_char(c.created_at AT TIME ZONE 0, 'HH24:MI:SS') AS started, c.state, "
+    "\"SELECT c.created_at::time(0) AS started, c.state, "
     "count(h.*) AS windows, max(h.generation) AS last_gen, "
     "round(extract(epoch FROM max(h.created_at) - min(h.created_at))) AS span_s "
     "FROM peer_connections c LEFT JOIN peer_window_holds h ON h.connection_id = c.id "
