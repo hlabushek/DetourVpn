@@ -48,6 +48,11 @@ class WindowConnectionController extends ConnectionController {
   final int windowSeconds;
   final Uri? _renewalOrigin;
   static const maxWindowMs = 900000;
+
+  /// Single-peer nodes meter the outer IP and use slots 1..16; pool nodes (ADR-101) meter the
+  /// inner IP and use slots 1..250. Both come from the same API contract (`v3_contracts.py`).
+  static const _meters = {'kernel-outer-ip.v1', 'kernel-inner-ip.v1'};
+  static const maxSlotId = 250;
   final int renewBeforeMs;
 
   /// Long windows renew once a third has elapsed (10 of 15 min left), leaving
@@ -429,7 +434,7 @@ class WindowConnectionController extends ConnectionController {
         raw is! Map<String, dynamic> ||
         value['id'] != _id ||
         value['device_id'] != _deviceId ||
-        value['meter'] != 'kernel-outer-ip.v1' ||
+        !_meters.contains(value['meter']) ||
         value['client_config'] is! String ||
         (value['client_config'] as String).length > 16384)
       throw const ClientError('window_not_active');
@@ -454,7 +459,7 @@ class WindowConnectionController extends ConnectionController {
         (raw['budget_bytes'] as int) > 67108864 ||
         raw['slot_id'] is! int ||
         (raw['slot_id'] as int) < 1 ||
-        (raw['slot_id'] as int) > 16)
+        (raw['slot_id'] as int) > maxSlotId)
       throw const ClientError('invalid_response');
     if (initial) {
       if (generation != 1) throw const ClientError('invalid_response');

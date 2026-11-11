@@ -98,6 +98,8 @@ class WindowsApi implements TunnelApi {
   bool denied = false;
   bool oldConnection = false;
   bool failDeletes = false;
+  String meter = 'kernel-outer-ip.v1';
+  int slot = 1;
   bool deviceBound = false;
   bool failRenewToken = false;
   final devicePlatforms = <Object?>[];
@@ -115,9 +117,9 @@ class WindowsApi implements TunnelApi {
     'id': connection,
     'node_id': node,
     'device_id': device,
-    'slot_id': 1,
+    'slot_id': slot,
     'state': state,
-    'meter': 'kernel-outer-ip.v1',
+    'meter': meter,
     'client_config': state == 'active' ? 'TEST ONLY PROFILE' : null,
     'window': {
       'contract_version': 3,
@@ -125,7 +127,7 @@ class WindowsApi implements TunnelApi {
       'window_id': window,
       'node_id': node,
       'runtime_id': tamper ? node : runtime,
-      'slot_id': 1,
+      'slot_id': slot,
       'generation': generation,
       'public_key': 'test-only-public-key',
       'issued_at': issued.toIso8601String(),
@@ -306,6 +308,25 @@ void main() {
         expect(args['generation'], 1);
       },
     );
+
+    test(
+      'pool node grants (inner-IP meter, slot above 16) are accepted',
+      () async {
+        controller(seconds: 90);
+        api.meter = 'kernel-inner-ip.v1';
+        api.slot = 200;
+        await c.connect();
+        expect(c.hasLease, isTrue);
+        expect(c.error, isNull);
+      },
+    );
+
+    test('an unknown meter is still refused', () async {
+      controller(seconds: 90);
+      api.meter = 'kernel-unknown.v1';
+      await c.connect();
+      expect(c.hasLease, isFalse);
+    });
 
     test('90 s windows and an old API keep Dart renewal', () async {
       controller(seconds: 90);
