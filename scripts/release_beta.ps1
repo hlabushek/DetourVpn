@@ -9,6 +9,9 @@ param(
     # Also build and verify the unsigned Windows zip (I-032). Combine with -NoDeploy -NoApk for Windows only.
     [switch]$Windows,
     [string]$ApiOrigin = 'https://193.68.88.239',
+    # ADR-096: 900 only after every node and the API run the new code (release_all.ps1 does that first).
+    [ValidateRange(30, 900)]
+    [int]$WindowSeconds = 90,
     # Each APK build leaves a ~1.6 GB source snapshot behind. Keep this many newest, delete older.
     [int]$KeepBuilds = 3,
     # Only report what the cleanup would delete.
@@ -75,7 +78,7 @@ if (-not $NoDeploy) {
 
 if (-not $NoApk) {
     Step 'Signed APK (you will be asked for the keystore password twice, input is hidden)'
-    & (Join-Path $root 'scripts\build_beta_apk.ps1') -ApiOrigin $ApiOrigin
+    & (Join-Path $root 'scripts\build_beta_apk.ps1') -ApiOrigin $ApiOrigin -WindowSeconds $WindowSeconds
     if (-not $?) { throw 'FAILED: signed APK build' }
     $apk = Join-Path $root 'apps\client\build\app\outputs\flutter-apk\app-release.apk'
     if (-not (Test-Path -LiteralPath $apk)) { throw 'APK was not produced.' }

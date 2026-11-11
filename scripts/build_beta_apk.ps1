@@ -8,6 +8,9 @@ param(
     [ValidateSet('android-arm64', 'android-arm64,android-x64')]
     [string]$TargetPlatforms = 'android-arm64',
     [switch]$PhysicalTestBuild,
+    # ADR-096: 900 only after every node and the API run ADR-096 code; 90 keeps the legacy request.
+    [ValidateRange(30, 900)]
+    [int]$WindowSeconds = 90,
     [string]$FlutterSdk = (Join-Path $env:LOCALAPPDATA 'ProjectVpn\toolchains\flutter'),
     [string]$JavaHome = 'C:\Program Files\Android\Android Studio\jbr',
     [switch]$IsolatedPowerShell
@@ -43,6 +46,7 @@ if (!$IsolatedPowerShell) {
         '-TargetPlatforms', $TargetPlatforms,
         '-FlutterSdk', $FlutterSdk,
         '-JavaHome', $JavaHome,
+        '-WindowSeconds', $WindowSeconds,
         '-IsolatedPowerShell'
     )
     if ($PhysicalTestBuild) { $isolatedArguments += '-PhysicalTestBuild' }
@@ -213,6 +217,7 @@ try {
     # Signed beta uses the current v3 window API; v2 stays in the lower-level
     # client builder so a beta APK cannot silently target closed v2 admission.
     $buildParameters.WindowTunnels = $true
+    $buildParameters.WindowSeconds = $WindowSeconds
     if ($PhysicalTestBuild) { $buildParameters.PhysicalTestBuild = $true }
     & (Join-Path $PSScriptRoot 'build_flutter_client.ps1') @buildParameters
     if ($LASTEXITCODE -ne 0) { throw 'Signed Android build did not complete successfully.' }
