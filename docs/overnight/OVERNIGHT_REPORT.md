@@ -425,3 +425,18 @@ steps: `RUN3_OWNER_STEPS.md`.
 ## Recommended next issue
 - Rebuild the engine with `with_utls` (owner decision), then build panel-server delivery to
   Windows devices (per-device panel client, capability flag, controller call) as one issue.
+
+---
+
+# Run 4 — 2026-11-11 (unattended, final)
+
+Full report: `docs/overnight/FINAL_REPORT.md`. Nothing pushed, nothing deployed, no server touched,
+nothing verified on a phone or a Windows PC.
+
+## Run 3 API test result (T2), finished
+- Full `services/api` suite (plus `infra/ansible/tests`) on a throwaway local PostgreSQL
+  (`scripts/test_with_postgres.py`, `VPN_TEST_POSTGRES_BIN` set so the backup tests find
+  `pg_dump`), on the committed run 1–3 tree: **1358 passed, 14 skipped, 0 failed** (10 min 32 s).
+  The skips are opt-in live/staging/device/browser/POSIX tests.
+- After all run 4 changes: **1379 passed, 14 skipped, 0 failed** (11 min 43 s). The run-3 error
+  `postgres_tool_missing` is gone because the tool path is now set.

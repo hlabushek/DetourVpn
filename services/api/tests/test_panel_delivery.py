@@ -44,7 +44,8 @@ def import_panel(h: Harness, key: bytes, link: str) -> UUID:
         identity = AdminIdentity(
             username="test-panel-admin-" + secrets.token_hex(4),
             role="admin",
-            password_hash="TEST-ONLY-not-a-hash",
+            # TEST ONLY random filler; this identity never logs in.
+            password_hash=secrets.token_hex(32),
             totp_ciphertext="TEST-ONLY",
             created_at=database_now(session),
         )
