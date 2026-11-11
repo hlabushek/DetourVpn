@@ -6,6 +6,10 @@ final class VlessEngineCapability {
     static final String REASON_FEATURE_DISABLED = "feature_disabled";
     static final String REASON_ENGINE_NOT_BUNDLED = "engine_not_bundled";
     static final String REASON_ADAPTER_VERSION_MISMATCH = "adapter_version_mismatch";
+    /** The bundled engine lacks uTLS (built without {@code with_utls}), so Reality cannot run. */
+    static final String REASON_REALITY_UNSUPPORTED = "reality_unsupported";
+    /** The bundled engine refused the fixed self-test config for another reason. */
+    static final String REASON_ENGINE_CHECK_FAILED = "engine_check_failed";
 
     final boolean available;
     final String reasonCode;

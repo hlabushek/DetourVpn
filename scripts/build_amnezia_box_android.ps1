@@ -6,12 +6,20 @@ param(
     [string]$GoPath = (Join-Path $PSScriptRoot '..\.cache\toolchains\go1.25.5\gopath'),
     [string]$JdkHome = (Join-Path $PSScriptRoot '..\.cache\toolchains\temurin17.0.21\extract\jdk-17.0.21+9'),
     [string]$AndroidSdk = (Join-Path $env:LOCALAPPDATA 'Android\Sdk'),
-    [string]$AndroidNdk = (Join-Path $env:LOCALAPPDATA 'Android\Sdk\ndk\28.2.13676358')
+    [string]$AndroidNdk = (Join-Path $env:LOCALAPPDATA 'Android\Sdk\ndk\28.2.13676358'),
+    # Set to 'off' to refuse any module download (offline reproduction check).
+    [string]$GoProxy = ''
 )
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
+# Build tags come from the source lock (ADR-114: `with_utls` added for VLESS + Reality).
+$lock = Get-Content -LiteralPath (Join-Path $repoRoot 'third_party\amnezia-box\source-lock.json') -Raw | ConvertFrom-Json
+$tags = ($lock.android_tags -join ',')
+if ($tags -notmatch '^with_[a-z0-9_]+(,with_[a-z0-9_]+)*$') { throw 'Unexpected Android build tags in the source lock.' }
+# A uTLS build gets its own file name so the earlier AWG-only AARs are never overwritten.
+$tagSuffix = if ($lock.android_tags -contains 'with_utls') { '-utls' } else { '' }
 $sourceArchive = Join-Path $repoRoot 'third_party\amnezia-box\amnezia-box-v1.260910.0-src.zip'
 $patchFiles = @(
     (Join-Path $repoRoot 'third_party\amnezia-box\peer-stats.patch'),
@@ -22,9 +30,9 @@ $sourceParent = Join-Path $repoRoot '.cache\upstream\amnezia-box-v1.260910.0-src
 $sourceRoot = Join-Path $sourceParent 'amnezia-box-1.260910.0'
 $outputDirectory = Join-Path $repoRoot '.cache\amnezia-box-build'
 $aarName = if ($AndroidPlatforms -eq 'android/arm64') {
-    'libbox-1.260910-arm64.aar'
+    "libbox-1.260910-arm64$tagSuffix.aar"
 } else {
-    'libbox-1.260910-arm64-x86_64.aar'
+    "libbox-1.260910-arm64-x86_64$tagSuffix.aar"
 }
 $output = Join-Path $outputDirectory $aarName
 
@@ -80,7 +88,11 @@ $oldNdkHome = $env:ANDROID_NDK_HOME
 $oldGoPath = $env:GOPATH
 $oldToolchain = $env:GOTOOLCHAIN
 $oldGoWork = $env:GOWORK
+$oldGoProxy = $env:GOPROXY
+$oldGoFlags = $env:GOFLAGS
 try {
+    $env:GOFLAGS = '-mod=readonly'
+    if ($GoProxy) { $env:GOPROXY = $GoProxy }
     $env:PATH = "$(Join-Path $GoRoot 'bin');$(Join-Path $GoPath 'bin');$(Join-Path $JdkHome 'bin');$oldPath"
     $env:JAVA_HOME = (Resolve-Path $JdkHome).Path
     $env:ANDROID_HOME = (Resolve-Path $AndroidSdk).Path
@@ -89,12 +101,16 @@ try {
     $env:GOTOOLCHAIN = 'local'
     $env:GOWORK = 'off'
     Push-Location $sourceRoot
+    # Go prints build progress on stderr; Windows PowerShell 5.1 would turn that into a
+    # terminating error under 'Stop'. The exit code is the result (same as the Windows script).
+    $ErrorActionPreference = 'Continue'
     try {
         & (Join-Path $GoRoot 'bin\go.exe') run ./cmd/internal/build_libbox `
-            -target android -version 1.260910.0 -tags with_awg,with_gvisor `
+            -target android -version 1.260910.0 -tags $tags `
             -platform $AndroidPlatforms -output $output -copy=false
-        if ($LASTEXITCODE -ne 0) { throw "Amnezia Box Android build failed with exit code $LASTEXITCODE." }
-    } finally { Pop-Location }
+        $buildExit = $LASTEXITCODE
+    } finally { Pop-Location; $ErrorActionPreference = 'Stop' }
+    if ($buildExit -ne 0) { throw "Amnezia Box Android build failed with exit code $buildExit." }
 } finally {
     $env:PATH = $oldPath
     $env:JAVA_HOME = $oldJavaHome
@@ -103,8 +119,10 @@ try {
     $env:GOPATH = $oldGoPath
     $env:GOTOOLCHAIN = $oldToolchain
     $env:GOWORK = $oldGoWork
+    $env:GOPROXY = $oldGoProxy
+    $env:GOFLAGS = $oldGoFlags
 }
 if (-not (Test-Path -LiteralPath $output)) { throw 'Amnezia Box build did not produce the expected AAR.' }
 $outputHash = (Get-FileHash -Algorithm SHA256 -LiteralPath $output).Hash.ToLowerInvariant()
 $abisLabel = if ($AndroidPlatforms -eq 'android/arm64') { 'arm64-v8a' } else { 'arm64-v8a,x86_64' }
-Write-Output "libbox_version=1.260910.0; abis=$abisLabel; aar_bytes=$((Get-Item -LiteralPath $output).Length); sha256=$outputHash"
+Write-Output "libbox_version=1.260910.0; tags=$tags; abis=$abisLabel; aar_bytes=$((Get-Item -LiteralPath $output).Length); sha256=$outputHash"

@@ -23,9 +23,12 @@ final class VlessEngineGate {
         return capability;
     }
 
-    /** The capability of this build: always unavailable while {@link #FEATURE_ENABLED} is false. */
+    /**
+     * The capability of this build: always unavailable while {@link #FEATURE_ENABLED} is false.
+     * The engine is the libbox probe (ADR-114); it is never even probed while the flag is off.
+     */
     static VlessEngineCapability current() {
-        return evaluate(FEATURE_ENABLED, NoVlessEngine.INSTANCE);
+        return evaluate(FEATURE_ENABLED, LibboxVlessEngine.INSTANCE);
     }
 
     /** Placeholder engine: no VLESS core is bundled. */

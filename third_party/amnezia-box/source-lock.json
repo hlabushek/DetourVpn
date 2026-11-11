@@ -7,7 +7,8 @@
   "license": "GPL-3.0-or-later; see upstream LICENSE for additional restriction",
   "android_tags": [
     "with_awg",
-    "with_gvisor"
+    "with_gvisor",
+    "with_utls"
   ],
   "android_abis": [
     "arm64-v8a",

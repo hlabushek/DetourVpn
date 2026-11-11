@@ -1,7 +1,8 @@
 # ADR-114: Android VLESS + Reality core choice (preparation only)
 
-Status: proposed (overnight run 4, 2026-11-11). Choice recorded; no engine enabled, no binary
-rebuilt, not run on a device. Follows ADR-112 (Windows engine) and ADR-113 (Android gap).
+Status: accepted, partial (run 4, 2026-11-11). AAR with `with_utls` built locally; libbox probe
+behind the gate (off); libbox not bundled in the APK; not run on a device. Follows ADR-112
+(Windows engine) and ADR-113 (Android gap).
 
 ## Context
 Panel servers (ADR-111) use VLESS + Reality. The Windows client already generates a sing-box
@@ -69,3 +70,26 @@ check or if the GPL distribution terms are not acceptable to the owner.
 - ADR-084 (AWG GoBackend, Libbox excluded), ADR-111 (panel servers), ADR-112 (Windows VLESS),
   ADR-113 (Android gap).
 - Plan: `docs/overnight/ANDROID_VLESS_PLAN.md`. Owner steps: `docs/overnight/ANDROID_VLESS_OWNER_STEPS.md`.
+
+## Update 2026-11-11 (run 4): `with_utls` AAR and libbox probe behind the gate
+- `source-lock.json` `android_tags` now includes `with_utls`. `scripts/build_amnezia_box_android.ps1`
+  reads the tags from the lock, gives a uTLS build its own file name (the earlier AWG-only AARs
+  are not overwritten), and accepts `-GoProxy off`.
+- Built offline with the pinned toolchain (Go 1.25.5, SagerNet gomobile, Temurin 17, NDK
+  28.2.13676358; `-GoProxy off`, no download):
+  `.cache/amnezia-box-build/libbox-1.260910-arm64-x86_64-utls.aar`, 34,185,677 bytes, SHA-256
+  `9a0bdcd56dec271fd0186b746951ef7bd853afa7c3bf14cd49fdbdb01fc55908`,
+  tags `with_awg,with_gvisor,with_utls`, ABIs arm64-v8a and x86_64. Git-ignored build artifact.
+- `LibboxVlessEngine` (shared Java tree) is the gate's engine now. Its probe calls
+  `io.nekohasekai.libbox.Libbox.checkConfig` by reflection on a fixed, fake VLESS + Reality
+  config; an engine without uTLS reports `reality_unsupported`, a missing binding or native
+  library reports `engine_not_bundled`. `VlessEngineGate.FEATURE_ENABLED` stays `false`, and the
+  gate never probes while it is off.
+- **Still missing (exact next step):** the client APK does not bundle libbox
+  (`apps/client/android/app/build.gradle.kts` excludes the libbox classes and has no AAR
+  dependency). Bundling it means a second Go runtime next to the AWG GoBackend (`libwg-go.so`) in
+  one process, about +34 MB of native code before ABI splits, and a single-active-tunnel rule
+  for the VPN service (ADR-097..099). That needs its own ADR and a physical-device AWG regression
+  test, so it was not done unattended. No VLESS tunnel code runs on Android.
+- Tests: `LibboxVlessEngineTest` (7) and `VlessEngineGateTest` (11), standalone javac
+  `-Xlint:all -Werror --release 17` + JUnit 4.13.2 on JDK 21: 18 passed.
