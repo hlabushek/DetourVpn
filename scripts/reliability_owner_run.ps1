@@ -5,8 +5,8 @@ param(
     [string]$Stage = 'all',
     # Install the signed APK over the USB phone right after the build (keeps app data).
     [switch]$Install,
-    # Phone tests to run (numbers from docs/overnight/RELIABILITY_DEVICE_TESTS.md). Default: all 8.
-    [int[]]$Tests = @(1, 2, 3, 4, 5, 6, 7, 8),
+    # Phone tests to run (numbers from docs/overnight/RELIABILITY_DEVICE_TESTS.md). Default: all 9.
+    [int[]]$Tests = @(1, 2, 3, 4, 5, 6, 7, 8, 9),
     # How far back the server read-out goes (1..72 hours). Cover the drops you want explained.
     [ValidateRange(1, 72)]
     [int]$Hours = 48,
@@ -144,6 +144,11 @@ $catalog = @{
         'After 2 minutes: is the VPN key icon shown? (expected: yes)',
         'Lock the phone for 30 minutes without opening the app. Then check the key icon again.',
         'Then open DetourVPN. Expected: the VPN stays on; the app does not turn it off.') }
+    9 = @{ Name = 'Wi-Fi to mobile data and back'; Minutes = 5; Steps = @(
+        'Connected on Wi-Fi with the app open. Turn Wi-Fi off (mobile data on). Do not touch airplane mode.',
+        'Open a web page every 10 s. Note how long until pages load again (expected: within about 20 s).',
+        'While pages do not load, the status must NOT say connected; it should say the network changed and is restoring.',
+        'Turn Wi-Fi back on and repeat. Then switch twice within 10 s and check it still recovers.') }
 }
 if (($Stage -in @('all', 'phone')) -and (Confirm-Stage 'phone tests')) {
     Step 'Phone tests (docs/overnight/RELIABILITY_DEVICE_TESTS.md)'

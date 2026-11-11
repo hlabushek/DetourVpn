@@ -28,6 +28,7 @@ period was added (ADR-120).
 | `985a4fc` | Android: the native renewer retries up to 4 times inside one wake-up (2/4/8 s apart, none after 30 s, inside the existing 60 s wake lock) before waiting for the next alarm. (ADR-118) |
 | `8d0a3be` | Client: (A) a reopened UI **adopts** the running tunnel when the server's active connection matches the native connection, generation and key, otherwise stops it as before; (B) a failed native-renewal hand-off keeps Dart renewal, and the restore engine answers "not started"; (C) reconnect starts once the old connection has closed; (D) connect waits up to 10 s for the old connection to close, and choosing another server while connected or connecting switches to it; (F) new code `window_activation_refused` with its own Russian text and up to 3 automatic retries; separate, accurate texts for `window_not_active` and `window_generation_conflict`. (ADR-117, ADR-119) |
 | (docs) | This report, plan, root cause, owner log steps, device tests. |
+| (ADR-122 commit) | Network switch (owner phone test 4 on beta.28: after Wi-Fi to mobile data the app said connected but no traffic passed until airplane mode was toggled). Verified in code: a network-change restart within 15 s of a previous restart was dropped, network restarts raised the stall backoff, and a handshake or inbound bytes from before the switch counted as "connected". Now the trigger stays pending, a restart without a handshake is retried up to 2 times, the backoff is for stalls only, and "connected" needs a handshake after the switch (status «Сеть сменилась, восстанавливается связь»). Version 0.1.0-beta.29 (code 30). (ADR-122) |
 | (ADR-121 commit) | Restored VPN (after a reboot or a process kill): (1) a Doze-safe alarm about every 4 minutes wakes the background restore engine for 45 s, so its normal renewal runs; (2) opening the app **hands the restored tunnel over** to the UI (same server-side checks as A) instead of stopping it, then starts native renewal; calls still arriving from the ended restore engine are refused. This also removes the two-engine fight behind finding F. (3) Under Android Lockdown native renewal is not started, because it cannot reach the API there; Dart keeps renewing. (ADR-121) |
 
 User-facing Russian texts changed:
@@ -42,9 +43,9 @@ User-facing Russian texts changed:
 | pytest `test_window_service.py`, `test_window_runtime.py`, `test_window_pool.py` (throwaway PostgreSQL) | **39 passed** (incl. new boundary test, 2 cases) |
 | Ruff check + format, mypy on `window_service.py` | passed / no issues |
 | `flutter analyze` (ASCII copy, and inside the Android build script) | no issues |
-| `flutter test`, full client suite | **205 passed** (21 new; 199 before ADR-121) |
+| `flutter test`, full client suite | **207 passed** (23 new; 199 before ADR-121, 205 before ADR-122) |
 | New tests against the **old** `window_connection.dart` | 4 bug tests fail as expected (A, B ×2, C); the fail-closed tests pass. The ADR-121 hand-over tests fail against the pre-ADR-121 controller, as expected |
-| Gradle `:app:testDebugUnitTest` | **83 tests, 0 failures** (incl. new `burstRetriesStayInsideTheWakeUp`, `restoreWakeUpsStayInsideTheWindow`) |
+| Gradle `:app:testDebugUnitTest` | **87 tests, 0 failures** (83 before ADR-122) (incl. new `burstRetriesStayInsideTheWakeUp`, `restoreWakeUpsStayInsideTheWindow`) |
 | Gradle `:app:lintDebug` | passed |
 | Android build `scripts/build_flutter_client.ps1 -WindowTunnels -WindowSeconds 900` | passed (debug + unsigned release APK) |
 | Windows build `scripts/build_windows_client.ps1` | passed before the ADR-121 commit: Dart analyze clean, flutter test 199 passed, C++ ctest 2/2 passed, release build and unsigned zip. Not re-run after ADR-121 (Android-only native changes; the shared Dart code is covered by the 205-test run) |

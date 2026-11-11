@@ -922,6 +922,8 @@ class WindowConnectionController extends ConnectionController {
           ? 'Свежий handshake подтверждён'
           : confirmed
           ? 'Входящий трафик через VPN подтверждён'
+          : snapshot.recentNetworkChange && _hasEstablishedHandshake
+          ? 'Сеть сменилась, восстанавливается связь'
           : _handshakeOverdue
           ? 'Handshake не получен более ${handshakeHintAfter.inSeconds} с. '
                 'Нажмите «Отключить» и подключитесь заново.'
@@ -1074,7 +1076,9 @@ class WindowConnectionController extends ConnectionController {
             _inboundTraffic.observe(
               snapshot.receivedBytes,
               _clock.elapsedMilliseconds,
-            ));
+            ) &&
+            // ADR-122: inbound bytes from just before a network change prove nothing.
+            !snapshot.recentNetworkChange);
   }
 
   @override

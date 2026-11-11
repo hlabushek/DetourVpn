@@ -27,7 +27,16 @@ class NativeSnapshot {
     this.connectionId,
     this.windowGeneration,
     this.restoreActive = false,
+    this.networkChangeAgeMs,
   });
+
+  /// ADR-122: milliseconds since the phone's default network last changed; null if never or
+  /// unknown (older native builds, Windows).
+  final int? networkChangeAgeMs;
+
+  /// ADR-122: the network changed within the last minute, so older evidence proves nothing.
+  bool get recentNetworkChange =>
+      networkChangeAgeMs != null && networkChangeAgeMs! < 60000;
 
   /// ADR-121: a headless restore engine (reboot or process-kill restore) owns the tunnel now.
   final bool restoreActive;
@@ -59,6 +68,9 @@ class NativeSnapshot {
       network &&
       handshakeAge >= 0 &&
       handshakeAge <= 60 &&
+      // ADR-122: a handshake from before the last network change does not prove the new path.
+      (networkChangeAgeMs == null ||
+          handshakeAge * 1000 < networkChangeAgeMs!) &&
       remainingMs > 0;
 }
 
@@ -248,6 +260,11 @@ class PlatformTunnel
           ? value['windowGeneration'] as int
           : null,
       restoreActive: value['restoreActive'] == true,
+      networkChangeAgeMs:
+          value['networkChangeAgeMs'] is int &&
+              (value['networkChangeAgeMs'] as int) >= 0
+          ? value['networkChangeAgeMs'] as int
+          : null,
     );
   }
 

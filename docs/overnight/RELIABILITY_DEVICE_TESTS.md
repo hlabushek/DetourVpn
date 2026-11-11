@@ -87,6 +87,14 @@ Use a server you know is down, or turn its node off for this test (only if you c
 5. Then open DetourVPN. **Expected:** the VPN stays on; the app does not turn it off or create a new
    connection (it takes over the restored one).
 
+## Test 9 — Wi-Fi to mobile data and back (ADR-122, from build 0.1.0-beta.29)
+1. Connected on Wi-Fi, app open. Turn Wi-Fi off so the phone uses mobile data. Do **not** use
+   airplane mode.
+2. Open a web page every 10 s. Note how many seconds until pages load again.
+3. **Expected:** pages load again within about 20 s. While they do not, the status must not say
+   connected; it says «Сеть сменилась, восстанавливается связь».
+4. Turn Wi-Fi back on and repeat. Then switch twice within 10 s, and check it still recovers.
+
 ## What not to do
 - Do not send screenshots that show IP addresses, server names you consider private, or links.
 - Do not change anything on the servers for these tests, except turning off a node you control in

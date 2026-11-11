@@ -37,6 +37,9 @@ public final class ClientApplication extends Application implements Tunnel {
     private final TunnelWatchdog watchdog = new TunnelWatchdog();
     private android.net.Network defaultNetwork;
     private boolean defaultNetworkLost;
+    /** ADR-122: elapsed-realtime of the last default-network change, -1 if none; worker thread. */
+    private long lastNetworkChangeAt = -1;
+    private java.util.concurrent.ScheduledFuture<?> pendingCheck;
     int tunnelRestarts;
     TunnelProviderV1 provider;
     private final Handler mainThread = new Handler(Looper.getMainLooper());
@@ -135,9 +138,9 @@ public final class ClientApplication extends Application implements Tunnel {
                         defaultNetwork = network;
                         defaultNetworkLost = false;
                         if (changed) {
-                            watchdog.networkChanged(SystemClock.elapsedRealtime());
-                            worker.schedule(ClientApplication.this::watchTunnel,
-                                    TunnelWatchdog.SETTLE_MS + 500, TimeUnit.MILLISECONDS);
+                            lastNetworkChangeAt = SystemClock.elapsedRealtime();
+                            watchdog.networkChanged(lastNetworkChangeAt);
+                            scheduleWatch(TunnelWatchdog.SETTLE_MS + 500);
                         }
                     });
                 }
@@ -163,11 +166,15 @@ public final class ClientApplication extends Application implements Tunnel {
             long wall = System.currentTimeMillis() / 1000;
             handshakes.observe(handshake, wall);
             long age = handshake > 0 && handshake <= wall ? (wall - handshake) * 1000 : -1;
-            if (!watchdog.shouldRestart(now, age, hasValidatedNetwork())) return;
+            if (!watchdog.shouldRestart(now, age, hasValidatedNetwork())) {
+                schedulePendingWatch(now);
+                return;
+            }
             watchdog.restarted(now);
             try {
                 provider.restartInPlace();
                 tunnelRestarts++;
+                schedulePendingWatch(SystemClock.elapsedRealtime());
             } catch (Exception | LinkageError failed) {
                 try { stop(); } catch (Exception ignored) { /* Already down. */ }
                 reason = "native_restart_failed";
@@ -176,6 +183,18 @@ public final class ClientApplication extends Application implements Tunnel {
         } catch (RuntimeException ignored) {
             // A watchdog bug must never take the tunnel down by itself.
         }
+    }
+
+    /** ADR-122: check again when a pending network trigger may act (not only on the 15 s tick). */
+    private void schedulePendingWatch(long now) {
+        long delay = watchdog.pendingNetworkDelayMs(now);
+        if (delay >= 0) scheduleWatch(Math.max(delay + 500, 2_000));
+    }
+
+    /** Worker thread. One extra watchdog check; replaces any earlier one still waiting. */
+    private void scheduleWatch(long delayMs) {
+        if (pendingCheck != null) pendingCheck.cancel(false);
+        pendingCheck = worker.schedule(this::watchTunnel, delayMs, TimeUnit.MILLISECONDS);
     }
 
     private boolean hasValidatedNetwork() {
@@ -576,6 +595,9 @@ public final class ClientApplication extends Application implements Tunnel {
         value.put("nativeRenewal", renewer.active());
         value.put("handshakeSeen", handshakes.seen());
         value.put("restoreActive", recoveryEngine != null);
+        // ADR-122: a handshake older than the last network change does not prove the new path.
+        value.put("networkChangeAgeMs", lastNetworkChangeAt < 0 ? -1L
+                : SystemClock.elapsedRealtime() - lastNetworkChangeAt);
         // ADR-117: the fenced window identity, so a restarted UI can adopt this tunnel. Values the
         // app already received from the API; no key or token.
         if (up && deadline > 0 && window.connection != null) {

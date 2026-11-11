@@ -25,6 +25,9 @@ class Native extends FakeNative implements WindowNative {
   int? traffic;
   int? received;
   bool seen = false;
+
+  /// ADR-122: milliseconds since the phone's network changed (null = never).
+  int? networkChange;
   bool failPublicKey = false;
   @override
   Future<String> publicKey() async {
@@ -42,6 +45,7 @@ class Native extends FakeNative implements WindowNative {
     receivedBytes: received,
     reason: reason,
     handshakeSeen: seen,
+    networkChangeAgeMs: networkChange,
   );
   @override
   Future<void> connectWindow(
@@ -606,6 +610,54 @@ void main() {
         expect(restored.handovers, 0);
         expect(restored.stops, greaterThanOrEqualTo(1));
         expect(c.hasLease, isFalse);
+      },
+    );
+  });
+
+  group('ADR-122 network switch', () {
+    test('a handshake from before the network change is not proof', () {
+      NativeSnapshot at(int handshakeAge, int? change) => NativeSnapshot(
+        up: true,
+        network: true,
+        handshakeAge: handshakeAge,
+        remainingMs: 59000,
+        networkChangeAgeMs: change,
+      );
+      expect(at(10, null).confirmed, isTrue);
+      expect(
+        at(10, 5000).confirmed,
+        isFalse,
+      ); // handshake 10 s ago, switch 5 s ago
+      expect(at(2, 5000).confirmed, isTrue); // new handshake after the switch
+      expect(at(10, 20000).confirmed, isTrue);
+      expect(at(10, 5000).recentNetworkChange, isTrue);
+      expect(at(10, 60000).recentNetworkChange, isFalse);
+    });
+
+    test(
+      'after a switch the status says restoring until a new handshake',
+      () async {
+        await c.connect();
+        await c.refresh();
+        expect(c.phase, ConnectionPhase.connected);
+        // Wi-Fi -> mobile: the last handshake (30 s) happened on the old network.
+        native.age = 30;
+        native.received = 1000;
+        native.networkChange = 5000;
+        await c.refresh();
+        expect(c.phase, ConnectionPhase.reconnecting);
+        expect(c.detail, 'Сеть сменилась, восстанавливается связь');
+        expect(c.error, isNull);
+        // Inbound bytes alone do not prove the new path within the first minute.
+        native.received = 5000;
+        await c.refresh();
+        expect(c.phase, ConnectionPhase.reconnecting);
+        // A handshake on the new network confirms it again.
+        native.age = 2;
+        native.networkChange = 9000;
+        await c.refresh();
+        expect(c.phase, ConnectionPhase.connected);
+        expect(c.detail, 'Свежий handshake подтверждён');
       },
     );
   });

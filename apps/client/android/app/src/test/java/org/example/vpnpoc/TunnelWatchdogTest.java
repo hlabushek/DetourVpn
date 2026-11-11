@@ -38,7 +38,7 @@ public class TunnelWatchdogTest {
         assertFalse(w.shouldRestart(101_000, 30_000, true)); // still settling
         assertTrue(w.shouldRestart(103_000, 30_000, true)); // handshake predates the change
         w.restarted(103_000);
-        assertFalse(w.shouldRestart(104_000, 31_000, true)); // consumed
+        assertFalse(w.shouldRestart(104_000, 31_000, true)); // the restart itself is settling
 
         w.networkChanged(200_000);
         assertFalse(w.shouldRestart(204_000, 2_000, true)); // handshake already on new network
@@ -53,5 +53,56 @@ public class TunnelWatchdogTest {
         w.networkChanged(10_000);
         w.tunnelUp(20_000);
         assertFalse(w.shouldRestart(30_000, 5_000, true));
+    }
+
+    /** ADR-122: a change too soon after a restart waits for the gap instead of being dropped. */
+    @Test public void quickSecondChangeIsPostponedNotDropped() {
+        var w = new TunnelWatchdog();
+        w.tunnelUp(0);
+        w.networkChanged(100_000);
+        assertTrue(w.shouldRestart(103_000, 50_000, true));
+        w.restarted(103_000);
+        w.networkChanged(105_000); // Wi-Fi -> mobile right after
+        assertFalse(w.shouldRestart(108_500, 55_000, true)); // gap to 118 s
+        assertEquals(9_500, w.pendingNetworkDelayMs(108_500));
+        assertTrue(w.shouldRestart(118_000, 65_000, true)); // still no handshake since 105 s
+    }
+
+    /** ADR-122: no validated network yet keeps the change pending. */
+    @Test public void changeWaitsForAValidatedNetwork() {
+        var w = new TunnelWatchdog();
+        w.tunnelUp(0);
+        w.networkChanged(100_000);
+        assertFalse(w.shouldRestart(104_000, 40_000, false));
+        assertFalse(w.shouldRestart(110_000, 46_000, false));
+        assertTrue(w.shouldRestart(112_000, 48_000, true));
+    }
+
+    /** ADR-122: a restart without a handshake is retried twice, then left to the stall rule. */
+    @Test public void networkRestartIsRetriedAtMostTwiceAndNeverRaisesTheBackoff() {
+        var w = new TunnelWatchdog();
+        w.tunnelUp(0);
+        w.networkChanged(100_000);
+        assertTrue(w.shouldRestart(103_000, 50_000, true));
+        w.restarted(103_000);
+        assertEquals(15_000, w.pendingNetworkDelayMs(103_000));
+        assertTrue(w.shouldRestart(118_000, 65_000, true)); // retry 1
+        w.restarted(118_000);
+        assertTrue(w.shouldRestart(133_000, 80_000, true)); // retry 2
+        w.restarted(133_000);
+        assertEquals(-1, w.pendingNetworkDelayMs(133_000));
+        assertFalse(w.shouldRestart(150_000, 97_000, true)); // done; stall rule needs 180 s
+        assertEquals(TunnelWatchdog.STALE_GAP_MS, w.staleGapMs());
+    }
+
+    /** ADR-122: a handshake after the restart ends the retries. */
+    @Test public void handshakeAfterARestartEndsTheRetries() {
+        var w = new TunnelWatchdog();
+        w.tunnelUp(0);
+        w.networkChanged(100_000);
+        assertTrue(w.shouldRestart(103_000, 50_000, true));
+        w.restarted(103_000);
+        assertFalse(w.shouldRestart(118_000, 5_000, true)); // handshake 5 s ago, after the restart
+        assertEquals(-1, w.pendingNetworkDelayMs(118_000));
     }
 }
