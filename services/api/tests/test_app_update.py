@@ -244,3 +244,23 @@ def test_keygen_refuses_repository_paths_existing_files_and_weak_passphrases(
     assert existing.read_text(encoding="utf-8") == "TEST ONLY"
     assert app_update_keygen.main(["--private-key-out", str(tmp_path / "new.pem")]) == 2
     assert not (tmp_path / "new.pem").exists() and not (ROOT / "never.pem").exists()
+
+
+def test_apk_download_serves_only_a_plain_apk_name_inside_its_folder(tmp_path: Path) -> None:
+    folder = tmp_path / "downloads"
+    folder.mkdir()
+    (folder / "DetourVpn-0.1.0.apk").write_bytes(b"TEST ONLY APK BYTES")
+    (tmp_path / "secret.apk").write_bytes(b"outside")
+    (folder / "notes.txt").write_text("not an apk")
+    on = Settings(_env_file=None, environment="test", app_update_download_dir=folder)
+    off = Settings(_env_file=None, environment="test")
+    with TestClient(create_app(on)) as client:
+        ok = client.get("/api/v1/app/download/DetourVpn-0.1.0.apk")
+        assert ok.status_code == 200 and ok.content == b"TEST ONLY APK BYTES"
+        assert ok.headers["content-type"] == "application/vnd.android.package-archive"
+        for name in ("missing.apk", "notes.txt", "..%2Fsecret.apk", ".hidden.apk", "a.APK"):
+            assert client.get(f"/api/v1/app/download/{name}").status_code == 404
+    with TestClient(create_app(off)) as client:
+        gone = client.get("/api/v1/app/download/DetourVpn-0.1.0.apk")
+        assert gone.status_code == 404
+        assert gone.json()["error"]["code"] == "update_unavailable"

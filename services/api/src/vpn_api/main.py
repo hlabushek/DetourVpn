@@ -1,10 +1,11 @@
+import re
 from collections.abc import AsyncIterator, Awaitable, Callable
 from contextlib import asynccontextmanager
 from uuid import uuid4
 
 from fastapi import FastAPI, Request, Response
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import JSONResponse
+from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy import Engine
 from sqlalchemy.exc import SQLAlchemyError
@@ -39,6 +40,8 @@ from vpn_api.tunnels.routes import router as tunnels_router
 from vpn_api.tunnels.v3_contracts import ContractError
 from vpn_api.tunnels.window_routes import agent_router as window_agent_router
 from vpn_api.tunnels.window_routes import router as window_router
+
+APK_FILE_NAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]{0,79}\.apk")
 
 
 def create_app(
@@ -256,5 +259,27 @@ def create_app(
         if signed is None:
             return error_response(request, 404, "update_unavailable")
         return signed[0]
+
+    @app.get(
+        "/api/v1/app/download/{file_name}",
+        response_model=None,
+        tags=["app"],
+        responses={404: {"model": ErrorResponse, "description": "No such release file"}},
+        summary="Release APK named in the signed manifest (ADR-107); the app verifies its SHA-256",
+    )
+    def download_update_apk(request: Request, file_name: str) -> FileResponse | JSONResponse:
+        folder = config.app_update_download_dir
+        if folder is None or not APK_FILE_NAME.fullmatch(file_name):
+            return error_response(request, 404, "update_unavailable")
+        try:
+            target = (folder / file_name).resolve(strict=True)
+            base = folder.resolve(strict=True)
+        except OSError:
+            return error_response(request, 404, "update_unavailable")
+        if target.parent != base or not target.is_file():
+            return error_response(request, 404, "update_unavailable")
+        return FileResponse(
+            target, media_type="application/vnd.android.package-archive", filename=file_name
+        )
 
     return app

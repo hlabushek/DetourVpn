@@ -41,6 +41,8 @@ class Settings(BaseSettings):
     tunnel_profile_file: Path | None = Field(default=None, repr=False)
     # Latest-release manifest for the in-app updater (ADR-107). Unset = no update offered.
     app_update_manifest_file: Path | None = Field(default=None, repr=False)
+    # Folder holding the release APK that the manifest points to (served at /api/v1/app/download/).
+    app_update_download_dir: Path | None = Field(default=None, repr=False)
     # Ed25519 public key that must have signed it (ADR-107). Defaults to the key in the repo,
     # which is also compiled into the app; overriding it here cannot make the app accept it.
     app_update_public_key: str = Field(default=UPDATE_SIGNING_PUBLIC_KEY, max_length=44)
