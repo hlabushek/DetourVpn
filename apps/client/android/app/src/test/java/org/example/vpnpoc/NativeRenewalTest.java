@@ -54,20 +54,25 @@ public class NativeRenewalTest {
         String key = p.beginIntent(100000);
         long end = p.adopt(C, R, key, 2, "2026-11-10T21:00:00.000000Z",
                 "2026-11-10T21:15:00Z", 101000, wall);
-        assertEquals(Math.min(100000 + 900000 - 6000, 101000 + 900000 - 6000), end);
+        assertEquals(100000 + 900000 - 6000, end);
         assertThrows(IllegalStateException.class,
                 () -> p.adopt(C, R, key, 3, "2026-11-10T21:00:00Z", "2026-11-10T21:15:00Z", 101000, wall));
         assertThrows(IllegalStateException.class,
                 () -> p.adopt(C, W, key, 2, "2026-11-10T21:00:00Z", "2026-11-10T21:15:00Z", 101000, wall));
         assertThrows(IllegalStateException.class,
                 () -> p.adopt(C, R, W, 2, "2026-11-10T21:00:00Z", "2026-11-10T21:15:00Z", 101000, wall));
-        // Longer than requested, already expired, or issued in the future: refused.
+        // Longer than requested, or a device clock more than 5 minutes off: refused.
         assertThrows(IllegalStateException.class,
                 () -> p.adopt(C, R, key, 2, "2026-11-10T21:00:00Z", "2026-11-10T21:15:01Z", 101000, wall));
         assertThrows(IllegalStateException.class,
                 () -> p.adopt(C, R, key, 2, "2026-11-10T20:00:00Z", "2026-11-10T20:10:00Z", 101000, wall));
         assertThrows(IllegalStateException.class,
-                () -> p.adopt(C, R, key, 2, "2026-11-10T21:00:05Z", "2026-11-10T21:10:00Z", 101000, wall));
+                () -> p.adopt(C, R, key, 2, "2026-11-10T21:05:01Z", "2026-11-10T21:15:00Z", 101000, wall));
+        // ADR-123: a clock a few seconds or minutes off still renews; the deadline is monotonic.
+        assertEquals(100000 + 595000 - 6000, p.adopt(C, R, key, 2, "2026-11-10T21:00:05Z",
+                "2026-11-10T21:10:00Z", 101000, wall));
+        assertEquals(100000 + 900000 - 6000, p.adopt(C, R, key, 2, "2026-11-10T20:56:00Z",
+                "2026-11-10T21:11:00Z", 101000, wall));
         p.adopted(2, key, 42);
         assertEquals(2, p.generation);
         assertNull(p.intentKey);

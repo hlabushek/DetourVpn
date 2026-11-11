@@ -356,7 +356,7 @@ class WindowConnectionController extends ConnectionController {
     var deadline = now + live.remainingMs;
     if (handover && generation == nativeGeneration + 1) {
       try {
-        final end = _bound(raw);
+        final end = _bound(raw, requested: false);
         if (end <= deadline) return false;
         await _native.advanceWindow(raw, end - _clock.elapsedMilliseconds);
         deadline = end;
@@ -686,22 +686,35 @@ class WindowConnectionController extends ConnectionController {
     }
   }
 
-  int _bound(Map<String, dynamic> grant) {
+  /// ADR-123: how far the device clock may differ from the server's.
+  static const maxClockSkew = Duration(minutes: 5);
+
+  /// [requested]: this client asked for the window after [_intentAt] (initial connect, Dart
+  /// renewal), so the monotonic deadline is safe whatever the device clock says. Otherwise
+  /// (adopting a window someone else renewed) the wall clock also bounds it.
+  int _bound(Map<String, dynamic> grant, {bool requested = true}) {
     final issued = DateTime.parse(grant['issued_at'] as String);
     final expiry = DateTime.parse(grant['not_after'] as String);
     final duration = expiry.difference(issued).inMilliseconds;
     if (!issued.isUtc ||
         !expiry.isUtc ||
         duration <= 6000 ||
-        duration > maxWindowMs ||
-        issued.isAfter(DateTime.now().toUtc().add(const Duration(seconds: 1))))
+        duration > maxWindowMs)
       throw const ClientError('invalid_response');
-    final deadline = min(
-      _intentAt + duration - 6000,
-      _clock.elapsedMilliseconds +
-          expiry.difference(DateTime.now().toUtc()).inMilliseconds -
-          6000,
-    );
+    final wallNow = DateTime.now().toUtc();
+    final elapsed = _clock.elapsedMilliseconds;
+    // ADR-123: a device clock that is minutes off is the user's setting to fix, not bad data.
+    final sinceIntent = Duration(milliseconds: max(0, elapsed - _intentAt));
+    if (issued.isAfter(wallNow.add(maxClockSkew)) ||
+        (requested &&
+            issued.isBefore(wallNow.subtract(sinceIntent + maxClockSkew))))
+      throw const ClientError('device_clock_skew');
+    final deadline = requested
+        ? _intentAt + duration - 6000
+        : min(
+            _intentAt + duration - 6000,
+            elapsed + expiry.difference(wallNow).inMilliseconds - 6000,
+          );
     if (deadline <= _clock.elapsedMilliseconds)
       throw const ClientError('lease_expired');
     return deadline;

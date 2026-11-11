@@ -14,6 +14,8 @@ import java.util.regex.Pattern;
  */
 final class NativeRenewal {
     static final long SAFETY_MS = 6000;
+    /** ADR-123: how far the device clock may differ from the server's. */
+    static final long MAX_CLOCK_SKEW_MS = 300000;
     static final long MIN_BACKOFF_MS = 2000;
     static final long MAX_BACKOFF_MS = 60000;
     static final long AWAKE_CHECK_MS = 30000;
@@ -116,11 +118,14 @@ final class NativeRenewal {
         long issued = parseUtcMillis(issuedAt);
         long expiry = parseUtcMillis(notAfter);
         long duration = expiry - issued;
+        // ADR-123: this window was issued after the intent, so the elapsed-realtime deadline is
+        // safe whatever the wall clock says; the wall clock only catches a clock minutes off.
+        long sinceIntent = Math.max(0, nowElapsed - intentAtElapsed);
         if (duration <= SAFETY_MS || duration > windowSeconds * 1000L
-                || issued > nowWallMs + 1000)
+                || issued > nowWallMs + MAX_CLOCK_SKEW_MS
+                || issued < nowWallMs - sinceIntent - MAX_CLOCK_SKEW_MS)
             throw new IllegalStateException();
-        long end = Math.min(intentAtElapsed + duration - SAFETY_MS,
-                nowElapsed + (expiry - nowWallMs) - SAFETY_MS);
+        long end = intentAtElapsed + duration - SAFETY_MS;
         if (end <= nowElapsed) throw new IllegalStateException();
         return end;
     }

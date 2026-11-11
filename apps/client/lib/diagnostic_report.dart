@@ -7,6 +7,7 @@ import 'platform_info.dart';
 const _reportableErrors = <String>{
   'admission_closed',
   'api_unavailable',
+  'device_clock_skew',
   'device_conflict',
   'device_limit_reached',
   'device_revoked',

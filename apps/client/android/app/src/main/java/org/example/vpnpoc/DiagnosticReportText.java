@@ -6,7 +6,7 @@ final class DiagnosticReportText {
     private DiagnosticReportText() { }
 
     private static final Set<String> ERROR_CODES = Set.of(
-        "admission_closed", "api_unavailable", "device_conflict", "device_limit_reached",
+        "admission_closed", "api_unavailable", "device_clock_skew", "device_conflict", "device_limit_reached",
         "device_revoked", "insufficient_quota", "insufficient_window_funding",
         "invalid_response", "lease_expired", "login_failed", "native_config_invalid",
         "native_disconnect_failed", "native_down", "native_engine_unavailable",

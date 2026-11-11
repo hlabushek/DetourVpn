@@ -28,6 +28,9 @@ class Native extends FakeNative implements WindowNative {
 
   /// ADR-122: milliseconds since the phone's network changed (null = never).
   int? networkChange;
+
+  /// ADR-123: the time the controller gave the last started window, in milliseconds.
+  int? windowMs;
   bool failPublicKey = false;
   @override
   Future<String> publicKey() async {
@@ -53,6 +56,7 @@ class Native extends FakeNative implements WindowNative {
     Map<String, dynamic> grant,
     int remainingMs,
   ) async {
+    windowMs = remainingMs;
     await connect(config, remainingMs);
     // Real monotonic controller clock must advance before a later ACK can extend
     // its deadline. An instantaneous fake platform reply can share the same ms.
@@ -610,6 +614,55 @@ void main() {
         expect(restored.handovers, 0);
         expect(restored.stops, greaterThanOrEqualTo(1));
         expect(c.hasLease, isFalse);
+      },
+    );
+  });
+
+  group('ADR-123 device clock', () {
+    test(
+      'a clock a few seconds slow still connects (was invalid_response)',
+      () async {
+        api.issued = DateTime.now().toUtc().add(const Duration(seconds: 3));
+        await c.connect();
+        expect(c.error, isNull);
+        expect(c.phase, isNot(ConnectionPhase.failed));
+        // The deadline comes from the app's own timer: the full window minus 6 s.
+        expect(native.windowMs, inInclusiveRange(80000, 84000));
+      },
+    );
+
+    test(
+      'a clock minutes fast does not shorten or expire the window',
+      () async {
+        api.issued = DateTime.now().toUtc().subtract(
+          const Duration(minutes: 4),
+        );
+        await c.connect();
+        expect(c.error, isNull);
+        expect(native.windowMs, inInclusiveRange(80000, 84000));
+      },
+    );
+
+    test(
+      'a clock more than 5 minutes off stops with a clear message',
+      () async {
+        for (final offset in [
+          const Duration(minutes: 6),
+          const Duration(minutes: -6),
+        ]) {
+          api
+            ..state = 'active'
+            ..issued = DateTime.now().toUtc().add(offset);
+          await c.connect();
+          expect(c.error, 'device_clock_skew');
+          expect(c.diagnosticStage, 'lease_validation');
+          expect(c.phase, ConnectionPhase.failed);
+          expect(
+            messageFor('device_clock_skew'),
+            contains('автоматическую установку'),
+          );
+          await c.disconnect();
+        }
       },
     );
   });
