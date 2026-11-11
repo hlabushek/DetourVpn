@@ -15,7 +15,7 @@ check(prepared.resolve("PREPARED.json").isFile) { "Run scripts/prepare_android_p
 val preparedReceipt = groovy.json.JsonSlurper().parse(prepared.resolve("PREPARED.json")) as Map<*, *>
 // Keep this fingerprint in sync with apps/android/patches/go-only.patch.
 // Build snapshots intentionally omit patch files, so the reviewed hash is pinned here.
-val expectedPatchHash = "523e726eb306af84addfa7c2ef6f4e0b6f89c8e4e9db7d015147752f843c2000"
+val expectedPatchHash = "8ec52ecfca43665a4a6db859a2adf4eb522ebd9009a5c474c9f063b83289fc26"
 check(preparedReceipt["patch_sha256"] == expectedPatchHash) {
     "Prepared GoBackend SDK patch hash is stale; prepare a fresh SDK tree matching apps/android/patches/go-only.patch and pass -PawgPreparedDir=<path>"
 }

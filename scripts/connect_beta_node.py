@@ -385,7 +385,12 @@ info = p.lstat()
 if not stat.S_ISREG(info.st_mode) or info.st_uid != 0 or info.st_mode & 0o077 or info.st_nlink != 1 or info.st_size > 65536: raise SystemExit(41)
 data = json.loads(p.read_bytes())
 if data.get("version") != 1 or not isinstance(data.get("slots"), list): raise SystemExit(42)
-sys.stdout.write(json.dumps({"version": 1, "slots": [{k: s[k] for k in ("slot_id", "endpoint", "server_public_key", "header_protection_key")} for s in data["slots"]]}, separators=(",", ":")))
+pool = data.get("pool_peers")
+if pool is not None and (type(pool) is not int or not 2 <= pool <= 250 or len(data["slots"]) != 1): raise SystemExit(43)
+out = {"version": 1, "slots": [{k: s[k] for k in ("slot_id", "endpoint", "server_public_key", "header_protection_key")} for s in data["slots"]]}
+if pool is not None: out["pool_peers"] = pool
+out["latency_probe"] = Path("/etc/systemd/system/detourvpn-beta-latency-probe.service").is_file()
+sys.stdout.write(json.dumps(out, separators=(",", ":")))
 """
 
 # stdin: {"node_id", "credential", "api_origin", "slot_count"}
@@ -403,7 +408,12 @@ si = (root / "slots.json").lstat()
 if not stat.S_ISREG(si.st_mode) or si.st_uid != 0 or si.st_mode & 0o077 or si.st_nlink != 1: raise SystemExit(43)
 slots = json.loads((root / "slots.json").read_bytes())
 if payload["slot_count"] != len(slots.get("slots", [])) or not 1 <= payload["slot_count"] <= 16: raise SystemExit(44)
-files = ((root / "agent.json", (json.dumps({"node_id": str(node_id), "api_origin": origin, "slot_count": payload["slot_count"]}, sort_keys=True, indent=2) + "\n").encode("ascii")), (root / "credential", (credential + "\n").encode("ascii")))
+agent = {"node_id": str(node_id), "api_origin": origin, "slot_count": payload["slot_count"]}
+pool = slots.get("pool_peers")
+if pool is not None:
+    if type(pool) is not int or not 2 <= pool <= 250 or payload["slot_count"] != 1: raise SystemExit(44)
+    agent["pool_peers"] = pool  # ADR-101: the installer's slots.json is the source of truth.
+files = ((root / "agent.json", (json.dumps(agent, sort_keys=True, indent=2) + "\n").encode("ascii")), (root / "credential", (credential + "\n").encode("ascii")))
 created = []
 try:
     for path, data in files:
@@ -684,19 +694,33 @@ def register(hosts: Hosts, execute_changes: bool) -> dict[str, object]:
     return {"registered": True, "node_id": node_id, "status": "disabled", **plan}
 
 
-def slots_of(hosts: Hosts) -> list[dict[str, object]]:
+def inventory_of(hosts: Hosts) -> tuple[list[dict[str, object]], int | None, bool]:
+    """The node's slots, its ADR-101 pool size (if any) and whether it runs the ADR-102 probe."""
     try:
-        slots: list[dict[str, object]] = json.loads(
-            hosts.node_run(NODE_READ_SLOTS, label="read_slots")
-        )["slots"]
-    except (ValueError, KeyError, TypeError):
+        data = json.loads(hosts.node_run(NODE_READ_SLOTS, label="read_slots"))
+        slots: list[dict[str, object]] = data["slots"]
+        pool = data.get("pool_peers")
+        probe = data.get("latency_probe", False) is True
+    except (ValueError, KeyError, TypeError, AttributeError):
         raise ConnectError("connect_slots_invalid") from None
     if not 1 <= len(slots) <= MAX_SLOTS:
         raise ConnectError("connect_slots_invalid")
-    return slots
+    if pool is not None and (type(pool) is not int or not 2 <= pool <= 250 or len(slots) != 1):
+        raise ConnectError("connect_slots_invalid")
+    return slots, pool, probe
 
 
-def manifest_entry(node_id: UUID, slots: list[dict[str, object]], host: str) -> dict[str, object]:
+def slots_of(hosts: Hosts) -> list[dict[str, object]]:
+    return inventory_of(hosts)[0]
+
+
+def manifest_entry(
+    node_id: UUID,
+    slots: list[dict[str, object]],
+    host: str,
+    pool_peers: int | None = None,
+    latency_probe: bool = False,
+) -> dict[str, object]:
     rendered = []
     for expected, slot in enumerate(slots, start=1):
         endpoint = str(slot["endpoint"])
@@ -708,7 +732,14 @@ def manifest_entry(node_id: UUID, slots: list[dict[str, object]], host: str) -> 
                 for key in ("slot_id", "endpoint", "server_public_key", "header_protection_key")
             }
         )
-    return {"node_id": str(node_id), "slots": rendered}
+    entry: dict[str, object] = {"node_id": str(node_id), "slots": rendered}
+    if pool_peers is not None:
+        if len(rendered) != 1:
+            raise ConnectError("connect_slot_endpoint_invalid")
+        entry["pool_peers"] = pool_peers
+    if latency_probe:
+        entry["latency_probe"] = True
+    return entry
 
 
 def bind(hosts: Hosts, execute_changes: bool) -> dict[str, object]:
@@ -717,9 +748,11 @@ def bind(hosts: Hosts, execute_changes: bool) -> dict[str, object]:
     state = api_status(hosts)
     if state.get("row") != "disabled" or state.get("credential") != "present":
         raise ConnectError("connect_bind_requires_registered_disabled_node")
-    slots = slots_of(hosts)
+    slots, pool_peers, latency_probe = inventory_of(hosts)
     summary: dict[str, object] = {
         "slots": len(slots),
+        "pool_peers": pool_peers,
+        "latency_probe": latency_probe,
         "in_manifest": state.get("in_manifest") == "1",
     }
     if not execute_changes:
@@ -734,7 +767,7 @@ def bind(hosts: Hosts, execute_changes: bool) -> dict[str, object]:
         credential = str(record["credential"])
     except (ValueError, KeyError, TypeError):
         raise ConnectError("connect_credential_invalid") from None
-    entry = manifest_entry(node_id, slots, node.host)
+    entry = manifest_entry(node_id, slots, node.host, pool_peers, latency_probe)
     payload = canonical_json(
         {
             "node_id": str(node_id),

@@ -108,6 +108,25 @@ void main() {
     );
   });
 
+  test('handshake line is a fixed category or omitted (task 7)', () {
+    final seen = DiagnosticReport.fromError(
+      'lease_expired',
+      'lease_poll',
+      handshake: 'not_seen',
+    );
+    expect(
+      seen.text.split(String.fromCharCode(10)).last,
+      'Handshake: not_seen',
+    );
+    final unknown = DiagnosticReport.fromError(
+      'lease_expired',
+      'lease_poll',
+      handshake: 'peer=secret',
+    );
+    expect(unknown.handshake, isNull);
+    expect(unknown.text.contains('Handshake'), isFalse);
+  });
+
   test('report retains known error and local stage', () {
     final report = DiagnosticReport.fromError(
       'invalid_response',

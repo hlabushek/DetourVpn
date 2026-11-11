@@ -21,8 +21,15 @@ from uuid import UUID, uuid4
 from pydantic import Field, field_validator
 from window_gate import SlotGate
 from window_peer import SlotPeer
+from window_pool import PoolGate, PoolInterface, PoolPeer
 
-from vpn_api.tunnels.v3_contracts import CAPABILITIES, ContractError, FrozenInput, WindowCommands
+from vpn_api.tunnels.v3_contracts import (
+    CAPABILITIES,
+    POOL_CAPABILITIES,
+    ContractError,
+    FrozenInput,
+    WindowCommands,
+)
 from vpn_api.tunnels.window_journal import RuntimeFault, open_private_journal
 from vpn_api.tunnels.window_runtime import Gate, Peer, WindowJournal, WindowRuntime
 
@@ -38,6 +45,15 @@ class Configuration(FrozenInput):
     node_id: UUID
     api_origin: str
     slot_count: int = Field(strict=True, ge=1, le=16)
+    # ADR-101: when set, slot 1 is a pool hosting this many peers (and slot_count must be 1).
+    pool_peers: int | None = Field(default=None, strict=True, ge=2, le=250)
+
+    @field_validator("pool_peers")
+    @classmethod
+    def pool_single_slot(cls, value: int | None, info: Any) -> int | None:
+        if value is not None and info.data.get("slot_count") != 1:
+            raise ValueError("A pool node has exactly one operator slot")
+        return value
 
     @field_validator("api_origin")
     @classmethod
@@ -131,7 +147,12 @@ class Control:
         return result
 
 
-def register(runtime: WindowRuntime, control: Control, public_keys: list[str]) -> None:
+def register(
+    runtime: WindowRuntime,
+    control: Control,
+    public_keys: list[str],
+    capabilities: frozenset[str] = CAPABILITIES,
+) -> None:
     observed = control.post("inventory", {})
     previous = observed.get("runtime_id")
     if previous == str(runtime.runtime_id):
@@ -144,7 +165,7 @@ def register(runtime: WindowRuntime, control: Control, public_keys: list[str]) -
             "contract_version": 3,
             "runtime_id": str(runtime.runtime_id),
             "previous_runtime_id": previous,
-            "capabilities": sorted(CAPABILITIES),
+            "capabilities": sorted(capabilities),
             "server_public_keys": public_keys,
             "gates_closed": True,
         },
@@ -198,6 +219,7 @@ def main() -> int:
     peers: dict[int, Peer] = {}
     native_gates: list[SlotGate] = []
     native_peers: list[SlotPeer] = []
+    pools: list[PoolInterface] = []
     runtime = None
     stage = "preflight"
     try:
@@ -214,17 +236,31 @@ def main() -> int:
             try:
                 if os.fstat(fd).st_ino != ready.native_netns_inode:
                     raise RuntimeFault("ready_core_namespace_conflict")
+                public_keys.append(ready.server_public_key)
+                if config.pool_peers is not None:
+                    pool = PoolInterface(AWG, ready.native_pid, fd, ready.server_public_key)
+                    pools.append(pool)
+                    for index in range(1, config.pool_peers + 1):
+                        gates[index] = PoolGate(index, pool)
+                        peers[index] = PoolPeer(index, pool)
+                    continue
                 peer = SlotPeer(slot, AWG, ready.native_pid, fd, ready.server_public_key)
                 native_peers.append(peer)
                 gate = SlotGate(slot, fd)
                 native_gates.append(gate)
                 gates[slot], peers[slot] = gate, peer
-                public_keys.append(ready.server_public_key)
             finally:
                 os.close(fd)
         control = Control(config, credential)
+        capabilities = CAPABILITIES if config.pool_peers is None else POOL_CAPABILITIES
         with open_private_journal(STATE) as connection:
-            runtime = WindowRuntime(config.node_id, WindowJournal(connection), gates, peers)
+            runtime = WindowRuntime(
+                config.node_id,
+                WindowJournal(connection),
+                gates,
+                peers,
+                meter="kernel-outer-ip.v1" if config.pool_peers is None else "kernel-inner-ip.v1",
+            )
             stage = "startup_close"
             runtime.startup()
             signal.signal(signal.SIGTERM, stop)
@@ -235,7 +271,7 @@ def main() -> int:
                 stage = "control_poll"
                 try:
                     if not registered:
-                        register(runtime, control, public_keys)
+                        register(runtime, control, public_keys, capabilities)
                         registered = True
                     tick(runtime, control)
                     if failed:
@@ -257,6 +293,14 @@ def main() -> int:
         return 1
     finally:
         # Always attempt every gate, including when only part of startup completed.
+        for index, pool_gate in gates.items():
+            if isinstance(pool_gate, PoolGate):
+                try:
+                    pool_gate.close()
+                except Exception:
+                    print(json.dumps({"event": "gate_close_failed", "peer": index}), flush=True)
+        for pool in pools:
+            pool.dispose()
         for gate in native_gates:
             try:
                 gate.close()

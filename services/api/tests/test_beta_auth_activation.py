@@ -44,9 +44,7 @@ def closed_environment() -> str:
 def test_render_activation_enables_auth_only_with_invite_gate(
     closed_environment: str, release: Path
 ) -> None:
-    rendered = activation.render_activation(
-        closed_environment, str(release), "A" * 43, "B" * 43
-    )
+    rendered = activation.render_activation(closed_environment, str(release), "A" * 43, "B" * 43)
     _, values = activation.parse_environment(rendered)
     assert values["VPN_CLOSED_ADMIN_ONLY"] == "false"
     assert values["VPN_ENABLE_AUTH"] == "true"
@@ -76,9 +74,7 @@ def test_render_activation_fails_closed(
         activation.render_activation(existing, str(release), "A" * 43, "B" * 43)
 
 
-def test_render_activation_rejects_duplicate_keys(
-    closed_environment: str, release: Path
-) -> None:
+def test_render_activation_rejects_duplicate_keys(closed_environment: str, release: Path) -> None:
     with pytest.raises(ValueError, match="duplicate_beta_environment_key"):
         activation.render_activation(
             closed_environment + "VPN_ENABLE_AUTH=false\n",
@@ -92,10 +88,6 @@ def test_render_activation_rejects_invalid_release_and_secrets(
     closed_environment: str, release: Path, tmp_path: Path
 ) -> None:
     with pytest.raises(ValueError, match="beta_mini_app_release_invalid"):
-        activation.render_activation(
-            closed_environment, str(tmp_path), "A" * 43, "B" * 43
-        )
+        activation.render_activation(closed_environment, str(tmp_path), "A" * 43, "B" * 43)
     with pytest.raises(ValueError, match="beta_auth_secret_invalid"):
-        activation.render_activation(
-            closed_environment, str(release), "short", "B" * 43
-        )
+        activation.render_activation(closed_environment, str(release), "short", "B" * 43)

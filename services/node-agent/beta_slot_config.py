@@ -37,6 +37,8 @@ class BetaSlotConfiguration(BaseModel):
     node_id: UUID
     api_origin: str
     slots: list[SlotSource] = Field(min_length=1, max_length=16)
+    # ADR-101: slot 1 becomes a pool hosting this many peers.
+    pool_peers: int | None = Field(default=None, strict=True, ge=2, le=250)
 
     @field_validator("api_origin")
     @classmethod
@@ -62,6 +64,8 @@ class BetaSlotConfiguration(BaseModel):
         endpoints = [slot.endpoint for slot in self.slots]
         if len(set(endpoints)) != len(endpoints):
             raise ValueError("Unique slot endpoints required")
+        if self.pool_peers is not None and len(self.slots) != 1:
+            raise ValueError("A pool uses exactly one slot")
         return self
 
 
@@ -148,28 +152,29 @@ def render_configs(raw: bytes) -> RenderedConfigs:
             + "\n"
         ).encode("ascii")
 
-    agent_config = {
+    agent_config: dict[str, object] = {
         "node_id": str(source.node_id),
         "api_origin": source.api_origin,
         "slot_count": len(source.slots),
     }
+    manifest_node: dict[str, object] = {"node_id": str(source.node_id), "slots": manifest_slots}
+    node_slots_source: dict[str, object] = {"version": 1, "slots": node_slots}
+    if source.pool_peers is not None:
+        agent_config["pool_peers"] = source.pool_peers
+        manifest_node["pool_peers"] = source.pool_peers
+        node_slots_source["pool_peers"] = source.pool_peers
     try:
-        WindowManifest.model_validate(
-            {"version": 3, "nodes": [{"node_id": str(source.node_id), "slots": manifest_slots}]}
-        )
+        WindowManifest.model_validate({"version": 3, "nodes": [manifest_node]})
     except ValueError:
         raise ConfigError("beta_window_manifest_invalid") from None
     manifest_bytes = (
-        json.dumps(
-            {"version": 3, "nodes": [{"node_id": str(source.node_id), "slots": manifest_slots}]},
-            indent=2,
-            sort_keys=True,
-        ).encode("utf-8")
+        json.dumps({"version": 3, "nodes": [manifest_node]}, indent=2, sort_keys=True).encode(
+            "utf-8"
+        )
         + b"\n"
     )
     node_slots_bytes = (
-        json.dumps({"version": 1, "slots": node_slots}, indent=2, sort_keys=True).encode("utf-8")
-        + b"\n"
+        json.dumps(node_slots_source, indent=2, sort_keys=True).encode("utf-8") + b"\n"
     )
     agent_bytes = json.dumps(agent_config, indent=2, sort_keys=True).encode("utf-8") + b"\n"
     if any(

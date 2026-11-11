@@ -12,7 +12,10 @@ from typing import Protocol
 from uuid import UUID, uuid4
 
 from vpn_api.tunnels.v3_contracts import (
+    MAX_PEER_SLOT,
+    MAX_WINDOW_SECONDS,
     ClosedWindow,
+    Meter,
     WindowGrant,
     validate_closed_window,
     validate_grant,
@@ -45,7 +48,7 @@ class WindowJournal:
         self.db.execute("PRAGMA synchronous=FULL")
         self.db.executescript("""
             CREATE TABLE IF NOT EXISTS slots (
-                slot INTEGER PRIMARY KEY CHECK(slot BETWEEN 1 AND 16),
+                slot INTEGER PRIMARY KEY CHECK(slot BETWEEN 1 AND 250),
                 grant_json TEXT NOT NULL,
                 state TEXT NOT NULL CHECK(state IN ('intent','active','closed'))
             );
@@ -62,6 +65,13 @@ class WindowJournal:
                 BEFORE DELETE ON receipts
                 BEGIN SELECT RAISE(ABORT,'receipt_immutable'); END;
         """)
+
+    def slot_limit(self) -> int:
+        """Highest slot id this journal's schema accepts (16 for pre-ADR-101 journals)."""
+        row = self.db.execute(
+            "SELECT sql FROM sqlite_master WHERE type='table' AND name='slots'"
+        ).fetchone()
+        return 250 if row and "BETWEEN 1 AND 250" in row[0] else 16
 
     def current(self, slot: int) -> tuple[WindowGrant, str] | None:
         row = self.db.execute("SELECT grant_json,state FROM slots WHERE slot=?", (slot,)).fetchone()
@@ -138,14 +148,21 @@ class WindowRuntime:
         peers: dict[int, Peer],
         *,
         now: Callable[[], datetime] = lambda: datetime.now(UTC),
+        meter: Meter = "kernel-outer-ip.v1",
     ) -> None:
+        limit = 16 if meter == "kernel-outer-ip.v1" else MAX_PEER_SLOT
         if (
             not gates
-            or len(gates) > 16
+            or len(gates) > limit
             or gates.keys() != peers.keys()
-            or any(type(slot) is not int or not 1 <= slot <= 16 for slot in gates)
+            or any(type(slot) is not int or not 1 <= slot <= limit for slot in gates)
         ):
             raise RuntimeFault("operator_slots_invalid")
+        if max(gates) > journal.slot_limit():
+            # A journal created before ADR-101 cannot hold pool peer indexes; fail closed
+            # instead of failing later, mid-admission.
+            raise RuntimeFault("journal_slot_range_legacy")
+        self.meter: Meter = meter
         self.node_id, self.runtime_id = node_id, uuid4()
         self.journal, self.gates, self.peers, self.now = journal, gates, peers, now
         self.started = False
@@ -161,7 +178,7 @@ class WindowRuntime:
             generation=grant.generation,
             gate_closed=True,
             observation="unknown" if measured is None else "measured",
-            meter="kernel-outer-ip.v1",
+            meter=self.meter,
             observed_bytes=measured,
         )
 
@@ -248,7 +265,7 @@ class WindowRuntime:
                 self.peers[slot].install(grant.public_key)
             # At most 5s native operation plus the allowed 1s server-ahead clock skew.
             remaining = math.floor((grant.not_after - self.now()).total_seconds() * 1000) - 6000
-            if not 1 <= remaining <= 90000:
+            if not 1 <= remaining <= MAX_WINDOW_SECONDS * 1000:
                 raise RuntimeFault("dispatch_deadline_exhausted")
             gate.open(remaining)
             self.journal.save(grant, "active")

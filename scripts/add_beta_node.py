@@ -141,10 +141,12 @@ def stage_preflight(node: BetaNode, inventory: Path) -> int:
     return 0
 
 
-def stages() -> list[tuple[str, str, Callable[[BetaNode, Path], int]]]:
+def stages(pool_peers: int = 0) -> list[tuple[str, str, Callable[[BetaNode, Path], int]]]:
     def install(node: BetaNode, inventory: Path) -> int:
+        # ADR-101: a pool node serves up to pool_peers devices at once; 0 = one-device slot.
+        pool = ["--pool-peers", str(pool_peers)] if pool_peers else []
         return install_beta_node.main(
-            ["--node", node.name, "--inventory", str(inventory), "--execute"]
+            ["--node", node.name, "--inventory", str(inventory), *pool, "--execute"]
         )
 
     def connect(command: str) -> Callable[[BetaNode, Path], int]:
@@ -169,7 +171,7 @@ def run(arguments: argparse.Namespace) -> int:
     if node is None or node.name == "detourvpn-beta-helsinki":
         raise WizardError("wizard_node_not_allowed")
     done = load_done(node.name)
-    for key, title, stage in stages():
+    for key, title, stage in stages(getattr(arguments, "pool_peers", 0)):
         if key in done:
             print(f"[пропуск] {title}: уже сделано")
             continue
@@ -200,6 +202,12 @@ def main(argv: list[str] | None = None) -> int:
     new.add_argument("--city", required=True)
     go = commands.add_parser("run")
     go.add_argument("--node", required=True)
+    go.add_argument(
+        "--pool-peers",
+        type=int,
+        default=32,
+        help="сколько устройств одновременно (ADR-101); 0 = старый режим на одно устройство",
+    )
     arguments = parser.parse_args(argv)
     try:
         return prepare(arguments) if arguments.command == "prepare" else run(arguments)

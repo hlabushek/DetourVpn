@@ -1,0 +1,8 @@
+<!-- Monochrome status-bar icon for the VPN foreground notification. GoBackend looks it up by
+     name (getIdentifier), so lint cannot see the reference and shrinking must keep it. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    tools:ignore="UnusedResources" tools:keep="@drawable/ic_stat_vpn"
+    android:width="24dp" android:height="24dp" android:viewportWidth="48" android:viewportHeight="48">
+    <path android:fillColor="#FFFFFFFF" android:pathData="M24,6L39,12v12c0,9.5 -7,15.5 -15,18.5C16,39.5 9,33.5 9,24V12z" />
+</vector>

@@ -134,7 +134,7 @@ void main() {
     api.close();
   });
   test(
-    'refresh is consumed durably before request and replaced after validation',
+    'old refresh stays durable during the request and is replaced after validation',
     () async {
       final store = MemoryStore()
         ..value = {
@@ -142,9 +142,9 @@ void main() {
           'refresh_token': 'TEST ONLY OLD',
         };
       final server = await HttpServer.bind('127.0.0.1', 18766);
-      var consumed = false;
+      String? durableDuringRequest;
       server.listen((request) async {
-        consumed = store.value == null;
+        durableDuringRequest = store.value?['refresh_token'] as String?;
         request.response.write(
           jsonEncode({
             'access_token': 'TEST ONLY ACCESS',
@@ -159,13 +159,14 @@ void main() {
         await server.close(force: true);
       });
       await api.restoreSession();
-      expect(consumed, true);
+      // ADR-100: a crash or lost response mid-request must leave a token to replay.
+      expect(durableDuringRequest, 'TEST ONLY OLD');
       expect(api.authenticated, true);
       expect(store.value!['refresh_token'], 'TEST ONLY NEW');
     },
   );
   test(
-    'lost response leaves no durable token to replay on next startup',
+    'transport failure keeps the durable token for a bounded server replay',
     () async {
       final store = MemoryStore()
         ..value = {
@@ -182,11 +183,41 @@ void main() {
         api.close();
         await server.close(force: true);
       });
-      await expectLater(api.restoreSession(), throwsA(isA<ClientError>()));
-      expect(store.value, null);
+      await expectLater(
+        api.restoreSession(),
+        throwsA(
+          isA<ClientError>().having((e) => e.code, 'code', 'api_unavailable'),
+        ),
+      );
+      expect(store.value!['refresh_token'], 'TEST ONLY OLD');
       expect(api.authenticated, false);
     },
   );
+  test('an explicit refresh refusal erases the session', () async {
+    final store = MemoryStore()
+      ..value = {
+        'origin': 'http://127.0.0.1:18766',
+        'refresh_token': 'TEST ONLY OLD',
+      };
+    final server = await HttpServer.bind('127.0.0.1', 18766);
+    server.listen((request) async {
+      request.response.statusCode = 401;
+      request.response.write(
+        jsonEncode({
+          'error': {'code': 'refresh_reused', 'message': 'TEST ONLY'},
+        }),
+      );
+      await request.response.close();
+    });
+    final api = Api(Uri.parse('http://127.0.0.1:18766'), store: store);
+    addTearDown(() async {
+      api.close();
+      await server.close(force: true);
+    });
+    await expectLater(api.restoreSession(), throwsA(isA<ClientError>()));
+    expect(store.value, null);
+    expect(api.authenticated, false);
+  });
 
   test(
     'history cursor query is sent intact; other queries are rejected',

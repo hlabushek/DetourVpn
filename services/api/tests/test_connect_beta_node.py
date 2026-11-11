@@ -545,3 +545,17 @@ def test_main_errors_use_fixed_codes_without_remote_output(
     monkeypatch.setattr(connect, "Hosts", lambda node: fake)
     code, _out, err = run_main(monkeypatch, capsys, "register", "--node", "detourvpn-beta-germany")
     assert code == 1 and json.loads(err)["error"].startswith("connect_remote_step_failed")
+
+
+def test_pool_manifest_entry_carries_peer_count() -> None:
+    slots = [
+        {
+            "slot_id": 1,
+            "endpoint": "9.9.9.9:51901",
+            "server_public_key": KEY_B,
+            "header_protection_key": HEADER_B,
+        }
+    ]
+    entry = connect.manifest_entry(UUID(GERMANY_ID), slots, "9.9.9.9", 32)
+    assert entry["pool_peers"] == 32
+    assert "pool_peers" not in connect.manifest_entry(UUID(GERMANY_ID), slots, "9.9.9.9")

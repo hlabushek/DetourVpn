@@ -511,29 +511,47 @@ def test_i028_two_physical_devices(harness: Harness) -> None:  # noqa: F811
             relay_module = importlib.util.module_from_spec(spec)
             spec.loader.exec_module(relay_module)
             bridge = relay_module.PipeRelay(ROOT / "scripts/i028_pipe_relay.py")
-            tunnel_control_dir = _fixed(
-                [
-                    "wsl.exe",
-                    "-d",
-                    "kali-linux",
-                    "--",
-                    "mktemp",
-                    "-d",
-                    "-p",
-                    "/tmp",  # noqa: S108 - mktemp atomically creates a private 0700 directory.
-                    "dv-i028-XXXXXX",
-                ],
-                timeout=10,
-            ).decode("ascii", "strict").strip()
+            tunnel_control_dir = (
+                _fixed(
+                    [
+                        "wsl.exe",
+                        "-d",
+                        "kali-linux",
+                        "--",
+                        "mktemp",
+                        "-d",
+                        "-p",
+                        "/tmp",  # noqa: S108 - mktemp atomically creates a private 0700 directory.
+                        "dv-i028-XXXXXX",
+                    ],
+                    timeout=10,
+                )
+                .decode("ascii", "strict")
+                .strip()
+            )
             if not re.fullmatch(
                 r"/tmp/dv-i028-[A-Za-z0-9]+",  # noqa: S108 - validates the private runtime path.
                 tunnel_control_dir,
             ):
                 raise RuntimeError("i028_two_device_tunnel_control_path_invalid")
-            control_mode = _fixed(
-                ["wsl.exe", "-d", "kali-linux", "--", "stat", "-c", "%a", "--", tunnel_control_dir],
-                timeout=10,
-            ).decode("ascii", "strict").strip()
+            control_mode = (
+                _fixed(
+                    [
+                        "wsl.exe",
+                        "-d",
+                        "kali-linux",
+                        "--",
+                        "stat",
+                        "-c",
+                        "%a",
+                        "--",
+                        tunnel_control_dir,
+                    ],
+                    timeout=10,
+                )
+                .decode("ascii", "strict")
+                .strip()
+            )
             if control_mode != "700":
                 raise RuntimeError("i028_two_device_tunnel_control_mode_invalid")
             tunnel_control_path = tunnel_control_dir + "/master"

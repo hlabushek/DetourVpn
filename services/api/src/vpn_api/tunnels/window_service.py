@@ -4,6 +4,7 @@ No native/network operations in this module. HTTP authentication and protected
 node transport remain mandatory at the adapter boundary.
 """
 
+import hmac
 from datetime import datetime, timedelta
 from uuid import UUID, uuid4
 
@@ -11,7 +12,7 @@ from pydantic import Field, SecretStr, StrictBool
 from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
-from vpn_api.auth.security import AuthError
+from vpn_api.auth.security import AuthError, keyed_digest, token
 from vpn_api.auth.service import AuthService, database_now
 from vpn_api.db.models import (
     Device,
@@ -31,6 +32,9 @@ from vpn_api.quota.contracts import QuotaError
 from vpn_api.quota.service import LedgerService
 from vpn_api.tunnels.admission import bound_device, consume_proof
 from vpn_api.tunnels.v3_contracts import (
+    DEFAULT_WINDOW_SECONDS,
+    MAX_WINDOW_SECONDS,
+    MIN_WINDOW_SECONDS,
     FrozenInput,
     WindowCommand,
     WindowGrant,
@@ -56,6 +60,12 @@ class ConnectionInput(FrozenInput):
     node_id: UUID
     idempotency_key: UUID
     budget_bytes: int = Field(strict=True, ge=65536, le=67108864)
+    window_seconds: int = Field(
+        default=DEFAULT_WINDOW_SECONDS,
+        strict=True,
+        ge=MIN_WINDOW_SECONDS,
+        le=MAX_WINDOW_SECONDS,
+    )
     proof_id: UUID
     proof_response: SecretStr
 
@@ -64,6 +74,12 @@ class RenewalInput(FrozenInput):
     previous_window_id: UUID
     idempotency_key: UUID
     budget_bytes: int = Field(strict=True, ge=65536, le=67108864)
+    window_seconds: int = Field(
+        default=DEFAULT_WINDOW_SECONDS,
+        strict=True,
+        ge=MIN_WINDOW_SECONDS,
+        le=MAX_WINDOW_SECONDS,
+    )
 
 
 def start_epoch(
@@ -73,7 +89,10 @@ def start_epoch(
     body: EpochStart,
 ) -> UUID:
     """NodeRegistry must already have authenticated/locked the same selected node."""
-    validate_capabilities(body.contract_version, body.capabilities)
+    mode = validate_capabilities(body.contract_version, body.capabilities)
+    if mode != ("pool" if selected.pool_peers is not None else "slots"):
+        # A pool runtime must never be bound to a slot manifest (or vice versa).
+        raise NodeError("window_operator_inventory_conflict")
     if not body.gates_closed or body.server_public_keys != [
         s.server_public_key for s in selected.slots
     ]:
@@ -101,7 +120,14 @@ def start_epoch(
         or body.runtime_id == body.previous_runtime_id
     ):
         raise NodeError("window_epoch_compare_failed")
-    if previous is not None and previous.manifest_digest != selected.digest():
+    if (
+        previous is not None
+        and previous.manifest_digest != selected.digest()
+        # ADR-101: the operator may change a node's manifest (for example to convert it to a
+        # pool) only once the node is fully drained: no live connection and no window without
+        # a receipt from any earlier runtime. Otherwise the old fence stands.
+        and not runtime_ready(session, node.id, body.runtime_id)
+    ):
         raise NodeError("window_operator_manifest_changed")
     if session.scalar(
         select(Tunnel.id).where(Tunnel.node_id == node.id, Tunnel.state != "revoked")
@@ -147,7 +173,16 @@ def runtime_ready(session: Session, node_id: UUID, runtime_id: UUID) -> bool:
     return missing is None and old_connection is None
 
 
-def available_runtime(session: Session, selected: WindowNode) -> VPNNode:
+# ADR-100: a new admission needs a node heard from within 10 s. An existing connection keeps
+# its config and may renew through a longer heartbeat gap (agent restart, network blip); the
+# renewal simply stays pending until the node acknowledges it.
+ADMISSION_HEARTBEAT_SECONDS = 10
+EXISTING_HEARTBEAT_SECONDS = 120
+
+
+def available_runtime(
+    session: Session, selected: WindowNode, stale_after: int = ADMISSION_HEARTBEAT_SECONDS
+) -> VPNNode:
     node = session.get(VPNNode, selected.node_id, populate_existing=True)
     now = database_now(session)
     epoch = (
@@ -161,7 +196,7 @@ def available_runtime(session: Session, selected: WindowNode) -> VPNNode:
         or node.peer_protocol_version != 3
         or node.peer_runtime_id is None
         or node.last_seen_at is None
-        or node.last_seen_at < now - timedelta(seconds=10)
+        or node.last_seen_at < now - timedelta(seconds=stale_after)
         or epoch is None
         or epoch.manifest_digest != selected.digest()
         or not runtime_ready(session, node.id, node.peer_runtime_id)
@@ -170,10 +205,12 @@ def available_runtime(session: Session, selected: WindowNode) -> VPNNode:
     return node
 
 
-def funding_deadline(session: Session, user_id: UUID, budget: int) -> datetime:
+def funding_deadline(
+    session: Session, user_id: UUID, budget: int, seconds: int = DEFAULT_WINDOW_SECONDS
+) -> datetime:
     now = database_now(session)
     held = LedgerService.held_lots(session, user_id)
-    deadline = now + timedelta(seconds=90)
+    deadline = now + timedelta(seconds=seconds)
     remaining = budget
     for lot in session.scalars(
         select(QuotaFundingLot)
@@ -264,10 +301,10 @@ def create_connection(
             )
         )
     )
-    slot = next((slot for slot in selected.slots if slot.slot_id not in occupied), None)
+    slot = next((slot for slot in selected.peer_slots if slot.slot_id not in occupied), None)
     if slot is None:
         raise AuthError("window_node_capacity", 409)
-    deadline = funding_deadline(session, principal.user_id, body.budget_bytes)
+    deadline = funding_deadline(session, principal.user_id, body.budget_bytes, body.window_seconds)
     consume_proof(session, principal, device.id, body.proof_id, body.proof_response)
     now = database_now(session)
     connection_id = uuid4()
@@ -282,7 +319,7 @@ def create_connection(
         generation=1,
         public_key=device.public_key,
         issued_at=now,
-        not_after=min(now + timedelta(seconds=90), deadline),
+        not_after=min(now + timedelta(seconds=body.window_seconds), deadline),
         budget_bytes=body.budget_bytes,
     )
     reserve_window(session, principal.user_id, grant)
@@ -376,6 +413,69 @@ def renew_connection(
     principal = auth.authenticate(session, access, "tunnels:manage")
     connection = owned_connection(session, principal.user_id, connection_id)
     bound_device(session, principal, connection.device_id)
+    return renew_owned(session, auth, selected, connection, body)
+
+
+def renew_token_digest(auth: AuthService, connection_id: UUID, value: str) -> str:
+    return keyed_digest(auth.pepper, "window-renew", connection_id.hex, value)
+
+
+def issue_renew_token(session: Session, auth: AuthService, access: str, connection_id: UUID) -> str:
+    """Rotate the native renewal token; the previous one stops working immediately."""
+    principal = auth.authenticate(session, access, "tunnels:manage")
+    connection = owned_connection(session, principal.user_id, connection_id)
+    bound_device(session, principal, connection.device_id)
+    if connection.state in {"revoke_pending", "closed"}:
+        raise AuthError("window_not_renewable", 409)
+    value = token()
+    connection.renew_token_digest = renew_token_digest(auth, connection.id, value)
+    session.flush()
+    return value
+
+
+def token_connection(
+    session: Session, auth: AuthService, connection_id: UUID, value: str | None
+) -> PeerConnection:
+    """Authenticate a native renewal token. Its only authority is this one connection."""
+    connection = session.scalar(
+        select(PeerConnection).where(PeerConnection.id == connection_id).with_for_update()
+    )
+    presented = renew_token_digest(auth, connection_id, value or "")
+    stored = connection.renew_token_digest if connection is not None else None
+    # Compare before branching on state so timing does not reveal which check failed.
+    matches = hmac.compare_digest(presented, stored or "0" * 64)
+    if (
+        connection is None
+        or stored is None
+        or value is None
+        or not matches
+        or connection.state in {"revoke_pending", "closed"}
+    ):
+        raise AuthError("renew_token_invalid", 401)
+    return connection
+
+
+def renew_with_token(
+    session: Session,
+    auth: AuthService,
+    selected: WindowNode,
+    connection: PeerConnection,
+    body: RenewalInput,
+) -> PeerWindowHold:
+    device = session.get(Device, connection.device_id)
+    if device is None or device.revoked_at is not None:
+        raise AuthError("renew_token_invalid", 401)
+    return renew_owned(session, auth, selected, connection, body)
+
+
+def renew_owned(
+    session: Session,
+    auth: AuthService,
+    selected: WindowNode,
+    connection: PeerConnection,
+    body: RenewalInput,
+) -> PeerWindowHold:
+    """Caller authenticated the owner (access token) or the connection (renew token)."""
     previous = session.get(PeerWindowHold, body.previous_window_id)
     if previous is None or previous.connection_id != connection.id:
         raise AuthError("window_generation_conflict", 409)
@@ -395,7 +495,7 @@ def renew_connection(
     ):
         raise AuthError("window_not_renewable", 409)
     auth.lock(session, "tunnel-node-slot", int(selected.node_id.hex[:15], 16))
-    node = available_runtime(session, selected)
+    node = available_runtime(session, selected, EXISTING_HEARTBEAT_SECONDS)
     old = current_grant(session, connection)
     if node.peer_runtime_id != connection.runtime_id or not grant_authorized(
         session, connection, old
@@ -404,7 +504,7 @@ def renew_connection(
     renewing = session.get(Device, connection.device_id)
     if renewing is not None and cap_reached(session, renewing.id, renewing.traffic_cap_bytes):
         raise AuthError("device_traffic_cap_reached", 403)
-    deadline = funding_deadline(session, principal.user_id, body.budget_bytes)
+    deadline = funding_deadline(session, connection.user_id, body.budget_bytes, body.window_seconds)
     now = database_now(session)
     grant = WindowGrant.model_validate(
         {
@@ -412,11 +512,11 @@ def renew_connection(
             "window_id": body.idempotency_key,
             "generation": old.generation + 1,
             "issued_at": now,
-            "not_after": min(now + timedelta(seconds=90), deadline),
+            "not_after": min(now + timedelta(seconds=body.window_seconds), deadline),
             "budget_bytes": body.budget_bytes,
         }
     )
-    hold = reserve_window(session, principal.user_id, grant)
+    hold = reserve_window(session, connection.user_id, grant)
     connection.window_id, connection.generation, connection.state = (
         hold.id,
         hold.generation,

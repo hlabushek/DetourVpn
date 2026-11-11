@@ -11,7 +11,20 @@ from vpn_api.tunnels.keys import canonical_key
 CAPABILITIES = frozenset(
     {"peer-window.v3", "per-slot-udp-budget.v1", "kernel-deadline.v1", "durable-close-receipt.v1"}
 )
-MAX_WINDOW_SECONDS = 90
+# ADR-101: a pool node hosts many peers on one interface; each peer's gate and meter are keyed
+# on its WireGuard-authenticated inner address instead of a dedicated outer UDP port.
+POOL_CAPABILITIES = frozenset(
+    {"peer-window.v3", "per-peer-inner-budget.v1", "kernel-deadline.v1", "durable-close-receipt.v1"}
+)
+# Slot ids 1..16 are physical single-peer slots; a pool node uses 1..MAX_PEER_SLOT as peer
+# indexes on its one interface.
+MAX_PEER_SLOT = 250
+Meter = Literal["kernel-outer-ip.v1", "kernel-inner-ip.v1"]
+# Upper bound accepted by every v3 component. Clients opt into long windows by
+# requesting window_seconds; the default keeps pre-existing clients on 90s windows.
+MAX_WINDOW_SECONDS = 900
+DEFAULT_WINDOW_SECONDS = 90
+MIN_WINDOW_SECONDS = 30
 MAX_WINDOW_BYTES = 64 * 1024 * 1024
 MIN_WINDOW_BYTES = 64 * 1024
 RENEWAL_MARGIN_SECONDS = 5
@@ -31,7 +44,7 @@ class WindowGrant(FrozenInput):
     window_id: UUID
     node_id: UUID
     runtime_id: UUID
-    slot_id: StrictInt = Field(ge=1, le=16)
+    slot_id: StrictInt = Field(ge=1, le=MAX_PEER_SLOT)
     generation: StrictInt = Field(ge=1, le=2**63 - 1)
     public_key: str = Field(min_length=44, max_length=44, repr=False)
     issued_at: AwareDatetime
@@ -104,11 +117,11 @@ class ClosedWindow(FrozenInput):
     window_id: UUID
     node_id: UUID
     runtime_id: UUID
-    slot_id: StrictInt = Field(ge=1, le=16)
+    slot_id: StrictInt = Field(ge=1, le=MAX_PEER_SLOT)
     generation: StrictInt = Field(ge=1, le=2**63 - 1)
     gate_closed: StrictBool
     observation: Literal["measured", "unknown"]
-    meter: Literal["kernel-outer-ip.v1"]
+    meter: Meter
     observed_bytes: StrictInt | None = Field(default=None, ge=0, le=2**63 - 1)
 
 
@@ -138,11 +151,15 @@ def validate_closed_window(receipt: ClosedWindow, grant: WindowGrant) -> None:
         raise ContractError("kernel_budget_violation")
 
 
-def validate_capabilities(version: int, capabilities: list[str]) -> None:
+def validate_capabilities(version: int, capabilities: list[str]) -> Literal["slots", "pool"]:
     if type(version) is not int or version != 3:
         raise ContractError("peer_protocol_unsupported")
-    if len(capabilities) != len(CAPABILITIES) or frozenset(capabilities) != CAPABILITIES:
-        raise ContractError("peer_capability_mismatch")
+    reported = frozenset(capabilities)
+    if len(capabilities) == len(CAPABILITIES) and reported == CAPABILITIES:
+        return "slots"
+    if len(capabilities) == len(POOL_CAPABILITIES) and reported == POOL_CAPABILITIES:
+        return "pool"
+    raise ContractError("peer_capability_mismatch")
 
 
 class WindowCommand(FrozenInput):
@@ -154,7 +171,7 @@ class WindowPoll(FrozenInput):
     contract_version: StrictInt = Field(default=3, ge=3, le=3)
     runtime_id: UUID
     receipts: list[ClosedWindow] = Field(default_factory=list, max_length=32)
-    active_windows: list[UUID] = Field(default_factory=list, max_length=16)
+    active_windows: list[UUID] = Field(default_factory=list, max_length=MAX_PEER_SLOT)
 
 
 class WindowCommands(FrozenInput):

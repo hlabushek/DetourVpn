@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 
 import 'api.dart';
+import 'latency_probe.dart';
 import 'country_flag.dart';
 import 'native_tunnel.dart';
 import 'platform_info.dart';
@@ -57,7 +58,7 @@ String messageFor(String code) => switch (code) {
   'admission_closed' =>
     'Тестовый узел не готов. Повторите после запуска staging.',
   'lease_expired' =>
-    'Связь с сервером прервалась: Android усыпил приложение в фоне. DetourVPN подключается заново; если не получилось, нажмите «Подключить». Разрешите работу без ограничений батареи (Настройки → «Работа в фоне»).',
+    'Время подключения истекло, и продлить его не удалось. Возможные причины: сервер не ответил (handshake не подтверждён) или Android остановил приложение в фоне. DetourVPN подключается заново; если не получилось, нажмите «Подключить» или выберите другой сервер. Если VPN отключается только при выключенном экране, разрешите работу без ограничений батареи (Настройки → «Работа в фоне»).',
   'remote_revoked' =>
     'Доступ к туннелю отозван сервером. VPN отключён на телефоне.',
   'revoke_unconfirmed' =>
@@ -81,6 +82,8 @@ String messageFor(String code) => switch (code) {
   'native_unavailable' => 'VPN-движок недоступен. Проверьте сборку приложения.',
   'native_down' =>
     'Системный VPN остановлен. Проверьте разрешение или другой VPN и подключитесь снова.',
+  'vpn_revoked' =>
+    'Разрешение на VPN передано другому приложению или отозвано. Подключитесь снова, если нужно.',
   'rate_limited' => 'Слишком много запросов. Подождите перед повтором.',
   _ =>
     'Подключение не выполнено. Проверьте сеть, доступ и готовность тестового узла.',
@@ -137,7 +140,13 @@ class NodeOption {
     this.reason, {
     this.countryCode,
     this.city,
+    this.probeHost,
+    this.probePort,
   });
+
+  /// ADR-102 UDP latency echo of this node, when the catalog advertises one.
+  final String? probeHost;
+  final int? probePort;
   final String? countryCode;
   final String? city;
   final String id;
@@ -167,6 +176,10 @@ class ConnectionController extends ChangeNotifier {
   ConnectionPhase phase = ConnectionPhase.disconnected;
   String? error;
   String? diagnosticStage;
+
+  /// Task 7: whether this app saw a confirmed handshake before the last failure
+  /// ('confirmed' / 'not_seen'); null when unknown. Fixed category, safe to export.
+  String? diagnosticHandshake;
   String detail = 'VPN выключен';
   final QuotaController quota;
   int? get availableBytes => quota.snapshot?.available;
@@ -174,6 +187,40 @@ class ConnectionController extends ChangeNotifier {
   bool get quotaStale => quota.stale;
   bool remotePending = false;
   List<NodeOption> nodes = [];
+
+  /// ADR-102: measured round trip per node id; null = no answer, absent = not measured.
+  final Map<String, int?> latencyMs = {};
+  bool latencyMeasuring = false;
+  LatencyMeter latencyMeter = const UdpLatencyMeter();
+
+  /// Measures every node that runs a latency echo, in parallel. Never blocks connecting.
+  Future<void> measureLatency() async {
+    if (latencyMeasuring || _disposed) return;
+    final targets = [
+      for (final node in nodes)
+        if (node.probeHost != null && node.probePort != null) node,
+    ];
+    latencyMs.removeWhere((id, _) => !nodes.any((n) => n.id == id));
+    if (targets.isEmpty) return;
+    latencyMeasuring = true;
+    _emit();
+    try {
+      final results = await Future.wait(
+        targets.map(
+          (node) => latencyMeter
+              .measure(node.probeHost!, node.probePort!)
+              .catchError((Object _) => null),
+        ),
+      );
+      for (var i = 0; i < targets.length; i++) {
+        latencyMs[targets[i].id] = results[i];
+      }
+    } finally {
+      latencyMeasuring = false;
+      _emit();
+    }
+  }
+
   String? selectedNode;
   String? nodesError;
   bool nodesLoading = false;

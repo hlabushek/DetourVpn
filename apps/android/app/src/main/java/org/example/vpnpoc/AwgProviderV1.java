@@ -30,6 +30,7 @@ final class AwgProviderV1 implements TunnelProviderV1 {
         // fast reconnect and can leave the next UP request using a dying service.
         backend.setState(tunnel, Tunnel.State.DOWN, null);
     }
+    @Override public void restartInPlace() throws Exception { backend.restartInPlace(); }
     @Override public boolean isUp() { return backend.getState(tunnel) == Tunnel.State.UP; }
     @Override public long lastHandshakeSeconds() { return backend.getLastHandshake(tunnel); }
     @Override public long transferBytes() {

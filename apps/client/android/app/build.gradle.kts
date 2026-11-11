@@ -98,7 +98,8 @@ android {
             if (i028IsolatedPackage) applicationIdSuffix = ".i028"
         }
         release {
-            manifestPlaceholders["supportsAlwaysOn"] = "false"
+            // ADR-098: Always-on and sticky restore use the headless recovery path (ADR-042).
+            manifestPlaceholders["supportsAlwaysOn"] = "true"
             isMinifyEnabled = false
             isShrinkResources = false
             if (betaSigningEnabled) {

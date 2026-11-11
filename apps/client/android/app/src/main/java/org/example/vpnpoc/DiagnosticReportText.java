@@ -15,7 +15,7 @@ final class DiagnosticReportText {
         "rate_limited", "remote_revoked", "revoke_unconfirmed", "session_device_mismatch",
         "session_erasure_failed", "session_expired", "session_storage_failed",
         "tunnel_node_capacity", "tunnel_node_unavailable", "tunnel_profile_unavailable",
-        "tunnel_recovery_not_ready", "unauthorized", "unknown_error",
+        "tunnel_recovery_not_ready", "unauthorized", "unknown_error", "vpn_revoked",
         "window_generation_conflict", "window_node_required", "window_node_unavailable",
         "window_not_active", "window_tunnels_unavailable"
     );
@@ -27,9 +27,16 @@ final class DiagnosticReportText {
         "selected_node", "unknown"
     );
 
-    static String format(String code, String stage) {
-        if (code == null || stage == null || !ERROR_CODES.contains(code) || !STAGES.contains(stage))
+    /** Task 7: whether the app saw a confirmed handshake; null omits the line. */
+    private static final Set<String> HANDSHAKES = Set.of("confirmed", "not_seen");
+
+    static String format(String code, String stage) { return format(code, stage, null); }
+
+    static String format(String code, String stage, String handshake) {
+        if (code == null || stage == null || !ERROR_CODES.contains(code) || !STAGES.contains(stage)
+                || (handshake != null && !HANDSHAKES.contains(handshake)))
             throw new IllegalArgumentException();
-        return "DetourVpn — отчёт диагностики\nКод: " + code + "\nЭтап: " + stage;
+        return "DetourVpn — отчёт диагностики\nКод: " + code + "\nЭтап: " + stage
+                + (handshake == null ? "" : "\nHandshake: " + handshake);
     }
 }

@@ -360,8 +360,13 @@ def redeem_link_code(body: LinkRedeemInput, request: Request, auth: Service) -> 
             raise invalid
         # Lock order is user then code, as in every owner-side path; no deadlock with cancel.
         user = session.scalar(select(User).where(User.id == probe.user_id).with_for_update())
+        # populate_existing: the unlocked probe cached this row; without a refresh a concurrent
+        # redeem would see the pre-lock consumed_at and succeed a second time.
         row = session.scalar(
-            select(DeviceLinkCode).where(DeviceLinkCode.id == probe.id).with_for_update()
+            select(DeviceLinkCode)
+            .where(DeviceLinkCode.id == probe.id)
+            .with_for_update()
+            .execution_options(populate_existing=True)
         )
         now = database_now(session)
         identity = session.scalar(select(AuthIdentity).where(AuthIdentity.user_id == probe.user_id))

@@ -38,6 +38,7 @@ const _reportableErrors = <String>{
   'tunnel_profile_unavailable',
   'tunnel_recovery_not_ready',
   'unauthorized',
+  'vpn_revoked',
   'window_generation_conflict',
   'window_node_required',
   'window_node_unavailable',
@@ -61,21 +62,36 @@ const _reportableStages = <String>{
   'selected_node',
 };
 
+/// Task 7: did the app itself see a confirmed handshake before the failure.
+const _reportableHandshakes = <String>{'confirmed', 'not_seen'};
+
 @immutable
 class DiagnosticReport {
-  const DiagnosticReport({required this.errorCode, required this.stage});
+  const DiagnosticReport({
+    required this.errorCode,
+    required this.stage,
+    this.handshake,
+  });
 
   final String errorCode;
   final String stage;
 
-  String get text =>
-      'DetourVpn — отчёт диагностики\nКод: $errorCode\nЭтап: $stage';
+  /// null = not recorded (the line is omitted).
+  final String? handshake;
 
-  static DiagnosticReport fromError(String? error, String? stage) =>
-      DiagnosticReport(
-        errorCode: _reportableErrors.contains(error) ? error! : 'unknown_error',
-        stage: _reportableStages.contains(stage) ? stage! : 'unknown',
-      );
+  String get text =>
+      'DetourVpn — отчёт диагностики\nКод: $errorCode\nЭтап: $stage'
+      '${handshake == null ? '' : '\nHandshake: $handshake'}';
+
+  static DiagnosticReport fromError(
+    String? error,
+    String? stage, {
+    String? handshake,
+  }) => DiagnosticReport(
+    errorCode: _reportableErrors.contains(error) ? error! : 'unknown_error',
+    stage: _reportableStages.contains(stage) ? stage! : 'unknown',
+    handshake: _reportableHandshakes.contains(handshake) ? handshake : null,
+  );
 }
 
 class DiagnosticReportButton extends StatelessWidget {
@@ -83,13 +99,19 @@ class DiagnosticReportButton extends StatelessWidget {
     super.key,
     required this.error,
     required this.stage,
+    this.handshake,
   });
 
   final String error;
   final String? stage;
+  final String? handshake;
 
   Future<void> _share(BuildContext context) async {
-    final report = DiagnosticReport.fromError(error, stage);
+    final report = DiagnosticReport.fromError(
+      error,
+      stage,
+      handshake: handshake,
+    );
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
@@ -99,7 +121,7 @@ class DiagnosticReportButton extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'В отчёте только код ошибки и этап. Он не содержит данных '
+              'В отчёте только код ошибки, этап и был ли handshake. Он не содержит данных '
               'аккаунта, ключей, адресов или истории трафика. '
               '${isWindowsClient ? 'Отчёт будет скопирован в буфер обмена, ничего не отправляется автоматически.' : 'Отправка начнётся только после выбора приложения Android.'}',
             ),
@@ -137,6 +159,7 @@ class DiagnosticReportButton extends StatelessWidget {
       await PlatformTunnel.channel.invokeMethod<void>('shareDiagnosticReport', {
         'code': report.errorCode,
         'stage': report.stage,
+        if (report.handshake != null) 'handshake': report.handshake,
       });
     } on PlatformException {
       if (!context.mounted) return;

@@ -102,7 +102,7 @@ def test_window_budget_is_strict_integer_and_bounded(budget: object) -> None:
         {"issued_at": NOW.replace(tzinfo=None)},
         {"not_after": NOW.replace(tzinfo=None)},
         {"slot_id": 0},
-        {"slot_id": 17},
+        {"slot_id": 251},
         {"slot_id": True},
         {"generation": 0},
         {"generation": 2**63},
@@ -120,7 +120,7 @@ def test_window_rejects_invalid_shape(changes: dict[str, object]) -> None:
     "changes,code",
     [
         ({"public_key": "!" * 44}, "invalid_peer_key"),
-        ({"not_after": NOW + timedelta(seconds=91)}, "window_duration_invalid"),
+        ({"not_after": NOW + timedelta(seconds=901)}, "window_duration_invalid"),
         ({"not_after": NOW}, "window_duration_invalid"),
         (
             {"issued_at": NOW + timedelta(seconds=2)},

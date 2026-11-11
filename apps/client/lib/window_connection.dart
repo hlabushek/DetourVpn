@@ -19,7 +19,9 @@ class WindowConnectionController extends ConnectionController {
     this.renewBeforeMs = 55000,
     this.handshakeHintAfter = const Duration(seconds: 25),
     this.autoReconnectDelay = const Duration(seconds: 2),
-  });
+    this.windowSeconds = defaultWindowSeconds,
+    Uri? renewalOrigin,
+  }) : _renewalOrigin = renewalOrigin;
   final Duration? autoReconnectDelay;
   final List<int> _autoReconnectAt = [];
   static const root = '/api/v1/window-tunnels';
@@ -27,7 +29,23 @@ class WindowConnectionController extends ConnectionController {
     'VPN_WINDOW_BUDGET_BYTES',
     defaultValue: 1048576,
   );
+
+  /// Requested window length. 90 keeps the legacy request body (no field sent),
+  /// so a build only asks for long windows once the API and nodes accept them.
+  static const defaultWindowSeconds = int.fromEnvironment(
+    'VPN_WINDOW_SECONDS',
+    defaultValue: 90,
+  );
+  final int windowSeconds;
+  final Uri? _renewalOrigin;
+  static const maxWindowMs = 900000;
   final int renewBeforeMs;
+
+  /// Long windows renew once a third has elapsed (10 of 15 min left), leaving
+  /// several retry chances before expiry; 90s windows keep [renewBeforeMs].
+  int get _renewBefore => max(renewBeforeMs, windowSeconds * 1000 - 300000);
+  Map<String, int> get _windowRequest =>
+      windowSeconds == 90 ? const {} : {'window_seconds': windowSeconds};
 
   /// After this long without any confirmed handshake, the status asks the user to reconnect.
   /// Advisory text only: no automatic reconnect, because every new window reserves quota.
@@ -126,12 +144,19 @@ class WindowConnectionController extends ConnectionController {
             (row['available'] as bool) ? 'available' : 'capacity',
             countryCode: parseCountryCode(row['country_code']),
             city: parseCity(row['city']),
+            probeHost: row['probe_host'] is String && row['probe_port'] is int
+                ? row['probe_host'] as String
+                : null,
+            probePort: row['probe_host'] is String && row['probe_port'] is int
+                ? row['probe_port'] as int
+                : null,
           ),
         );
       }
       nodes = parsed;
       nodesUpdatedAt = DateTime.parse(value['checked_at'] as String);
       nodesError = null;
+      unawaited(measureLatency());
     } catch (e) {
       nodesError = e is ClientError ? e.code : 'invalid_response';
     } finally {
@@ -240,6 +265,7 @@ class WindowConnectionController extends ConnectionController {
         'proof_id': proof['id'],
         'proof_response': answer,
         'budget_bytes': budgetBytes,
+        ..._windowRequest,
       };
       _intentAt = _clock.elapsedMilliseconds;
       diagnosticStage = 'lease_create';
@@ -277,7 +303,10 @@ class WindowConnectionController extends ConnectionController {
       _hasEstablishedHandshake = false;
       _connectedAtMs = _clock.elapsedMilliseconds;
       diagnosticStage = null;
+      diagnosticHandshake = null;
       detail = 'Ожидается handshake';
+      await _startNativeRenewal(grant);
+      if (_cancelled(version)) return;
       startPolling();
     } catch (e) {
       if (!_cancelled(version)) {
@@ -288,6 +317,9 @@ class WindowConnectionController extends ConnectionController {
             : 'native_unavailable';
         phase = ConnectionPhase.failed;
         await _cleanup();
+        // ADR-099: an automatic reconnect that hit a temporary failure keeps trying.
+        if (_autoReconnecting && _retryCodes.contains(error))
+          _scheduleAutoReconnect(version);
       }
     }
   }
@@ -314,6 +346,7 @@ class WindowConnectionController extends ConnectionController {
   Map<String, dynamic> _validate(
     Map<String, dynamic> value, {
     bool initial = false,
+    bool nativeRenewal = false,
   }) {
     final raw = value['window'];
     if (value['state'] != 'active' ||
@@ -354,17 +387,51 @@ class WindowConnectionController extends ConnectionController {
       if (raw['runtime_id'] != old['runtime_id'] ||
           raw['slot_id'] != old['slot_id'] ||
           value['client_config'] != _config ||
-          (generation != old['generation'] &&
-              generation != old['generation'] + 1))
+          (nativeRenewal
+              ? generation < (old['generation'] as int)
+              : generation != old['generation'] &&
+                    generation != old['generation'] + 1))
         throw const ClientError('window_generation_conflict');
       if (generation == old['generation']) {
         if (!mapEquals(raw, old))
           throw const ClientError('window_generation_conflict');
-      } else if (raw['window_id'] != _renewIntent?['idempotency_key']) {
+      } else if (!nativeRenewal &&
+          raw['window_id'] != _renewIntent?['idempotency_key']) {
         throw const ClientError('window_generation_conflict');
       }
     }
     return raw;
+  }
+
+  /// ADR-097: hand renewal to the native VPN process for long windows. Any failure (old API,
+  /// platform without a renewer) silently keeps Dart-driven renewal; it never stops the tunnel.
+  Future<void> _startNativeRenewal(Map<String, dynamic> grant) async {
+    final tunnel = native;
+    final host = tunnel is NativeRenewalHost
+        ? tunnel as NativeRenewalHost
+        : null;
+    final client = api;
+    final origin = _renewalOrigin ?? (client is Api ? client.origin : null);
+    if (windowSeconds == 90 || host == null || origin == null) {
+      return;
+    }
+    try {
+      final issued = await api.call('POST', '$root/$_id/renew-token');
+      final token = issued['renew_token'];
+      if (token is! String) return;
+      await host.startNativeRenewal({
+        'origin': origin.toString(),
+        'token': token,
+        'connection': grant['connection_id'],
+        'runtime': grant['runtime_id'],
+        'windowId': grant['window_id'],
+        'generation': grant['generation'],
+        'budgetBytes': budgetBytes,
+        'windowSeconds': windowSeconds,
+      });
+    } on ClientError {
+      return;
+    }
   }
 
   int _bound(Map<String, dynamic> grant) {
@@ -374,7 +441,7 @@ class WindowConnectionController extends ConnectionController {
     if (!issued.isUtc ||
         !expiry.isUtc ||
         duration <= 6000 ||
-        duration > 90000 ||
+        duration > maxWindowMs ||
         issued.isAfter(DateTime.now().toUtc().add(const Duration(seconds: 1))))
       throw const ClientError('invalid_response');
     final deadline = min(
@@ -475,6 +542,9 @@ class WindowConnectionController extends ConnectionController {
       if (_cancelled(version) || _id == null) return;
       var snapshot = await native.snapshot();
       if (_cancelled(version)) return;
+      // While native renews, its deadline is authoritative: Dart timers may have slept.
+      if (snapshot.nativeRenewal && snapshot.up && snapshot.remainingMs > 0)
+        _deadline = _clock.elapsedMilliseconds + snapshot.remainingMs;
       if (_clock.elapsedMilliseconds >= _deadline ||
           !snapshot.up ||
           snapshot.remainingMs <= 0)
@@ -501,16 +571,18 @@ class WindowConnectionController extends ConnectionController {
           traffic >= _trafficBaseline! &&
           traffic - _trafficBaseline! >= (_grant!['budget_bytes'] as int) ~/ 2;
       if (_renewIntent == null &&
-          (_deadline - _clock.elapsedMilliseconds <= renewBeforeMs ||
+          !snapshot.nativeRenewal &&
+          (_deadline - _clock.elapsedMilliseconds <= _renewBefore ||
               trafficSuggestsRenewal)) {
         if (trafficSuggestsRenewal &&
-            _deadline - _clock.elapsedMilliseconds > renewBeforeMs) {
+            _deadline - _clock.elapsedMilliseconds > _renewBefore) {
           _trafficRenewalRequested = true;
         }
         _renewIntent = {
           'previous_window_id': _grant!['window_id'],
           'idempotency_key': newId(),
           'budget_bytes': budgetBytes,
+          ..._windowRequest,
         };
         _intentAt = _clock.elapsedMilliseconds;
         // Capture before issuing the request: bytes sent during rotation are
@@ -528,7 +600,8 @@ class WindowConnectionController extends ConnectionController {
       if (_cancelled(version)) return;
       if (_clock.elapsedMilliseconds >= _deadline)
         throw const ClientError('lease_expired');
-      if (value['state'] == 'pending' && _renewIntent != null) {
+      if (value['state'] == 'pending' &&
+          (_renewIntent != null || snapshot.nativeRenewal)) {
         final confirmed = _establishedStatusConfirmed(snapshot);
         phase = confirmed
             ? ConnectionPhase.connected
@@ -540,8 +613,16 @@ class WindowConnectionController extends ConnectionController {
             : 'Ожидается подтверждение продления';
         return;
       }
-      final grant = _validate(value);
-      if (grant['generation'] != _grant!['generation']) {
+      final grant = _validate(value, nativeRenewal: snapshot.nativeRenewal);
+      if (grant['generation'] != _grant!['generation'] &&
+          snapshot.nativeRenewal) {
+        // Native already advanced its own deadline (possibly several generations while the app
+        // slept); adopt the grant and keep mirroring the native deadline.
+        _grant = grant;
+        _trafficBaseline = traffic;
+        _renewTrafficAnchor = null;
+        _renewIntent = null;
+      } else if (grant['generation'] != _grant!['generation']) {
         final end = _bound(grant);
         if (end <= _deadline)
           throw const ClientError('window_generation_conflict');
@@ -585,6 +666,9 @@ class WindowConnectionController extends ConnectionController {
       // API response failure.
       final code = e is ClientError ? e.code : 'native_unavailable';
       error = code;
+      // Task 7: recorded before cleanup resets it. Only what the app itself observed; a
+      // handshake that happened while the app was asleep in the background is not seen here.
+      diagnosticHandshake = _hasEstablishedHandshake ? 'confirmed' : 'not_seen';
       phase = ConnectionPhase.reconnecting;
       if (!{
             'network_unavailable',
@@ -600,35 +684,67 @@ class WindowConnectionController extends ConnectionController {
     }
   }
 
-  /// Window ran out, or the server no longer treats it as active (a late renewal): reconnecting
-  /// is the only recovery.
-  static const _autoReconnectCodes = {'lease_expired', 'window_not_active'};
+  /// Window ran out, the server no longer treats it as active (a late renewal), or the phone
+  /// dropped the tunnel while time was left (failed in-place restart, killed service):
+  /// reconnecting is the only recovery. Lost VPN consent ('vpn_revoked') is never undone.
+  static const _autoReconnectCodes = {
+    'lease_expired',
+    'window_not_active',
+    'native_down',
+  };
+
+  /// Temporary failures of an automatic reconnect attempt itself; it is retried with backoff.
+  static const _retryCodes = {
+    ..._autoReconnectCodes,
+    'network_unavailable',
+    'api_unavailable',
+    'rate_limited',
+    'window_node_unavailable',
+    // A create with an unknown outcome must be settled first; the attempt fails fast without
+    // an API call until the background settlement finishes, then the next attempt connects.
+    'revoke_unconfirmed',
+  };
+  bool _autoReconnecting = false;
+
+  /// Backoff multipliers of [autoReconnectDelay] by attempts in the last 10 minutes
+  /// (2 s, 5 s, 15 s, 30 s, 60 s, then every 2 min with the default delay).
+  static const _backoff = [1, 2.5, 7.5, 15, 30, 60];
 
   /// Why the tunnel is gone. Only a window that really ran out is 'lease_expired'; if the phone
   /// stopped the VPN while time was left (another VPN, system toggle, service restart) say so.
   String _stopCode(NativeSnapshot snapshot) =>
-      !snapshot.up &&
-          snapshot.reason != 'lease_expired' &&
-          _clock.elapsedMilliseconds < _deadline - 1000
+      !snapshot.up && snapshot.reason == 'vpn_revoked'
+      ? 'vpn_revoked'
+      : !snapshot.up &&
+            snapshot.reason != 'lease_expired' &&
+            _clock.elapsedMilliseconds < _deadline - 1000
       ? 'native_down'
       : 'lease_expired';
 
-  /// The 90 s window is renewed by a timer that Android may suspend with the screen off. When that
-  /// happens (and the user did not press Disconnect), connect again on our own, a few times only:
-  /// every new window reserves quota.
+  /// The tunnel ended without the user pressing Disconnect: connect again on our own with
+  /// backoff and no hard limit (ADR-099). A failed attempt reserves no quota; a user disconnect
+  /// bumps the version and cancels every pending attempt.
   void _scheduleAutoReconnect(int version) {
     final now = _clock.elapsedMilliseconds;
     _autoReconnectAt.removeWhere((t) => now - t > 600000);
-    if (autoReconnectDelay == null || _autoReconnectAt.length >= 4) return;
+    final base = autoReconnectDelay;
+    if (base == null) return;
+    final step = _backoff[min(_autoReconnectAt.length, _backoff.length - 1)];
     _autoReconnectAt.add(now);
-    Future<void>.delayed(autoReconnectDelay!, () {
+    final delay = Duration(microseconds: (base.inMicroseconds * step).round());
+    Future<void>.delayed(delay, () async {
       if (_dead ||
           _version != version ||
           phase != ConnectionPhase.failed ||
-          !_autoReconnectCodes.contains(error)) {
+          !_retryCodes.contains(error)) {
         return;
       }
-      unawaited(connect());
+      _autoReconnecting = true;
+      try {
+        await connect();
+      } finally {
+        _autoReconnecting = false;
+      }
     });
   }
 

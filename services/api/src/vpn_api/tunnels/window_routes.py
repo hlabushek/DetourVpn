@@ -17,9 +17,10 @@ from vpn_api.db.models import PeerConnection, SessionFamily, VPNNode
 from vpn_api.nodes.service import NodeError, NodeRegistry
 from vpn_api.schemas import ErrorResponse
 from vpn_api.tunnels.admission import bound_device, profiles
-from vpn_api.tunnels.v3_contracts import WindowGrant
+from vpn_api.tunnels.v3_contracts import Meter, WindowGrant
 from vpn_api.tunnels.window_profiles import WindowNode, load_manifest
 from vpn_api.tunnels.window_service import (
+    EXISTING_HEARTBEAT_SECONDS,
     ConnectionInput,
     EpochStart,
     RenewalInput,
@@ -29,12 +30,17 @@ from vpn_api.tunnels.window_service import (
     create_connection,
     current_grant,
     grant_authorized,
+    issue_renew_token,
     owned_connection,
     poll_windows,
     renew_connection,
+    renew_with_token,
     runtime_ready,
     start_epoch,
+    token_connection,
 )
+
+LATENCY_PROBE_PORT = 51899
 
 router = APIRouter(
     prefix="/api/v1/window-tunnels",
@@ -53,7 +59,7 @@ class ConnectionView(BaseModel):
     state: Literal["pending", "active", "revoke_pending", "closed"]
     window: WindowGrant
     client_config: str | None = Field(default=None, repr=False)
-    meter: Literal["kernel-outer-ip.v1"] = "kernel-outer-ip.v1"
+    meter: Meter = "kernel-outer-ip.v1"
 
 
 class WindowNodeView(BaseModel):
@@ -65,6 +71,9 @@ class WindowNodeView(BaseModel):
     slots: int
     occupied: int
     available: bool
+    # ADR-102: where the client sends its UDP latency probe; absent for nodes without one.
+    probe_host: str | None = None
+    probe_port: int | None = None
 
 
 class WindowCatalog(BaseModel):
@@ -97,11 +106,11 @@ def view(session: Session, selected: WindowNode, connection: PeerConnection) -> 
             connection.state = "revoke_pending"
         else:
             try:
-                node = available_runtime(session, selected)
+                node = available_runtime(session, selected, EXISTING_HEARTBEAT_SECONDS)
             except AuthError:
                 node = None
             if node is not None and node.peer_runtime_id == connection.runtime_id:
-                config = selected.slots[connection.slot_id - 1].client_config()
+                config = selected.peer_slots[connection.slot_id - 1].client_config()
     return ConnectionView(
         id=connection.id,
         device_id=connection.device_id,
@@ -110,6 +119,7 @@ def view(session: Session, selected: WindowNode, connection: PeerConnection) -> 
         state=connection.state,
         window=grant,
         client_config=config,
+        meter="kernel-outer-ip.v1" if selected.pool_peers is None else "kernel-inner-ip.v1",
     )
 
 
@@ -136,7 +146,7 @@ def nodes(auth: Service, access: Access) -> WindowCatalog:
             )
             try:
                 available_runtime(session, selected)
-                available = occupied < len(selected.slots)
+                available = occupied < len(selected.peer_slots)
             except AuthError:
                 available = False
             result.append(
@@ -146,7 +156,9 @@ def nodes(auth: Service, access: Access) -> WindowCatalog:
                     region=node.region,
                     country_code=node.country_code,
                     city=node.city,
-                    slots=len(selected.slots),
+                    slots=len(selected.peer_slots),
+                    probe_host=selected.probe_host,
+                    probe_port=LATENCY_PROBE_PORT if selected.probe_host else None,
                     occupied=occupied,
                     available=available,
                 )
@@ -216,6 +228,68 @@ def renew(
         return result
 
 
+RenewToken = Annotated[str | None, Header(alias="X-Window-Renew-Token")]
+
+
+class RenewTokenView(BaseModel):
+    model_config = ConfigDict(hide_input_in_errors=True)
+    renew_token: str = Field(repr=False)
+
+
+class NativeWindowView(BaseModel):
+    """What the native renewer needs; no client configuration or other connections."""
+
+    model_config = ConfigDict(hide_input_in_errors=True)
+    id: UUID
+    state: Literal["pending", "active", "revoke_pending", "closed"]
+    window: WindowGrant
+
+
+def native_view(
+    session: Session, selected: WindowNode, connection: PeerConnection
+) -> NativeWindowView:
+    full = view(session, selected, connection)
+    return NativeWindowView(id=full.id, state=full.state, window=full.window)
+
+
+@router.post("/{connection_id}/renew-token", response_model=RenewTokenView)
+def renew_token(
+    connection_id: UUID, request: Request, auth: Service, access: Access
+) -> RenewTokenView:
+    """ADR-097: rotate the token the OS-level VPN service uses to renew this connection only."""
+    auth.rate("device", network(request))
+    with transaction(auth.engine) as session:
+        return RenewTokenView(renew_token=issue_renew_token(session, auth, access, connection_id))
+
+
+@router.get("/{connection_id}/native", response_model=NativeWindowView)
+def native_status(
+    connection_id: UUID, request: Request, auth: Service, token: RenewToken = None
+) -> NativeWindowView:
+    auth.rate("device", network(request))
+    with transaction(auth.engine) as session:
+        connection = token_connection(session, auth, connection_id, token)
+        return native_view(session, selected_node(auth, connection.node_id), connection)
+
+
+@router.post("/{connection_id}/native-renew", response_model=NativeWindowView, status_code=202)
+def native_renew(
+    connection_id: UUID,
+    body: RenewalInput,
+    request: Request,
+    auth: Service,
+    token: RenewToken = None,
+) -> NativeWindowView:
+    auth.rate("device", network(request))
+    with transaction(auth.engine) as session:
+        connection = token_connection(session, auth, connection_id, token)
+        selected = selected_node(auth, connection.node_id)
+        hold = renew_with_token(session, auth, selected, connection, body)
+        result = native_view(session, selected, connection)
+        result.window = WindowGrant.model_validate(hold.grant)
+        return result
+
+
 @router.delete("/{connection_id}", response_model=ConnectionView, status_code=202)
 def revoke(connection_id: UUID, request: Request, auth: Service, access: Access) -> ConnectionView:
     auth.rate("device", network(request))
@@ -226,6 +300,7 @@ def revoke(connection_id: UUID, request: Request, auth: Service, access: Access)
         selected = selected_node(auth, connection.node_id)
         if connection.state != "closed":
             connection.state = "revoke_pending"
+        connection.renew_token_digest = None
         return view(session, selected, connection)
 
 

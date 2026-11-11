@@ -1,0 +1,139 @@
+package org.example.vpnpoc;
+
+import java.util.Calendar;
+import java.util.TimeZone;
+import java.util.UUID;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+/**
+ * Pure timing and validation for ADR-097 native window renewal. No I/O, no Android types, so the
+ * decisions are unit-tested on the JVM. Mirrors the Dart controller: renew once a third of a long
+ * window has elapsed (55 s before expiry for 90 s windows) or after half the byte budget, and
+ * accept only the next generation of the same connection and runtime.
+ */
+final class NativeRenewal {
+    static final long SAFETY_MS = 6000;
+    static final long MIN_BACKOFF_MS = 2000;
+    static final long MAX_BACKOFF_MS = 60000;
+    static final long AWAKE_CHECK_MS = 30000;
+
+    final String connection;
+    final String runtime;
+    final long budgetBytes;
+    final int windowSeconds;
+    String windowId;
+    long generation;
+    /** Idempotency key of the renewal in flight; reused verbatim on every retry. */
+    String intentKey;
+    long intentAtElapsed;
+    long trafficBaseline = -1;
+    int failures;
+
+    NativeRenewal(String connection, String runtime, String windowId, long generation,
+            long budgetBytes, int windowSeconds) {
+        if (!uuid(connection) || !uuid(runtime) || !uuid(windowId) || generation < 1
+                || budgetBytes < 65536 || budgetBytes > 67108864
+                || windowSeconds < 30 || windowSeconds > 900)
+            throw new IllegalArgumentException();
+        this.connection = connection;
+        this.runtime = runtime;
+        this.windowId = windowId;
+        this.generation = generation;
+        this.budgetBytes = budgetBytes;
+        this.windowSeconds = windowSeconds;
+    }
+
+    long renewBeforeMs() { return Math.max(55000, windowSeconds * 1000L - 300000); }
+
+    boolean due(long remainingMs, long trafficBytes) {
+        if (intentKey != null) return true;
+        if (remainingMs <= renewBeforeMs()) return true;
+        if (trafficBytes < 0) return false;
+        if (trafficBaseline < 0 || trafficBytes < trafficBaseline) {
+            trafficBaseline = trafficBytes; // Missing or reset counters start a fresh baseline.
+            return false;
+        }
+        return trafficBytes - trafficBaseline >= budgetBytes / 2;
+    }
+
+    /** Delay until the next check while nothing is due; the alarm uses the time-based part. */
+    long idleDelayMs(long remainingMs) {
+        return Math.max(1000, remainingMs - renewBeforeMs());
+    }
+
+    String beginIntent(long nowElapsed) {
+        if (intentKey == null) {
+            intentKey = UUID.randomUUID().toString();
+            intentAtElapsed = nowElapsed;
+        }
+        return intentKey;
+    }
+
+    /** Exponential backoff with jitter in [0, 1); never past the safety margin of the window. */
+    long backoffMs(long remainingMs, double jitter) {
+        failures = Math.min(failures + 1, 16);
+        long base = Math.min(MAX_BACKOFF_MS, MIN_BACKOFF_MS << Math.min(failures - 1, 10));
+        long delay = base / 2 + (long) (base / 2 * Math.max(0, Math.min(jitter, 0.999)));
+        return Math.max(500, Math.min(delay, remainingMs - SAFETY_MS));
+    }
+
+    /**
+     * Validates the server window and returns the new native deadline in elapsed-realtime
+     * milliseconds. Throws IllegalStateException for anything but this connection's next window.
+     */
+    long adopt(String connectionId, String runtimeId, String newWindowId, long newGeneration,
+            String issuedAt, String notAfter, long nowElapsed, long nowWallMs) {
+        if (intentKey == null || !connection.equals(connectionId) || !runtime.equals(runtimeId)
+                || newGeneration != generation + 1 || !intentKey.equals(newWindowId))
+            throw new IllegalStateException();
+        long issued = parseUtcMillis(issuedAt);
+        long expiry = parseUtcMillis(notAfter);
+        long duration = expiry - issued;
+        if (duration <= SAFETY_MS || duration > windowSeconds * 1000L
+                || issued > nowWallMs + 1000)
+            throw new IllegalStateException();
+        long end = Math.min(intentAtElapsed + duration - SAFETY_MS,
+                nowElapsed + (expiry - nowWallMs) - SAFETY_MS);
+        if (end <= nowElapsed) throw new IllegalStateException();
+        return end;
+    }
+
+    void adopted(long newGeneration, String newWindowId, long trafficBytes) {
+        generation = newGeneration;
+        windowId = newWindowId;
+        intentKey = null;
+        failures = 0;
+        trafficBaseline = trafficBytes;
+    }
+
+    private static final Pattern UTC = Pattern.compile(
+            "(\\d{4})-(\\d{2})-(\\d{2})T(\\d{2}):(\\d{2}):(\\d{2})(?:\\.(\\d{1,9}))?(?:Z|\\+00:00)");
+
+    /** ISO-8601 UTC only (as the API emits); minSdk 24 has no java.time. */
+    static long parseUtcMillis(String value) {
+        Matcher m = value == null ? null : UTC.matcher(value);
+        if (m == null || !m.matches()) throw new IllegalStateException();
+        Calendar calendar = Calendar.getInstance(TimeZone.getTimeZone("UTC"));
+        calendar.clear();
+        calendar.setLenient(false);
+        calendar.set(Integer.parseInt(m.group(1)), Integer.parseInt(m.group(2)) - 1,
+                Integer.parseInt(m.group(3)), Integer.parseInt(m.group(4)),
+                Integer.parseInt(m.group(5)), Integer.parseInt(m.group(6)));
+        String fraction = m.group(7) == null ? "0" : (m.group(7) + "00").substring(0, 3);
+        try {
+            return calendar.getTimeInMillis() + Integer.parseInt(fraction);
+        } catch (IllegalArgumentException invalid) {
+            throw new IllegalStateException();
+        }
+    }
+
+    static boolean uuid(String value) {
+        if (value == null || value.length() != 36) return false;
+        try {
+            return UUID.fromString(value).toString().equals(value);
+        } catch (IllegalArgumentException invalid) {
+            return false;
+        }
+    }
+}

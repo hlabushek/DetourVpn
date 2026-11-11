@@ -344,6 +344,8 @@ def test_refresh_reuse_revokes_rotated_tokens(harness: Harness) -> None:
     h = harness
     first = login(h)
     rotated = h.auth.refresh(first.refresh_token, "refresh")
+    # Using the successor proves its holder received it: a later replay is reuse (ADR-012).
+    assert h.client.get("/api/v1/me", headers=headers(rotated)).status_code == 200
     with pytest.raises(AuthError, match="refresh_reused"):
         h.auth.refresh(first.refresh_token, "refresh")
     assert h.client.get("/api/v1/me", headers=headers(rotated)).status_code == 401
@@ -364,10 +366,53 @@ def test_concurrent_refresh_detects_reuse(harness: Harness) -> None:
         except AuthError as exc:
             return exc.code
 
+    # ADR-100: a concurrent retry is indistinguishable from a lost-response retry. Both
+    # succeed, the first successor is replaced, and only the last issued pair keeps working.
     with ThreadPoolExecutor(max_workers=2) as pool:
-        assert sorted(pool.map(refresh_once, range(2))) == ["ok", "refresh_reused"]
+        assert sorted(pool.map(refresh_once, range(2))) == ["ok", "ok"]
     with transaction(h.engine) as session:
-        assert session.scalar(select(SessionFamily.revoked_at)) is not None
+        assert session.scalar(select(SessionFamily.revoked_at)) is None
+        live = session.scalars(
+            select(SessionCredential).where(SessionCredential.rotated_at.is_(None))
+        ).all()
+        assert len(live) == 1
+
+
+def test_lost_refresh_response_can_be_replayed_once_before_use(harness: Harness) -> None:
+    h = harness
+    first = login(h)
+    lost = h.auth.refresh(first.refresh_token, "refresh")  # response never reached the client
+    replayed = h.auth.refresh(first.refresh_token, "refresh")
+    assert replayed.refresh_token != lost.refresh_token
+    assert h.client.get("/api/v1/me", headers=headers(lost)).status_code == 401
+    with pytest.raises(AuthError, match="invalid_refresh"):
+        h.auth.refresh(lost.refresh_token, "refresh")
+    assert h.client.get("/api/v1/me", headers=headers(replayed)).status_code == 200
+    # Once the replayed successor has been used, the old token is plain reuse again.
+    with pytest.raises(AuthError, match="refresh_reused"):
+        h.auth.refresh(first.refresh_token, "refresh")
+    assert h.client.get("/api/v1/me", headers=headers(replayed)).status_code == 401
+
+
+def test_refresh_replay_after_grace_or_successor_rotation_revokes(harness: Harness) -> None:
+    h = harness
+    first = login(h)
+    second = h.auth.refresh(first.refresh_token, "refresh")
+    third = h.auth.refresh(second.refresh_token, "refresh")  # successor rotated: it was used
+    with pytest.raises(AuthError, match="refresh_reused"):
+        h.auth.refresh(first.refresh_token, "refresh")
+    assert h.client.get("/api/v1/me", headers=headers(third)).status_code == 401
+
+    other = login(h, 2**40 + 7)
+    h.auth.refresh(other.refresh_token, "refresh")
+    with transaction(h.engine) as session:
+        session.execute(
+            update(SessionCredential)
+            .where(SessionCredential.rotated_at.is_not(None))
+            .values(rotated_at=SessionCredential.rotated_at - timedelta(seconds=121))
+        )
+    with pytest.raises(AuthError, match="refresh_reused"):
+        h.auth.refresh(other.refresh_token, "refresh")
 
 
 def test_logout_all_scopes_to_account_and_disabled_users_fail(harness: Harness) -> None:

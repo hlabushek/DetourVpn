@@ -10,6 +10,9 @@ param(
     # ADR-084: 16 MiB window; the API accepts 64 KiB..64 MiB per window.
     [ValidateRange(65536, 67108864)]
     [int]$WindowBudgetBytes = 16777216,
+    # ADR-096: 90 keeps the legacy request. Use 900 only after every node and the API run ADR-096 code.
+    [ValidateRange(30, 900)]
+    [int]$WindowSeconds = 90,
     [switch]$DeviceChecks
 )
 $ErrorActionPreference = 'Stop'
@@ -158,6 +161,7 @@ try {
             if ($WindowTunnels) {
                 $taskArguments += "--dart-define=VPN_WINDOW_TUNNELS=true"
                 $taskArguments += "--dart-define=VPN_WINDOW_BUDGET_BYTES=$WindowBudgetBytes"
+            $taskArguments += "--dart-define=VPN_WINDOW_SECONDS=$WindowSeconds"
             }
             & $taskFlutter @taskArguments
             if ($LASTEXITCODE -ne 0) { throw 'Flutter Android build failed' }
@@ -188,6 +192,7 @@ try {
         if ($WindowTunnels) {
             $taskReleaseArguments += "--dart-define=VPN_WINDOW_TUNNELS=true"
             $taskReleaseArguments += "--dart-define=VPN_WINDOW_BUDGET_BYTES=$WindowBudgetBytes"
+            $taskReleaseArguments += "--dart-define=VPN_WINDOW_SECONDS=$WindowSeconds"
         }
         & $taskFlutter @taskReleaseArguments
         if ($LASTEXITCODE -ne 0) { throw 'Flutter Android release build failed' }

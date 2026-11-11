@@ -3,7 +3,7 @@ import re
 import secrets
 from dataclasses import dataclass
 from datetime import datetime, timedelta
-from uuid import UUID
+from uuid import UUID, uuid4
 
 from sqlalchemy import Engine, delete, func, select, text, update
 from sqlalchemy.dialects.postgresql import insert
@@ -42,6 +42,9 @@ from vpn_api.db.models import (
     User,
 )
 from vpn_api.quota.service import LedgerService
+
+# ADR-100: how long after rotation an unused successor may be replaced by a replay.
+REFRESH_REPLAY_GRACE = timedelta(seconds=120)
 
 
 def database_now(session: Session) -> datetime:
@@ -362,23 +365,31 @@ class AuthService:
         return WebhookResponse(status="delivery_unknown" if status == "unknown" else "processed")
 
     def issue_tokens(self, session: Session, family: SessionFamily, now: datetime) -> TokenResponse:
+        return self._issue(session, family, now)[0]
+
+    def _issue(
+        self, session: Session, family: SessionFamily, now: datetime
+    ) -> tuple[TokenResponse, SessionCredential]:
         access, refresh = token(), token()
         expires = min(now + timedelta(minutes=10), family.expires_at)
-        session.add(
-            SessionCredential(
-                family_id=family.id,
-                access_digest=digest(access),
-                refresh_digest=digest(refresh),
-                created_at=now,
-                access_expires_at=expires,
-            )
+        credential = SessionCredential(
+            id=uuid4(),
+            family_id=family.id,
+            access_digest=digest(access),
+            refresh_digest=digest(refresh),
+            created_at=now,
+            access_expires_at=expires,
         )
+        session.add(credential)
+        # Insert now: a rotation then points the old credential's successor_id at this row,
+        # and the unit of work does not order a self-referential FK without a relationship.
+        session.flush()
         return TokenResponse(
             access_token=access,
             refresh_token=refresh,
             access_expires_at=expires,
             refresh_expires_at=family.expires_at,
-        )
+        ), credential
 
     def verify(self, request_id: UUID, verifier: str, code: str, network: str) -> TokenResponse:
         self.rate("verify", network)
@@ -493,6 +504,8 @@ class AuthService:
         principal = Principal(
             user.id, family.id, user.role, identity.provider_subject, guest, family.device_id
         )
+        if credential.first_used_at is None:
+            self._mark_used(credential.id)
         if guest and permission not in GUEST_PERMISSIONS:
             raise AuthError("forbidden", 403)
         if family.client_kind == "mini_app" and permission not in {
@@ -538,15 +551,46 @@ class AuthService:
         if user is None or user.status != "active" or family.revoked_at or family.expires_at <= now:
             return AuthError("invalid_refresh")
         if credential.rotated_at is not None:
-            family.revoked_at = now
-            return AuthError("refresh_reused")
+            successor = (
+                session.get(SessionCredential, credential.successor_id, with_for_update=True)
+                if credential.successor_id is not None
+                else None
+            )
+            # ADR-100: a replay shortly after rotation whose successor was never used at all
+            # (neither refresh nor access) is a lost response, not theft. Anything else keeps
+            # ADR-012 behaviour: the whole family is revoked.
+            if (
+                successor is None
+                or successor.rotated_at is not None
+                or successor.first_used_at is not None
+                or now - credential.rotated_at > REFRESH_REPLAY_GRACE
+            ):
+                family.revoked_at = now
+                return AuthError("refresh_reused")
+            session.delete(successor)
+            session.flush()
         device = session.get(Device, family.device_id) if family.device_id is not None else None
         if family.device_id is not None and (
             device is None or device.revoked_at is not None or device.user_id != user.id
         ):
             return AuthError("invalid_refresh")
-        credential.rotated_at = now
-        return self.issue_tokens(session, family, now)
+        if credential.rotated_at is None:
+            credential.rotated_at = now
+        tokens, issued = self._issue(session, family, now)
+        credential.successor_id = issued.id
+        return tokens
+
+    def _mark_used(self, credential_id: UUID) -> None:
+        """Own short transaction: a later rollback of the request must not erase first use."""
+        with self.engine.begin() as connection:
+            connection.execute(
+                update(SessionCredential)
+                .where(
+                    SessionCredential.id == credential_id,
+                    SessionCredential.first_used_at.is_(None),
+                )
+                .values(first_used_at=func.clock_timestamp())
+            )
 
     def logout(self, access: str, all_sessions: bool) -> None:
         with transaction(self.engine) as session:

@@ -86,7 +86,7 @@ def test_run_executes_every_stage_in_order_and_saves_progress(
     monkeypatch.setattr(
         wizard,
         "stages",
-        lambda: [
+        lambda *_: [
             (k, k, stage(k, 1 if k == "bind" and not calls.count("fixed") else 0))
             for k in ("preflight", "install", "register", "bind", "activate")
         ],
@@ -99,7 +99,7 @@ def test_run_executes_every_stage_in_order_and_saves_progress(
     monkeypatch.setattr(
         wizard,
         "stages",
-        lambda: [
+        lambda *_: [
             (k, k, stage(k)) for k in ("preflight", "install", "register", "bind", "activate")
         ],
     )
@@ -147,3 +147,18 @@ def test_stage_list_is_the_reviewed_chain() -> None:
         "bind",
         "activate",
     ]
+
+
+def test_install_stage_passes_the_pool_size(monkeypatch: pytest.MonkeyPatch) -> None:
+    seen: list[list[str]] = []
+    monkeypatch.setattr(wizard.install_beta_node, "main", lambda argv: seen.append(argv) or 0)
+    install = dict((key, run) for key, _title, run in wizard.stages(32))["install"]
+    plain = dict((key, run) for key, _title, run in wizard.stages())["install"]
+
+    class Node:
+        name = "detourvpn-beta-france"
+
+    install(Node(), Path("x"))  # type: ignore[arg-type]
+    plain(Node(), Path("x"))  # type: ignore[arg-type]
+    assert seen[0][-3:] == ["--pool-peers", "32", "--execute"]
+    assert "--pool-peers" not in seen[1]

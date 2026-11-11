@@ -22,6 +22,7 @@ class NativeSnapshot {
     this.trafficBytes,
     this.receivedBytes,
     this.reason = '',
+    this.nativeRenewal = false,
   });
   final bool up;
   final bool network;
@@ -34,6 +35,9 @@ class NativeSnapshot {
   /// Approximate inbound tunnel bytes; used only as recent data-path evidence.
   final int? receivedBytes;
   final String reason;
+
+  /// ADR-097: the OS-level VPN process renews the window itself; Dart only observes.
+  final bool nativeRenewal;
   bool get confirmed =>
       up &&
       network &&
@@ -89,6 +93,12 @@ abstract interface class NativeTunnel {
   Future<void> openLogin(String url);
 }
 
+/// ADR-097: optional native renewer. Platforms without one keep Dart-driven renewal.
+abstract interface class NativeRenewalHost {
+  /// True only if the native side accepted and started renewing this exact connection.
+  Future<bool> startNativeRenewal(Map<String, Object?> args);
+}
+
 abstract interface class WindowNative implements NativeTunnel {
   Future<void> connectWindow(
     String config,
@@ -104,7 +114,8 @@ abstract interface class NodePreferenceStore {
   Future<void> writeSelectedNode(String? id);
 }
 
-class PlatformTunnel implements WindowNative, NodePreferenceStore {
+class PlatformTunnel
+    implements WindowNative, NodePreferenceStore, NativeRenewalHost {
   static const channel = MethodChannel('project.vpn/tunnel.v1');
   Map<String, dynamic> _windowArgs(
     Map<String, dynamic> grant,
@@ -124,6 +135,18 @@ class PlatformTunnel implements WindowNative, NodePreferenceStore {
     ..._windowArgs(grant, remainingMs),
     'config': config,
   });
+  @override
+  Future<bool> startNativeRenewal(Map<String, Object?> args) async {
+    try {
+      return await channel.invokeMethod<bool>('startNativeRenewal', args) ??
+          false;
+    } on PlatformException {
+      return false;
+    } on MissingPluginException {
+      return false;
+    }
+  }
+
   @override
   Future<void> advanceWindow(Map<String, dynamic> grant, int remainingMs) =>
       channel.invokeMethod<void>(
@@ -167,6 +190,7 @@ class PlatformTunnel implements WindowNative, NodePreferenceStore {
           ? value['receivedBytes'] as int
           : null,
       reason: value['reason'] as String,
+      nativeRenewal: value['nativeRenewal'] == true,
     );
   }
 

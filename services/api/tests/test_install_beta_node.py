@@ -2,6 +2,7 @@
 
 # ruff: noqa: E501, S607
 
+import base64
 import io
 import json
 import re
@@ -218,7 +219,9 @@ def run_cli(
         install, "evaluate", lambda values: [{"check": "x", "ok": ready, "required": True}]
     )
 
-    def fake_prepare(node: BetaNode, slots: int, artifacts: Path) -> tuple[bytes, int]:
+    def fake_prepare(
+        node: BetaNode, slots: int, artifacts: Path, pool_peers: int | None = None
+    ) -> tuple[bytes, int]:
         built.append("payload")
         return b"archive", 18
 
@@ -283,3 +286,51 @@ def test_failure_message_carries_fixed_diagnostics_only(monkeypatch: pytest.Monk
     with pytest.raises(install.InstallError) as error:
         install.execute(make_node(), b"x", 1)
     assert str(error.value) == "install_failed:bootstrap:beta_awg_port_in_use,result_exit_code"
+
+
+def test_pool_install_source_renders_pool_everywhere(monkeypatch: pytest.MonkeyPatch) -> None:
+    """ADR-101: --pool-peers reaches the agent config, node slots file and API manifest."""
+    monkeypatch.syspath_prepend(str(Path(__file__).resolve().parents[2] / "node-agent"))
+    from beta_slot_config import render_configs
+
+    from vpn_api.tunnels.window_profiles import WindowManifest
+
+    pool = render_configs(install.generate_slot_source(make_node(), 1, 40))
+    assert json.loads(pool["agent_config"])["pool_peers"] == 40
+    assert json.loads(pool["node_slots"])["pool_peers"] == 40
+    manifest = WindowManifest.model_validate_json(pool["api_manifest"])
+    assert manifest.nodes[0].pool_peers == 40 and len(manifest.nodes[0].peer_slots) == 40
+    plain = render_configs(install.generate_slot_source(make_node(), 2))
+    for name in ("agent_config", "node_slots", "api_manifest"):
+        assert b"pool_peers" not in plain[name]
+    for slots, peers in ((2, 40), (1, 1), (1, 251)):
+        with pytest.raises(install.InstallError, match="install_pool_invalid"):
+            install.generate_slot_source(make_node(), slots, peers)
+
+
+def test_pool_bootstrap_rules_cover_the_pool_subnet(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.syspath_prepend(str(Path(__file__).resolve().parents[2] / "node-agent"))
+    import beta_slot_bootstrap as bootstrap
+
+    source = json.loads(install.generate_slot_source(make_node(), 1, 8))
+    from cryptography.hazmat.primitives.asymmetric.x25519 import X25519PrivateKey
+
+    private = base64.b64decode(source["slots"][0]["server_private_key"])
+    public = X25519PrivateKey.from_private_bytes(private).public_key().public_bytes_raw()
+    slot = bootstrap.Slot.model_validate(
+        {**source["slots"][0], "server_public_key": base64.b64encode(public).decode()}
+    )
+    import window_gate
+
+    # Pool mode deletes the per-port gate by this name; it must be the gate's real table.
+    assert bootstrap.GATE_TABLE == window_gate.TABLE
+    pooled = bootstrap._slot_network_rules(slot, pool=True)
+    assert "ip saddr 10.203.72.0/24 accept" in pooled
+    assert "ip saddr 10.203.72.0/24 masquerade" in pooled
+    assert "10.203.71.2" not in pooled
+    single = bootstrap._slot_network_rules(slot)
+    assert "ip saddr 10.203.71.2 accept" in single and "10.203.72" not in single
+    with pytest.raises(ValueError):
+        bootstrap.Slots.model_validate(
+            {"version": 1, "slots": [slot.model_dump(), slot.model_dump()], "pool_peers": 8}
+        )

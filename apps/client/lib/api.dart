@@ -163,28 +163,46 @@ class Api implements TunnelApi {
     }
   }
 
+  /// ADR-100: the old refresh token stays durable until the new pair is validated and stored.
+  /// A lost response or transport failure keeps the session: the next attempt replays the
+  /// same token, which the server accepts once within its grace window if the rotated
+  /// successor was never used. Only an explicit refusal (401) or a storage failure ends it.
   Future<void> _renew() async {
     final token = _refresh;
     final epoch = _sessionEpoch;
-    // A lost response may have rotated the refresh token. Fail closed, require login.
-    _refresh = null;
+    if (token == null) throw const ClientError('session_expired');
+    Map<String, dynamic> value;
     try {
-      // Consume durable refresh before the request. Crash/response loss requires login.
-      await _persist(null);
-      if (epoch != _sessionEpoch) throw const ClientError('session_expired');
-      final value = await _request('POST', '/api/v1/auth/refresh', {
+      value = await _request('POST', '/api/v1/auth/refresh', {
         'refresh_token': token,
       });
+    } on ClientError catch (e) {
       if (epoch != _sessionEpoch) throw const ClientError('session_expired');
-      _access = value['access_token'] as String;
-      _refresh = value['refresh_token'] as String;
-      await _persist({'origin': origin.toString(), 'refresh_token': _refresh});
+      if (_transient.contains(e.code)) rethrow;
+      await forgetSession();
+      throw const ClientError('session_expired');
+    }
+    try {
       if (epoch != _sessionEpoch) throw const ClientError('session_expired');
+      final access = value['access_token'];
+      final refresh = value['refresh_token'];
+      if (access is! String || refresh is! String)
+        throw const ClientError('invalid_response');
+      await _persist({'origin': origin.toString(), 'refresh_token': refresh});
+      if (epoch != _sessionEpoch) throw const ClientError('session_expired');
+      _access = access;
+      _refresh = refresh;
     } catch (_) {
       if (epoch == _sessionEpoch) await forgetSession();
       throw const ClientError('session_expired');
     }
   }
+
+  static const _transient = {
+    'network_unavailable',
+    'api_unavailable',
+    'rate_limited',
+  };
 
   Future<Map<String, dynamic>> _request(
     String method,

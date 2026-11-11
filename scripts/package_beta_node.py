@@ -21,6 +21,8 @@ SOURCE_FILES = (
     ("services/node-agent/beta_slot_bootstrap.py", "beta_slot_bootstrap.py"),
     ("services/node-agent/window_gate.py", "window_gate.py"),
     ("services/node-agent/window_peer.py", "window_peer.py"),
+    ("services/node-agent/window_pool.py", "window_pool.py"),
+    ("services/node-agent/latency_probe.py", "latency_probe.py"),
     ("services/node-agent/window-requirements.txt", "requirements.txt"),
     ("services/api/src/vpn_api/__init__.py", "vpn_api/__init__.py"),
     ("services/api/src/vpn_api/tunnels/__init__.py", "vpn_api/tunnels/__init__.py"),
@@ -46,6 +48,10 @@ SOURCE_FILES = (
     (
         "infra/beta-node/detourvpn-beta-core@.service",
         "systemd/detourvpn-beta-core@.service",
+    ),
+    (
+        "infra/beta-node/detourvpn-beta-latency-probe.service",
+        "systemd/detourvpn-beta-latency-probe.service",
     ),
 )
 

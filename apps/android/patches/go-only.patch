@@ -121,8 +121,42 @@
          final State originalState = getState(tunnel);
  
          if (state == State.TOGGLE)
-@@ -321,7 +320,7 @@
+@@ -319,9 +318,41 @@
+         return getState(tunnel);
+     }
  
++    /**
++     * Recreates the running tunnel in place: establish() replaces the live VPN interface without
++     * a gap, a fresh userspace device binds a new UDP socket (new NAT mapping, immediate
++     * handshake), and only then is the old device closed. Used after network changes and for a
++     * stalled handshake. On any failure the tunnel is fully torn down (no half state).
++     */
++    public synchronized void restartInPlace() throws Exception {
++        final Tunnel tunnel = currentTunnel;
++        final Config config = currentConfig;
++        final int old = currentTunnelHandle;
++        if (tunnel == null || config == null || old < 0)
++            throw new IllegalStateException("tunnel_not_up");
++        try {
++            setStateInternal(tunnel, config, State.UP);
++        } catch (final Exception e) {
++            final int fresh = currentTunnelHandle;
++            currentTunnel = null;
++            currentConfig = null;
++            currentTunnelHandle = -1;
++            if (fresh >= 0 && fresh != old)
++                awgTurnOff(fresh);
++            awgTurnOff(old);
++            try {
++                vpnService.get(0, TimeUnit.NANOSECONDS).stopSelf();
++            } catch (final TimeoutException ignored) { }
++            tunnel.onStateChange(State.DOWN);
++            throw e;
++        }
++        if (currentTunnelHandle != old)
++            awgTurnOff(old);
++    }
++
      private void setStateInternal(final Tunnel tunnel, @Nullable final Config config, final State state)
              throws Exception {
 -        Log.i(TAG, "Bringing tunnel " + tunnel.getName() + ' ' + state);
@@ -130,7 +164,7 @@
  
          if (state == State.UP) {
              if (config == null)
-@@ -332,7 +331,7 @@
+@@ -332,7 +363,7 @@
  
              final VpnService service;
              if (!vpnService.isDone()) {
@@ -139,7 +173,7 @@
                  context.startService(new Intent(context, VpnService.class));
              }
  
-@@ -346,7 +345,7 @@
+@@ -346,7 +377,7 @@
              service.setOwner(this);
  
              if (currentTunnelHandle != -1) {
@@ -148,7 +182,7 @@
                  return;
              }
  
-@@ -359,7 +358,7 @@
+@@ -359,7 +390,7 @@
                          continue;
                      if (ep.getResolved().orElse(null) == null) {
                          if (i < DNS_RESOLUTION_RETRIES - 1) {
@@ -157,7 +191,7 @@
                              Thread.sleep(1000);
                              continue dnsRetry;
                          } else
-@@ -417,7 +416,7 @@
+@@ -417,7 +448,7 @@
              try (final ParcelFileDescriptor tun = builder.establish()) {
                  if (tun == null)
                      throw new BackendException(Reason.TUN_CREATION_ERROR);
@@ -166,21 +200,20 @@
                  currentTunnelHandle = awgTurnOn(tunnel.getName(), tun.detachFd(), goConfig);
              }
              if (currentTunnelHandle < 0)
-@@ -426,13 +425,17 @@
+@@ -426,13 +457,17 @@
              currentTunnel = tunnel;
              currentConfig = config;
  
 -            service.protect(awgGetSocketV4(currentTunnelHandle));
 -            service.protect(awgGetSocketV6(currentTunnelHandle));
--
--            launchStatusJob();
 +            int socket4 = awgGetSocketV4(currentTunnelHandle);
 +            int socket6 = awgGetSocketV6(currentTunnelHandle);
 +            if (socket4 < 0 || !service.protect(socket4) || (socket6 >= 0 && !service.protect(socket6))) {
 +                setStateInternal(tunnel, null, State.DOWN);
 +                throw new IllegalStateException("socket_protection_failed");
 +            }
-+
+ 
+-            launchStatusJob();
 +            // I-011 polls through a single serialized caller; no JNI status thread.
          } else {
              if (currentTunnelHandle == -1) {
@@ -189,23 +222,51 @@
                  return;
              }
              stopStatusJob();
-@@ -498,13 +501,24 @@
+@@ -454,7 +489,8 @@
+      * system's Always-On VPN mode.
+      */
+     public interface AlwaysOnCallback {
+-        void alwaysOnTriggered();
++        void alwaysOnTriggered(VpnService service);
++        void alwaysOnStopped(VpnService service);
+     }
+ 
+     // TODO: When we finally drop API 21 and move to API 24, delete this and replace with the ordinary CompletableFuture.
+@@ -490,6 +526,8 @@
+      * {@link android.net.VpnService} implementation for {@link GoBackend}
+      */
+     public static class VpnService extends android.net.VpnService {
++        /** Explicit restore request from the app (boot); handled like an Always-on start. */
++        public static final String RESTORE_ACTION = "org.amnezia.awg.backend.action.RESTORE";
+         @Nullable private GoBackend owner;
+ 
+         public Builder getBuilder() {
+@@ -498,13 +536,33 @@
  
          @Override
          public void onCreate() {
-+            super.onCreate();
+-            vpnService.complete(this);
+             super.onCreate();
 +            android.app.NotificationManager notifications = getSystemService(android.app.NotificationManager.class);
-+            if (Build.VERSION.SDK_INT >= 26)
++            if (Build.VERSION.SDK_INT >= 26) {
++                notifications.deleteNotificationChannel("i011");
 +                notifications.createNotificationChannel(new android.app.NotificationChannel(
-+                    "i011", "VPN I-011 test", android.app.NotificationManager.IMPORTANCE_LOW));
++                    "detourvpn.vpn", "VPN-подключение", android.app.NotificationManager.IMPORTANCE_LOW));
++            }
 +            android.app.Notification.Builder notification = Build.VERSION.SDK_INT >= 26
-+                ? new android.app.Notification.Builder(this, "i011") : new android.app.Notification.Builder(this);
-+            notification.setContentTitle("VPN I-011 · test service")
-+                .setContentText("Native tunnel; handshake and egress checked separately")
-+                .setSmallIcon(android.R.drawable.stat_sys_warning).setOngoing(true);
++                ? new android.app.Notification.Builder(this, "detourvpn.vpn") : new android.app.Notification.Builder(this);
++            // The app may ship a monochrome status icon; the platform lock is the fallback.
++            int icon = getResources().getIdentifier("ic_stat_vpn", "drawable", getPackageName());
++            notification.setContentTitle("DetourVPN включён")
++                .setContentText("Нажмите, чтобы открыть приложение")
++                .setSmallIcon(icon != 0 ? icon : android.R.drawable.ic_lock_lock)
++                .setShowWhen(false).setOngoing(true);
++            Intent launch = getPackageManager().getLaunchIntentForPackage(getPackageName());
++            if (launch != null)
++                notification.setContentIntent(android.app.PendingIntent.getActivity(this, 0, launch,
++                    android.app.PendingIntent.FLAG_IMMUTABLE | android.app.PendingIntent.FLAG_UPDATE_CURRENT));
 +            startForeground(11, notification.build());
-             vpnService.complete(this);
--            super.onCreate();
++            vpnService.complete(this);
          }
  
          @Override
@@ -215,7 +276,7 @@
                  final Tunnel tunnel = owner.currentTunnel;
                  if (tunnel != null) {
                      if (owner.currentTunnelHandle != -1)
-@@ -515,19 +529,22 @@
+@@ -515,6 +573,9 @@
                      tunnel.onStateChange(State.DOWN);
                  }
              }
@@ -225,29 +286,27 @@
              vpnService = vpnService.newIncompleteFuture();
              super.onDestroy();
          }
- 
+@@ -522,12 +583,16 @@
          @Override
          public int onStartCommand(@Nullable final Intent intent, final int flags, final int startId) {
              vpnService.complete(this);
-             if (intent == null || intent.getComponent() == null || !intent.getComponent().getPackageName().equals(getPackageName())) {
+-            if (intent == null || intent.getComponent() == null || !intent.getComponent().getPackageName().equals(getPackageName())) {
 -                Log.d(TAG, "Service started by Always-on VPN feature");
++            final boolean restore = intent != null && RESTORE_ACTION.equals(intent.getAction());
++            if (restore || intent == null || intent.getComponent() == null || !intent.getComponent().getPackageName().equals(getPackageName())) {
 +
                  if (alwaysOnCallback != null)
 -                    alwaysOnCallback.alwaysOnTriggered();
 +                    alwaysOnCallback.alwaysOnTriggered(this);
              }
 -            return super.onStartCommand(intent, flags, startId);
-+            return START_NOT_STICKY;
++            // Sticky: if the system kills the process while the tunnel runs, it restarts the
++            // service with a null intent, which goes through the same restore callback.
++            // stopSelf() after a user disconnect or expiry never triggers a restart.
++            return START_STICKY;
          }
  
          public void setOwner(final GoBackend owner) {
-@@ -455,4 +455,5 @@
-      */
-     public interface AlwaysOnCallback {
--        void alwaysOnTriggered();
-+        void alwaysOnTriggered(VpnService service);
-+        void alwaysOnStopped(VpnService service);
-     }
 --- a/tunnel/tools/libwg-go/api-android.go
 +++ b/tunnel/tools/libwg-go/api-android.go
 @@ -10,121 +10,43 @@

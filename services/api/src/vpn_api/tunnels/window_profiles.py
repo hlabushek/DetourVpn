@@ -42,9 +42,9 @@ class WindowSlot(FrozenInput):
             raise ValueError("Fixed slot UDP port required")
         return self
 
-    def client_config(self) -> str:
+    def client_config(self, address: str = "10.203.71.2/30") -> str:
         return (
-            "[Interface]\nAddress = 10.203.71.2/30\nDNS = 1.1.1.1\nMTU = 1280\n"
+            f"[Interface]\nAddress = {address}\nDNS = 1.1.1.1\nMTU = 1280\n"
             + AWG_PARAMETERS
             + "HeaderProtectionKey = "
             + self.header_protection_key.get_secret_value()
@@ -56,19 +56,53 @@ class WindowSlot(FrozenInput):
         )
 
 
+class PoolPeerSlot:
+    """ADR-101: one peer index on a pool node. Shares slot 1's key and endpoint and owns one
+    fixed inner address; same interface the admission code uses for a physical slot."""
+
+    def __init__(self, slot_id: int, base: WindowSlot) -> None:
+        self.slot_id, self.base = slot_id, base
+        self.server_public_key = base.server_public_key
+        self.endpoint = base.endpoint
+
+    @property
+    def address(self) -> str:
+        return f"10.203.72.{self.slot_id + 1}"
+
+    def client_config(self) -> str:
+        return self.base.client_config(self.address + "/32")
+
+
 class WindowNode(FrozenInput):
     node_id: UUID
     slots: list[WindowSlot] = Field(min_length=1, max_length=16)
+    pool_peers: int | None = Field(default=None, strict=True, ge=2, le=250)
+    # ADR-102: the node runs the UDP latency echo. Display only, so it is not part of digest().
+    latency_probe: bool = Field(default=False, strict=True)
 
     @model_validator(mode="after")
     def slot_order(self) -> "WindowNode":
         if [slot.slot_id for slot in self.slots] != list(range(1, len(self.slots) + 1)):
             raise ValueError("Contiguous fixed operator slots required")
+        if self.pool_peers is not None and len(self.slots) != 1:
+            raise ValueError("A pool node has exactly one operator slot")
         return self
+
+    @property
+    def probe_host(self) -> str | None:
+        """Public IPv4 of the node's latency echo, when it runs one."""
+        return self.slots[0].endpoint.rsplit(":", 1)[0] if self.latency_probe else None
+
+    @property
+    def peer_slots(self) -> "list[WindowSlot] | list[PoolPeerSlot]":
+        """Admission units: physical slots, or the pool's peer indexes."""
+        if self.pool_peers is None:
+            return list(self.slots)
+        return [PoolPeerSlot(index, self.slots[0]) for index in range(1, self.pool_peers + 1)]
 
     def digest(self) -> str:
         # SecretStr JSON serialization masks values; explicitly bind the real operator key.
-        material = {
+        material: dict[str, object] = {
             "node_id": str(self.node_id),
             "slots": [
                 {
@@ -78,6 +112,9 @@ class WindowNode(FrozenInput):
                 for slot in self.slots
             ],
         }
+        if self.pool_peers is not None:
+            # Only pool manifests carry the key, so existing slot digests do not change.
+            material["pool_peers"] = self.pool_peers
         return hashlib.sha256(json.dumps(material, sort_keys=True).encode()).hexdigest()
 
 

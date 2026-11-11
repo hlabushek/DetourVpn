@@ -4,10 +4,11 @@ import 'package:flutter/material.dart';
 
 import '../orbit_widgets.dart';
 import 'motion.dart';
+import '../latency_probe.dart';
 import 'tokens.dart';
 
 /// User-facing server state, derived only from the catalog `reason` (ADR-092).
-/// No latency or speed is ever shown.
+/// Latency is shown separately and only when measured (ADR-102); speed is never shown.
 enum ServerState { available, busy, unavailable }
 
 ServerState serverState(String reason) => switch (reason) {
@@ -57,6 +58,32 @@ class StateLabel extends StatelessWidget {
       ),
     ],
   );
+}
+
+/// ADR-102: a measured round trip ("42 мс"), "нет ответа", or "измеряем…" while pending.
+class LatencyLabel extends StatelessWidget {
+  const LatencyLabel({super.key, required this.ms, this.measuring = false});
+  final int? ms;
+  final bool measuring;
+  @override
+  Widget build(BuildContext context) {
+    final t = OrbitTokens.of(context);
+    final color = measuring
+        ? t.idle
+        : switch (latencyBand(ms)) {
+            LatencyBand.good => t.success,
+            LatencyBand.fair => t.warning,
+            LatencyBand.poor => t.danger,
+          };
+    return Semantics(
+      label: measuring ? 'Пинг измеряется' : 'Пинг ${latencyLabel(ms)}',
+      excludeSemantics: true,
+      child: StateLabel(
+        label: measuring ? 'измеряем…' : latencyLabel(ms),
+        color: color,
+      ),
+    );
+  }
 }
 
 class OrbitBadge extends StatelessWidget {

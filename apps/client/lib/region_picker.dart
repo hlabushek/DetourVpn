@@ -149,7 +149,23 @@ class _RegionPickerScreenState extends State<RegionPickerScreen> {
                             style: Theme.of(context).textTheme.titleMedium,
                           ),
                           const SizedBox(height: 4),
-                          StateLabel(label: state.label, color: state.color(t)),
+                          Wrap(
+                            spacing: 16,
+                            runSpacing: 4,
+                            children: [
+                              StateLabel(
+                                label: state.label,
+                                color: state.color(t),
+                              ),
+                              if (node.probeHost != null)
+                                LatencyLabel(
+                                  ms: c.latencyMs[node.id],
+                                  measuring:
+                                      c.latencyMeasuring &&
+                                      !c.latencyMs.containsKey(node.id),
+                                ),
+                            ],
+                          ),
                         ],
                       ),
                     ),
@@ -175,117 +191,124 @@ class _RegionPickerScreenState extends State<RegionPickerScreen> {
     }
 
     final empty = !c.nodesLoading && c.nodes.isEmpty && c.nodesError == null;
-    return ListView(
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
-      children: [
-        if (!empty)
-          Padding(
-            padding: const EdgeInsets.only(bottom: 16),
-            child: Text(
-              'Подключение будет выполнено к выбранному серверу',
-              style: Theme.of(context).textTheme.bodySmall,
-            ),
-          ),
-        if (c.hasLease)
-          const Padding(
-            padding: EdgeInsets.only(bottom: 16),
-            child: OrbitNotice(
-              text: 'Сначала отключите VPN и дождитесь завершения подключения.',
-            ),
-          ),
-        if (c.nodesError != null)
-          const Padding(
-            padding: EdgeInsets.only(bottom: 16),
-            child: OrbitNotice(
-              text: 'Каталог не обновлён; прежние статусы устарели.',
-            ),
-          ),
-        if (c is! WindowConnectionController)
-          Padding(
-            padding: const EdgeInsets.only(bottom: 12),
-            child: OrbitPanel(
-              selected: c.selectedNode == null,
-              onTap: locked ? null : () => _select(null),
-              child: Row(
-                children: [
-                  Icon(Icons.public, color: t.accent, size: 28),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: Text(
-                      'Первый доступный узел',
-                      style: Theme.of(context).textTheme.titleMedium,
-                    ),
-                  ),
-                ],
+    return RefreshIndicator(
+      onRefresh: c.refreshNodes,
+      child: ListView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
+        children: [
+          if (!empty)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 16),
+              child: Text(
+                'Подключение будет выполнено к выбранному серверу',
+                style: Theme.of(context).textTheme.bodySmall,
               ),
             ),
-          ),
-        if (grouped)
-          for (final entry in byCountry.entries) ...[
+          if (c.hasLease)
+            const Padding(
+              padding: EdgeInsets.only(bottom: 16),
+              child: OrbitNotice(
+                text:
+                    'Сначала отключите VPN и дождитесь завершения подключения.',
+              ),
+            ),
+          if (c.nodesError != null)
+            const Padding(
+              padding: EdgeInsets.only(bottom: 16),
+              child: OrbitNotice(
+                text: 'Каталог не обновлён; прежние статусы устарели.',
+              ),
+            ),
+          if (c is! WindowConnectionController)
             Padding(
-              padding: const EdgeInsets.fromLTRB(4, 8, 4, 12),
-              child: Text.rich(
-                TextSpan(
-                  text: countryNames[entry.key] ?? 'Другие',
-                  style: Theme.of(context).textTheme.titleMedium,
+              padding: const EdgeInsets.only(bottom: 12),
+              child: OrbitPanel(
+                selected: c.selectedNode == null,
+                onTap: locked ? null : () => _select(null),
+                child: Row(
                   children: [
-                    TextSpan(
-                      text: ' · ${_servers(entry.value.length)}',
-                      style: Theme.of(context).textTheme.bodySmall,
+                    Icon(Icons.public, color: t.accent, size: 28),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: Text(
+                        'Первый доступный узел',
+                        style: Theme.of(context).textTheme.titleMedium,
+                      ),
                     ),
                   ],
                 ),
               ),
             ),
-            for (final node in entry.value) card(node, compact: true),
-          ]
-        else
-          for (final node in c.nodes) card(node),
-        if (c.nodesLoading)
-          const Padding(
-            padding: EdgeInsets.symmetric(vertical: 16),
-            child: LinearProgressIndicator(),
-          ),
-        if (empty) ...[
+          if (grouped)
+            for (final entry in byCountry.entries) ...[
+              Padding(
+                padding: const EdgeInsets.fromLTRB(4, 8, 4, 12),
+                child: Text.rich(
+                  TextSpan(
+                    text: countryNames[entry.key] ?? 'Другие',
+                    style: Theme.of(context).textTheme.titleMedium,
+                    children: [
+                      TextSpan(
+                        text: ' · ${_servers(entry.value.length)}',
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              for (final node in entry.value) card(node, compact: true),
+            ]
+          else
+            for (final node in c.nodes) card(node),
+          if (c.nodesLoading)
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 16),
+              child: LinearProgressIndicator(),
+            ),
+          if (empty) ...[
+            const SizedBox(height: 16),
+            OrbitBlob(
+              height: 200,
+              child: Icon(Icons.dns_outlined, size: 48, color: t.accent),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'Серверы пока не настроены.',
+              textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'Обновите список позже',
+              textAlign: TextAlign.center,
+              style: Theme.of(
+                context,
+              ).textTheme.bodySmall?.copyWith(color: t.accent),
+            ),
+          ],
           const SizedBox(height: 16),
-          OrbitBlob(
-            height: 200,
-            child: Icon(Icons.dns_outlined, size: 48, color: t.accent),
-          ),
-          const SizedBox(height: 16),
           Text(
-            'Серверы пока не настроены.',
-            textAlign: TextAlign.center,
-            style: Theme.of(context).textTheme.titleMedium,
-          ),
-          const SizedBox(height: 4),
-          Text(
-            'Обновите список позже',
-            textAlign: TextAlign.center,
-            style: Theme.of(
-              context,
-            ).textTheme.bodySmall?.copyWith(color: t.accent),
-          ),
-        ],
-        const SizedBox(height: 16),
-        Text(
-          'Доступность по данным агента. Скорость здесь не измеряется.',
-          textAlign: TextAlign.center,
-          style: Theme.of(context).textTheme.bodySmall,
-        ),
-        if (c.nodesUpdatedAt != null)
-          Text(
-            'Проверка: ${c.nodesUpdatedAt!.toLocal().toString().substring(0, 19)}',
+            'Доступность по данным агента. Пинг измеряется с этого устройства до сервера; скорость не измеряется.',
             textAlign: TextAlign.center,
             style: Theme.of(context).textTheme.bodySmall,
           ),
-        const SizedBox(height: 16),
-        FilledButton.icon(
-          onPressed: c.nodesLoading ? null : c.refreshNodes,
-          icon: const Icon(Icons.refresh_rounded),
-          label: const Text('Обновить список'),
-        ),
-      ],
+          if (c.nodesUpdatedAt != null)
+            Text(
+              'Проверка: ${c.nodesUpdatedAt!.toLocal().toString().substring(0, 19)}',
+              textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+          const SizedBox(height: 16),
+          FilledButton.icon(
+            onPressed: c.nodesLoading || c.latencyMeasuring
+                ? null
+                : c.refreshNodes,
+            icon: const Icon(Icons.refresh_rounded),
+            label: const Text('Обновить список и пинг'),
+          ),
+        ],
+      ),
     );
   }
 

@@ -12,6 +12,8 @@ import subprocess
 TABLE = "detour_window_v3"
 NFT = "/usr/sbin/nft"
 NSENTER = "/usr/bin/nsenter"
+# Mirrors vpn_api.tunnels.v3_contracts.MAX_WINDOW_SECONDS; a test pins the equality.
+MAX_WINDOW_MS = 900_000
 ENV = {"PATH": "/usr/sbin:/usr/bin:/sbin:/bin", "LC_ALL": "C"}
 
 
@@ -57,7 +59,7 @@ class SlotGate:
     def program(self, budget: int, milliseconds: int, *, replace: bool) -> str:
         if type(budget) is not int or not 65536 <= budget <= 67108864:
             raise GateError("invalid_window_budget")
-        if type(milliseconds) is not int or not 0 <= milliseconds <= 90000:
+        if type(milliseconds) is not int or not 0 <= milliseconds <= MAX_WINDOW_MS:
             raise GateError("invalid_window_duration")
         live = f"elements = {{ {self.port} timeout {milliseconds}ms }};" if milliseconds else ""
         prefix = f"delete table inet {TABLE}\n" if replace else ""
@@ -108,7 +110,7 @@ class SlotGate:
 
         Must follow install_closed. Replays must never call this method to refresh TTL.
         """
-        if type(milliseconds) is not int or not 1 <= milliseconds <= 90000:
+        if type(milliseconds) is not int or not 1 <= milliseconds <= MAX_WINDOW_MS:
             raise GateError("invalid_window_duration")
         self.nft(
             ["-f", "-"],

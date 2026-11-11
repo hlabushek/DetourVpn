@@ -37,7 +37,9 @@ public final class ClientActivity extends FlutterActivity {
     private ClientApplication owner() { return (ClientApplication) getApplication(); }
     @Override protected void onCreate(Bundle state) {
         super.onCreate(state);
-        getWindow().addFlags(WindowManager.LayoutParams.FLAG_SECURE);
+        // FLAG_SECURE intentionally not set: screenshots and recents previews are allowed (ADR-103).
+        // ADR-107: a cold start drops an update APK left by an earlier attempt.
+        if (state == null) AppUpdateInstaller.discardStale(this);
         recordI028Lifecycle("activity_created");
     }
     @Override protected void onStart() {
@@ -158,12 +160,24 @@ public final class ClientActivity extends FlutterActivity {
             }
             return;
         }
+        if (call.method.equals("appVersionCode")) {
+            try { result.success(AppUpdateInstaller.installedVersionCode(this)); }
+            catch (PackageManager.NameNotFoundException | RuntimeException unavailable) {
+                result.error("app_version_unavailable", "Версия приложения недоступна", null);
+            }
+            return;
+        }
+        if (call.method.equals("appUpdateInstall")) {
+            handleUpdateInstall(call, result);
+            return;
+        }
         if (call.method.equals("shareDiagnosticReport")) {
             String code = call.argument("code");
             String stage = call.argument("stage");
+            String handshake = call.argument("handshake");
             final String reportText;
             try {
-                reportText = DiagnosticReportText.format(code, stage);
+                reportText = DiagnosticReportText.format(code, stage, handshake);
             } catch (IllegalArgumentException invalidReport) {
                 result.error("diagnostic_report_invalid", "Отчёт диагностики недоступен", null);
                 return;
@@ -182,12 +196,15 @@ public final class ClientActivity extends FlutterActivity {
         if (!java.util.Set.of("publicKey", "prove", "connect", "connectWindow", "advanceWindow",
                 "disconnect", "snapshot", "sessionRead", "sessionWrite", "pendingLoginRead",
                 "pendingLoginWrite", "splitRead", "splitModeRead", "splitLastModeRead",
-                "splitWrite", "splitDomainsRead", "apps", "nodeRead", "nodeWrite").contains(call.method)) {
+                "splitWrite", "splitDomainsRead", "apps", "nodeRead", "nodeWrite",
+                "startNativeRenewal", "dnsRead", "dnsWrite").contains(call.method)) {
             result.notImplemented(); return;
         }
         ClientApplication app = owner();
         if (call.method.equals("disconnect")) {
             app.generation.incrementAndGet();
+            // Any app-side disconnect (button, logout, failed lease) ends the restore intent.
+            ClientApplication.setWantsConnected(app, false);
             if (permissionResult != null) { permissionResult.success(false); permissionResult = null; }
         }
         final long generation = app.generation.get();
@@ -241,6 +258,24 @@ public final class ClientActivity extends FlutterActivity {
                         value = new java.util.ArrayList<>(getSharedPreferences("routing", MODE_PRIVATE)
                                 .getStringSet("domains", java.util.Collections.emptySet()));
                         break;
+                    case "dnsRead": {
+                        // "" = as in the server profile (default).
+                        String storedDns = DnsChoice.storedOrNull(getSharedPreferences("routing", MODE_PRIVATE)
+                                .getString("dns", null));
+                        value = storedDns == null ? "" : storedDns;
+                        break;
+                    }
+                    case "dnsWrite": {
+                        // Like split settings: only while the tunnel is off; applied on next connect.
+                        if (app.provider.isUp() || app.deadline != 0) throw new IllegalStateException();
+                        String requestedDns = call.argument("server");
+                        String canonicalDns = DnsChoice.canonicalOrNull(requestedDns);
+                        if (!getSharedPreferences("routing", MODE_PRIVATE).edit()
+                                .putString("dns", canonicalDns == null ? "" : canonicalDns)
+                                .commit()) throw new IllegalStateException();
+                        value = canonicalDns == null ? "" : canonicalDns;
+                        break;
+                    }
                     case "splitModeRead": value = routingModeName(); break;
                     case "splitLastModeRead":
                         var prefs = getSharedPreferences("routing", MODE_PRIVATE);
@@ -298,6 +333,14 @@ public final class ClientActivity extends FlutterActivity {
                             submittedAt + ((Number) call.argument("remainingMs")).longValue(), SystemClock.elapsedRealtime());
                         app.deadline = app.window.deadline;
                         break;
+                    case "startNativeRenewal":
+                        // ADR-097: only for the tunnel this call raced against; a disconnect in
+                        // between bumps the generation and the renewer refuses to start.
+                        if (generation != app.generation.get() || !app.provider.isUp()
+                                || app.deadline <= 0) throw new IllegalStateException();
+                        app.renewer.start(call.arguments(), generation);
+                        value = true;
+                        break;
                     case "publicKey": value = app.key.getPublicKey().toBase64(); break;
                     case "prove": value = KeyConfirmation.answer(app.key,
                         call.argument("ephemeralKey"), call.argument("transcript")); break;
@@ -307,7 +350,7 @@ public final class ClientActivity extends FlutterActivity {
                     case "connectWindow":
                         boolean renewable = call.method.equals("connectWindow");
                         Number duration = call.argument("remainingMs");
-                        if (duration == null || duration.longValue() <= 0 || duration.longValue() > (renewable ? 90000 : 60000)
+                        if (duration == null || duration.longValue() <= 0 || duration.longValue() > (renewable ? WindowDeadline.MAX_MS : 60000)
                                 || generation != app.generation.get() || app.provider.isUp()
                                 || VpnService.prepare(this) != null) throw new IllegalStateException();
                         long deadline = submittedAt + duration.longValue();
@@ -323,7 +366,10 @@ public final class ClientActivity extends FlutterActivity {
                             }
                             app.reason = "";
                         } catch (Exception failure) { app.stop(); throw failure; }
-                        if (renewable) runOnUiThread(this::askBatteryExemption);
+                        if (renewable) {
+                            ClientApplication.setWantsConnected(app, true);
+                            runOnUiThread(this::askBatteryExemption);
+                        }
                         break;
                     default: throw new IllegalArgumentException();
                 }
@@ -361,6 +407,35 @@ public final class ClientActivity extends FlutterActivity {
                 runOnUiThread(() -> result.error(code, message, null));
             }
         });
+    }
+    /**
+     * ADR-107: downloads, verifies and opens the system installer. Answers a stable outcome code;
+     * "install_permission_required" opens Android's "install unknown apps" screen first.
+     */
+    private void handleUpdateInstall(MethodCall call, MethodChannel.Result result) {
+        String url = call.argument("url");
+        String sha256 = call.argument("sha256");
+        Number size = call.argument("sizeBytes");
+        Number version = call.argument("versionCode");
+        Number minimum = call.argument("minSupportedVersionCode");
+        if (url == null || sha256 == null || size == null || version == null || minimum == null) {
+            result.success("invalid_manifest"); return;
+        }
+        if (!AppUpdateInstaller.canInstall(this)) {
+            try { startActivity(AppUpdateInstaller.unknownSourcesSettings(this)); }
+            catch (RuntimeException unavailable) { /* The dialog explains the setting. */ }
+            result.success("install_permission_required"); return;
+        }
+        AppUpdateInstaller.download(this, url, sha256, size.longValue(), version.longValue(),
+                minimum.longValue(), outcome -> runOnUiThread(() -> {
+                    if (!"verified".equals(outcome)) { result.success(outcome); return; }
+                    try {
+                        startActivity(AppUpdateInstaller.installIntent(this));
+                        result.success("installer_opened");
+                    } catch (RuntimeException unavailable) {
+                        result.success("installer_unavailable");
+                    }
+                }));
     }
     /** Shows Android's own "allow background activity" dialog; false if already allowed or unavailable. */
     private boolean requestBatteryExemption() {

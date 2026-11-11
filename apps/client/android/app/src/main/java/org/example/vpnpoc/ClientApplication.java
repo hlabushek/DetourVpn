@@ -32,6 +32,12 @@ public final class ClientApplication extends Application implements Tunnel {
     KeyPair key;
     SecureVault vault;
     final WindowDeadline window = new WindowDeadline();
+    final NativeRenewer renewer = new NativeRenewer(this);
+    /** ADR-099; touched only on the worker thread. */
+    private final TunnelWatchdog watchdog = new TunnelWatchdog();
+    private android.net.Network defaultNetwork;
+    private boolean defaultNetworkLost;
+    int tunnelRestarts;
     TunnelProviderV1 provider;
     private final Handler mainThread = new Handler(Looper.getMainLooper());
     private volatile VpnService recoveryService;
@@ -90,12 +96,79 @@ public final class ClientApplication extends Application implements Tunnel {
                         + " failure=" + failure.getClass().getSimpleName());
             }
         });
+        watchNetwork();
+        worker.scheduleWithFixedDelay(this::watchTunnel, 15, 15, TimeUnit.SECONDS);
         worker.scheduleWithFixedDelay(() -> {
             if (deadline > 0 && SystemClock.elapsedRealtime() >= deadline) {
                 try { stop(); reason = "lease_expired"; }
                 catch (Exception ignored) { reason = "native_disconnect_failed"; }
             }
         }, 250, 250, TimeUnit.MILLISECONDS);
+    }
+
+    /** Default-network changes (Wi-Fi <-> mobile, reconnects) feed the watchdog. */
+    private void watchNetwork() {
+        try {
+            ConnectivityManager manager = (ConnectivityManager) getSystemService(CONNECTIVITY_SERVICE);
+            manager.registerDefaultNetworkCallback(new ConnectivityManager.NetworkCallback() {
+                @Override public void onAvailable(android.net.Network network) {
+                    worker.execute(() -> {
+                        boolean changed = defaultNetworkLost
+                                || (defaultNetwork != null && !defaultNetwork.equals(network));
+                        defaultNetwork = network;
+                        defaultNetworkLost = false;
+                        if (changed) {
+                            watchdog.networkChanged(SystemClock.elapsedRealtime());
+                            worker.schedule(ClientApplication.this::watchTunnel,
+                                    TunnelWatchdog.SETTLE_MS + 500, TimeUnit.MILLISECONDS);
+                        }
+                    });
+                }
+                @Override public void onLost(android.net.Network network) {
+                    worker.execute(() -> {
+                        if (network.equals(defaultNetwork)) defaultNetworkLost = true;
+                    });
+                }
+            });
+        } catch (RuntimeException unavailable) {
+            // Stall detection below still works without change notifications.
+        }
+    }
+
+    /** Worker thread. Recreates a stalled tunnel in place; fail-closed if that fails. */
+    private void watchTunnel() {
+        try {
+            long now = SystemClock.elapsedRealtime();
+            boolean up = provider != null && deadline > 0 && provider.isUp();
+            if (!up) { watchdog.tunnelDown(); return; }
+            if (!watchdog.running()) watchdog.tunnelUp(now);
+            long handshake = provider.lastHandshakeSeconds();
+            long wall = System.currentTimeMillis() / 1000;
+            long age = handshake > 0 && handshake <= wall ? (wall - handshake) * 1000 : -1;
+            if (!watchdog.shouldRestart(now, age, hasValidatedNetwork())) return;
+            watchdog.restarted(now);
+            try {
+                provider.restartInPlace();
+                tunnelRestarts++;
+            } catch (Exception | LinkageError failed) {
+                try { stop(); } catch (Exception ignored) { /* Already down. */ }
+                reason = "native_restart_failed";
+                watchdog.tunnelDown();
+            }
+        } catch (RuntimeException ignored) {
+            // A watchdog bug must never take the tunnel down by itself.
+        }
+    }
+
+    private boolean hasValidatedNetwork() {
+        ConnectivityManager manager = (ConnectivityManager) getSystemService(CONNECTIVITY_SERVICE);
+        for (var candidate : manager.getAllNetworks()) {
+            NetworkCapabilities caps = manager.getNetworkCapabilities(candidate);
+            if (caps != null && caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_NOT_VPN)
+                    && caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
+                    && caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)) return true;
+        }
+        return false;
     }
 
     void startAlwaysOnRecovery(VpnService service) {
@@ -204,7 +277,7 @@ public final class ClientApplication extends Application implements Tunnel {
                         break;
                     case "connectWindow":
                         Number duration = call.argument("remainingMs");
-                        if (duration == null || duration.longValue() <= 0 || duration.longValue() > 90000
+                        if (duration == null || duration.longValue() <= 0 || duration.longValue() > WindowDeadline.MAX_MS
                                 || generation != this.generation.get() || provider.isUp()
                                 || VpnService.prepare(this) != null)
                             throw new IllegalStateException();
@@ -263,8 +336,26 @@ public final class ClientApplication extends Application implements Tunnel {
         if (service != null) service.stopSelf();
     }
 
+    /** User intent to stay connected across reboots and process restarts (ADR-098). */
+    static boolean wantsConnected(android.content.Context context) {
+        return context.getSharedPreferences("connection", MODE_PRIVATE)
+                .getBoolean("resume_connected", false);
+    }
+
+    static void setWantsConnected(android.content.Context context, boolean value) {
+        context.getSharedPreferences("connection", MODE_PRIVATE).edit()
+                .putBoolean("resume_connected", value).apply();
+    }
+
     void stopAlwaysOnService(VpnService service) {
         worker.execute(() -> {
+            // Lost VPN consent (another VPN app took over, or the user revoked it in Settings)
+            // is a wanted stop: never restore it on the next boot or restart.
+            if (VpnService.prepare(this) != null) {
+                setWantsConnected(this, false);
+                renewer.stop();
+                reason = "vpn_revoked";
+            }
             if (service == null || recoveryService != service) return;
             generation.incrementAndGet();
             deadline = 0;
@@ -301,10 +392,48 @@ public final class ClientApplication extends Application implements Tunnel {
             throw new IllegalStateException();
         String stored = preferences.getString("mode", "exclude");
         var packages = ClientProfile.packagesForMode(stored, selectedPackages(), getPackageName());
-        return ClientProfile.parse(text, key, packages, ClientProfile.routingModeFor(stored));
+        // User DNS choice (ADR-106). Unset = the profile's own DNS, as before. Applied at connect time.
+        String dns = DnsChoice.storedOrNull(preferences.getString("dns", null));
+        return ClientProfile.parse(DnsChoice.applyToConfigText(text, dns), key, packages,
+                ClientProfile.routingModeFor(stored));
+    }
+
+    /**
+     * [remainingMs, advisory transfer bytes or -1] for the native renewer, read on the worker
+     * thread that owns the tunnel state. Throws once the tunnel this renewal belongs to is gone.
+     */
+    long[] renewalView(long appGeneration) throws Exception {
+        return worker.submit(() -> {
+            if (generation.get() != appGeneration || provider == null || !provider.isUp()
+                    || deadline <= 0)
+                throw new IllegalStateException();
+            long traffic = -1;
+            try {
+                if (provider.capabilities().contains("traffic-stats-advisory.v1"))
+                    traffic = provider.transferBytes();
+            } catch (RuntimeException | LinkageError ignored) { /* Advisory only. */ }
+            return new long[] {Math.max(0, deadline - SystemClock.elapsedRealtime()), traffic};
+        }).get(5, TimeUnit.SECONDS);
+    }
+
+    /** Applies a natively renewed window under the same fencing as advanceWindow. */
+    void advanceNative(long appGeneration, String connection, String runtime, long version,
+            long end) throws Exception {
+        try {
+            worker.submit(() -> {
+                if (generation.get() != appGeneration || provider == null || !provider.isUp())
+                    throw new IllegalStateException();
+                window.advance(connection, runtime, version, end, SystemClock.elapsedRealtime());
+                deadline = window.deadline;
+                return null;
+            }).get(5, TimeUnit.SECONDS);
+        } catch (java.util.concurrent.ExecutionException failure) {
+            throw new IllegalStateException();
+        }
     }
 
     void stop() throws Exception {
+        renewer.stop();
         releaseCpu();
         if (provider != null) provider.disconnect();
         deadline = 0;
@@ -315,14 +444,7 @@ public final class ClientApplication extends Application implements Tunnel {
         boolean up = provider.isUp();
         long handshake = up ? provider.lastHandshakeSeconds() : 0;
         long now = System.currentTimeMillis() / 1000;
-        boolean network = false;
-        ConnectivityManager manager = (ConnectivityManager) getSystemService(CONNECTIVITY_SERVICE);
-        for (var candidate : manager.getAllNetworks()) {
-            NetworkCapabilities caps = manager.getNetworkCapabilities(candidate);
-            if (caps != null && caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_NOT_VPN)
-                    && caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
-                    && caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)) network = true;
-        }
+        boolean network = hasValidatedNetwork();
         Map<String, Object> value = new HashMap<>();
         value.put("up", up); value.put("network", network);
         value.put("handshakeAge", handshake > 0 && handshake <= now ? now - handshake : -1L);
@@ -336,6 +458,8 @@ public final class ClientApplication extends Application implements Tunnel {
             if (received >= 0) value.put("receivedBytes", received);
         } catch (RuntimeException | LinkageError ignored) { /* Advisory unavailable. */ }
         value.put("reason", reason);
+        value.put("nativeRenewal", renewer.active());
+        value.put("tunnelRestarts", (long) tunnelRestarts);
         return value;
     }
     @Override public String getName() { return "i013"; }

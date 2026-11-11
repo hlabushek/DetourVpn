@@ -41,6 +41,7 @@ HOST_NAT_TABLE = "detourvpn_beta_nat"
 VETH_POOL = ipaddress.IPv4Network("10.203.82.0/26")
 ENV = {"PATH": "/usr/sbin:/usr/bin:/sbin:/bin", "LOG_LEVEL": "silent", "LC_ALL": "C"}
 NAMESPACE_PREFIX = "detourvpn-beta-slot-"
+GATE_TABLE = "detour_window_v3"
 UNIT_PREFIX = "detourvpn-beta-core@"
 
 
@@ -109,6 +110,15 @@ class Slots(BaseModel):
 
     version: int = Field(strict=True, ge=1, le=1)
     slots: list[Slot] = Field(min_length=1, max_length=16)
+    # ADR-101: slot 1 hosts this many peers on 10.203.72.0/24 instead of one fixed peer.
+    pool_peers: int | None = Field(default=None, strict=True, ge=2, le=250)
+
+    @field_validator("pool_peers")
+    @classmethod
+    def pool_has_one_slot(cls, value: int | None, info: Any) -> int | None:
+        if value is not None and len(info.data.get("slots", [])) != 1:
+            raise ValueError("A pool uses exactly one slot")
+        return value
 
     @field_validator("slots")
     @classmethod
@@ -231,10 +241,18 @@ def _veth(slot_id: int) -> tuple[str, str, str, str]:
     return f"dvbh{slot_id}", host, f"dvbu{slot_id}", outer
 
 
-def _slot_network_rules(slot: Slot) -> str:
+# Inner client addresses: one fixed peer per slot, or a /24 pool on slot 1 (ADR-101).
+SLOT_CLIENT = "10.203.71.2"
+SLOT_SERVER = "10.203.71.1/30"
+POOL_CLIENTS = "10.203.72.0/24"
+POOL_SERVER = "10.203.72.1/24"
+
+
+def _slot_network_rules(slot: Slot, pool: bool = False) -> str:
     _hostdev, _host, _outerdev, _outer = _veth(slot.slot_id)
     port = 51900 + slot.slot_id
     endpoint = slot.endpoint.rsplit(":", 1)[0]
+    clients = POOL_CLIENTS if pool else SLOT_CLIENT
     # The gate table remains a separate earlier hook and is the sole window limiter.
     return f"""table inet detourvpn_beta_slot {{
  chain input {{ type filter hook input priority 0; policy drop;
@@ -248,13 +266,13 @@ def _slot_network_rules(slot: Slot) -> str:
    198.18.0.0/15, 198.51.100.0/24, 203.0.113.0/24, 224.0.0.0/4, 240.0.0.0/4,
    {endpoint}
   }} drop
-  iifname "dv3s{slot.slot_id}" oifname "outer0" ip saddr 10.203.71.2 accept
+  iifname "dv3s{slot.slot_id}" oifname "outer0" ip saddr {clients} accept
   iifname "outer0" oifname "dv3s{slot.slot_id}" ct state established,related accept
  }}
 }}
 table ip detourvpn_beta_slot_nat {{
  chain post {{ type nat hook postrouting priority srcnat; policy accept;
-  oifname "outer0" ip saddr 10.203.71.2 masquerade
+  oifname "outer0" ip saddr {clients} masquerade
  }}
 }}
 """
@@ -381,7 +399,7 @@ def _host_firewall_program(slots: list[Slot], uplink: str) -> str:
     )
 
 
-def _create_veth(slot: Slot, namespace: str) -> None:
+def _create_veth(slot: Slot, namespace: str, pool: bool = False) -> None:
     slot_id = slot.slot_id
     hostdev, host, peerdev, outer = _veth(slot_id)
     _run([IP, "link", "add", hostdev, "type", "veth", "peer", "name", peerdev])
@@ -407,7 +425,7 @@ def _create_veth(slot: Slot, namespace: str) -> None:
         ]
     )
     # nft JSON/CLI inputs are generated solely from validated fixed slot and host values.
-    _run([IP, "netns", "exec", namespace, NFT, "-f", "-"], data=_slot_network_rules(slot))
+    _run([IP, "netns", "exec", namespace, NFT, "-f", "-"], data=_slot_network_rules(slot, pool))
 
 
 def _remove_host_firewall() -> None:
@@ -437,7 +455,7 @@ def expected_awg_config(slot: Slot) -> bytes:
     ).encode("ascii")
 
 
-def _load_slots() -> list[Slot]:
+def _load_configuration() -> Slots:
     _artifact(AWG, AWG_HASH)
     try:
         parsed = Slots.model_validate_json(_private_read(CONFIG, 65536))
@@ -454,7 +472,11 @@ def _load_slots() -> list[Slot]:
             raise BootstrapError("slot_public_key_conflict")
         if not slot.endpoint.endswith(f":{51900 + slot.slot_id}"):
             raise BootstrapError("slot_endpoint_conflict")
-    return parsed.slots
+    return parsed
+
+
+def _load_slots() -> list[Slot]:
+    return list(_load_configuration().slots)
 
 
 def _service_active(unit: str) -> bool:
@@ -587,8 +609,11 @@ def _gate(slot_id: int) -> SlotGate:
         os.close(fd)
 
 
-def start_slots(slots: list[Slot] | None = None) -> int:
-    slots = slots if slots is not None else _load_slots()
+def start_slots(slots: list[Slot] | None = None, *, pool: bool | None = None) -> int:
+    if slots is None:
+        configuration = _load_configuration()
+        slots, pool = list(configuration.slots), configuration.pool_peers is not None
+    pool = bool(pool)
     uplink = _preflight_start(slots)
     created_namespaces: list[int] = []
     started_cores: list[int] = []
@@ -604,7 +629,7 @@ def start_slots(slots: list[Slot] | None = None) -> int:
             _run([IP, "netns", "add", namespace])
             created_namespaces.append(slot_id)
             _run([IP, "-n", namespace, "link", "set", "lo", "up"])
-            _create_veth(slot, namespace)
+            _create_veth(slot, namespace, pool)
             _run([SYSTEMCTL, "start", _unit(slot_id)])
             started_cores.append(slot_id)
             inode = (NETNS_DIR / namespace).stat().st_ino
@@ -621,13 +646,22 @@ def start_slots(slots: list[Slot] | None = None) -> int:
                     str(AWG_CONFIGS / f"slot-{slot_id}.conf"),
                 ]
             )
-            _run([IP, "-n", namespace, "address", "add", "10.203.71.1/30", "dev", interface])
+            server = POOL_SERVER if pool else SLOT_SERVER
+            _run([IP, "-n", namespace, "address", "add", server, "dev", interface])
             _run([IP, "-n", namespace, "link", "set", interface, "mtu", "1280", "up"])
-            gate = _gate(slot_id)
-            try:
-                gate.initialize_closed()
-            finally:
-                gate.dispose()
+            if pool:
+                # ADR-101: per-peer gates replace the per-port gate. A port gate left closed
+                # here would drop every pool packet, so make sure none exists.
+                _run(
+                    [IP, "netns", "exec", namespace, NFT, "delete", "table", "inet", GATE_TABLE],
+                    required=False,
+                )
+            else:
+                gate = _gate(slot_id)
+                try:
+                    gate.initialize_closed()
+                finally:
+                    gate.dispose()
             observed_public = _run(
                 [IP, "netns", "exec", namespace, str(AWG), "show", interface, "public-key"]
             )
@@ -696,8 +730,11 @@ def _read_ready(slot_id: int, *, allow_stopped_core: bool = False) -> Ready:
     return ready
 
 
-def stop_slots(slots: list[Slot] | None = None) -> int:
-    slots = slots if slots is not None else _load_slots()
+def stop_slots(slots: list[Slot] | None = None, *, pool: bool | None = None) -> int:
+    if slots is None:
+        configuration = _load_configuration()
+        slots, pool = list(configuration.slots), configuration.pool_peers is not None
+    pool = bool(pool)
     if not READY.exists():
         if any((NETNS_DIR / _namespace(slot.slot_id)).exists() for slot in slots):
             raise BootstrapError("slot_namespace_without_readiness")
@@ -710,12 +747,13 @@ def stop_slots(slots: list[Slot] | None = None) -> int:
         for marker, slot in zip(ready, slots, strict=True)
     ):
         raise BootstrapError("slot_readiness_conflict")
-    for slot in slots:
+    for slot in slots if not pool else []:
         gate = _gate(slot.slot_id)
         try:
             gate.close()
         finally:
             gate.dispose()
+    # A pool's per-peer gate tables live in the namespace and are deleted with it below.
     for slot in slots:
         _run([SYSTEMCTL, "stop", _unit(slot.slot_id)])
     for slot, marker in zip(slots, ready, strict=True):
@@ -735,9 +773,14 @@ def main(arguments: list[str] | None = None) -> int:
     args = parser.parse_args(arguments)
     stage = "configuration"
     try:
-        slots = _load_slots()
+        configuration = _load_configuration()
+        slots = list(configuration.slots)
         stage = args.action
-        count = start_slots(slots) if args.action == "start" else stop_slots(slots)
+        count = (
+            start_slots(slots, pool=configuration.pool_peers is not None)
+            if args.action == "start"
+            else stop_slots(slots, pool=configuration.pool_peers is not None)
+        )
     except BootstrapError as error:
         print(json.dumps({"error": str(error), "stage": stage}), flush=True)
         return 1

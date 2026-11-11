@@ -76,8 +76,9 @@ trap 'rm -rf -- "$stage"' EXIT
 emit() { step="$1"; printf 'step=%s\n' "$1"; }
 rollback() {
   if [ "$started" = 1 ]; then systemctl disable --now detourvpn-beta-slot-bootstrap.service >/dev/null 2>&1 || true; fi
+  systemctl disable --now detourvpn-beta-latency-probe.service >/dev/null 2>&1 || true
   if [ "$created" = 1 ]; then
-    rm -f -- /etc/systemd/system/detourvpn-beta-node-agent.service /etc/systemd/system/detourvpn-beta-slot-bootstrap.service '/etc/systemd/system/detourvpn-beta-core@.service'
+    rm -f -- /etc/systemd/system/detourvpn-beta-node-agent.service /etc/systemd/system/detourvpn-beta-slot-bootstrap.service '/etc/systemd/system/detourvpn-beta-core@.service' /etc/systemd/system/detourvpn-beta-latency-probe.service
     rm -rf -- /opt/detourvpn-node /etc/detourvpn-node /run/detourvpn-node
     systemctl daemon-reload >/dev/null 2>&1 || true
     systemctl reset-failed 'detourvpn-beta-*' >/dev/null 2>&1 || true
@@ -100,7 +101,7 @@ emit checks
 test "$(id -u)" = 0
 test -d "$stage/pkg"
 test -d "$stage/cfg"
-for path in /opt/detourvpn-node /etc/detourvpn-node /run/detourvpn-node /var/lib/detourvpn-node /etc/systemd/system/detourvpn-beta-node-agent.service /etc/systemd/system/detourvpn-beta-slot-bootstrap.service '/etc/systemd/system/detourvpn-beta-core@.service'; do
+for path in /opt/detourvpn-node /etc/detourvpn-node /run/detourvpn-node /var/lib/detourvpn-node /etc/systemd/system/detourvpn-beta-node-agent.service /etc/systemd/system/detourvpn-beta-slot-bootstrap.service '/etc/systemd/system/detourvpn-beta-core@.service' /etc/systemd/system/detourvpn-beta-latency-probe.service; do
   test ! -e "$path"
   test ! -L "$path"
 done
@@ -113,7 +114,7 @@ curl -fsSI -m 15 --proto '=https' https://github.com >/dev/null
 emit files
 created=1
 install -d -m 0700 /opt/detourvpn-node /opt/detourvpn-node/current /opt/detourvpn-node/vpn_api /opt/detourvpn-node/vpn_api/tunnels /etc/detourvpn-node /etc/detourvpn-node/awg
-for name in window_daemon.py beta_node_preflight.py beta_slot_bootstrap.py window_gate.py window_peer.py requirements.txt; do
+for name in window_daemon.py beta_node_preflight.py beta_slot_bootstrap.py window_gate.py window_peer.py window_pool.py latency_probe.py requirements.txt; do
   install -m 0600 "$stage/pkg/$name" "/opt/detourvpn-node/$name"
 done
 for name in __init__.py tunnels/__init__.py tunnels/keys.py tunnels/awg_profile.py tunnels/v3_contracts.py tunnels/window_journal.py tunnels/window_runtime.py; do
@@ -149,7 +150,7 @@ for index in $(seq 1 "$slots"); do
 done
 
 emit units
-for unit in detourvpn-beta-node-agent.service detourvpn-beta-slot-bootstrap.service 'detourvpn-beta-core@.service'; do
+for unit in detourvpn-beta-node-agent.service detourvpn-beta-slot-bootstrap.service 'detourvpn-beta-core@.service' detourvpn-beta-latency-probe.service; do
   install -m 0644 -o root -g root "$stage/pkg/systemd/$unit" "/etc/systemd/system/$unit"
 done
 systemctl daemon-reload
@@ -162,6 +163,11 @@ for index in $(seq 1 "$slots"); do
   test -f "/run/detourvpn-node/slots/$index.json"
 done
 test "$(systemctl is-active detourvpn-beta-node-agent.service || true)" = inactive
+
+emit probe
+# ADR-102: unauthenticated UDP latency echo, capability-free, no tunnel state.
+systemctl enable --now detourvpn-beta-latency-probe.service >/dev/null 2>&1
+systemctl is-active --quiet detourvpn-beta-latency-probe.service
 
 emit done
 """
@@ -176,10 +182,15 @@ def default_artifact_directory() -> Path:
     return ROOT / ".cache" / "i-010" / "artifacts"
 
 
-def generate_slot_source(node: BetaNode, slots: int) -> bytes:
-    """Fresh slot keys for this node. The placeholder node id is discarded; bind sets the real one."""
+def generate_slot_source(node: BetaNode, slots: int, pool_peers: int | None = None) -> bytes:
+    """Fresh slot keys for this node. The placeholder node id is discarded; bind sets the real one.
+
+    ``pool_peers`` (ADR-101) turns slot 1 into a pool for that many simultaneous devices.
+    """
     if not 1 <= slots <= MAX_SLOTS:
         raise InstallError("install_slot_count_invalid")
+    if pool_peers is not None and (slots != 1 or not 2 <= pool_peers <= 250):
+        raise InstallError("install_pool_invalid")
     entries = []
     for slot_id in range(1, slots + 1):
         private = X25519PrivateKey.generate().private_bytes(
@@ -201,6 +212,8 @@ def generate_slot_source(node: BetaNode, slots: int) -> bytes:
         "api_origin": "https://192.0.2.1",
         "slots": entries,
     }
+    if pool_peers is not None:
+        source["pool_peers"] = pool_peers
     return json.dumps(source, sort_keys=True).encode("ascii")
 
 
@@ -232,9 +245,11 @@ def build_archive(package_directory: Path, rendered: dict[str, bytes]) -> bytes:
     return buffer.getvalue()
 
 
-def prepare_payload(node: BetaNode, slots: int, artifact_directory: Path) -> tuple[bytes, int]:
+def prepare_payload(
+    node: BetaNode, slots: int, artifact_directory: Path, pool_peers: int | None = None
+) -> tuple[bytes, int]:
     try:
-        rendered = render_configs(generate_slot_source(node, slots))
+        rendered = render_configs(generate_slot_source(node, slots, pool_peers))
         with tempfile.TemporaryDirectory(prefix="detourvpn-node-package-") as scratch:
             package = Path(scratch) / "package"
             manifest = build_package(ROOT, artifact_directory, package)
@@ -316,6 +331,12 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--inventory", type=Path, default=DEFAULT_INVENTORY)
     parser.add_argument("--artifact-dir", type=Path, default=None)
     parser.add_argument("--slots", type=int, default=1)
+    parser.add_argument(
+        "--pool-peers",
+        type=int,
+        default=None,
+        help="ADR-101: one slot hosting this many simultaneous devices (2..250)",
+    )
     parser.add_argument("--execute", action="store_true", help="really install (default: dry run)")
     parser.add_argument("--receipt", type=Path, help="write the sanitized result to a NEW file")
     arguments = parser.parse_args(argv)
@@ -327,7 +348,10 @@ def main(argv: list[str] | None = None) -> int:
         if not all(item["ok"] for item in checks if item["required"]):
             raise InstallError("install_candidate_not_ready")
         archive, file_count = prepare_payload(
-            node, arguments.slots, arguments.artifact_dir or default_artifact_directory()
+            node,
+            arguments.slots,
+            arguments.artifact_dir or default_artifact_directory(),
+            arguments.pool_peers,
         )
         report: dict[str, object] = {
             "node": node.name,
@@ -335,6 +359,7 @@ def main(argv: list[str] | None = None) -> int:
             "preflight": "ready",
             "package_files": file_count,
             "slots": arguments.slots,
+            "pool_peers": arguments.pool_peers,
             "archive_bytes": len(archive),
         }
         if arguments.execute:

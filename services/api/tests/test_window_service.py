@@ -8,7 +8,7 @@ import secrets
 import sqlite3
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from threading import Barrier
 from types import ModuleType
@@ -45,7 +45,12 @@ from vpn_api.quota.contracts import QuotaError
 from vpn_api.quota.service import LedgerService
 from vpn_api.subscriptions import EntitlementService
 from vpn_api.tunnels.admission import key_challenge
-from vpn_api.tunnels.v3_contracts import CAPABILITIES, ClosedWindow, WindowGrant
+from vpn_api.tunnels.v3_contracts import (
+    CAPABILITIES,
+    POOL_CAPABILITIES,
+    ClosedWindow,
+    WindowGrant,
+)
 from vpn_api.tunnels.window_profiles import WindowNode, WindowSlot
 from vpn_api.tunnels.window_runtime import WindowJournal, WindowRuntime
 from vpn_api.tunnels.window_service import (
@@ -224,6 +229,50 @@ def test_admission_replay_renew_and_exact_settlement(harness: Harness) -> None:
         assert ledger.reconcile(session, user.user_id).consistent
 
 
+def test_long_window_is_opt_in_and_bounded(harness: Harness) -> None:
+    h = harness
+    node, selected = inventory(h)
+    runtime = boot(h, node, selected)
+    user = request(h, selected)
+    long_body = user.body.model_copy(update={"window_seconds": 900})
+    with transaction(h.engine) as session:
+        connection = create_connection(
+            session, h.auth, user.tokens.access_token, selected, long_body
+        )
+        first = current_grant(session, connection)
+    assert first.not_after - first.issued_at <= timedelta(seconds=900)
+    assert first.not_after - first.issued_at > timedelta(seconds=899)
+    assert poll(h, node, selected, runtime).commands[0].grant == first
+    assert poll(h, node, selected, runtime, active=[first.window_id]).commands == []
+    with transaction(h.engine) as session:
+        hold = renew_connection(
+            session,
+            h.auth,
+            user.tokens.access_token,
+            selected,
+            connection.id,
+            RenewalInput(
+                previous_window_id=first.window_id,
+                idempotency_key=uuid4(),
+                budget_bytes=BUDGET,
+                window_seconds=900,
+            ),
+        )
+    second = WindowGrant.model_validate(hold.grant)
+    assert second.generation == 2 and second.not_after > first.not_after
+    assert second.not_after - second.issued_at <= timedelta(seconds=900)
+    # A client that sends nothing keeps the pre-existing 90s window.
+    assert user.body.window_seconds == 90
+    for invalid in (29, 901):
+        with pytest.raises(ValueError):
+            RenewalInput(
+                previous_window_id=first.window_id,
+                idempotency_key=uuid4(),
+                budget_bytes=BUDGET,
+                window_seconds=invalid,
+            )
+
+
 def test_two_users_claim_distinct_slots_and_third_is_denied(harness: Harness) -> None:
     h = harness
     node, selected = inventory(h)
@@ -250,6 +299,127 @@ def test_two_users_claim_distinct_slots_and_third_is_denied(harness: Harness) ->
     for user in users:
         with transaction(h.engine) as session:
             assert LedgerService(h.engine).reconcile(session, user.user_id).consistent
+
+
+def test_pool_node_admits_many_devices_with_distinct_addresses(harness: Harness) -> None:
+    """ADR-101: one pool interface, several simultaneous devices, each on its own address."""
+    h = harness
+    node, physical = inventory(h, slots=1)
+    selected = physical.model_copy(update={"pool_peers": 3})
+    assert selected.digest() != physical.digest()
+    assert physical.digest() == inventory_digest_without_pool(physical)
+    pool_body = EpochStart(
+        contract_version=3,
+        runtime_id=uuid4(),
+        previous_runtime_id=None,
+        capabilities=sorted(CAPABILITIES),
+        server_public_keys=[s.server_public_key for s in selected.slots],
+        gates_closed=True,
+    )
+    with transaction(h.engine) as session:
+        verify(h, session, node)
+        # A slot-capability runtime must not bind to a pool manifest.
+        with pytest.raises(NodeError, match="window_operator_inventory_conflict"):
+            start_epoch(session, h.auth, selected, pool_body)
+    runtime = uuid4()
+    pool_body = pool_body.model_copy(
+        update={"runtime_id": runtime, "capabilities": sorted(POOL_CAPABILITIES)}
+    )
+    with transaction(h.engine) as session:
+        verify(h, session, node)
+        assert start_epoch(session, h.auth, selected, pool_body) == runtime
+    users = [request(h, selected, subject) for subject in (111, 222, 333, 444)]
+    grants = []
+    for user in users[:3]:
+        grants.append(create(h, selected, user)[1])
+    with pytest.raises(AuthError, match="window_node_capacity"):
+        create(h, selected, users[3])
+    assert sorted(grant.slot_id for grant in grants) == [1, 2, 3]
+    configs = {slot.client_config() for slot in selected.peer_slots}
+    assert len(configs) == 3
+    assert "Address = 10.203.72.2/32" in selected.peer_slots[0].client_config()
+    assert "Address = 10.203.72.4/32" in selected.peer_slots[2].client_config()
+    assert {slot.endpoint for slot in selected.peer_slots} == {physical.slots[0].endpoint}
+    commands = poll(h, node, selected, runtime).commands
+    assert sorted(command.grant.slot_id for command in commands) == [1, 2, 3]
+    active = [grant.window_id for grant in grants]
+    poll(h, node, selected, runtime, active=active)
+    receipt = close(grants[1], 77).model_copy(update={"meter": "kernel-inner-ip.v1"})
+    poll(
+        h,
+        node,
+        selected,
+        runtime,
+        active=[grants[0].window_id, grants[2].window_id],
+        receipts=[receipt],
+    )
+    for user in users:
+        with transaction(h.engine) as session:
+            assert LedgerService(h.engine).reconcile(session, user.user_id).consistent
+
+
+def test_manifest_change_waits_until_the_node_is_drained(harness: Harness) -> None:
+    """ADR-101 in-place conversion: same node id, new (pool) manifest, only when drained."""
+    h = harness
+    node, selected = inventory(h, slots=1)
+    first_runtime = boot(h, node, selected)
+    user = request(h, selected)
+    _connection_id, grant = create(h, selected, user)
+    poll(h, node, selected, first_runtime)
+    poll(h, node, selected, first_runtime, active=[grant.window_id])
+    pool = selected.model_copy(update={"pool_peers": 8})
+
+    def start(runtime: UUID, previous: UUID) -> UUID:
+        body = EpochStart(
+            contract_version=3,
+            runtime_id=runtime,
+            previous_runtime_id=previous,
+            capabilities=sorted(POOL_CAPABILITIES),
+            server_public_keys=[s.server_public_key for s in pool.slots],
+            gates_closed=True,
+        )
+        with transaction(h.engine) as session:
+            verify(h, session, node)
+            return start_epoch(session, h.auth, pool, body)
+
+    # A live connection keeps the old fence: no manifest change.
+    with pytest.raises(NodeError, match="window_operator_manifest_changed"):
+        start(uuid4(), first_runtime)
+    # Drain: the owner revokes, the old runtime closes the window and reports its receipt.
+    with transaction(h.engine) as session:
+        session.execute(
+            text("UPDATE peer_connections SET state = 'revoke_pending' WHERE node_id = :n"),
+            {"n": node.node_id},
+        )
+    poll(h, node, selected, first_runtime, receipts=[close(grant, 11)])
+    with transaction(h.engine) as session:
+        assert (
+            session.scalar(
+                select(func.count())
+                .select_from(PeerConnection)
+                .where(PeerConnection.node_id == node.node_id, PeerConnection.state != "closed")
+            )
+            == 0
+        )
+    runtime = uuid4()
+    assert start(runtime, first_runtime) == runtime
+    second = request(h, pool, 2222)
+    assert create(h, pool, second)[1].slot_id == 1
+
+
+def inventory_digest_without_pool(selected: WindowNode) -> str:
+    """The pre-ADR-101 digest formula, to prove slot-mode manifests are unchanged."""
+    material = {
+        "node_id": str(selected.node_id),
+        "slots": [
+            {
+                **slot.model_dump(mode="json"),
+                "header_protection_key": slot.header_protection_key.get_secret_value(),
+            }
+            for slot in selected.slots
+        ],
+    }
+    return hashlib.sha256(json.dumps(material, sort_keys=True).encode()).hexdigest()
 
 
 def test_restart_requires_old_receipts_and_rejects_old_polls(harness: Harness) -> None:
@@ -477,6 +647,114 @@ def test_http_v3_lifecycle_auth_replay_and_default_gate(harness: Harness, tmp_pa
     response = h.client.get(f"/api/v1/window-tunnels/{connection_id}", headers=headers(user.tokens))
     assert response.json()["state"] == "closed" and response.json()["client_config"] is None
     assert not any("/api/internal/" in path for path in create_app(h.settings).openapi()["paths"])
+
+
+def test_http_native_renew_token_is_scoped_rotated_and_revocable(
+    harness: Harness, tmp_path: Path
+) -> None:
+    h = harness
+    node, selected = inventory(h)
+    enable_http(h, selected, tmp_path)
+    prefix = "/api/internal/v3/windows"
+    root = "/api/v1/window-tunnels"
+    runtime_id = uuid4()
+    start_body = EpochStart(
+        contract_version=3,
+        runtime_id=runtime_id,
+        previous_runtime_id=None,
+        capabilities=sorted(CAPABILITIES),
+        server_public_keys=[s.server_public_key for s in selected.slots],
+        gates_closed=True,
+    ).model_dump(mode="json")
+    assert h.client.post(prefix + "/start", headers=agent_headers(node), json=start_body).json()[
+        "ready"
+    ]
+
+    def admit(user: UserRequest) -> tuple[str, WindowGrant]:
+        body = user.body.model_dump(mode="json") | {
+            "proof_response": user.body.proof_response.get_secret_value()
+        }
+        response = h.client.post(root, headers=headers(user.tokens), json=body)
+        assert response.status_code == 202
+        return response.json()["id"], WindowGrant.model_validate(response.json()["window"])
+
+    owner, other = request(h, selected), request(h, selected, 2222)
+    connection_id, first = admit(owner)
+    other_id, other_first = admit(other)
+    poll_body = WindowPoll(runtime_id=runtime_id).model_dump(mode="json")
+    h.client.post(prefix + "/poll", headers=agent_headers(node), json=poll_body)
+    poll_body["active_windows"] = [str(first.window_id), str(other_first.window_id)]
+    h.client.post(prefix + "/poll", headers=agent_headers(node), json=poll_body)
+
+    # Issuing needs the owner's access token; strangers and anonymous callers get nothing.
+    assert h.client.post(f"{root}/{connection_id}/renew-token").status_code == 401
+    assert (
+        h.client.post(
+            f"{root}/{connection_id}/renew-token", headers=headers(other.tokens)
+        ).status_code
+        == 404
+    )
+    stale = h.client.post(f"{root}/{connection_id}/renew-token", headers=headers(owner.tokens))
+    issued = h.client.post(f"{root}/{connection_id}/renew-token", headers=headers(owner.tokens))
+    assert stale.status_code == issued.status_code == 200
+    token = issued.json()["renew_token"]
+    other_token = h.client.post(
+        f"{root}/{other_id}/renew-token", headers=headers(other.tokens)
+    ).json()["renew_token"]
+
+    def native(connection: str, value: str | None) -> int:
+        extra = {} if value is None else {"X-Window-Renew-Token": value}
+        return h.client.get(f"{root}/{connection}/native", headers=extra).status_code
+
+    assert native(connection_id, token) == 200
+    # Rotation kills the previous token; tokens never cross connections; absent token fails.
+    assert native(connection_id, stale.json()["renew_token"]) == 401
+    assert native(connection_id, other_token) == 401
+    assert native(connection_id, None) == 401
+    assert native(str(uuid4()), token) == 401
+    status = h.client.get(
+        f"{root}/{connection_id}/native", headers={"X-Window-Renew-Token": token}
+    ).json()
+    assert status["state"] == "active" and "client_config" not in status
+    # The renew token is not an access token for the rest of the API.
+    assert (
+        h.client.get(
+            f"{root}/{connection_id}", headers={"Authorization": f"Bearer {token}"}
+        ).status_code
+        == 401
+    )
+
+    renewal = {
+        "previous_window_id": str(first.window_id),
+        "idempotency_key": str(uuid4()),
+        "budget_bytes": BUDGET,
+        "window_seconds": 900,
+    }
+    answers = [
+        h.client.post(
+            f"{root}/{connection_id}/native-renew",
+            headers={"X-Window-Renew-Token": token},
+            json=renewal,
+        )
+        for _ in range(2)
+    ]
+    assert [a.status_code for a in answers] == [202, 202]
+    second = WindowGrant.model_validate(answers[0].json()["window"])
+    assert second == WindowGrant.model_validate(answers[1].json()["window"])
+    assert second.generation == 2 and second.connection_id == first.connection_id
+    assert (
+        h.client.post(
+            f"{root}/{connection_id}/native-renew",
+            headers={"X-Window-Renew-Token": other_token},
+            json=renewal | {"idempotency_key": str(uuid4())},
+        ).status_code
+        == 401
+    )
+
+    # Owner revoke invalidates the token at once, before the node even confirms the close.
+    h.client.delete(f"{root}/{connection_id}", headers=headers(owner.tokens))
+    assert native(connection_id, token) == 401
+    assert native(other_id, other_token) == 200
 
 
 def test_daemon_http_postgres_two_users_multiple_renewals_and_revoke(

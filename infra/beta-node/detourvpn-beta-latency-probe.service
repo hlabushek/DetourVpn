@@ -1,0 +1,41 @@
+[Unit]
+Description=DetourVPN beta UDP latency echo (ADR-102; no tunnel state, no logging)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+# Root only to read the root-owned 0700 install tree; every capability is dropped below, so it
+# cannot override file permissions, bind privileged ports or touch kernel state.
+User=root
+ExecStart=/opt/detourvpn-node/.venv/bin/python -I /opt/detourvpn-node/latency_probe.py
+Environment=DETOURVPN_PROBE_PORT=51899
+NoNewPrivileges=yes
+CapabilityBoundingSet=
+AmbientCapabilities=
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectSystem=strict
+ProtectHome=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+ProtectHostname=yes
+RestrictAddressFamilies=AF_INET
+RestrictNamespaces=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+SystemCallArchitectures=native
+SystemCallFilter=@system-service
+MemoryMax=64M
+TasksMax=4
+Restart=on-failure
+RestartSec=5
+StandardOutput=null
+
+[Install]
+WantedBy=multi-user.target

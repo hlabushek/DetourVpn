@@ -175,3 +175,16 @@ def test_tick_rejects_wrong_epoch_or_admission_phase(
         daemon.tick(runtime, SyntheticControl([response.model_dump(mode="json")]))
     assert not gate.live
     runtime.journal.db.close()
+
+
+def test_gate_bounds_follow_contract(monkeypatch: pytest.MonkeyPatch) -> None:
+    from vpn_api.tunnels.v3_contracts import MAX_WINDOW_SECONDS
+
+    monkeypatch.syspath_prepend(str(Path(__file__).resolve().parents[2] / "node-agent"))
+    gate_module = importlib.import_module("window_gate")
+    assert gate_module.MAX_WINDOW_MS == MAX_WINDOW_SECONDS * 1000
+    gate = object.__new__(gate_module.SlotGate)
+    gate.port = 51901
+    assert "timeout 900000ms" in gate.program(65536, 900_000, replace=False)
+    with pytest.raises(gate_module.GateError, match="invalid_window_duration"):
+        gate.program(65536, 900_001, replace=False)

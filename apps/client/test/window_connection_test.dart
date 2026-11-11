@@ -61,6 +61,30 @@ class Native extends FakeNative implements WindowNative {
   }
 }
 
+/// TEST ONLY native renewer host: records the hand-off, never renews anything itself.
+class RenewingNative extends Native implements NativeRenewalHost {
+  final handoffs = <Map<String, Object?>>[];
+  bool renewing = false;
+  @override
+  Future<bool> startNativeRenewal(Map<String, Object?> args) async {
+    handoffs.add(args);
+    renewing = true;
+    return true;
+  }
+
+  @override
+  Future<NativeSnapshot> snapshot() async => NativeSnapshot(
+    up: up,
+    network: network,
+    handshakeAge: age,
+    remainingMs: remaining,
+    trafficBytes: traffic,
+    receivedBytes: received,
+    reason: reason,
+    nativeRenewal: renewing && up,
+  );
+}
+
 class WindowsApi implements TunnelApi {
   int generation = 1;
   String window = '55555555-5555-4555-8555-555555555555';
@@ -73,6 +97,7 @@ class WindowsApi implements TunnelApi {
   bool oldConnection = false;
   bool failDeletes = false;
   bool deviceBound = false;
+  bool failRenewToken = false;
   final devicePlatforms = <Object?>[];
   String? invalidResponsePath;
   int creates = 0;
@@ -139,6 +164,10 @@ class WindowsApi implements TunnelApi {
       if (failDeletes) throw const ClientError('network_unavailable');
       state = 'closed';
       return view();
+    }
+    if (path.endsWith('/renew-token')) {
+      if (failRenewToken) throw const ClientError('not_found');
+      return {'renew_token': 'TEST-ONLY-renew-token-not-a-real-secret'};
     }
     if (path.endsWith('/renew')) {
       final request = body!;
@@ -241,6 +270,76 @@ void main() {
       expect(find.byType(SplitAppsScreen), findsOneWidget);
     },
   );
+  group('ADR-097 native renewal', () {
+    late RenewingNative renewing;
+    WindowConnectionController controller({int seconds = 900}) {
+      c.dispose();
+      renewing = RenewingNative()..age = 0;
+      return c = WindowConnectionController(
+        api,
+        renewing,
+        pollInterval: const Duration(days: 1),
+        windowSeconds: seconds,
+        renewalOrigin: Uri.parse('https://api.example.invalid'),
+      )..selectedNode = node;
+    }
+
+    test(
+      'long windows hand a scoped token to native after connecting',
+      () async {
+        controller();
+        await c.connect();
+        expect(
+          api.calls,
+          contains(
+            'POST ${WindowConnectionController.root}/$connection/renew-token',
+          ),
+        );
+        final args = renewing.handoffs.single;
+        expect(args['token'], 'TEST-ONLY-renew-token-not-a-real-secret');
+        expect(args['origin'], 'https://api.example.invalid');
+        expect(args['connection'], connection);
+        expect(args['runtime'], runtime);
+        expect(args['windowSeconds'], 900);
+        expect(args['generation'], 1);
+      },
+    );
+
+    test('90 s windows and an old API keep Dart renewal', () async {
+      controller(seconds: 90);
+      await c.connect();
+      expect(renewing.handoffs, isEmpty);
+      controller();
+      api.failRenewToken = true;
+      api.state = 'active';
+      await c.connect();
+      expect(renewing.handoffs, isEmpty);
+      expect(c.hasLease, isTrue);
+    });
+
+    test('while native renews, Dart only adopts its windows', () async {
+      controller();
+      await c.connect();
+      // Native renewed twice while the app slept: generation 3 with native's own window ids.
+      api.generation = 3;
+      api.window = '66666666-6666-4666-8666-666666666666';
+      renewing.remaining = 500000;
+      await c.refresh();
+      expect(api.renewKeys, isEmpty);
+      expect(renewing.advances, 0);
+      expect(c.error, isNull);
+      expect(c.hasLease, isTrue);
+      // A pending window during a native renewal is waited out, not treated as a failure.
+      api.state = 'pending';
+      await c.refresh();
+      expect(c.error, isNull);
+      expect(renewing.up, isTrue);
+      api.state = 'active';
+      await c.refresh();
+      expect(c.error, isNull);
+      expect(api.renewKeys, isEmpty);
+    });
+  });
   test('production window budget remains 1 MiB by default', () {
     expect(WindowConnectionController.budgetBytes, 1048576);
   });
@@ -621,6 +720,8 @@ void main() {
     native.remaining = 0;
     await auto.refresh();
     expect(auto.error, 'lease_expired');
+    // Task 7: the fake never reported a handshake, and the export says so.
+    expect(auto.diagnosticHandshake, 'not_seen');
     await Future<void>.delayed(const Duration(milliseconds: 300));
     // The fake API issues one window, so the second attempt fails later; what matters is that
     // the client tried again on its own.
@@ -644,6 +745,18 @@ void main() {
     expect(api.creates, greaterThanOrEqualTo(2));
     await auto.disconnect();
   });
+  test(
+    'an expiry after a confirmed handshake is exported as confirmed',
+    () async {
+      await c.connect();
+      native.age = 1;
+      await c.refresh();
+      native.remaining = 0;
+      await c.refresh();
+      expect(c.error, 'lease_expired');
+      expect(c.diagnosticHandshake, 'confirmed');
+    },
+  );
   test('user disconnect is never undone by auto reconnect', () async {
     final auto = WindowConnectionController(
       api,
@@ -660,6 +773,71 @@ void main() {
     await Future<void>.delayed(const Duration(milliseconds: 300));
     expect(native.up, false);
   });
+  test('auto reconnect has no hard cap and survives failing attempts', () async {
+    // Every create fails transiently: the old limit stopped after 4 tries in 10 minutes.
+    final failing = _FailingCreates(api);
+    final retrying = WindowConnectionController(
+      failing,
+      native,
+      pollInterval: const Duration(days: 1),
+      renewBeforeMs: 90000,
+      autoReconnectDelay: const Duration(milliseconds: 5),
+    )..selectedNode = node;
+    addTearDown(retrying.dispose);
+    await retrying.connect();
+    native.remaining = 0;
+    await retrying.refresh();
+    expect(retrying.error, 'lease_expired');
+    failing.fail = true;
+    // Backoff 5, 12.5, 37.5, 75 ms ...: at least five attempts within ~1 s.
+    await Future<void>.delayed(const Duration(milliseconds: 1200));
+    expect(failing.failedCreates, greaterThanOrEqualTo(5));
+    expect(retrying.phase, ConnectionPhase.failed);
+    await retrying.disconnect();
+    final after = failing.failedCreates;
+    await Future<void>.delayed(const Duration(milliseconds: 400));
+    expect(
+      failing.failedCreates,
+      after,
+    ); // a user disconnect cancels the retries
+  });
+  test('lost VPN consent is reported and never reconnected', () async {
+    final auto = WindowConnectionController(
+      api,
+      native,
+      pollInterval: const Duration(days: 1),
+      renewBeforeMs: 90000,
+      autoReconnectDelay: const Duration(milliseconds: 5),
+    )..selectedNode = node;
+    addTearDown(auto.dispose);
+    await auto.connect();
+    final creates = api.creates;
+    native.up = false;
+    native.reason = 'vpn_revoked';
+    await auto.refresh();
+    expect(auto.error, 'vpn_revoked');
+    await Future<void>.delayed(const Duration(milliseconds: 200));
+    expect(api.creates, creates);
+  });
+  test('a tunnel the phone dropped early reconnects by itself', () async {
+    final auto = WindowConnectionController(
+      api,
+      native,
+      pollInterval: const Duration(days: 1),
+      renewBeforeMs: 90000,
+      autoReconnectDelay: const Duration(milliseconds: 5),
+    )..selectedNode = node;
+    addTearDown(auto.dispose);
+    await auto.connect();
+    final creates = api.creates;
+    native.up = false;
+    native.reason = 'native_restart_failed';
+    await auto.refresh();
+    expect(auto.error, 'native_down');
+    await Future<void>.delayed(const Duration(milliseconds: 200));
+    expect(api.creates, greaterThan(creates));
+    await auto.disconnect();
+  });
   test('native down cannot be resurrected by fresh API metadata', () async {
     await c.connect();
     native.up = false;
@@ -670,4 +848,24 @@ void main() {
     expect(api.renewKeys, isEmpty);
     expect(api.deletes, 1);
   });
+}
+
+/// TEST ONLY: delegates to [WindowsApi] but can fail every connection create transiently.
+class _FailingCreates implements TunnelApi {
+  _FailingCreates(this.inner);
+  final WindowsApi inner;
+  bool fail = false;
+  int failedCreates = 0;
+  @override
+  Future<Map<String, dynamic>> call(
+    String method,
+    String path, [
+    Map<String, dynamic>? body,
+  ]) {
+    if (fail && method == 'POST' && path == WindowConnectionController.root) {
+      failedCreates++;
+      throw const ClientError('window_node_unavailable');
+    }
+    return inner.call(method, path, body);
+  }
 }
