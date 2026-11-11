@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import 'app_update.dart';
 import 'connection.dart';
 import 'dns_choice.dart';
 import 'orbit_widgets.dart';
@@ -16,9 +17,28 @@ class SettingsScreen extends StatelessWidget {
     super.key,
     required this.onTheme,
     required this.controller,
+    this.onCheckUpdates,
   });
   final VoidCallback onTheme;
   final ConnectionController? controller;
+
+  /// ADR-107: manual update check; null hides the row (Windows, tests without an updater).
+  /// The result is null when a check or an update dialog is already in progress.
+  final Future<UpdateCheck?> Function()? onCheckUpdates;
+
+  Future<void> _checkUpdates(BuildContext context) async {
+    final messenger = ScaffoldMessenger.of(context);
+    messenger.showSnackBar(
+      const SnackBar(content: Text('Проверяем обновления…')),
+    );
+    final result = await onCheckUpdates!();
+    messenger.hideCurrentSnackBar();
+    if (result == null || result.status == UpdateCheckStatus.available) return;
+    messenger.showSnackBar(
+      SnackBar(content: Text(updateCheckText(result.status))),
+    );
+  }
+
   static const _vpnSettings = MethodChannel('project.vpn/tunnel.v1');
 
   /// Split settings are applied when the tunnel is built, so they can only change while it is
@@ -155,6 +175,15 @@ class SettingsScreen extends StatelessWidget {
           subtitle: dark ? 'Тёмная тема' : 'Светлая тема',
           onTap: onTheme,
         ),
+        if (onCheckUpdates != null) ...[
+          const SizedBox(height: 12),
+          NavRow(
+            icon: Icons.system_update_outlined,
+            title: 'Проверить обновления',
+            subtitle: 'Новые версии также проверяются при запуске приложения',
+            onTap: () => _checkUpdates(context),
+          ),
+        ],
         if (c is WindowConnectionController) ...[
           const SizedBox(height: 12),
           NavRow(

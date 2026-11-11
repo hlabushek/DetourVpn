@@ -1,9 +1,11 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:vpn_client/api.dart';
 import 'package:vpn_client/app_update.dart';
+import 'package:vpn_client/settings_screen.dart';
 
 Map<String, dynamic> manifest({
   Object code = 30,
@@ -277,5 +279,135 @@ void main() {
       ),
       findsOneWidget,
     );
+  });
+
+  group('manual and repeated checks', () {
+    test('check statuses tell available, up to date and failed apart', () async {
+      final available = await checkForUpdateDetailed(
+        FakeApi(envelope(manifest())),
+        FakeUpdateNative(29),
+      );
+      expect(available.status, UpdateCheckStatus.available);
+      expect(available.offer, isNotNull);
+      expect(
+        (await checkForUpdateDetailed(
+          FakeApi(envelope(manifest())),
+          FakeUpdateNative(30),
+        )).status,
+        UpdateCheckStatus.upToDate,
+      );
+      expect(
+        (await checkForUpdateDetailed(
+          FakeApi(envelope(manifest()), error: 'update_unavailable'),
+          FakeUpdateNative(29),
+        )).status,
+        UpdateCheckStatus.upToDate,
+      );
+      for (final failing in [
+        checkForUpdateDetailed(
+          FakeApi(envelope(manifest()), error: 'network_unavailable'),
+          FakeUpdateNative(29),
+        ),
+        // Android below 13 or a bad signature: the manifest cannot be verified.
+        checkForUpdateDetailed(
+          FakeApi(envelope(manifest())),
+          FakeUpdateNative(29, verifies: false),
+        ),
+        checkForUpdateDetailed(
+          FakeApi(envelope(manifest())),
+          FakeUpdateNative(null),
+        ),
+      ]) {
+        final result = await failing;
+        expect(result.status, UpdateCheckStatus.failed);
+        expect(result.offer, isNull);
+      }
+      expect(
+        updateCheckText(UpdateCheckStatus.upToDate),
+        contains('последняя версия'),
+      );
+      expect(updateCheckText(UpdateCheckStatus.failed), contains('Android 13'));
+    });
+
+    test(
+      'automatic checks run at most every 6 hours; manual ones always',
+      () async {
+        var now = DateTime.utc(2026, 11, 11, 12);
+        final api = FakeApi(envelope(manifest()));
+        final scheduler = UpdateScheduler(
+          api,
+          FakeUpdateNative(30),
+          now: () => now,
+        );
+        Future<void> none(UpdateOffer _) async {}
+        expect(await scheduler.run(manual: false, show: none), isNotNull);
+        now = now.add(const Duration(hours: 5));
+        expect(
+          await scheduler.run(manual: false, show: none),
+          isNull,
+        ); // not due
+        expect(await scheduler.run(manual: true, show: none), isNotNull);
+        now = now.add(const Duration(hours: 6));
+        expect(await scheduler.run(manual: false, show: none), isNotNull);
+        expect(api.paths, hasLength(3));
+      },
+    );
+
+    test('an open update dialog blocks a second one', () async {
+      final scheduler = UpdateScheduler(
+        FakeApi(envelope(manifest())),
+        FakeUpdateNative(29),
+      );
+      final open = Completer<void>();
+      var shown = 0;
+      Future<void> show(UpdateOffer _) {
+        shown++;
+        return open.future;
+      }
+
+      final first = scheduler.run(manual: false, show: show);
+      await Future<void>.delayed(Duration.zero);
+      expect(await scheduler.run(manual: true, show: show), isNull);
+      open.complete();
+      expect((await first)!.status, UpdateCheckStatus.available);
+      expect(shown, 1);
+    });
+  });
+
+  Future<void> settle(WidgetTester tester) async {
+    for (var i = 0; i < 6; i++) {
+      await tester.pump(const Duration(milliseconds: 200));
+    }
+  }
+
+  testWidgets('Settings: the manual check says when there is nothing new', (
+    tester,
+  ) async {
+    var checks = 0;
+    await tester.pumpWidget(
+      MaterialApp(
+        home: SettingsScreen(
+          onTheme: () {},
+          controller: null,
+          onCheckUpdates: () async {
+            checks++;
+            return const UpdateCheck(UpdateCheckStatus.upToDate);
+          },
+        ),
+      ),
+    );
+    await settle(tester);
+    await tester.tap(find.text('Проверить обновления'));
+    await settle(tester);
+    expect(checks, 1);
+    expect(find.text('У вас последняя версия DetourVPN.'), findsOneWidget);
+  });
+
+  testWidgets('Settings: no updater, no row', (tester) async {
+    await tester.pumpWidget(
+      MaterialApp(home: SettingsScreen(onTheme: () {}, controller: null)),
+    );
+    await settle(tester);
+    expect(find.text('Проверить обновления'), findsNothing);
   });
 }

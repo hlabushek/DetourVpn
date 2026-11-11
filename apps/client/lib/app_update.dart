@@ -184,27 +184,112 @@ class UpdateOffer {
   final SignedManifest signed;
 }
 
-/// One check per launch. Any failure (no manifest, network, invalid data) means no dialog.
-Future<UpdateOffer?> checkForUpdate(TunnelApi api, UpdateNative native) async {
+/// Any failure (no manifest, network, invalid data) means no dialog.
+Future<UpdateOffer?> checkForUpdate(TunnelApi api, UpdateNative native) async =>
+    (await checkForUpdateDetailed(api, native)).offer;
+
+/// Result of one check, so a manual check can say why nothing was offered.
+enum UpdateCheckStatus { available, upToDate, failed }
+
+class UpdateCheck {
+  const UpdateCheck(this.status, [this.offer]);
+  final UpdateCheckStatus status;
+  final UpdateOffer? offer;
+}
+
+/// `upToDate`: no newer verified build is published. `failed`: the check itself did not work
+/// (network, unverifiable manifest, Android below 13). Never throws.
+Future<UpdateCheck> checkForUpdateDetailed(
+  TunnelApi api,
+  UpdateNative native,
+) async {
+  const failed = UpdateCheck(UpdateCheckStatus.failed);
   try {
     final installed = await native.installedVersionCode();
-    if (installed == null || installed < 1) return null;
-    final signed = SignedManifest.parse(
-      await api.call('GET', '/api/v1/app/signed-update-manifest'),
-    );
-    if (signed == null) return null;
+    if (installed == null || installed < 1) return failed;
+    final Map<String, dynamic> raw;
+    try {
+      raw = await api.call('GET', '/api/v1/app/signed-update-manifest');
+    } on ClientError catch (e) {
+      // The server has no valid release published: nothing to offer, not a broken check.
+      return e.code == 'update_unavailable' || e.code == 'not_found'
+          ? const UpdateCheck(UpdateCheckStatus.upToDate)
+          : failed;
+    }
+    final signed = SignedManifest.parse(raw);
+    if (signed == null) return failed;
     final verified = await native.verifyManifest(signed);
-    if (verified == null) return null;
+    if (verified == null) return failed;
     final decoded = jsonDecode(verified);
-    if (decoded is! Map<String, dynamic>) return null;
+    if (decoded is! Map<String, dynamic>) return failed;
     final manifest = UpdateManifest.parse(decoded);
-    if (manifest == null) return null;
+    if (manifest == null) return failed;
     final decision = decideUpdate(installed, manifest);
     return decision == UpdateDecision.none
-        ? null
-        : UpdateOffer(manifest, decision, signed);
+        ? const UpdateCheck(UpdateCheckStatus.upToDate)
+        : UpdateCheck(
+            UpdateCheckStatus.available,
+            UpdateOffer(manifest, decision, signed),
+          );
   } catch (_) {
-    return null;
+    return failed;
+  }
+}
+
+/// Russian text for a manual check that offered nothing.
+String updateCheckText(UpdateCheckStatus status) => switch (status) {
+  UpdateCheckStatus.upToDate => 'У вас последняя версия DetourVPN.',
+  UpdateCheckStatus.failed =>
+    'Не удалось проверить обновления. Проверьте интернет и попробуйте ещё раз. '
+        'Обновление из приложения работает на Android 13 и новее.',
+  UpdateCheckStatus.available => 'Доступно обновление.',
+};
+
+/// When to check: at start, when the app returns to the screen (at most every [autoEvery]),
+/// and whenever the user asks. One check at a time; no second dialog while one is open.
+class UpdateScheduler {
+  UpdateScheduler(
+    this.api,
+    this.native, {
+    this.autoEvery = const Duration(hours: 6),
+    DateTime Function()? now,
+  }) : _now = now ?? DateTime.now;
+  final TunnelApi api;
+  final UpdateNative native;
+  final Duration autoEvery;
+  final DateTime Function() _now;
+  DateTime? _lastCheck;
+  bool _running = false;
+  bool _showing = false;
+
+  bool get dueForAuto =>
+      _lastCheck == null || _now().difference(_lastCheck!) >= autoEvery;
+
+  /// Null when skipped (another check or dialog is in progress, or an automatic check is not
+  /// due yet). [show] opens the dialog for an available update.
+  Future<UpdateCheck?> run({
+    required bool manual,
+    required Future<void> Function(UpdateOffer offer) show,
+  }) async {
+    if (_running || _showing || (!manual && !dueForAuto)) return null;
+    _running = true;
+    _lastCheck = _now();
+    final UpdateCheck result;
+    try {
+      result = await checkForUpdateDetailed(api, native);
+    } finally {
+      _running = false;
+    }
+    final offer = result.offer;
+    if (offer != null) {
+      _showing = true;
+      try {
+        await show(offer);
+      } finally {
+        _showing = false;
+      }
+    }
+    return result;
   }
 }
 

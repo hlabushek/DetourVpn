@@ -81,19 +81,28 @@ class _VpnAppState extends State<VpnApp> with WidgetsBindingObserver {
       unawaited(restore());
     }
     if (widget.api != null && widget.updates != null) {
-      unawaited(_checkForUpdate(widget.api!, widget.updates!));
+      _updates = UpdateScheduler(widget.api!, widget.updates!);
+      unawaited(_runUpdateCheck(manual: false));
     }
   }
 
+  UpdateScheduler? _updates;
+
   final _navigator = GlobalKey<NavigatorState>();
 
-  /// ADR-107: once per launch; failures are silent and never block the app.
-  Future<void> _checkForUpdate(Api api, UpdateNative updates) async {
-    final offer = await checkForUpdate(api, updates);
-    if (offer == null || !mounted) return;
-    final context = _navigator.currentContext;
-    if (context == null || !context.mounted) return;
-    await showUpdateDialog(context, offer, updates);
+  /// ADR-107: at start, on return to the screen (at most every 6 h) and from Settings.
+  /// Automatic checks are silent on failure and never block the app.
+  Future<UpdateCheck?> _runUpdateCheck({required bool manual}) async {
+    final scheduler = _updates;
+    if (scheduler == null) return null;
+    return scheduler.run(
+      manual: manual,
+      show: (offer) async {
+        final context = _navigator.currentContext;
+        if (!mounted || context == null || !context.mounted) return;
+        await showUpdateDialog(context, offer, scheduler.native);
+      },
+    );
   }
 
   /// ADR-100: no network at startup must not sign the user out. Temporary failures are retried
@@ -150,6 +159,10 @@ class _VpnAppState extends State<VpnApp> with WidgetsBindingObserver {
     if (state == AppLifecycleState.resumed && !showLogin) {
       unawaited(connection?.refresh());
       unawaited(connection?.refreshQuota());
+    }
+    // The VPN keeps the app alive for days, so a check only at start is not enough.
+    if (state == AppLifecycleState.resumed) {
+      unawaited(_runUpdateCheck(manual: false));
     }
   }
 
@@ -313,6 +326,9 @@ class _VpnAppState extends State<VpnApp> with WidgetsBindingObserver {
       builder: (_) => SettingsScreen(
         onTheme: _toggleTheme,
         controller: showLogin ? null : connection,
+        onCheckUpdates: _updates == null
+            ? null
+            : () => _runUpdateCheck(manual: true),
       ),
     ),
   );

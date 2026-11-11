@@ -119,3 +119,14 @@ check our server and offer the latest build. Existing code: no version or update
 - The download is cancelled if the app process dies; the user simply taps «Обновить» again.
 - Owner must upload the APK and manifest manually to the path the API serves. The API setting
   is `VPN_APP_UPDATE_MANIFEST_FILE` (path to the JSON). See the runbook.
+
+## Amendment 2026-11-11 — when the app checks (connection reliability branch)
+- The check ran only on a cold start (`main.dart` `initState`). Because the VPN keeps the app
+  process alive for days, a phone could go a long time without checking.
+- Now `UpdateScheduler` (`app_update.dart`) checks at start, when the app returns to the screen
+  (at most every 6 hours), and from a «Проверить обновления» row in Settings. One check at a time,
+  and no second dialog while one is open.
+- A manual check that offers nothing says why: «У вас последняя версия DetourVPN.» (no newer
+  verified build, or the server has none published) or a failure text that names Android 13+.
+- No new endpoint, permission or data. Tests: `app_update_test.dart` (statuses, 6-hour limit,
+  one dialog at a time, Settings row). Not verified on a device.
