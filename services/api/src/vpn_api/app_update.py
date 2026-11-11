@@ -26,8 +26,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 # Owner's update-signing public key: raw 32-byte Ed25519 key, standard base64. Must equal
 # `UpdateSignature.PUBLIC_KEY_B64` (Java; a test pins the equality). Empty = no signed key has
 # been generated yet, so no manifest is served and the app offers no update.
-UPDATE_SIGNING_PUBLIC_KEY = ""
-
+UPDATE_SIGNING_PUBLIC_KEY = "Y9b9HwC1Ch4Ee7TO+7n5si0NcpC1putqR7D7RNQjHTs="
 MAX_MANIFEST_BYTES = 16 * 1024
 _BASE64 = re.compile(r"[A-Za-z0-9+/]+={0,2}")
 _SHA256 = re.compile(r"[0-9a-f]{64}")
