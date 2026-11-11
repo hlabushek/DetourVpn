@@ -8,7 +8,7 @@ from urllib.parse import urlencode
 
 import pytest
 
-from vpn_api.auth.mini_app import validate_init_data
+from vpn_api.auth.mini_app import init_data_username, validate_init_data
 from vpn_api.auth.security import AuthError
 
 
@@ -79,3 +79,32 @@ def test_duplicates_wrong_bot_tampering_and_bad_timestamp() -> None:
             validate_init_data(value, token, 1000)
     with pytest.raises(AuthError):
         validate_init_data(raw, secrets.token_urlsafe(32), 1000)
+
+
+@pytest.mark.parametrize(
+    ("user", "expected"),
+    [
+        ({"id": 123, "username": "Test_User1"}, "Test_User1"),
+        ({"id": 123, "username": "abcd"}, "abcd"),
+        ({"id": 123}, None),
+        ({"id": 123, "username": ""}, None),
+        ({"id": 123, "username": "abc"}, None),
+        ({"id": 123, "username": "a" * 33}, None),
+        ({"id": 123, "username": "bad-name"}, None),
+        ({"id": 123, "username": "имя_пользователя"}, None),
+        ({"id": 123, "username": "name\n"}, None),
+        ({"id": 123, "username": 12345}, None),
+        ({"id": 123, "username": ["name"]}, None),
+    ],
+)
+def test_username_is_taken_only_in_telegram_format(user: object, expected: str | None) -> None:
+    # ADR-110: a missing or malformed username never fails the login; it is stored as NULL.
+    token = secrets.token_urlsafe(32)
+    raw = signed(token, user=json.dumps(user))
+    assert validate_init_data(raw, token, 1000)[0] == 123
+    assert init_data_username(raw) == expected
+
+
+def test_username_helper_tolerates_garbage() -> None:
+    for raw in ("", "user=", "user=not-json", "user=%5B1%5D", "auth_date=1"):
+        assert init_data_username(raw) is None

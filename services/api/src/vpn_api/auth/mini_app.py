@@ -1,4 +1,8 @@
-"""Telegram HMAC validation. Raw initData and profile fields are never persisted."""
+"""Telegram HMAC validation.
+
+Raw initData and profile fields are never persisted, with one exception: the Telegram username
+from a validated login is kept on the identity for admin search (ADR-110). It is never logged.
+"""
 
 import hashlib
 import hmac
@@ -54,6 +58,22 @@ def validate_init_data(raw: str, bot_token: str, now: float) -> tuple[int, str, 
         raise AuthError("invalid_init_data") from None
 
 
+TELEGRAM_USERNAME = re.compile(r"[A-Za-z0-9_]{4,32}")
+
+
+def init_data_username(raw: str) -> str | None:
+    """Username from initData that `validate_init_data` already accepted (ADR-110).
+
+    Absent, empty or malformed usernames become None; they never fail the login.
+    """
+    try:
+        user = json.loads(dict(parse_qsl(raw, keep_blank_values=True))["user"])
+        name = user.get("username")
+    except (ValueError, KeyError, TypeError, AttributeError, UnicodeError):
+        return None
+    return name if isinstance(name, str) and TELEGRAM_USERNAME.fullmatch(name) else None
+
+
 class MiniAppInput(Input):
     init_data: SecretStr = Field(min_length=1, max_length=16384)
 
@@ -96,6 +116,7 @@ def exchange(body: MiniAppInput, request: Request, auth: Service) -> TokenRespon
         )
         if claimed is None:
             raise AuthError("init_data_replayed", 409)
+        username = init_data_username(body.init_data.get_secret_value())
         identity = session.scalar(
             select(AuthIdentity).where(
                 AuthIdentity.provider == "telegram_bot", AuthIdentity.provider_subject == subject
@@ -105,8 +126,18 @@ def exchange(body: MiniAppInput, request: Request, auth: Service) -> TokenRespon
             user = User(status="active", verified_at=now)
             session.add(user)
             session.flush()
-            session.add(AuthIdentity(user_id=user.id, provider_subject=subject, verified_at=now))
+            session.add(
+                AuthIdentity(
+                    user_id=user.id,
+                    provider_subject=subject,
+                    verified_at=now,
+                    telegram_username=username,
+                )
+            )
         else:
+            # Overwrite on every login; a removed username clears the stored one (ADR-110).
+            # Commits only with the rest of the login transaction.
+            identity.telegram_username = username
             existing = session.scalar(
                 select(User).where(User.id == identity.user_id).with_for_update()
             )

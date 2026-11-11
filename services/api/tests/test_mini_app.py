@@ -1,5 +1,6 @@
 """Real local PostgreSQL/API; signed Telegram input is TEST SYNTHETIC ONLY."""
 
+import json
 import re
 from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC, datetime, timedelta
@@ -22,6 +23,7 @@ from vpn_api.auth.security import beta_invite_digest
 from vpn_api.db.connection import transaction
 from vpn_api.db.models import (
     AdminIdentity,
+    AuthIdentity,
     BetaInvite,
     CodeIssue,
     LoginAttempt,
@@ -408,3 +410,65 @@ def test_retention_expiry_and_safe_rollback(harness: Harness) -> None:
         )
     assert h.client.get("/api/v1/me", headers=auth).status_code == 401
     assert h.auth.cleanup()["mini_app_exchanges"] == 1
+
+
+def stored_username(h: Harness, subject: int) -> str | None:
+    with transaction(h.engine) as session:
+        return session.scalar(
+            select(AuthIdentity.telegram_username).where(AuthIdentity.provider_subject == subject)
+        )
+
+
+def named_payload(h: Harness, subject: int, user: dict[str, object]) -> str:
+    assert h.settings.telegram_bot_token is not None
+    return signed(
+        h.settings.telegram_bot_token.get_secret_value(),
+        auth_date=str(int(datetime.now(UTC).timestamp())),
+        user=json.dumps({"id": subject, **user}),
+    )
+
+
+def test_mini_app_login_stores_overwrites_and_clears_telegram_username(harness: Harness) -> None:
+    # ADR-110: set on first login, overwritten on each login, cleared when Telegram sends none.
+    h = harness
+    tokens = exchange(h, named_payload(h, 777, {"username": "First_Name"}))
+    assert stored_username(h, 777) == "First_Name"
+    # Never sent back to the client app.
+    me = h.client.get("/api/v1/me", headers=headers(tokens))
+    assert "First_Name" not in me.text and "username" not in me.text
+    exchange(h, named_payload(h, 777, {"username": "second_name"}))
+    assert stored_username(h, 777) == "second_name"
+    exchange(h, named_payload(h, 777, {"username": "bad-name!"}))
+    assert stored_username(h, 777) is None
+    exchange(h, named_payload(h, 777, {"username": "back_again"}))
+    exchange(h, named_payload(h, 777, {}))
+    assert stored_username(h, 777) is None
+
+
+def test_bot_code_login_keeps_the_stored_username(harness: Harness) -> None:
+    h = harness
+    exchange(h, named_payload(h, 778, {"username": "kept_name"}))
+    login(h, 778)
+    assert stored_username(h, 778) == "kept_name"
+
+
+def test_rejected_mini_app_login_does_not_change_username(harness: Harness) -> None:
+    h = harness
+    exchange(h, named_payload(h, 779, {"username": "original"}))
+    with transaction(h.engine) as session:
+        session.execute(
+            update(User)
+            .where(
+                User.id
+                == select(AuthIdentity.user_id)
+                .where(AuthIdentity.provider_subject == 779)
+                .scalar_subquery()
+            )
+            .values(status="disabled")
+        )
+    h.auth.settings.enable_mini_app = True
+    result = h.client.post(
+        "/api/v1/auth/mini-app", json={"init_data": named_payload(h, 779, {"username": "other"})}
+    )
+    assert result.status_code == 401
+    assert stored_username(h, 779) == "original"
