@@ -38,7 +38,7 @@ Plan: `docs/overnight/FINAL_PLAN.md`.
 | `8193787` | feat(api): parse verified 3x-ui/Remnawave subscription bodies (ADR-116) |
 | `851c56e` | feat: Ed25519-signed in-app update manifest (ADR-107) |
 | `55a5e74` | feat: native handshake-seen memory for diagnostics on Android and Windows (task 7) |
-| (last) | docs: final run 4 report, runbooks, test filler fix |
+| `4694e68` | docs: final run 4 report, runbooks, test filler fix |
 
 Every commit ends with `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`. The task text
 asked for a Haiku 5.5 line, but this run was Opus 5.5, so the trailer names the model that did the
