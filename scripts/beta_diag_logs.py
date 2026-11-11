@@ -14,7 +14,9 @@ import subprocess
 import sys
 from pathlib import Path
 
-from scripts.deploy_beta_api_latest import HOST, IDENTITY
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))  # allow `python scripts/beta_diag_logs.py`
+
+from scripts.deploy_beta_api_latest import HOST, IDENTITY  # noqa: E402
 
 # Fixed remote command; the only variable part is an integer validated below.
 REMOTE = (
