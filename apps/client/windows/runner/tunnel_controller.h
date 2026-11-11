@@ -44,6 +44,8 @@ struct TunnelSnapshot {
   std::optional<int64_t> traffic_bytes;
   std::optional<int64_t> received_bytes;
   std::string reason;
+  // Task 7: a handshake was seen since the last connect; kept after the tunnel stops.
+  bool handshake_seen = false;
 };
 
 struct ControllerHooks {
@@ -129,6 +131,7 @@ class TunnelController {
   std::string reason_;
   std::optional<std::string> key_cache_;
   bool engine_started_ = false;
+  bool handshake_seen_ = false;
 
   std::condition_variable wake_;
   bool stopping_ = false;

@@ -366,12 +366,14 @@ void ControllerTests() {
     Rig r("ctl-life");
     fs::path marker = r.dir / "graceful.txt";
     SetEnvironmentVariableW(L"FAKE_ENGINE_MARKER", marker.c_str());
+    CHECK(!r.c->Snapshot().handshake_seen);
     r.c->Connect(kProfile, 60000, grant);
     TunnelSnapshot s = r.c->Snapshot();
     CHECK(s.up && s.network && s.remaining_ms > 0 && s.remaining_ms <= 60000);
     for (int i = 0; i < 30 && r.c->Snapshot().handshake_age < 0; ++i) Sleep(100);
     s = r.c->Snapshot();
     CHECK(s.handshake_age >= 2 && s.handshake_age <= 6);  // the fake reports "3 s ago"
+    CHECK(s.handshake_seen);  // Task 7: native memory of this connection's handshake
     CHECK(s.received_bytes == 1000 && s.traffic_bytes == 1500);
     CHECK(ThrowsCode("native_service_state_invalid", [&] { r.c->Connect(kProfile, 30000, grant); }));  // already up
     CHECK(ThrowsCode("native_operation_failed", [&] { r.c->WriteSplit("all", {}, {}); }));             // locked while up
@@ -382,6 +384,7 @@ void ControllerTests() {
     r.c->Disconnect();
     s = r.c->Snapshot();
     CHECK(!s.up && s.remaining_ms == 0 && s.handshake_age == -1);
+    CHECK(s.handshake_seen);  // kept after the tunnel stops, until the next connect
     CHECK(fs::exists(marker));
     CHECK(ThrowsCode("native_service_state_invalid", [&] { r.c->AdvanceWindow(WindowGrant{"conn-1", "run-1", 3}, 80000); }));
     SetEnvironmentVariableW(L"FAKE_ENGINE_MARKER", nullptr);

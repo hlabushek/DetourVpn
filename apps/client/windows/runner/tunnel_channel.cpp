@@ -189,6 +189,7 @@ void TunnelChannel::Handle(const flutter::MethodCall<EncodableValue>& call,
       if (s.traffic_bytes) map[EncodableValue("trafficBytes")] = EncodableValue(*s.traffic_bytes);
       if (s.received_bytes) map[EncodableValue("receivedBytes")] = EncodableValue(*s.received_bytes);
       map[EncodableValue("reason")] = EncodableValue(s.reason);
+      map[EncodableValue("handshakeSeen")] = EncodableValue(s.handshake_seen);
       result->Success(EncodableValue(map));
     } else if (method == "sessionRead") {
       result->Success(RecordValue(c.ReadSession()));

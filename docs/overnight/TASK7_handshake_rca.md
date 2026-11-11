@@ -143,3 +143,23 @@ exist in any code. The tester's text did not come from this app's strings.
 The diagnostic report from a build that includes this change: code + stage + handshake line.
 `lease_expired` + `not_seen` while the screen was on points to the server/network path;
 `lease_expired` + `confirmed` points to background or renewal.
+
+## 10. Run 4 (2026-11-11): native "handshake seen in this connection"
+- Android: `HandshakeMemory` (pure Java) in `ClientApplication`. It is reset by `connectWindow`
+  and fed in the VPN process by the 15 s watchdog tick, by each snapshot, and once right before
+  a window expires. It is kept after the tunnel stops, until the next connect. The snapshot
+  sends `handshakeSeen`.
+- Windows: `TunnelController` keeps `handshake_seen_`. It is reset when an engine starts
+  (`LaunchLocked`, AWG and VLESS), set when a fresh stats reading shows a handshake, and kept
+  after stop. The channel snapshot sends `handshakeSeen`.
+- Dart: `NativeSnapshot.handshakeSeen` (older native builds send nothing, read as false) feeds
+  only the diagnostic line. `Handshake: confirmed` now also covers a handshake that happened
+  while the app slept. Status, renewal and reconnect decisions are unchanged (a test pins this).
+- No new stop code. The native signal now exists, but splitting `lease_expired` changes
+  auto-reconnect behaviour and needs a device test first. Next step: with device reports in
+  hand, add `handshake_not_established` only for `lease_expired` + `handshakeSeen == false`
+  with the screen on.
+- Tests: Java `HandshakeMemoryTest` 3 passed. C++ `adapter_tests` lifecycle checks (not seen
+  before connect, seen after the fake engine's handshake, kept after disconnect) passed under
+  ctest. Dart `window_connection_test.dart` (two new tests) and `diagnostic_report_test.dart`:
+  50 passed. Not verified on a phone or a Windows PC.

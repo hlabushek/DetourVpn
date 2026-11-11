@@ -23,7 +23,12 @@ class NativeSnapshot {
     this.receivedBytes,
     this.reason = '',
     this.nativeRenewal = false,
+    this.handshakeSeen = false,
   });
+
+  /// Task 7: the native side saw a handshake since the last connect, even while Dart slept.
+  /// Kept after the tunnel stops. Older native builds do not send it (false).
+  final bool handshakeSeen;
   final bool up;
   final bool network;
   final int handshakeAge;
@@ -204,6 +209,7 @@ class PlatformTunnel
           : null,
       reason: value['reason'] as String,
       nativeRenewal: value['nativeRenewal'] == true,
+      handshakeSeen: value['handshakeSeen'] == true,
     );
   }
 

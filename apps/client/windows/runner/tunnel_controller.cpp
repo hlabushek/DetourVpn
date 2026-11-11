@@ -379,6 +379,7 @@ void TunnelController::Connect(const std::string& config, int64_t remaining_ms,
 
 void TunnelController::LaunchLocked(const std::filesystem::path& exe, std::string& engine_config) {
   reason_.clear();
+  handshake_seen_ = false;  // a new connection: nothing seen yet (kept after stop until here)
   try {
     engine_.Start(exe.wstring(), L"run -c stdin", engine_config, true);
     engine_started_ = true;
@@ -471,14 +472,17 @@ TunnelSnapshot TunnelController::Snapshot() {
       const auto age = std::chrono::steady_clock::now() - stats->received_at;
       if (age < std::chrono::seconds(5)) {  // stale counters never confirm a handshake
         int64_t now = hooks_.unix_seconds();
-        if (stats->last_handshake_unix > 0 && stats->last_handshake_unix <= now)
+        if (stats->last_handshake_unix > 0 && stats->last_handshake_unix <= now) {
           snapshot.handshake_age = now - stats->last_handshake_unix;
+          handshake_seen_ = true;
+        }
         snapshot.traffic_bytes = stats->rx_bytes + stats->tx_bytes;
         snapshot.received_bytes = stats->rx_bytes;
       }
     }
   }
   snapshot.reason = reason_;
+  snapshot.handshake_seen = handshake_seen_;
   return snapshot;
 }
 

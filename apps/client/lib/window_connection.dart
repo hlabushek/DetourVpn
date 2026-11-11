@@ -75,6 +75,10 @@ class WindowConnectionController extends ConnectionController {
   int? _renewTrafficAnchor;
   final InboundTrafficFreshness _inboundTraffic = InboundTrafficFreshness();
   bool _hasEstablishedHandshake = false;
+
+  /// Task 7: the native side's own memory (NativeSnapshot.handshakeSeen). Diagnostics only:
+  /// it never changes status, renewal or reconnect decisions.
+  bool _nativeHandshakeSeen = false;
   bool _trafficRenewalRequested = false;
   @visibleForTesting
   bool get trafficRenewalRequested => _trafficRenewalRequested;
@@ -330,6 +334,7 @@ class WindowConnectionController extends ConnectionController {
       _renewTrafficAnchor = null;
       _inboundTraffic.reset();
       _hasEstablishedHandshake = false;
+      _nativeHandshakeSeen = false;
       _connectedAtMs = _clock.elapsedMilliseconds;
       diagnosticStage = null;
       diagnosticHandshake = null;
@@ -621,6 +626,8 @@ class WindowConnectionController extends ConnectionController {
       if (_cancelled(version) || _id == null) return;
       var snapshot = await native.snapshot();
       if (_cancelled(version)) return;
+      // Read before any stop check below, so a window that just ended still reports it.
+      if (snapshot.handshakeSeen) _nativeHandshakeSeen = true;
       // While native renews, its deadline is authoritative: Dart timers may have slept.
       if (snapshot.nativeRenewal && snapshot.up && snapshot.remainingMs > 0)
         _deadline = _clock.elapsedMilliseconds + snapshot.remainingMs;
@@ -745,9 +752,11 @@ class WindowConnectionController extends ConnectionController {
       // API response failure.
       final code = e is ClientError ? e.code : 'native_unavailable';
       error = code;
-      // Task 7: recorded before cleanup resets it. Only what the app itself observed; a
-      // handshake that happened while the app was asleep in the background is not seen here.
-      diagnosticHandshake = _hasEstablishedHandshake ? 'confirmed' : 'not_seen';
+      // Task 7: recorded before cleanup resets it. The native memory also counts a handshake
+      // that happened while the app was asleep (Android VPN process, Windows controller).
+      diagnosticHandshake = _hasEstablishedHandshake || _nativeHandshakeSeen
+          ? 'confirmed'
+          : 'not_seen';
       phase = ConnectionPhase.reconnecting;
       if (!{
             'network_unavailable',

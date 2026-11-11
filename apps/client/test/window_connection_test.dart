@@ -23,6 +23,7 @@ class Native extends FakeNative implements WindowNative {
   int remaining = 59000;
   int? traffic;
   int? received;
+  bool seen = false;
   bool failPublicKey = false;
   @override
   Future<String> publicKey() async {
@@ -39,6 +40,7 @@ class Native extends FakeNative implements WindowNative {
     trafficBytes: traffic,
     receivedBytes: received,
     reason: reason,
+    handshakeSeen: seen,
   );
   @override
   Future<void> connectWindow(
@@ -757,6 +759,27 @@ void main() {
       expect(c.diagnosticHandshake, 'confirmed');
     },
   );
+  test(
+    'a handshake only the native side saw (app asleep) is exported as confirmed',
+    () async {
+      await c.connect();
+      // Dart never saw a fresh handshake age; the VPN process remembers one.
+      native.seen = true;
+      native.remaining = 0;
+      await c.refresh();
+      expect(c.error, 'lease_expired');
+      expect(c.diagnosticHandshake, 'confirmed');
+    },
+  );
+  test('the native memory alone never changes the connection status', () async {
+    await c.connect();
+    await c.refresh();
+    final before = (c.phase, c.detail, c.error);
+    native.seen = true;
+    await c.refresh();
+    expect((c.phase, c.detail, c.error), before);
+    expect(c.diagnosticHandshake, isNull);
+  });
   test('user disconnect is never undone by auto reconnect', () async {
     final auto = WindowConnectionController(
       api,

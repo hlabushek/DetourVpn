@@ -45,6 +45,8 @@ public final class ClientApplication extends Application implements Tunnel {
     private FlutterEngine recoveryEngine;
     long deadline;
     String reason = "";
+    // Task 7: whether a handshake happened since the last connect, seen natively (Dart may sleep).
+    final HandshakeMemory handshakes = new HandshakeMemory();
     // Window renewals are driven from Dart timers. Without this the CPU may sleep with the screen
     // off and a 90 s window then expires. The lock has a timeout and is refreshed on each renewal,
     // so a dead process can never leak it.
@@ -100,10 +102,19 @@ public final class ClientApplication extends Application implements Tunnel {
         worker.scheduleWithFixedDelay(this::watchTunnel, 15, 15, TimeUnit.SECONDS);
         worker.scheduleWithFixedDelay(() -> {
             if (deadline > 0 && SystemClock.elapsedRealtime() >= deadline) {
+                observeHandshake();
                 try { stop(); reason = "lease_expired"; }
                 catch (Exception ignored) { reason = "native_disconnect_failed"; }
             }
         }, 250, 250, TimeUnit.MILLISECONDS);
+    }
+
+    /** Worker thread. One reading for {@link #handshakes}; never throws. */
+    private void observeHandshake() {
+        try {
+            if (provider != null && provider.isUp())
+                handshakes.observe(provider.lastHandshakeSeconds(), System.currentTimeMillis() / 1000);
+        } catch (RuntimeException | LinkageError ignored) { /* Diagnostics only. */ }
     }
 
     /** Default-network changes (Wi-Fi <-> mobile, reconnects) feed the watchdog. */
@@ -144,6 +155,7 @@ public final class ClientApplication extends Application implements Tunnel {
             if (!watchdog.running()) watchdog.tunnelUp(now);
             long handshake = provider.lastHandshakeSeconds();
             long wall = System.currentTimeMillis() / 1000;
+            handshakes.observe(handshake, wall);
             long age = handshake > 0 && handshake <= wall ? (wall - handshake) * 1000 : -1;
             if (!watchdog.shouldRestart(now, age, hasValidatedNetwork())) return;
             watchdog.restarted(now);
@@ -287,6 +299,7 @@ public final class ClientApplication extends Application implements Tunnel {
                                 ((Number) call.argument("generation")).longValue(), end,
                                 SystemClock.elapsedRealtime());
                         deadline = end;
+                        handshakes.reset();
                         try {
                             provider.connect(config);
                             if (generation != this.generation.get()
@@ -444,6 +457,7 @@ public final class ClientApplication extends Application implements Tunnel {
         boolean up = provider.isUp();
         long handshake = up ? provider.lastHandshakeSeconds() : 0;
         long now = System.currentTimeMillis() / 1000;
+        handshakes.observe(handshake, now);
         boolean network = hasValidatedNetwork();
         Map<String, Object> value = new HashMap<>();
         value.put("up", up); value.put("network", network);
@@ -459,6 +473,7 @@ public final class ClientApplication extends Application implements Tunnel {
         } catch (RuntimeException | LinkageError ignored) { /* Advisory unavailable. */ }
         value.put("reason", reason);
         value.put("nativeRenewal", renewer.active());
+        value.put("handshakeSeen", handshakes.seen());
         value.put("tunnelRestarts", (long) tunnelRestarts);
         return value;
     }
