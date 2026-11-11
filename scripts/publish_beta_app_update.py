@@ -94,8 +94,13 @@ os.replace(tmp, path)
 PY
 systemctl restart detourvpn-beta-api.service
 wait_ready || { echo rollout=api_readiness_failed; false; }
-test "$(curl -sS -o /dev/null -w '%{http_code}' http://127.0.0.1:28000/api/v1/app/signed-update-manifest)" = 200
-test "$(curl -sS -o /dev/null -w '%{http_code}' http://127.0.0.1:28000/api/v1/app/download/$apk)" = 200
+# Name the failing check: 404 on the manifest usually means the host API code has no (or another)
+# signing key or no update route yet; see scripts/beta_app_update_check.py.
+check_manifest=$(curl -sS -o /dev/null -w '%{http_code}' http://127.0.0.1:28000/api/v1/app/signed-update-manifest || true)
+check_download=$(curl -sS -o /dev/null -w '%{http_code}' http://127.0.0.1:28000/api/v1/app/download/$apk || true)
+echo check_manifest="$check_manifest"; echo check_download="$check_download"
+test "$check_manifest" = 200
+test "$check_download" = 200
 phase=caddy
 python3 - "$caddyf" "$backup/Caddyfile.new" <<'PY'
 import sys
@@ -182,9 +187,11 @@ def main() -> int:
         text=True,
         check=False,
     )
-    wanted = ("rollout", "rollback_phase", "apk_url")
+    wanted = ("rollout", "rollback_phase", "apk_url", "check_manifest", "check_download")
     print("\n".join(x for x in result.stdout.splitlines() if x.split("=")[0] in wanted))
     print(f"exit_code={result.returncode}")
+    if result.returncode:
+        print("Read-only diagnosis: uv run --frozen python scripts/beta_app_update_check.py")
     return result.returncode
 
 
