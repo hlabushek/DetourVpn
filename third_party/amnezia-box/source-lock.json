@@ -15,7 +15,8 @@
   ],
   "windows_tags": [
     "with_awg",
-    "with_gvisor"
+    "with_gvisor",
+    "with_utls"
   ],
   "windows_patches": [
     "peer-stats.patch",

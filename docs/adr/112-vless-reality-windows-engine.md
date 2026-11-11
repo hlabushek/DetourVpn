@@ -1,6 +1,6 @@
 # ADR-112: VLESS + Reality outbound in the Windows engine config
 
-Status: proposed (overnight run 3, 2026-11-11). Config generation implemented and unit-tested
+Status: accepted for beta (run 4, 2026-11-11): engine rebuilt with `with_utls`; config generation unit-tested
 locally. Not wired to the UI or the API. Not verified with a live server.
 
 ## Context
@@ -48,3 +48,21 @@ speak VLESS + Reality, which upstream sing-box implements as a `vless` outbound 
 ## Verification
 - New checks in `apps/client/windows/tests/config_factory_tests.cpp` (structure, fields, DNS
   choice, split modes, refusals). No connection test.
+
+## Update 2026-11-11 (run 4): engine rebuilt with `with_utls`
+- `third_party/amnezia-box/source-lock.json` `windows_tags` now includes `with_utls`. One engine
+  binary serves AWG and VLESS: the tag only compiles in uTLS/Reality code that a config must ask
+  for; AWG configs do not.
+- Built by `scripts/build_engine_windows.ps1 -Build -GoProxy off` (pinned Go 1.25.5, verified
+  source archive, no module download; `metacubex/utls v1.8.3` came from the local module cache
+  and is checked against the pinned `go.sum`).
+  `detour-engine.exe`: 25,773,056 bytes, SHA-256
+  `56eebc1cd4ff6356eb84349e6359b4093ea8e170519d6eeb1e06018b806f0869`,
+  `version` reports `Tags: with_awg,with_gvisor,with_utls`.
+- Self-test: `detour_config_tool --vless-selftest` (gate helper, not shipped) prints the real
+  generator's output for a fixed fake profile. `detour-engine check -c` on it: new engine exit 0;
+  the previous engine (tags `with_awg,with_gvisor`) exit 1 with "uTLS, which is required by
+  reality is not included in this build".
+- Not verified: a live VLESS connection, and the AWG path on the new binary on a PC
+  (device test needed). The next Windows release zip must be built with `-BuildEngine` so it
+  carries this engine.
