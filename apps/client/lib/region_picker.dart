@@ -6,6 +6,7 @@ import 'connection.dart';
 import 'country_flag.dart';
 import 'native_tunnel.dart';
 import 'orbit_widgets.dart';
+import 'panel_servers.dart';
 import 'ui/components.dart';
 import 'ui/motion.dart';
 import 'ui/tokens.dart';
@@ -166,6 +167,16 @@ class _RegionPickerScreenState extends State<RegionPickerScreen> {
                                 ),
                             ],
                           ),
+                          // ADR-115: a panel server is labelled; on Android it says why not.
+                          if (node.isPanel) ...[
+                            const SizedBox(height: 4),
+                            Text(
+                              node.reason == panelUnsupportedReason
+                                  ? panelServerUnsupportedAndroid
+                                  : panelServerLabel,
+                              style: Theme.of(context).textTheme.bodySmall,
+                            ),
+                          ],
                         ],
                       ),
                     ),

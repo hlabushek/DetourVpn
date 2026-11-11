@@ -407,6 +407,42 @@ void ControllerTests() {
     TunnelSnapshot s = r.c->Snapshot();
     CHECK(!s.up && s.reason == "engine_exited" && s.remaining_ms == 0);
   }
+  {
+    // ADR-115 panel server (VLESS + Reality); obviously fake values, reserved test names
+    VlessRealityProfile v;
+    v.server = "panel.example.test";
+    v.port = 443;
+    v.uuid = "00000000-0000-4000-8000-000000000001";
+    v.flow = "xtls-rprx-vision";
+    v.sni = "www.example.test";
+    v.public_key = std::string(42, 'r') + "A";
+    v.short_id = "0a1b";
+    v.fingerprint = "chrome";
+    Rig missing("ctl-vless-noengine", false);
+    CHECK(ThrowsCode("native_engine_unavailable", [&] { missing.c->ConnectVless(v, 60000); }));
+    Rig r("ctl-vless");
+    CHECK(ThrowsCode("native_service_state_invalid", [&] { r.c->ConnectVless(v, 0); }));
+    CHECK(ThrowsCode("native_service_state_invalid",
+                     [&] { r.c->ConnectVless(v, TunnelController::kMaxVlessMs + 1); }));
+    r.admin = false;
+    CHECK(ThrowsCode("native_permission_error", [&] { r.c->ConnectVless(v, 60000); }));
+    r.admin = true;
+    VlessRealityProfile bad = v;
+    bad.public_key = "short";
+    CHECK(ThrowsCode("native_config_invalid", [&] { r.c->ConnectVless(bad, 60000); }));
+    CHECK(!r.c->Snapshot().up);
+    r.c->WriteDns("8.8.8.8");
+    r.c->ConnectVless(v, TunnelController::kMaxVlessMs);
+    TunnelSnapshot s = r.c->Snapshot();
+    CHECK(s.up && s.remaining_ms > 60000 && s.remaining_ms <= TunnelController::kMaxVlessMs);
+    // One tunnel at a time, either kind; settings stay locked while up.
+    CHECK(ThrowsCode("native_service_state_invalid", [&] { r.c->ConnectVless(v, 60000); }));
+    CHECK(ThrowsCode("native_service_state_invalid", [&] { r.c->Connect(kProfile, 30000, grant); }));
+    CHECK(ThrowsCode("native_operation_failed", [&] { r.c->WriteDns("1.1.1.1"); }));
+    r.c->Disconnect();
+    s = r.c->Snapshot();
+    CHECK(!s.up && s.remaining_ms == 0);
+  }
 }
 
 }  // namespace

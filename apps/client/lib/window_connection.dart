@@ -8,6 +8,7 @@ import 'api.dart';
 import 'country_flag.dart';
 import 'connection.dart';
 import 'native_tunnel.dart';
+import 'panel_servers.dart';
 import 'platform_info.dart';
 
 /// Explicit v3 selection, never falls back to the bounded v2 protocol.
@@ -21,7 +22,15 @@ class WindowConnectionController extends ConnectionController {
     this.autoReconnectDelay = const Duration(seconds: 2),
     this.windowSeconds = defaultWindowSeconds,
     Uri? renewalOrigin,
-  }) : _renewalOrigin = renewalOrigin;
+    bool? panelVless,
+  }) : _renewalOrigin = renewalOrigin,
+       panelVless = panelVless ?? isWindowsClient;
+
+  /// ADR-115: this engine can run panel servers (VLESS + Reality). Windows only today.
+  final bool panelVless;
+  bool _panelUp = false;
+  @visibleForTesting
+  bool get panelConnected => _panelUp;
   final Duration? autoReconnectDelay;
   final List<int> _autoReconnectAt = [];
   static const root = '/api/v1/window-tunnels';
@@ -122,9 +131,10 @@ class WindowConnectionController extends ConnectionController {
     nodesLoading = true;
     _emit();
     try {
-      final value = await api.call('GET', '$root/nodes');
+      // ADR-115: panel rows come only on request; the server adds them when enabled.
+      final value = await api.call('GET', '$root/nodes?include=panel');
       final rows = value['nodes'];
-      if (rows is! List || rows.length > maxCatalogNodes)
+      if (rows is! List || rows.length > maxCatalogNodes + maxPanelNodes)
         throw const ClientError('invalid_response');
       final parsed = <NodeOption>[];
       for (final row in rows) {
@@ -136,12 +146,26 @@ class WindowConnectionController extends ConnectionController {
         final id = _uuid(row['id']);
         if (parsed.any((n) => n.id == id))
           throw const ClientError('invalid_response');
+        // Absent fields = an older API: a VPS node. Any other pairing is refused.
+        final source = row['source'] ?? 'vps';
+        final protocol = row['protocol'] ?? 'awg';
+        final panel = source == panelServerSource;
+        if (!(source == 'vps' && protocol == 'awg') &&
+            !(panel && protocol == panelServerProtocol))
+          throw const ClientError('invalid_response');
+        final available = row['available'] as bool;
         parsed.add(
           NodeOption(
             id,
             row['name'] as String,
             row['region'] as String,
-            (row['available'] as bool) ? 'available' : 'capacity',
+            panel && !panelVless
+                ? panelUnsupportedReason
+                : available
+                ? 'available'
+                : 'capacity',
+            source: source as String,
+            protocol: protocol as String,
             countryCode: parseCountryCode(row['country_code']),
             city: parseCity(row['city']),
             probeHost: row['probe_host'] is String && row['probe_port'] is int
@@ -232,6 +256,11 @@ class WindowConnectionController extends ConnectionController {
     try {
       diagnosticStage = 'selected_node';
       if (selectedNode == null) throw const ClientError('window_node_required');
+      final chosen = nodes.where((n) => n.id == selectedNode).firstOrNull;
+      if (chosen != null && chosen.isPanel) {
+        await _connectPanel(version, chosen);
+        return;
+      }
       // A fresh OTP session has no device binding yet. Register this phone's
       // public key before asking the API to enumerate connections for it.
       await _ensureDevice();
@@ -322,6 +351,48 @@ class WindowConnectionController extends ConnectionController {
           _scheduleAutoReconnect(version);
       }
     }
+  }
+
+  /// ADR-115: a panel server. No lease, quota window or renewal: the panel meters its own
+  /// client. The API re-checks the platform and the native side re-checks every field.
+  Future<void> _connectPanel(int version, NodeOption node) async {
+    final engine = native;
+    if (!panelVless || engine is! VlessNative)
+      throw const ClientError('panel_platform_unsupported');
+    await _ensureDevice();
+    if (_cancelled(version)) return;
+    await _reconcile();
+    if (_cancelled(version)) return;
+    if (hasLease) {
+      diagnosticStage = 'old_lease_cleanup';
+      await _cleanup();
+      if (hasLease) throw const ClientError('revoke_unconfirmed');
+    }
+    diagnosticStage = 'android_vpn_permission';
+    if (!await native.permission())
+      throw const ClientError('permission_denied');
+    if (_cancelled(version)) return;
+    diagnosticStage = 'panel_profile';
+    final args = vlessProfileArgs(
+      await api.call('GET', '$root/panel-servers/${node.id}/profile'),
+      node.id,
+    );
+    if (args == null) throw const ClientError('invalid_response');
+    if (_cancelled(version)) return;
+    diagnosticStage = 'native_tunnel_start';
+    // VlessNative is a separate interface, so the check above cannot promote `engine`.
+    await (engine as VlessNative).connectVless(args, panelSessionMaxMs);
+    if (_cancelled(version)) {
+      await native.disconnect();
+      return;
+    }
+    _panelUp = true;
+    _connectedAtMs = _clock.elapsedMilliseconds;
+    diagnosticStage = null;
+    diagnosticHandshake = null;
+    phase = ConnectionPhase.connected;
+    detail = 'Подключено к серверу из панели';
+    startPolling();
   }
 
   Future<Map<String, dynamic>> _create() async {
@@ -457,6 +528,7 @@ class WindowConnectionController extends ConnectionController {
 
   Future<void> _cleanup() async {
     await native.disconnect();
+    _panelUp = false;
     _grant = null;
     _config = null;
     _renewIntent = null;
@@ -533,6 +605,13 @@ class WindowConnectionController extends ConnectionController {
       if (_cancelled(version)) return;
       if (remotePending) {
         await _cleanup();
+        return;
+      }
+      // ADR-115: a panel session has no lease to reconcile; only the engine's liveness.
+      if (_panelUp) {
+        final snapshot = await native.snapshot();
+        if (_cancelled(version)) return;
+        if (!snapshot.up) throw ClientError(_stopCode(snapshot));
         return;
       }
       // Fresh OTP sessions are not bound to a device until this phone registers

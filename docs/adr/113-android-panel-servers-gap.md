@@ -32,3 +32,7 @@ physical-device test.
 ## Verification
 - Dart unit test that the constant exists and is the text above (no device test needed for a
   string; the row behaviour does not exist yet).
+
+## Update 2026-11-11 (run 4)
+Panel servers are now delivered to clients when the owner enables it (ADR-115). Android lists
+them as unavailable with the text above and does not allow selecting them.

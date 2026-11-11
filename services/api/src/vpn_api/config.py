@@ -42,6 +42,9 @@ class Settings(BaseSettings):
     app_update_manifest_file: Path | None = Field(default=None, repr=False)
     enable_window_tunnels: bool = False
     window_manifest_file: Path | None = Field(default=None, repr=False)
+    # ADR-115: list imported panel servers to devices and give Windows devices their VLESS
+    # profile. Off by default: a panel link is one shared panel client and is not metered.
+    deliver_panel_servers: bool = False
 
     @model_validator(mode="after")
     def validate_window_tunnels(self) -> "Settings":
@@ -51,6 +54,10 @@ class Settings(BaseSettings):
             raise ValueError(
                 "Window tunnels require authentication and explicit operator inventory"
             )
+        if self.deliver_panel_servers and (
+            not self.enable_window_tunnels or self.admin_encryption_key is None
+        ):
+            raise ValueError("Panel server delivery requires window tunnels and the admin key")
         return self
 
     @model_validator(mode="after")

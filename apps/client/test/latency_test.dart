@@ -21,7 +21,7 @@ class CatalogApi implements TunnelApi {
     String path, [
     Map<String, dynamic>? body,
   ]) async {
-    if (path == '${WindowConnectionController.root}/nodes') {
+    if (path == '${WindowConnectionController.root}/nodes?include=panel') {
       return {
         'nodes': [
           {

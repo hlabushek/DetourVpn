@@ -48,6 +48,7 @@ from vpn_api.quota.contracts import MAX_BYTES, LedgerCommand, QuotaError
 from vpn_api.quota.service import LedgerService
 from vpn_api.schemas import ErrorResponse
 from vpn_api.subscriptions import EntitlementService, PlanInput, PlanView
+from vpn_api.tunnels import panel_delivery
 from vpn_api.tunnels.service import revoke_device_tunnels
 
 
@@ -841,8 +842,8 @@ def panel_servers(admin: Admin, access: Access) -> list[dict[str, object]]:
                 "panel_kind": row.panel_kind,
                 "protocol": row.protocol,
                 "created_at": row.created_at.isoformat(),
-                # Not delivered to devices yet (ADR-112); Android has no VLESS core (ADR-113).
-                "delivered_to_devices": False,
+                # ADR-115: delivered only when enabled; Android has no VLESS core (ADR-113).
+                "delivered_to_devices": panel_delivery.enabled(admin.settings),
                 "android_supported": False,
             }
             for row in session.scalars(

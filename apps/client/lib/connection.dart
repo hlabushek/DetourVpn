@@ -6,6 +6,7 @@ import 'api.dart';
 import 'latency_probe.dart';
 import 'country_flag.dart';
 import 'native_tunnel.dart';
+import 'panel_servers.dart';
 import 'platform_info.dart';
 import 'quota.dart';
 
@@ -126,6 +127,7 @@ String nodeMessage(String reason) => switch (reason) {
   'heartbeat_stale' => 'Нет свежего ответа агента',
   'runtime_mismatch' => 'Движок не подтверждён',
   'capacity' => 'Сервер занят',
+  panelUnsupportedReason => panelServerUnsupportedAndroid,
   _ => 'Состояние неизвестно',
 };
 
@@ -142,7 +144,14 @@ class NodeOption {
     this.city,
     this.probeHost,
     this.probePort,
+    this.source = 'vps',
+    this.protocol = 'awg',
   });
+
+  /// ADR-115: `vps` (our node, AmneziaWG window) or `panel` (VLESS + Reality).
+  final String source;
+  final String protocol;
+  bool get isPanel => source == panelServerSource;
 
   /// ADR-102 UDP latency echo of this node, when the catalog advertises one.
   final String? probeHost;

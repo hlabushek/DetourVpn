@@ -1325,6 +1325,67 @@
         "title": "OverviewResponse",
         "type": "object"
       },
+      "PanelProfileView": {
+        "description": "Exactly the fields `CreateVlessEngineConfig` needs; each one is re-checked natively.",
+        "properties": {
+          "fingerprint": {
+            "title": "Fingerprint",
+            "type": "string"
+          },
+          "flow": {
+            "title": "Flow",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "port": {
+            "title": "Port",
+            "type": "integer"
+          },
+          "protocol": {
+            "const": "vless_reality",
+            "default": "vless_reality",
+            "title": "Protocol",
+            "type": "string"
+          },
+          "public_key": {
+            "title": "Public Key",
+            "type": "string"
+          },
+          "server": {
+            "title": "Server",
+            "type": "string"
+          },
+          "short_id": {
+            "title": "Short Id",
+            "type": "string"
+          },
+          "sni": {
+            "title": "Sni",
+            "type": "string"
+          },
+          "uuid": {
+            "title": "Uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "server",
+          "port",
+          "uuid",
+          "flow",
+          "sni",
+          "public_key",
+          "short_id",
+          "fingerprint"
+        ],
+        "title": "PanelProfileView",
+        "type": "object"
+      },
       "PanelServerImport": {
         "additionalProperties": false,
         "description": "One panel server by its `vless://` Reality link (ADR-111). The link is a credential.",
@@ -2424,6 +2485,15 @@
             ],
             "title": "Probe Port"
           },
+          "protocol": {
+            "default": "awg",
+            "enum": [
+              "awg",
+              "vless_reality"
+            ],
+            "title": "Protocol",
+            "type": "string"
+          },
           "region": {
             "title": "Region",
             "type": "string"
@@ -2431,6 +2501,15 @@
           "slots": {
             "title": "Slots",
             "type": "integer"
+          },
+          "source": {
+            "default": "vps",
+            "enum": [
+              "vps",
+              "panel"
+            ],
+            "title": "Source",
+            "type": "string"
           }
         },
         "required": [
@@ -7843,7 +7922,27 @@
     },
     "/api/v1/window-tunnels/nodes": {
       "get": {
+        "description": "VPS nodes; panel servers too when asked with `include=panel` and enabled (ADR-115).",
         "operationId": "nodes_api_v1_window_tunnels_nodes_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "include",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "const": "panel",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Include"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "content": {
@@ -7932,6 +8031,115 @@
           }
         ],
         "summary": "Nodes",
+        "tags": [
+          "window-tunnels"
+        ]
+      }
+    },
+    "/api/v1/window-tunnels/panel-servers/{server_id}/profile": {
+      "get": {
+        "description": "VLESS + Reality profile of one panel server, for a bound Windows device only (ADR-115).",
+        "operationId": "panel_profile_api_v1_window_tunnels_panel_servers__server_id__profile_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "server_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Server Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PanelProfileView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Panel Profile",
         "tags": [
           "window-tunnels"
         ]

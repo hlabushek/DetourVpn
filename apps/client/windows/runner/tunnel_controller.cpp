@@ -374,11 +374,16 @@ void TunnelController::Connect(const std::string& config, int64_t remaining_ms,
     throw state_error();
   }
   deadline_ = deadline;
+  LaunchLocked(exe, engine_config);
+}
+
+void TunnelController::LaunchLocked(const std::filesystem::path& exe, std::string& engine_config) {
   reason_.clear();
   try {
     engine_.Start(exe.wstring(), L"run -c stdin", engine_config, true);
     engine_started_ = true;
   } catch (const std::exception&) {
+    std::fill(engine_config.begin(), engine_config.end(), '\0');
     StopLocked();
     throw NativeError("native_start_failed", kGenericMessage);
   }
@@ -395,8 +400,41 @@ void TunnelController::Connect(const std::string& config, int64_t remaining_ms,
   }
   if (hooks_.now_ms() >= deadline_) {
     StopLocked();
-    throw state_error();
+    throw NativeError("native_service_state_invalid", kGenericMessage);
   }
+}
+
+void TunnelController::ConnectVless(const VlessRealityProfile& profile, int64_t max_ms) {
+  std::lock_guard<std::mutex> lock(mutex_);
+  const int64_t submitted = hooks_.now_ms();
+  if (max_ms <= 0 || max_ms > kMaxVlessMs || engine_started_ || deadline_ != 0)
+    throw NativeError("native_service_state_invalid", kGenericMessage);
+  if (!hooks_.is_admin()) throw NativeError("native_permission_error", kGenericMessage);
+
+  const std::filesystem::path exe = hooks_.engine_dir / L"detour-engine.exe";
+  if (!std::filesystem::is_regular_file(exe) || !std::filesystem::is_regular_file(hooks_.engine_dir / L"wintun.dll"))
+    throw NativeError("native_engine_unavailable", kGenericMessage);
+
+  std::string engine_config;
+  try {
+    Prefs prefs = LoadPrefs();
+    RoutingPolicy policy;
+    policy.mode = prefs.mode;
+    policy.app_paths = prefs.apps;
+    policy.domains = prefs.domains;
+    policy.api_ipv4 = ControlPlaneAddresses();
+    policy.dns_server = prefs.dns;
+    engine_config = CreateVlessEngineConfig(profile, policy);
+  } catch (const NativeError&) {
+    throw;
+  } catch (const std::invalid_argument&) {
+    throw NativeError("native_config_invalid", kGenericMessage);
+  } catch (const std::exception&) {
+    throw NativeError("native_io_error", kGenericMessage);
+  }
+  // No quota window: the panel meters its own client. The deadline only bounds one session.
+  deadline_ = submitted + max_ms;
+  LaunchLocked(exe, engine_config);
 }
 
 void TunnelController::AdvanceWindow(const WindowGrant& grant, int64_t remaining_ms) {

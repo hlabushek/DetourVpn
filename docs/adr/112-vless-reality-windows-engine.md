@@ -1,7 +1,7 @@
 # ADR-112: VLESS + Reality outbound in the Windows engine config
 
 Status: accepted for beta (run 4, 2026-11-11): engine rebuilt with `with_utls`; config generation unit-tested
-locally. Not wired to the UI or the API. Not verified with a live server.
+locally. Delivered to Windows devices by ADR-115 (off by default). Not verified with a live server.
 
 ## Context
 The Windows client runs Amnezia Box (`detour-engine.exe`, sing-box fork, pinned

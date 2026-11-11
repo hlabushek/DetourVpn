@@ -55,7 +55,8 @@ class _RecoveryApi extends Api {
   ]) async {
     calls.add((method, path));
     timeline.add('api:$method $path');
-    if (method == 'GET' && path == '/api/v1/window-tunnels/nodes') {
+    if (method == 'GET' &&
+        path == '/api/v1/window-tunnels/nodes?include=panel') {
       return {
         'checked_at': '2026-10-29T12:00:00Z',
         'nodes': [
@@ -258,7 +259,9 @@ void main() {
 
       await runRecovery(api: api, native: native);
 
-      expect(api.calls, [('GET', '/api/v1/window-tunnels/nodes')]);
+      expect(api.calls, [
+        ('GET', '/api/v1/window-tunnels/nodes?include=panel'),
+      ]);
       expect(native.calls, ['disconnect']);
       expect(native.windowStarts, 0);
       expect(platformCalls, contains('bootstrapFailed'));

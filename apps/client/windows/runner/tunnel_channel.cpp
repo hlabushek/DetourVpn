@@ -2,9 +2,11 @@
 
 #include <flutter/standard_method_codec.h>
 
+#include <algorithm>
 #include <optional>
 #include <set>
 
+#include "config_factory.h"
 #include "system_hooks.h"
 
 namespace detour {
@@ -118,7 +120,7 @@ void TunnelChannel::Handle(const flutter::MethodCall<EncodableValue>& call,
       "permission", "publicKey", "prove", "connect", "connectWindow", "advanceWindow", "disconnect",
       "snapshot", "sessionRead", "sessionWrite", "pendingLoginRead", "pendingLoginWrite", "splitRead",
       "splitModeRead", "splitLastModeRead", "splitWrite", "splitDomainsRead", "apps", "nodeRead",
-      "nodeWrite", "openLogin", "capabilities", "pickApp", "dnsRead", "dnsWrite"};
+      "nodeWrite", "openLogin", "capabilities", "pickApp", "dnsRead", "dnsWrite", "connectVless"};
   const std::string& method = call.method_name();
   if (!controller_ || !kAllowed.count(method)) {
     result->NotImplemented();
@@ -142,6 +144,32 @@ void TunnelChannel::Handle(const flutter::MethodCall<EncodableValue>& call,
       if (!config || !remaining) Bad();
       if (method == "connectWindow") c.Connect(*config, *remaining, GrantFrom(args));
       else c.Connect(*config, *remaining, std::nullopt);
+      result->Success();
+    } else if (method == "connectVless") {
+      // ADR-115: a panel server profile; every field is re-checked by CreateVlessEngineConfig.
+      VlessRealityProfile profile;
+      auto server = GetString(args, "server");
+      auto port = GetInt(args, "port");
+      auto uuid = GetString(args, "uuid");
+      auto flow = GetString(args, "flow");
+      auto sni = GetString(args, "sni");
+      auto public_key = GetString(args, "publicKey");
+      auto short_id = GetString(args, "shortId");
+      auto fingerprint = GetString(args, "fingerprint");
+      auto max_ms = GetInt(args, "maxMs");
+      if (!server || !port || !uuid || !flow || !sni || !public_key || !short_id || !fingerprint ||
+          !max_ms || *port < 1 || *port > 65535)
+        Bad();
+      profile.server = *server;
+      profile.port = static_cast<int>(*port);
+      profile.uuid = *uuid;
+      profile.flow = *flow;
+      profile.sni = *sni;
+      profile.public_key = *public_key;
+      profile.short_id = *short_id;
+      profile.fingerprint = *fingerprint;
+      c.ConnectVless(profile, *max_ms);
+      std::fill(profile.uuid.begin(), profile.uuid.end(), '\0');
       result->Success();
     } else if (method == "advanceWindow") {
       auto remaining = GetInt(args, "remainingMs");

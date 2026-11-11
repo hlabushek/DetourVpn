@@ -108,6 +108,12 @@ abstract interface class WindowNative implements NativeTunnel {
   Future<void> advanceWindow(Map<String, dynamic> grant, int remainingMs);
 }
 
+/// ADR-115: a panel server (VLESS + Reality). Only the Windows runner implements the
+/// channel method; [profile] holds a credential and must never be logged.
+abstract interface class VlessNative {
+  Future<void> connectVless(Map<String, Object> profile, int maxMs);
+}
+
 /// Local non-secret preference needed to select a node after process restart.
 abstract interface class NodePreferenceStore {
   Future<String?> readSelectedNode();
@@ -115,8 +121,15 @@ abstract interface class NodePreferenceStore {
 }
 
 class PlatformTunnel
-    implements WindowNative, NodePreferenceStore, NativeRenewalHost {
+    implements
+        WindowNative,
+        NodePreferenceStore,
+        NativeRenewalHost,
+        VlessNative {
   static const channel = MethodChannel('project.vpn/tunnel.v1');
+  @override
+  Future<void> connectVless(Map<String, Object> profile, int maxMs) =>
+      channel.invokeMethod<void>('connectVless', {...profile, 'maxMs': maxMs});
   Map<String, dynamic> _windowArgs(
     Map<String, dynamic> grant,
     int remainingMs,

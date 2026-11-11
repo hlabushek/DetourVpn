@@ -16,6 +16,7 @@ from vpn_api.db.connection import transaction
 from vpn_api.db.models import PeerConnection, SessionFamily, VPNNode
 from vpn_api.nodes.service import NodeError, NodeRegistry
 from vpn_api.schemas import ErrorResponse
+from vpn_api.tunnels import panel_delivery
 from vpn_api.tunnels.admission import bound_device, profiles
 from vpn_api.tunnels.v3_contracts import Meter, WindowGrant
 from vpn_api.tunnels.window_profiles import WindowNode, load_manifest
@@ -74,6 +75,9 @@ class WindowNodeView(BaseModel):
     # ADR-102: where the client sends its UDP latency probe; absent for nodes without one.
     probe_host: str | None = None
     probe_port: int | None = None
+    # ADR-115: our VPS node (AmneziaWG window) or an imported panel server (VLESS + Reality).
+    source: Literal["vps", "panel"] = "vps"
+    protocol: Literal["awg", "vless_reality"] = "awg"
 
 
 class WindowCatalog(BaseModel):
@@ -124,7 +128,12 @@ def view(session: Session, selected: WindowNode, connection: PeerConnection) -> 
 
 
 @router.get("/nodes", response_model=WindowCatalog)
-def nodes(auth: Service, access: Access) -> WindowCatalog:
+def nodes(
+    auth: Service,
+    access: Access,
+    include: Literal["panel"] | None = Query(None),
+) -> WindowCatalog:
+    """VPS nodes; panel servers too when asked with `include=panel` and enabled (ADR-115)."""
     configured = inventory(auth)
     with transaction(auth.engine) as session:
         auth.authenticate(session, access, "tunnels:manage")
@@ -163,7 +172,33 @@ def nodes(auth: Service, access: Access) -> WindowCatalog:
                     available=available,
                 )
             )
+        # Older clients do not ask for panel rows and would treat them as VPS nodes.
+        if include == "panel" and panel_delivery.enabled(auth.settings):
+            for row in panel_delivery.catalog_rows(session):
+                result.append(
+                    WindowNodeView(
+                        id=row.id,
+                        name=row.label,
+                        region="",
+                        slots=0,
+                        occupied=0,
+                        available=True,
+                        source="panel",
+                        protocol="vless_reality",
+                    )
+                )
         return WindowCatalog(nodes=result, checked_at=database_now(session))
+
+
+@router.get("/panel-servers/{server_id}/profile", response_model=panel_delivery.PanelProfileView)
+def panel_profile(
+    server_id: UUID, request: Request, auth: Service, access: Access
+) -> panel_delivery.PanelProfileView:
+    """VLESS + Reality profile of one panel server, for a bound Windows device only (ADR-115)."""
+    auth.rate("device", network(request))
+    with transaction(auth.engine) as session:
+        principal = auth.authenticate(session, access, "tunnels:manage")
+        return panel_delivery.profile(session, auth.settings, principal, server_id)
 
 
 @router.post("", response_model=ConnectionView, status_code=202)

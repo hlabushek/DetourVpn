@@ -214,9 +214,10 @@ class Api implements TunnelApi {
         path.contains('#') ||
         (path.contains('?') &&
             !(method == 'GET' &&
-                RegExp(
-                  r'^/api/v1/quota/history\?limit=20&snapshot_revision=[0-9]{1,19}(&before_sequence=[0-9]{1,19})?$',
-                ).hasMatch(path)))) {
+                (path == '/api/v1/window-tunnels/nodes?include=panel' ||
+                    RegExp(
+                      r'^/api/v1/quota/history\?limit=20&snapshot_revision=[0-9]{1,19}(&before_sequence=[0-9]{1,19})?$',
+                    ).hasMatch(path))))) {
       throw const ClientError('invalid_request');
     }
     HttpClientRequest? request;

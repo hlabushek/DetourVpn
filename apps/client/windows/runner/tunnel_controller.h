@@ -15,6 +15,7 @@
 #include <thread>
 #include <vector>
 
+#include "config_factory.h"
 #include "engine_process.h"
 #include "secure_vault.h"
 #include "window_deadline.h"
@@ -75,6 +76,10 @@ class TunnelController {
 
   // `grant` set = renewable window (<= 90 s), unset = plain connect (<= 60 s).
   void Connect(const std::string& config, int64_t remaining_ms, const std::optional<WindowGrant>& grant);
+  // ADR-115: a panel server (VLESS + Reality). No window: the session ends at `max_ms`
+  // (at most kMaxVlessMs) or on Disconnect. Same routing, DNS and error codes as Connect.
+  static constexpr int64_t kMaxVlessMs = 12LL * 60 * 60 * 1000;
+  void ConnectVless(const VlessRealityProfile& profile, int64_t max_ms);
   void AdvanceWindow(const WindowGrant& grant, int64_t remaining_ms);
   void Disconnect();
   TunnelSnapshot Snapshot();
@@ -110,6 +115,8 @@ class TunnelController {
                    const std::optional<Record>& value);
   std::vector<std::string> ControlPlaneAddresses();
   void StopLocked();
+  // Starts the engine with `engine_config` (wiped afterwards) and waits for the start probe.
+  void LaunchLocked(const std::filesystem::path& exe, std::string& engine_config);
   void WatchLoop();
   std::string PrivateKey();
 
