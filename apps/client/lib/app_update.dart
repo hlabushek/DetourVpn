@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -92,9 +93,47 @@ UpdateDecision decideUpdate(int installed, UpdateManifest manifest) {
       : UpdateDecision.optional;
 }
 
+/// ADR-107 decision 5: what the API serves. The app trusts only what the native side verified
+/// with the Ed25519 public key compiled into it; this class just carries the three strings.
+class SignedManifest {
+  const SignedManifest(this.payload, this.signature, this.keyId);
+  final String payload;
+  final String signature;
+  final String keyId;
+
+  static SignedManifest? parse(Map<String, dynamic> value) {
+    final payload = value['payload'];
+    final signature = value['signature'];
+    final keyId = value['key_id'];
+    if (value.length != 3 ||
+        payload is! String ||
+        signature is! String ||
+        keyId is! String ||
+        payload.isEmpty ||
+        payload.length > 16 * 1024 ||
+        signature.length != 88 ||
+        !RegExp(r'^[0-9a-f]{16}$').hasMatch(keyId)) {
+      return null;
+    }
+    return SignedManifest(payload, signature, keyId);
+  }
+
+  Map<String, Object> get channelArgs => {
+    'payload': payload,
+    'signature': signature,
+    'keyId': keyId,
+  };
+}
+
 abstract interface class UpdateNative {
   Future<int?> installedVersionCode();
-  Future<String> install(UpdateManifest manifest);
+
+  /// The verified manifest JSON text, or `null` when the signature does not verify (also on
+  /// Android below 13, which has no platform Ed25519, and while no key is configured).
+  Future<String?> verifyManifest(SignedManifest signed);
+
+  /// The native side re-verifies [signed] and takes every install value from it.
+  Future<String> install(SignedManifest signed);
 }
 
 class PlatformUpdateNative implements UpdateNative {
@@ -112,15 +151,25 @@ class PlatformUpdateNative implements UpdateNative {
   }
 
   @override
-  Future<String> install(UpdateManifest manifest) async {
+  Future<String?> verifyManifest(SignedManifest signed) async {
     try {
-      final value = await _channel.invokeMethod<Object>('appUpdateInstall', {
-        'url': manifest.apkUrl,
-        'sha256': manifest.apkSha256,
-        'sizeBytes': manifest.apkSizeBytes,
-        'versionCode': manifest.versionCode,
-        'minSupportedVersionCode': manifest.minSupportedVersionCode,
-      });
+      final value = await _channel.invokeMethod<Object>(
+        'appUpdateVerify',
+        signed.channelArgs,
+      );
+      return value is String ? value : null;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  @override
+  Future<String> install(SignedManifest signed) async {
+    try {
+      final value = await _channel.invokeMethod<Object>(
+        'appUpdateInstall',
+        signed.channelArgs,
+      );
       return value is String ? value : 'download_failed';
     } catch (_) {
       return 'download_failed';
@@ -129,9 +178,10 @@ class PlatformUpdateNative implements UpdateNative {
 }
 
 class UpdateOffer {
-  const UpdateOffer(this.manifest, this.decision);
+  const UpdateOffer(this.manifest, this.decision, this.signed);
   final UpdateManifest manifest;
   final UpdateDecision decision;
+  final SignedManifest signed;
 }
 
 /// One check per launch. Any failure (no manifest, network, invalid data) means no dialog.
@@ -139,14 +189,20 @@ Future<UpdateOffer?> checkForUpdate(TunnelApi api, UpdateNative native) async {
   try {
     final installed = await native.installedVersionCode();
     if (installed == null || installed < 1) return null;
-    final manifest = UpdateManifest.parse(
-      await api.call('GET', '/api/v1/app/update-manifest'),
+    final signed = SignedManifest.parse(
+      await api.call('GET', '/api/v1/app/signed-update-manifest'),
     );
+    if (signed == null) return null;
+    final verified = await native.verifyManifest(signed);
+    if (verified == null) return null;
+    final decoded = jsonDecode(verified);
+    if (decoded is! Map<String, dynamic>) return null;
+    final manifest = UpdateManifest.parse(decoded);
     if (manifest == null) return null;
     final decision = decideUpdate(installed, manifest);
     return decision == UpdateDecision.none
         ? null
-        : UpdateOffer(manifest, decision);
+        : UpdateOffer(manifest, decision, signed);
   } catch (_) {
     return null;
   }
@@ -159,6 +215,8 @@ String updateOutcomeText(String outcome) => switch (outcome) {
   'hash_mismatch' || 'size_mismatch' || 'package_mismatch' =>
     'Загруженный файл не прошёл проверку и удалён. Попробуйте позже.',
   'not_newer' => 'У вас уже установлена актуальная версия.',
+  'manifest_unverified' =>
+    'Не удалось проверить подпись обновления. Обновление не установлено.',
   'busy' => 'Загрузка уже идёт.',
   _ =>
     'Не удалось загрузить обновление. Проверьте интернет и попробуйте ещё раз.',
@@ -198,7 +256,7 @@ class _UpdateDialogState extends State<_UpdateDialog> {
       busy = true;
       status = 'Загрузка и проверка обновления…';
     });
-    final outcome = await widget.native.install(widget.offer.manifest);
+    final outcome = await widget.native.install(widget.offer.signed);
     if (!mounted) return;
     setState(() {
       busy = false;

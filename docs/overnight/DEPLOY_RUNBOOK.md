@@ -47,8 +47,17 @@ Use the existing script; do not change signing settings.
 Record the output path and `Get-FileHash -Algorithm SHA256 <apk-or-zip>` for your records.
 
 ## 4. Optional: in-app update manifest [LOCAL, then SERVER]
-Only when you have a signed/uploaded APK you want to offer. The overnight build does **not** include
-the download/installer code, so the app cannot install from the manifest yet. Prepare the manifest only:
+Only when you have a signed/uploaded APK you want to offer. Run 4 update: the manifest must be
+**Ed25519-signed** (ADR-107 decision 5). An unsigned file is not served.
+
+One time only, create your signing key in a secure folder **outside** this repository (it asks for
+a passphrase twice). Paste the printed `public_key_b64` into `UPDATE_SIGNING_PUBLIC_KEY`
+(`services/api/src/vpn_api/app_update.py`) and `PUBLIC_KEY_B64` (`UpdateSignature.java`), then
+rebuild the app and deploy the API. Back the key up offline; losing it ends in-app updates.
+```bash
+.venv/Scripts/python.exe scripts/app_update_keygen.py --private-key-out <SECURE_FOLDER>/detourvpn-update-signing.pem
+```
+For each release (asks for the passphrase):
 ```bash
 .venv/Scripts/python.exe scripts/prepare_app_update.py \
   --apk <PATH_TO_RELEASE_APK> \
@@ -56,8 +65,10 @@ the download/installer code, so the app cannot install from the manifest yet. Pr
   --min-supported-version-code <MIN_CODE> \
   --apk-url https://<PUBLIC_HOST>/downloads/<APK_FILE_NAME> \
   --notes-file <PATH_TO_RUSSIAN_NOTES.txt> \
-  --out <OUTPUT_DIR>
+  --out <OUTPUT_DIR> \
+  --signing-key <SECURE_FOLDER>/detourvpn-update-signing.pem
 ```
+Only Android 13 and newer verify the signature; older phones get no in-app update (Telegram APK).
 Upload steps **[SERVER]** (run yourself; host paths are placeholders):
 ```bash
 scp <OUTPUT_DIR>/app-update.json root@<SERVER_HOST>:/opt/detourvpn/updates/app-update.json

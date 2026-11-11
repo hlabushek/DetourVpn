@@ -24,10 +24,37 @@ check our server and offer the latest build. Existing code: no version or update
 4. **Integrity before install:** the APK is downloaded over HTTPS only, its SHA-256 is compared
    with `apk_sha256` (exact lowercase match), and only then handed to the system installer.
    Redirects to non-HTTPS are refused by the planned client.
-5. **Manifest signing: NOT done.** The SHA in the manifest comes from the same server over HTTPS.
-   That protects against corruption and CDN/transport tampering but not against a compromised
-   API host. Before a public release, sign the manifest (Ed25519; public key compiled into the
-   app; private key kept offline by the owner, never in the repo). This is an open item.
+5. **Manifest signing: done in code (run 4, 2026-11-11); waiting for the owner's key.**
+   - File format: `app-update.json` is an envelope `{payload, signature, key_id}`. `payload` is
+     the exact manifest JSON bytes in standard base64. `signature` is Ed25519 over those bytes.
+     `key_id` is the first 16 hex characters of SHA-256 of the raw public key. Signing exact bytes
+     avoids any canonical-JSON rule shared between Python, Dart and Java.
+   - Public key: `UPDATE_SIGNING_PUBLIC_KEY` (API, `app_update.py`) and
+     `UpdateSignature.PUBLIC_KEY_B64` (Android). A test fails if they differ. **Both are empty
+     today**, so nothing is served and the app offers no update until the owner runs
+     `scripts/app_update_keygen.py --private-key-out <secure path outside the repo>`, pastes the
+     printed public key into both constants and rebuilds. The private key is passphrase-encrypted
+     PKCS#8 PEM. It is never in the repo, and no file written by these sessions holds it.
+   - Release: `scripts/prepare_app_update.py --signing-key <path>` reads the key from the
+     owner's location (passphrase asked in the terminal), refuses a key inside the repository,
+     and refuses to write when the signature does not verify with the app's public key.
+   - API: the file is served only if its signature verifies with the configured key (default:
+     the repo key). The new `GET /api/v1/app/signed-update-manifest` returns the envelope, and the
+     old `GET /api/v1/app/update-manifest` returns the verified manifest. An unsigned (old-format)
+     file is unavailable.
+   - App: Dart fetches the envelope and asks the native side to verify it (`appUpdateVerify`).
+     Only the verified payload is parsed. At install, Java verifies again and takes URL, SHA-256,
+     size and versions from the verified payload only (`appUpdateInstall`); Dart values are not
+     used. A refusal shows «Не удалось проверить подпись обновления. Обновление не установлено.»
+   - Limit: Android provides Ed25519 in `java.security` from API 33 (Android 13). On Android 7–12
+     the app cannot verify, so it offers **no** in-app update (fail closed). Those users update
+     from the Telegram APK as before. No crypto library was added and no primitive was
+     hand-written (AGENTS.md).
+   - Tests: Python `test_app_update.py` (valid, signed-but-invalid, unsigned, tampered payload,
+     flipped signature, wrong key, relabelled key id, no key, endpoints, Java/API key equality,
+     release script incl. refusals, keygen refusals): 25 passed with `test_health.py`. Java
+     `UpdateSignatureTest` (valid, tampered, wrong key, malformed) 5 passed on JDK 21. Dart
+     `app_update_test.dart` 13 passed. Not run on a phone.
 6. **Release tooling:** `scripts/prepare_app_update.py` computes the SHA-256 and size, validates
    the result with the same model the API uses, and writes `app-update.json`. It uploads nothing.
 

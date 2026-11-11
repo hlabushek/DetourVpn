@@ -13,7 +13,7 @@ from starlette.exceptions import HTTPException
 from vpn_api.account import router as account_router
 from vpn_api.admin import AdminService
 from vpn_api.admin import router as admin_router
-from vpn_api.app_update import AppUpdateManifest, load_manifest
+from vpn_api.app_update import AppUpdateManifest, SignedAppUpdateManifest, load_signed
 from vpn_api.auth.mini_app import router as mini_app_router
 from vpn_api.auth.routes import router
 from vpn_api.auth.security import AuthError
@@ -238,9 +238,23 @@ def create_app(
         summary="Latest Android release manifest for the in-app updater (ADR-107)",
     )
     def update_manifest(request: Request) -> AppUpdateManifest | JSONResponse:
-        manifest = load_manifest(config.app_update_manifest_file)
-        if manifest is None:
+        # Served only when the file's signature verifies (ADR-107); kept for tooling.
+        signed = load_signed(config.app_update_manifest_file, config.app_update_public_key)
+        if signed is None:
             return error_response(request, 404, "update_unavailable")
-        return manifest
+        return signed[1]
+
+    @app.get(
+        "/api/v1/app/signed-update-manifest",
+        response_model=SignedAppUpdateManifest,
+        tags=["app"],
+        responses={404: {"model": ErrorResponse, "description": "No valid signed manifest"}},
+        summary="Ed25519-signed latest Android release manifest; the app verifies it (ADR-107)",
+    )
+    def signed_update_manifest(request: Request) -> SignedAppUpdateManifest | JSONResponse:
+        signed = load_signed(config.app_update_manifest_file, config.app_update_public_key)
+        if signed is None:
+            return error_response(request, 404, "update_unavailable")
+        return signed[0]
 
     return app

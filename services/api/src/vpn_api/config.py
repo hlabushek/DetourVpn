@@ -4,6 +4,7 @@ from typing import Literal
 from pydantic import Field, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from vpn_api.app_update import UPDATE_SIGNING_PUBLIC_KEY
 from vpn_api.db.url import parse_local_database_url
 
 
@@ -40,6 +41,9 @@ class Settings(BaseSettings):
     tunnel_profile_file: Path | None = Field(default=None, repr=False)
     # Latest-release manifest for the in-app updater (ADR-107). Unset = no update offered.
     app_update_manifest_file: Path | None = Field(default=None, repr=False)
+    # Ed25519 public key that must have signed it (ADR-107). Defaults to the key in the repo,
+    # which is also compiled into the app; overriding it here cannot make the app accept it.
+    app_update_public_key: str = Field(default=UPDATE_SIGNING_PUBLIC_KEY, max_length=44)
     enable_window_tunnels: bool = False
     window_manifest_file: Path | None = Field(default=None, repr=False)
     # ADR-115: list imported panel servers to devices and give Windows devices their VLESS

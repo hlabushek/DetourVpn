@@ -1836,6 +1836,36 @@
         "title": "RulesResponse",
         "type": "object"
       },
+      "SignedAppUpdateManifest": {
+        "additionalProperties": false,
+        "description": "What the app receives: it verifies `signature` over the decoded `payload` bytes itself.",
+        "properties": {
+          "key_id": {
+            "pattern": "^[0-9a-f]{16}$",
+            "title": "Key Id",
+            "type": "string"
+          },
+          "payload": {
+            "maxLength": 16384,
+            "minLength": 4,
+            "title": "Payload",
+            "type": "string"
+          },
+          "signature": {
+            "maxLength": 88,
+            "minLength": 86,
+            "title": "Signature",
+            "type": "string"
+          }
+        },
+        "required": [
+          "payload",
+          "signature",
+          "key_id"
+        ],
+        "title": "SignedAppUpdateManifest",
+        "type": "object"
+      },
       "StartResponse": {
         "properties": {
           "bot_url": {
@@ -3861,6 +3891,37 @@
         "summary": "User Window Status",
         "tags": [
           "administration"
+        ]
+      }
+    },
+    "/api/v1/app/signed-update-manifest": {
+      "get": {
+        "operationId": "signed_update_manifest_api_v1_app_signed_update_manifest_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SignedAppUpdateManifest"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "No valid signed manifest"
+          }
+        },
+        "summary": "Ed25519-signed latest Android release manifest; the app verifies it (ADR-107)",
+        "tags": [
+          "app"
         ]
       }
     },

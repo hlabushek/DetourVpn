@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:vpn_client/api.dart';
@@ -20,6 +22,19 @@ Map<String, dynamic> manifest({
   'release_notes_ru': 'Исправления',
 };
 
+const keyId = '0123456789abcdef';
+
+/// MOCK envelope: the payload is real base64 of [value]; the signature is NOT a real signature,
+/// because the fake native side below decides "verified" itself (Java tests cover Ed25519).
+Map<String, dynamic> envelope(Map<String, dynamic> value) => {
+  'payload': base64.encode(utf8.encode(jsonEncode(value))),
+  'signature': '${'A' * 86}==',
+  'key_id': keyId,
+};
+
+SignedManifest signedOf(Map<String, dynamic> value) =>
+    SignedManifest.parse(envelope(value))!;
+
 /// MOCK: fixed manifest response; no network.
 class FakeApi implements TunnelApi {
   FakeApi(this.value, {this.error});
@@ -40,14 +55,26 @@ class FakeApi implements TunnelApi {
 
 /// MOCK: installed version and install outcome; nothing is downloaded.
 class FakeUpdateNative implements UpdateNative {
-  FakeUpdateNative(this.installed, {this.outcome = 'installer_opened'});
+  FakeUpdateNative(
+    this.installed, {
+    this.outcome = 'installer_opened',
+    this.verifies = true,
+  });
   final int? installed;
   final String outcome;
+  final bool verifies;
   int installs = 0;
+  final verified = <SignedManifest>[];
   @override
   Future<int?> installedVersionCode() async => installed;
   @override
-  Future<String> install(UpdateManifest manifest) async {
+  Future<String?> verifyManifest(SignedManifest signed) async {
+    verified.add(signed);
+    return verifies ? utf8.decode(base64.decode(signed.payload)) : null;
+  }
+
+  @override
+  Future<String> install(SignedManifest signed) async {
     installs++;
     return outcome;
   }
@@ -91,33 +118,65 @@ void main() {
   });
 
   group('checkForUpdate', () {
-    test('asks the public manifest endpoint', () async {
-      final api = FakeApi(manifest());
-      final offer = await checkForUpdate(api, FakeUpdateNative(27));
-      expect(api.paths, ['GET /api/v1/app/update-manifest']);
-      expect(offer!.decision, UpdateDecision.blocking);
+    test(
+      'asks the signed endpoint and uses only the verified payload',
+      () async {
+        final api = FakeApi(envelope(manifest()));
+        final native = FakeUpdateNative(27);
+        final offer = await checkForUpdate(api, native);
+        expect(api.paths, ['GET /api/v1/app/signed-update-manifest']);
+        expect(native.verified.single.keyId, keyId);
+        expect(offer!.decision, UpdateDecision.blocking);
+        expect(offer.signed.payload, envelope(manifest())['payload']);
+      },
+    );
+    test('a signature the native side rejects gives nothing', () async {
+      final native = FakeUpdateNative(27, verifies: false);
+      expect(
+        await checkForUpdate(FakeApi(envelope(manifest())), native),
+        isNull,
+      );
+      expect(native.verified, hasLength(1));
+    });
+    test('an unsigned or malformed envelope is never even verified', () async {
+      for (final bad in <Map<String, dynamic>>[
+        manifest(),
+        {...envelope(manifest()), 'extra': 1},
+        {...envelope(manifest()), 'key_id': 'ABC'},
+        {...envelope(manifest()), 'signature': 'short'},
+      ]) {
+        final native = FakeUpdateNative(27);
+        expect(await checkForUpdate(FakeApi(bad), native), isNull);
+        expect(native.verified, isEmpty);
+      }
     });
     test(
       'unavailable manifest, unknown version or downgrade gives nothing',
       () async {
         expect(
           await checkForUpdate(
-            FakeApi(manifest(), error: 'update_unavailable'),
+            FakeApi(envelope(manifest()), error: 'update_unavailable'),
             FakeUpdateNative(27),
           ),
           isNull,
         );
         expect(
-          await checkForUpdate(FakeApi(manifest()), FakeUpdateNative(null)),
-          isNull,
-        );
-        expect(
-          await checkForUpdate(FakeApi(manifest()), FakeUpdateNative(40)),
+          await checkForUpdate(
+            FakeApi(envelope(manifest())),
+            FakeUpdateNative(null),
+          ),
           isNull,
         );
         expect(
           await checkForUpdate(
-            FakeApi(manifest(sha: 'x')),
+            FakeApi(envelope(manifest())),
+            FakeUpdateNative(40),
+          ),
+          isNull,
+        );
+        expect(
+          await checkForUpdate(
+            FakeApi(envelope(manifest(sha: 'x'))),
             FakeUpdateNative(1),
           ),
           isNull,
@@ -152,6 +211,7 @@ void main() {
     final offer = UpdateOffer(
       UpdateManifest.parse(manifest())!,
       UpdateDecision.blocking,
+      signedOf(manifest()),
     );
     await open(tester, offer, native);
     expect(find.text('Нужно обновить приложение'), findsOneWidget);
@@ -172,6 +232,7 @@ void main() {
     final offer = UpdateOffer(
       UpdateManifest.parse(manifest())!,
       UpdateDecision.optional,
+      signedOf(manifest()),
     );
     await open(tester, offer, FakeUpdateNative(29));
     expect(find.text('Доступно обновление'), findsOneWidget);
@@ -180,11 +241,32 @@ void main() {
     expect(find.text('Доступно обновление'), findsNothing);
   });
 
+  testWidgets('a signature refused at install is reported in Russian', (
+    tester,
+  ) async {
+    final native = FakeUpdateNative(27, outcome: 'manifest_unverified');
+    final offer = UpdateOffer(
+      UpdateManifest.parse(manifest())!,
+      UpdateDecision.blocking,
+      signedOf(manifest()),
+    );
+    await open(tester, offer, native);
+    await tester.tap(find.text('Обновить'));
+    await tester.pumpAndSettle();
+    expect(
+      find.text(
+        'Не удалось проверить подпись обновления. Обновление не установлено.',
+      ),
+      findsOneWidget,
+    );
+  });
+
   testWidgets('verification failure is reported in Russian', (tester) async {
     final native = FakeUpdateNative(27, outcome: 'hash_mismatch');
     final offer = UpdateOffer(
       UpdateManifest.parse(manifest())!,
       UpdateDecision.blocking,
+      signedOf(manifest()),
     );
     await open(tester, offer, native);
     await tester.tap(find.text('Обновить'));

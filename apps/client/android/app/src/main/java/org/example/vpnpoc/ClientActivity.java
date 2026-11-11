@@ -167,6 +167,11 @@ public final class ClientActivity extends FlutterActivity {
             }
             return;
         }
+        if (call.method.equals("appUpdateVerify")) {
+            // ADR-107: the manifest counts only if its Ed25519 signature verifies here.
+            result.success(verifiedUpdatePayload(call));
+            return;
+        }
         if (call.method.equals("appUpdateInstall")) {
             handleUpdateInstall(call, result);
             return;
@@ -412,13 +417,30 @@ public final class ClientActivity extends FlutterActivity {
      * ADR-107: downloads, verifies and opens the system installer. Answers a stable outcome code;
      * "install_permission_required" opens Android's "install unknown apps" screen first.
      */
+    /** Verified manifest JSON text, or null (no key, old Android, bad or missing signature). */
+    private static String verifiedUpdatePayload(MethodCall call) {
+        if (android.os.Build.VERSION.SDK_INT < UpdateSignature.MIN_API) return null;
+        return UpdateSignature.verify(UpdateSignature.PUBLIC_KEY_B64, call.argument("payload"),
+                call.argument("signature"), call.argument("keyId"));
+    }
+
     private void handleUpdateInstall(MethodCall call, MethodChannel.Result result) {
-        String url = call.argument("url");
-        String sha256 = call.argument("sha256");
-        Number size = call.argument("sizeBytes");
-        Number version = call.argument("versionCode");
-        Number minimum = call.argument("minSupportedVersionCode");
-        if (url == null || sha256 == null || size == null || version == null || minimum == null) {
+        // Every install value comes from the signed payload, re-verified here; Dart only relays it.
+        String payload = verifiedUpdatePayload(call);
+        if (payload == null) { result.success("manifest_unverified"); return; }
+        final String url;
+        final String sha256;
+        final long size;
+        final long version;
+        final long minimum;
+        try {
+            org.json.JSONObject manifest = new org.json.JSONObject(payload);
+            url = manifest.getString("apk_url");
+            sha256 = manifest.getString("apk_sha256");
+            size = manifest.getLong("apk_size_bytes");
+            version = manifest.getLong("version_code");
+            minimum = manifest.getLong("min_supported_version_code");
+        } catch (org.json.JSONException invalid) {
             result.success("invalid_manifest"); return;
         }
         if (!AppUpdateInstaller.canInstall(this)) {
@@ -426,8 +448,8 @@ public final class ClientActivity extends FlutterActivity {
             catch (RuntimeException unavailable) { /* The dialog explains the setting. */ }
             result.success("install_permission_required"); return;
         }
-        AppUpdateInstaller.download(this, url, sha256, size.longValue(), version.longValue(),
-                minimum.longValue(), outcome -> runOnUiThread(() -> {
+        AppUpdateInstaller.download(this, url, sha256, size, version,
+                minimum, outcome -> runOnUiThread(() -> {
                     if (!"verified".equals(outcome)) { result.success(outcome); return; }
                     try {
                         startActivity(AppUpdateInstaller.installIntent(this));
