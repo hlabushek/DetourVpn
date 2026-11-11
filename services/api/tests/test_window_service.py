@@ -44,10 +44,12 @@ from vpn_api.nodes.service import NodeError, NodeRegistry
 from vpn_api.quota.contracts import QuotaError
 from vpn_api.quota.service import LedgerService
 from vpn_api.subscriptions import EntitlementService
+from vpn_api.tunnels import window_service
 from vpn_api.tunnels.admission import key_challenge
 from vpn_api.tunnels.v3_contracts import (
     CAPABILITIES,
     POOL_CAPABILITIES,
+    RENEWAL_MARGIN_SECONDS,
     ClosedWindow,
     WindowGrant,
 )
@@ -227,6 +229,40 @@ def test_admission_replay_renew_and_exact_settlement(harness: Harness) -> None:
         assert ledger._state(session, user.user_id).used_bytes == 357
         assert ledger._state(session, user.user_id).reserved_bytes == 0
         assert ledger.reconcile(session, user.user_id).consistent
+
+
+@pytest.mark.parametrize(
+    ("left", "authorized"),
+    [(RENEWAL_MARGIN_SECONDS + 1, True), (RENEWAL_MARGIN_SECONDS, False)],
+)
+def test_renewal_margin_boundary_is_explicit(
+    harness: Harness, monkeypatch: pytest.MonkeyPatch, left: int, authorized: bool
+) -> None:
+    """ADR-120: a window stays renewable until the shared margin before it ends, never after."""
+    h = harness
+    node, selected = inventory(h)
+    runtime = boot(h, node, selected)
+    user = request(h, selected)
+    connection_id, first = create(h, selected, user)
+    poll(h, node, selected, runtime)
+    poll(h, node, selected, runtime, active=[first.window_id])
+    late = first.not_after - timedelta(seconds=left)
+    monkeypatch.setattr(window_service, "database_now", lambda _session: late)
+    with transaction(h.engine) as session:
+        connection = session.get(PeerConnection, connection_id)
+        assert connection is not None
+        assert window_service.grant_authorized(session, connection, first) is authorized
+    if authorized:
+        return
+    # Inside the margin the renewal itself is refused, so no unfunded window can follow.
+    renewal = RenewalInput(
+        previous_window_id=first.window_id, idempotency_key=uuid4(), budget_bytes=BUDGET
+    )
+    with transaction(h.engine) as session, pytest.raises(AuthError) as refused:
+        renew_connection(
+            session, h.auth, user.tokens.access_token, selected, connection_id, renewal
+        )
+    assert refused.value.code == "window_not_renewable"
 
 
 def test_long_window_is_opt_in_and_bounded(harness: Harness) -> None:

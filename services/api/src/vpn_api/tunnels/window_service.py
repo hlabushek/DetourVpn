@@ -35,6 +35,7 @@ from vpn_api.tunnels.v3_contracts import (
     DEFAULT_WINDOW_SECONDS,
     MAX_WINDOW_SECONDS,
     MIN_WINDOW_SECONDS,
+    RENEWAL_MARGIN_SECONDS,
     FrozenInput,
     WindowCommand,
     WindowGrant,
@@ -380,7 +381,8 @@ def grant_authorized(session: Session, connection: PeerConnection, grant: Window
         or user.status != "active"
         or device is None
         or device.revoked_at is not None
-        or grant.not_after <= database_now(session) + timedelta(seconds=5)
+        # ADR-120: the same margin the node contract uses; no grace after the window ends.
+        or grant.not_after <= database_now(session) + timedelta(seconds=RENEWAL_MARGIN_SECONDS)
     ):
         return False
     now = database_now(session)
