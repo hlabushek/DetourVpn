@@ -21,6 +21,8 @@ class WindowConnectionController extends ConnectionController {
     this.handshakeHintAfter = const Duration(seconds: 25),
     this.autoReconnectDelay = const Duration(seconds: 2),
     this.windowSeconds = defaultWindowSeconds,
+    this.revokeWaitInterval = const Duration(seconds: 1),
+    this.revokeWaitChecks = 10,
     Uri? renewalOrigin,
     bool? panelVless,
   }) : _renewalOrigin = renewalOrigin,
@@ -32,6 +34,20 @@ class WindowConnectionController extends ConnectionController {
   @visibleForTesting
   bool get panelConnected => _panelUp;
   final Duration? autoReconnectDelay;
+
+  /// ADR-119: before a new connection, how often and how many times to check that the previous
+  /// one finished closing (the node confirms a revoke within a few seconds).
+  final Duration revokeWaitInterval;
+  final int revokeWaitChecks;
+
+  /// ADR-119: a refresh failure qualified for automatic reconnect while the old connection was
+  /// still closing; reconnect once that cleanup finishes.
+  bool _reconnectAfterCleanup = false;
+
+  /// ADR-119: connect-time activation refusals retried in a row (bounded; quota is reserved).
+  static const maxActivationRetries = 3;
+  int _activationRetries = 0;
+  bool _switching = false;
   final List<int> _autoReconnectAt = [];
   static const root = '/api/v1/window-tunnels';
   static const budgetBytes = int.fromEnvironment(
@@ -221,16 +237,56 @@ class WindowConnectionController extends ConnectionController {
     _deviceId = _uuid(device['id']);
   }
 
-  Future<void> _reconcile() async {
-    if (_synced) return;
-    diagnosticStage = 'native_disconnect';
-    await native.disconnect();
+  /// After a UI restart: adopt the natively renewed tunnel still running in this process
+  /// (ADR-117). Otherwise stop native and revoke this device's old connections before admission.
+  /// Returns true if a running tunnel was adopted.
+  Future<bool> _reconcile() async {
+    if (_synced) return false;
+    NativeSnapshot? live;
+    try {
+      live = await native.snapshot();
+    } catch (_) {
+      live = null;
+    }
+    final adoptable =
+        live != null &&
+        live.up &&
+        live.nativeRenewal &&
+        live.remainingMs > 0 &&
+        live.connectionId != null &&
+        live.windowGeneration != null;
+    if (!adoptable) {
+      diagnosticStage = 'native_disconnect';
+      await native.disconnect();
+    }
     diagnosticStage = 'connection_reconcile';
     final result = await api.call('GET', root);
     final rows = result['items'];
     if (rows is! List) throw const ClientError('invalid_response');
     for (final row in rows) {
       if (row is! Map) throw const ClientError('invalid_response');
+    }
+    if (adoptable) {
+      final match = rows
+          .where((row) => row['id'] == live!.connectionId)
+          .firstOrNull;
+      if (match is Map<String, dynamic> && _adopt(match, live)) {
+        for (final row in rows) {
+          if (identical(row, match) || row['state'] == 'closed') continue;
+          try {
+            await api.call('DELETE', '$root/${_uuid(row['id'])}');
+          } catch (_) {
+            /* Best effort; the server refuses a second live connection anyway. */
+          }
+        }
+        _synced = true;
+        return true;
+      }
+      diagnosticStage = 'native_disconnect';
+      await native.disconnect();
+      diagnosticStage = 'connection_reconcile';
+    }
+    for (final row in rows) {
       if (row['state'] != 'closed') {
         _id = _uuid(row['id']);
         remotePending = true;
@@ -239,6 +295,89 @@ class WindowConnectionController extends ConnectionController {
       }
     }
     _synced = true;
+    return false;
+  }
+
+  /// ADR-117: take over a running tunnel only if the server's view of this device's connection
+  /// matches what native holds; the same checks as [_validate] for a first grant.
+  bool _adopt(Map<String, dynamic> value, NativeSnapshot live) {
+    final raw = value['window'];
+    if (value['state'] != 'active' ||
+        raw is! Map<String, dynamic> ||
+        value['id'] != live.connectionId ||
+        value['device_id'] != _deviceId ||
+        _key == null ||
+        !_meters.contains(value['meter']) ||
+        value['client_config'] is! String ||
+        (value['client_config'] as String).length > 16384)
+      return false;
+    try {
+      _uuid(value['id']);
+      _uuid(value['node_id']);
+      for (final field in [
+        'connection_id',
+        'window_id',
+        'node_id',
+        'runtime_id',
+      ]) {
+        _uuid(raw[field]);
+      }
+    } on ClientError {
+      return false;
+    }
+    final generation = raw['generation'];
+    final budget = raw['budget_bytes'];
+    final slot = raw['slot_id'];
+    if (raw['contract_version'] != 3 ||
+        raw['connection_id'] != value['id'] ||
+        raw['public_key'] != _key ||
+        raw['node_id'] != value['node_id'] ||
+        slot != value['slot_id'] ||
+        generation is! int ||
+        generation < live.windowGeneration! ||
+        budget is! int ||
+        budget < 65536 ||
+        budget > 67108864 ||
+        slot is! int ||
+        slot < 1 ||
+        slot > maxSlotId)
+      return false;
+    final now = _clock.elapsedMilliseconds;
+    _id = value['id'] as String;
+    _grant = raw;
+    _config = value['client_config'] as String;
+    selectedNode = value['node_id'] as String;
+    _deadline = now + live.remainingMs;
+    _intentAt = now;
+    _renewIntent = null;
+    _trafficBaseline = null;
+    _lastTraffic = null;
+    _renewTrafficAnchor = null;
+    _inboundTraffic.reset();
+    _hasEstablishedHandshake = false;
+    _nativeHandshakeSeen = live.handshakeSeen;
+    _connectedAtMs = now;
+    remotePending = false;
+    error = null;
+    diagnosticStage = null;
+    phase = ConnectionPhase.reconnecting;
+    detail = 'VPN продолжает работать, проверяется связь';
+    return true;
+  }
+
+  /// ADR-119: settle the previous connection and wait (bounded) until the server closed it.
+  /// Returns false if the attempt was cancelled meanwhile.
+  Future<bool> _closeOldLease(int version) async {
+    diagnosticStage = 'old_lease_cleanup';
+    await _cleanup();
+    for (var i = 0; hasLease && i < revokeWaitChecks; i++) {
+      if (_cancelled(version)) return false;
+      await Future<void>.delayed(revokeWaitInterval);
+      if (_cancelled(version)) return false;
+      await _cleanup();
+    }
+    if (hasLease) throw const ClientError('revoke_unconfirmed');
+    return !_cancelled(version);
   }
 
   @override
@@ -246,6 +385,8 @@ class WindowConnectionController extends ConnectionController {
     if (busy || _polling || _dead) return;
     _working = true;
     final version = ++_version;
+    _reconnectAfterCleanup = false;
+    if (!_autoReconnecting) _activationRetries = 0;
     error = null;
     diagnosticStage = null;
     phase = ConnectionPhase.connecting;
@@ -274,13 +415,13 @@ class WindowConnectionController extends ConnectionController {
       // public key before asking the API to enumerate connections for it.
       await _ensureDevice();
       if (_cancelled(version)) return;
-      await _reconcile();
-      if (_cancelled(version)) return;
-      if (hasLease) {
-        diagnosticStage = 'old_lease_cleanup';
-        await _cleanup();
-        if (hasLease) throw const ClientError('revoke_unconfirmed');
+      if (await _reconcile()) {
+        // ADR-117: the VPN was still running; keep it, the next refresh confirms it.
+        startPolling();
+        return;
       }
+      if (_cancelled(version)) return;
+      if (hasLease && !await _closeOldLease(version)) return;
       diagnosticStage = 'android_vpn_permission';
       if (!await native.permission())
         throw const ClientError('permission_denied');
@@ -341,6 +482,7 @@ class WindowConnectionController extends ConnectionController {
       _hasEstablishedHandshake = false;
       _nativeHandshakeSeen = false;
       _connectedAtMs = _clock.elapsedMilliseconds;
+      _activationRetries = 0;
       diagnosticStage = null;
       diagnosticHandshake = null;
       detail = 'Ожидается handshake';
@@ -356,8 +498,14 @@ class WindowConnectionController extends ConnectionController {
             : 'native_unavailable';
         phase = ConnectionPhase.failed;
         await _cleanup();
+        // ADR-119: the server did not activate a new connection (revoked or not acknowledged
+        // in time). Retried a few times in a row, also after a manual connect.
+        final activation = error == 'window_activation_refused';
+        if (activation) _activationRetries++;
         // ADR-099: an automatic reconnect that hit a temporary failure keeps trying.
-        if (_autoReconnecting && _retryCodes.contains(error))
+        if (activation
+            ? _activationRetries <= maxActivationRetries
+            : _autoReconnecting && _retryCodes.contains(error))
           _scheduleAutoReconnect(version);
       }
     }
@@ -373,11 +521,7 @@ class WindowConnectionController extends ConnectionController {
     if (_cancelled(version)) return;
     await _reconcile();
     if (_cancelled(version)) return;
-    if (hasLease) {
-      diagnosticStage = 'old_lease_cleanup';
-      await _cleanup();
-      if (hasLease) throw const ClientError('revoke_unconfirmed');
-    }
+    if (hasLease && !await _closeOldLease(version)) return;
     diagnosticStage = 'android_vpn_permission';
     if (!await native.permission())
       throw const ClientError('permission_denied');
@@ -437,7 +581,10 @@ class WindowConnectionController extends ConnectionController {
         !_meters.contains(value['meter']) ||
         value['client_config'] is! String ||
         (value['client_config'] as String).length > 16384)
-      throw const ClientError('window_not_active');
+      // ADR-119: a new connection the server did not activate is not a failed renewal.
+      throw ClientError(
+        initial ? 'window_activation_refused' : 'window_not_active',
+      );
     for (final field in [
       'connection_id',
       'window_id',
@@ -510,7 +657,9 @@ class WindowConnectionController extends ConnectionController {
         'budgetBytes': budgetBytes,
         'windowSeconds': windowSeconds,
       });
-    } on ClientError {
+    } catch (_) {
+      // ADR-117: any failure keeps Dart renewal, including MissingPluginException from an
+      // engine that does not offer native renewal. It must never fail a connect.
       return;
     }
   }
@@ -571,6 +720,7 @@ class WindowConnectionController extends ConnectionController {
     if (_closed) return;
     _closed = true;
     ++_version;
+    _reconnectAfterCleanup = false;
     _emit();
     try {
       await native.disconnect();
@@ -615,6 +765,11 @@ class WindowConnectionController extends ConnectionController {
       if (_cancelled(version)) return;
       if (remotePending) {
         await _cleanup();
+        // ADR-119: the stopped connection finished closing; now the reconnect can start.
+        if (!hasLease && _reconnectAfterCleanup && !_cancelled(version)) {
+          _reconnectAfterCleanup = false;
+          _scheduleAutoReconnect(version);
+        }
         return;
       }
       // ADR-115: a panel session has no lease to reconcile; only the engine's liveness.
@@ -771,8 +926,13 @@ class WindowConnectionController extends ConnectionController {
           (_grant != null && _clock.elapsedMilliseconds >= _deadline)) {
         phase = ConnectionPhase.failed;
         await _cleanup();
-        if (_autoReconnectCodes.contains(code) && !hasLease)
-          _scheduleAutoReconnect(version);
+        if (_autoReconnectCodes.contains(code)) {
+          if (!hasLease) {
+            _scheduleAutoReconnect(version);
+          } else {
+            _reconnectAfterCleanup = true;
+          }
+        }
       }
     }
   }
@@ -793,6 +953,7 @@ class WindowConnectionController extends ConnectionController {
     'api_unavailable',
     'rate_limited',
     'window_node_unavailable',
+    'window_activation_refused',
     // A create with an unknown outcome must be settled first; the attempt fails fast without
     // an API call until the background settlement finishes, then the next attempt connects.
     'revoke_unconfirmed',
@@ -825,11 +986,16 @@ class WindowConnectionController extends ConnectionController {
     final step = _backoff[min(_autoReconnectAt.length, _backoff.length - 1)];
     _autoReconnectAt.add(now);
     final delay = Duration(microseconds: (base.inMicroseconds * step).round());
-    Future<void>.delayed(delay, () async {
+    Future<void> fire() async {
       if (_dead ||
           _version != version ||
           phase != ConnectionPhase.failed ||
           !_retryCodes.contains(error)) {
+        return;
+      }
+      // ADR-119: a refresh in flight would make connect() return without trying; wait for it.
+      if (_working || _polling) {
+        unawaited(Future<void>.delayed(base, fire));
         return;
       }
       _autoReconnecting = true;
@@ -838,7 +1004,42 @@ class WindowConnectionController extends ConnectionController {
       } finally {
         _autoReconnecting = false;
       }
-    });
+    }
+
+    unawaited(Future<void>.delayed(delay, fire));
+  }
+
+  /// ADR-119: choose another server. While connected or connecting: stop, settle the old
+  /// connection (a pending create keeps its idempotency key), then connect to the new server.
+  /// A switch while another one runs is ignored.
+  Future<void> switchNode(String id) async {
+    if (_dead || _switching) return;
+    if (!nodes.any((n) => n.id == id && n.reason == 'available')) return;
+    final live =
+        hasLease ||
+        busy ||
+        phase == ConnectionPhase.connecting ||
+        phase == ConnectionPhase.connected ||
+        phase == ConnectionPhase.reconnecting;
+    if (!live) {
+      selectNode(id);
+      return;
+    }
+    if (id == selectedNode && hasLease && phase != ConnectionPhase.failed)
+      return;
+    _switching = true;
+    try {
+      await disconnect();
+      if (_dead) return;
+      await _refreshWork;
+      if (_dead) return;
+      // The old connection may still be closing; connect() waits for that (bounded).
+      selectedNode = id;
+      _emit();
+      await connect();
+    } finally {
+      _switching = false;
+    }
   }
 
   bool _establishedStatusConfirmed(NativeSnapshot snapshot) {

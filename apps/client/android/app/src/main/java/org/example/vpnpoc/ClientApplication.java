@@ -226,6 +226,12 @@ public final class ClientApplication extends Application implements Tunnel {
             result.success(null);
             return;
         }
+        // ADR-117: the restore path keeps Dart-driven renewal (Lockdown would need protect()).
+        // Answer "not started" instead of notImplemented, which Dart cannot treat as a refusal.
+        if (call.method.equals("startNativeRenewal")) {
+            result.success(false);
+            return;
+        }
         if (!java.util.Set.of("protectedRelayRead", "sessionRead", "sessionWrite", "nodeRead",
                 "publicKey", "prove", "permission", "connectWindow", "advanceWindow",
                 "disconnect", "snapshot").contains(call.method)) {
@@ -474,6 +480,12 @@ public final class ClientApplication extends Application implements Tunnel {
         value.put("reason", reason);
         value.put("nativeRenewal", renewer.active());
         value.put("handshakeSeen", handshakes.seen());
+        // ADR-117: the fenced window identity, so a restarted UI can adopt this tunnel. Values the
+        // app already received from the API; no key or token.
+        if (up && deadline > 0 && window.connection != null) {
+            value.put("connection", window.connection);
+            value.put("windowGeneration", window.generation);
+        }
         value.put("tunnelRestarts", (long) tunnelRestarts);
         return value;
     }

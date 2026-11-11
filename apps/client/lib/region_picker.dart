@@ -64,9 +64,19 @@ class RegionPickerScreen extends StatefulWidget {
 class _RegionPickerScreenState extends State<RegionPickerScreen> {
   void _select(String? value) {
     final c = widget.controller;
-    c.selectNode(value);
+    // ADR-119: picking another server while connected or connecting switches to it.
+    final switching =
+        c is WindowConnectionController &&
+        value != null &&
+        value != c.selectedNode &&
+        (c.hasLease || c.busy);
+    if (switching) {
+      unawaited(c.switchNode(value));
+    } else {
+      c.selectNode(value);
+    }
     if (c is WindowConnectionController &&
-        c.selectedNode == value &&
+        (switching || c.selectedNode == value) &&
         c.native is NodePreferenceStore) {
       unawaited(_save(c.native as NodePreferenceStore, value));
     }

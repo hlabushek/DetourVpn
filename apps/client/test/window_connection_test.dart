@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show MissingPluginException;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:vpn_client/api.dart';
 import 'package:vpn_client/connection.dart';
@@ -67,6 +68,10 @@ class Native extends FakeNative implements WindowNative {
 class RenewingNative extends Native implements NativeRenewalHost {
   final handoffs = <Map<String, Object?>>[];
   bool renewing = false;
+
+  /// ADR-117: the window the native fence holds (what ClientApplication.snapshot reports).
+  String? heldConnection;
+  int? heldGeneration;
   @override
   Future<bool> startNativeRenewal(Map<String, Object?> args) async {
     handoffs.add(args);
@@ -84,7 +89,17 @@ class RenewingNative extends Native implements NativeRenewalHost {
     receivedBytes: received,
     reason: reason,
     nativeRenewal: renewing && up,
+    connectionId: up ? heldConnection : null,
+    windowGeneration: up ? heldGeneration : null,
   );
+}
+
+/// TEST ONLY: an engine whose channel has no native renewal (the headless restore engine before
+/// ADR-117 answered notImplemented, which Flutter raises as MissingPluginException).
+class NoRenewalChannelNative extends Native implements NativeRenewalHost {
+  @override
+  Future<bool> startNativeRenewal(Map<String, Object?> args) =>
+      throw MissingPluginException('TEST ONLY no handler');
 }
 
 class WindowsApi implements TunnelApi {
@@ -102,6 +117,15 @@ class WindowsApi implements TunnelApi {
   int slot = 1;
   bool deviceBound = false;
   bool failRenewToken = false;
+
+  /// ADR-119 TEST ONLY knobs: DELETE answers revoke_pending this many times before closing;
+  /// with [freshCreates] every create starts a new active (or, for [pendingNodes], pending)
+  /// generation-1 connection on the requested node.
+  int pendingDeletes = 0;
+  bool freshCreates = false;
+  Set<String> pendingNodes = {};
+  String nodeId = node;
+  final deletedNodes = <String>[];
   final devicePlatforms = <Object?>[];
   String? invalidResponsePath;
   int creates = 0;
@@ -115,7 +139,7 @@ class WindowsApi implements TunnelApi {
   late DateTime issued = DateTime.now().toUtc();
   Map<String, dynamic> view() => {
     'id': connection,
-    'node_id': node,
+    'node_id': nodeId,
     'device_id': device,
     'slot_id': slot,
     'state': state,
@@ -125,7 +149,7 @@ class WindowsApi implements TunnelApi {
       'contract_version': 3,
       'connection_id': connection,
       'window_id': window,
-      'node_id': node,
+      'node_id': nodeId,
       'runtime_id': tamper ? node : runtime,
       'slot_id': slot,
       'generation': generation,
@@ -165,7 +189,13 @@ class WindowsApi implements TunnelApi {
     }
     if (method == 'DELETE') {
       deletes++;
+      deletedNodes.add(nodeId);
       if (failDeletes) throw const ClientError('network_unavailable');
+      if (pendingDeletes > 0) {
+        pendingDeletes--;
+        state = 'revoke_pending';
+        return view();
+      }
       state = 'closed';
       return view();
     }
@@ -196,6 +226,12 @@ class WindowsApi implements TunnelApi {
       final request = body!;
       budgets.add(request['budget_bytes'] as int);
       createKeys.add(request['idempotency_key'] as String);
+      if (freshCreates) {
+        nodeId = request['node_id'] as String;
+        state = pendingNodes.contains(nodeId) ? 'pending' : 'active';
+        generation = 1;
+        issued = DateTime.now().toUtc();
+      }
       if (lostCreate) {
         lostCreate = false;
         throw const ClientError('network_unavailable');
@@ -361,6 +397,318 @@ void main() {
       await c.refresh();
       expect(c.error, isNull);
       expect(api.renewKeys, isEmpty);
+    });
+  });
+  group('ADR-117 running tunnel after a UI restart', () {
+    late RenewingNative renewing;
+    WindowConnectionController reopened() {
+      c.dispose();
+      renewing = RenewingNative()
+        ..age = 0
+        ..up = true
+        ..renewing = true
+        ..heldConnection = connection
+        ..heldGeneration = 1
+        ..remaining = 500000;
+      api.oldConnection = true;
+      // A new UI engine: fresh controller, nothing selected yet.
+      return c = WindowConnectionController(
+        api,
+        renewing,
+        pollInterval: const Duration(days: 1),
+        windowSeconds: 900,
+        renewalOrigin: Uri.parse('https://api.example.invalid'),
+      );
+    }
+
+    test('a reopened UI adopts the natively renewed tunnel', () async {
+      reopened();
+      await c.refresh();
+      expect(renewing.stops, 0);
+      expect(api.deletes, 0);
+      expect(api.creates, 0);
+      expect(c.hasLease, isTrue);
+      expect(c.selectedNode, node);
+      expect(c.error, isNull);
+      expect(c.phase, ConnectionPhase.connected);
+      // Later refreshes keep mirroring native, with no Dart renewal.
+      await c.refresh();
+      expect(c.error, isNull);
+      expect(api.renewKeys, isEmpty);
+    });
+
+    test(
+      'a connect tapped right after reopening keeps the running tunnel',
+      () async {
+        reopened()..selectedNode = node;
+        await c.connect();
+        expect(renewing.stops, 0);
+        expect(api.creates, 0);
+        expect(c.hasLease, isTrue);
+      },
+    );
+
+    test('a native window that does not match the server is stopped', () async {
+      reopened();
+      renewing.heldConnection = '99999999-9999-4999-8999-999999999999';
+      await c.refresh();
+      expect(renewing.stops, greaterThanOrEqualTo(1));
+      expect(api.deletes, 1);
+      expect(c.hasLease, isFalse);
+    });
+
+    test('a server generation older than native is not adopted', () async {
+      reopened();
+      renewing.heldGeneration = 2;
+      await c.refresh();
+      expect(renewing.stops, greaterThanOrEqualTo(1));
+      expect(c.hasLease, isFalse);
+    });
+
+    test(
+      'without native renewal the old fail-closed reconcile stays',
+      () async {
+        reopened();
+        renewing.renewing = false;
+        await c.refresh();
+        expect(renewing.stops, greaterThanOrEqualTo(1));
+        expect(api.deletes, 1);
+        expect(c.hasLease, isFalse);
+      },
+    );
+
+    test(
+      'an engine without native renewal still connects (restore path)',
+      () async {
+        c.dispose();
+        final plain = NoRenewalChannelNative()..age = 0;
+        c = WindowConnectionController(
+          api,
+          plain,
+          pollInterval: const Duration(days: 1),
+          windowSeconds: 900,
+          renewalOrigin: Uri.parse('https://api.example.invalid'),
+        )..selectedNode = node;
+        await c.connect();
+        expect(c.error, isNull);
+        expect(c.hasLease, isTrue);
+        expect(plain.up, isTrue);
+      },
+    );
+  });
+
+  group('ADR-119 connect, reconnect and server switch', () {
+    const other = '77777777-7777-4777-8777-777777777777';
+
+    test(
+      'reconnect starts once a still-closing connection has closed',
+      () async {
+        final auto = WindowConnectionController(
+          api,
+          native,
+          pollInterval: const Duration(days: 1),
+          renewBeforeMs: 1000,
+          autoReconnectDelay: const Duration(milliseconds: 20),
+        )..selectedNode = node;
+        addTearDown(auto.dispose);
+        await auto.connect();
+        api.state = 'revoke_pending';
+        api.pendingDeletes = 1;
+        await auto.refresh();
+        expect(auto.error, 'window_not_active');
+        expect(auto.hasLease, isTrue);
+        await Future<void>.delayed(const Duration(milliseconds: 150));
+        expect(api.creates, 1); // nothing can start while the old one closes
+        api.freshCreates = true;
+        await auto.refresh(); // the revoke completes here
+        expect(auto.hasLease, isFalse);
+        await Future<void>.delayed(const Duration(milliseconds: 300));
+        expect(api.creates, greaterThanOrEqualTo(2));
+        expect(auto.hasLease, isTrue);
+        await auto.disconnect();
+      },
+    );
+
+    test('a user disconnect cancels a reconnect waiting for cleanup', () async {
+      final auto = WindowConnectionController(
+        api,
+        native,
+        pollInterval: const Duration(days: 1),
+        renewBeforeMs: 1000,
+        autoReconnectDelay: const Duration(milliseconds: 20),
+      )..selectedNode = node;
+      addTearDown(auto.dispose);
+      await auto.connect();
+      api.state = 'revoke_pending';
+      api.pendingDeletes = 1;
+      await auto.refresh();
+      await auto.disconnect();
+      await auto.refresh();
+      await Future<void>.delayed(const Duration(milliseconds: 300));
+      expect(api.creates, 1);
+    });
+
+    test(
+      'connect waits for the previous connection to finish closing',
+      () async {
+        final w = WindowConnectionController(
+          api,
+          native,
+          pollInterval: const Duration(days: 1),
+          renewBeforeMs: 90000,
+          revokeWaitInterval: const Duration(milliseconds: 5),
+        )..selectedNode = node;
+        addTearDown(w.dispose);
+        await w.connect();
+        api.pendingDeletes = 3;
+        await w.disconnect();
+        expect(w.hasLease, isTrue);
+        api.freshCreates = true;
+        await w.connect();
+        expect(w.error, isNull);
+        expect(w.hasLease, isTrue);
+        expect(api.creates, 2);
+      },
+    );
+
+    test(
+      'a revoke that never closes is reported, with no second connection',
+      () async {
+        final w = WindowConnectionController(
+          api,
+          native,
+          pollInterval: const Duration(days: 1),
+          renewBeforeMs: 90000,
+          revokeWaitInterval: const Duration(milliseconds: 1),
+          revokeWaitChecks: 3,
+        )..selectedNode = node;
+        addTearDown(w.dispose);
+        await w.connect();
+        api.pendingDeletes = 100;
+        await w.disconnect();
+        await w.connect();
+        expect(w.error, 'revoke_unconfirmed');
+        expect(api.creates, 1);
+      },
+    );
+
+    test('switching servers while connected moves to the new server', () async {
+      final w = WindowConnectionController(
+        api,
+        native,
+        pollInterval: const Duration(days: 1),
+        renewBeforeMs: 90000,
+        revokeWaitInterval: const Duration(milliseconds: 5),
+      );
+      addTearDown(w.dispose);
+      w.nodes = [
+        NodeOption(node, 'A', 'r', 'available'),
+        NodeOption(other, 'B', 'r', 'available'),
+      ];
+      api.freshCreates = true;
+      w.selectedNode = node;
+      await w.connect();
+      // The old selection guard ignores a choice while connected.
+      w.selectNode(other);
+      expect(w.selectedNode, node);
+      await w.switchNode(other);
+      expect(w.selectedNode, other);
+      expect(w.error, isNull);
+      expect(w.hasLease, isTrue);
+      expect(api.creates, 2);
+      expect(api.deletedNodes, [node]);
+    });
+
+    test(
+      'switching servers during a pending connect leaves no stale connection',
+      () async {
+        final w = WindowConnectionController(
+          api,
+          native,
+          pollInterval: const Duration(milliseconds: 20),
+          renewBeforeMs: 90000,
+          revokeWaitInterval: const Duration(milliseconds: 5),
+          autoReconnectDelay: null,
+        );
+        addTearDown(w.dispose);
+        w.nodes = [
+          NodeOption(node, 'A', 'r', 'available'),
+          NodeOption(other, 'B', 'r', 'available'),
+        ];
+        api.freshCreates = true;
+        api.pendingNodes = {node};
+        w.selectedNode = node;
+        final first = w.connect();
+        await Future<void>.delayed(const Duration(milliseconds: 60));
+        expect(w.busy, isTrue);
+        expect(w.hasLease, isTrue); // pending connection on A
+        await w.switchNode(other);
+        await first;
+        w.pausePolling();
+        expect(w.selectedNode, other);
+        expect(w.error, isNull);
+        expect(w.hasLease, isTrue);
+        expect(api.creates, 2);
+        // A was revoked before B was created; nothing else was left behind.
+        expect(api.deletedNodes, [node]);
+        expect(native.up, isTrue);
+      },
+    );
+
+    test('a second switch while one is running is ignored', () async {
+      final w = WindowConnectionController(
+        api,
+        native,
+        pollInterval: const Duration(days: 1),
+        renewBeforeMs: 90000,
+        revokeWaitInterval: const Duration(milliseconds: 5),
+      );
+      addTearDown(w.dispose);
+      w.nodes = [
+        NodeOption(node, 'A', 'r', 'available'),
+        NodeOption(other, 'B', 'r', 'available'),
+      ];
+      api.freshCreates = true;
+      w.selectedNode = node;
+      await w.connect();
+      final one = w.switchNode(other);
+      final two = w.switchNode(node);
+      await Future.wait([one, two]);
+      expect(w.selectedNode, other);
+      expect(api.creates, 2);
+    });
+
+    test(
+      'a new connection the server did not activate has its own code and bounded retries',
+      () async {
+        final w = WindowConnectionController(
+          api,
+          native,
+          pollInterval: const Duration(days: 1),
+          renewBeforeMs: 90000,
+          autoReconnectDelay: const Duration(milliseconds: 5),
+        )..selectedNode = node;
+        addTearDown(w.dispose);
+        api.state = 'revoke_pending';
+        await w.connect();
+        expect(w.error, 'window_activation_refused');
+        expect(w.diagnosticStage, 'lease_validation');
+        await Future<void>.delayed(const Duration(milliseconds: 1000));
+        expect(
+          api.creates,
+          1 + WindowConnectionController.maxActivationRetries,
+        );
+        await w.disconnect();
+      },
+    );
+
+    test('each stop cause has its own accurate Russian text', () {
+      expect(messageFor('window_not_active'), contains('подключается заново'));
+      expect(messageFor('window_activation_refused'), contains('не включил'));
+      expect(
+        messageFor('window_generation_conflict'),
+        isNot(contains('подключается заново')),
+      );
     });
   });
   test('production window budget remains 1 MiB by default', () {

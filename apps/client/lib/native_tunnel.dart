@@ -24,7 +24,14 @@ class NativeSnapshot {
     this.reason = '',
     this.nativeRenewal = false,
     this.handshakeSeen = false,
+    this.connectionId,
+    this.windowGeneration,
   });
+
+  /// ADR-117: the connection and generation the native deadline fence holds right now, so a
+  /// restarted UI can adopt a running tunnel. Null when no window is held or on older builds.
+  final String? connectionId;
+  final int? windowGeneration;
 
   /// Task 7: the native side saw a handshake since the last connect, even while Dart slept.
   /// Kept after the tunnel stops. Older native builds do not send it (false).
@@ -210,6 +217,14 @@ class PlatformTunnel
       reason: value['reason'] as String,
       nativeRenewal: value['nativeRenewal'] == true,
       handshakeSeen: value['handshakeSeen'] == true,
+      connectionId: value['connection'] is String
+          ? value['connection'] as String
+          : null,
+      windowGeneration:
+          value['windowGeneration'] is int &&
+              (value['windowGeneration'] as int) >= 1
+          ? value['windowGeneration'] as int
+          : null,
     );
   }
 

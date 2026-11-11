@@ -39,6 +39,7 @@ const _reportableErrors = <String>{
   'tunnel_recovery_not_ready',
   'unauthorized',
   'vpn_revoked',
+  'window_activation_refused',
   'window_generation_conflict',
   'window_node_required',
   'window_node_unavailable',

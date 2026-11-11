@@ -16,7 +16,8 @@ final class DiagnosticReportText {
         "session_erasure_failed", "session_expired", "session_storage_failed",
         "tunnel_node_capacity", "tunnel_node_unavailable", "tunnel_profile_unavailable",
         "tunnel_recovery_not_ready", "unauthorized", "unknown_error", "vpn_revoked",
-        "window_generation_conflict", "window_node_required", "window_node_unavailable",
+        "window_activation_refused", "window_generation_conflict", "window_node_required",
+        "window_node_unavailable",
         "window_not_active", "window_tunnels_unavailable"
     );
 
