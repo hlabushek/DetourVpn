@@ -60,3 +60,15 @@ def test_access_lines_reduce_to_time_method_path_status() -> None:
         "/api/v1/window-tunnels/<id>/native-renew",
         "202",
     )
+
+
+def test_ssh_reason_hides_host_address_and_key() -> None:
+    from scripts.beta_reliability_logs import HOST, IDENTITY, ssh_reason
+
+    reason = ssh_reason(
+        f"debug1: x\nssh: connect to host {HOST} port 22: Connection timed out\n"
+        f'Load key "{IDENTITY}": bad permissions 10.1.2.3'
+    )
+    assert HOST not in reason and IDENTITY.name not in reason and "10.1.2.3" not in reason
+    assert reason.startswith("Load key")
+    assert ssh_reason("") == "(ssh printed no reason)"

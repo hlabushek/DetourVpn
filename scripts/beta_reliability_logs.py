@@ -137,7 +137,22 @@ def ssh(remote: str, stdin: str | None = None) -> tuple[int, str]:
             break
     if result is None:
         raise RuntimeError("ssh_not_run")
+    if result.returncode == 255:
+        SSH_ERRORS.append(ssh_reason(result.stderr))
     return result.returncode, result.stdout
+
+
+SSH_ERRORS: list[str] = []
+
+
+def ssh_reason(stderr: str) -> str:
+    """Last SSH error line, without the host name, address or key path."""
+    lines = [x.strip() for x in (stderr or "").splitlines() if x.strip()]
+    line = lines[-1] if lines else "(ssh printed no reason)"
+    line = (
+        line.replace(HOST, "<host>").replace(str(IDENTITY), "<key>").replace(IDENTITY.name, "<key>")
+    )
+    return mask(line)
 
 
 def journal_lines(hours: int) -> list[str]:
@@ -169,6 +184,8 @@ def main() -> int:
     lines += [mask(x) for x in out.splitlines()]
     if code != 0:
         lines.append(f"sql_exit_code={code}")
+    if SSH_ERRORS:
+        lines.append(f"ssh_error={SSH_ERRORS[-1]}")
     lines.append("")
     lines.append("== API window requests (time|method|path|status)")
     lines += [mask(x) for x in journal_lines(args.hours)]
