@@ -79,10 +79,15 @@ $adb = Join-Path $env:LOCALAPPDATA 'Android\Sdk\platform-tools\adb.exe'
 function Installed-VersionCode {
     # Read-only adb query; $null if no single phone is connected.
     if (-not (Test-Path -LiteralPath $adb)) { return $null }
-    $devices = @(& $adb devices 2>$null | Where-Object { $_ -match "`tdevice\s*$" })
-    if ($devices.Count -ne 1) { return $null }
-    $line = & $adb shell dumpsys package com.detourvpn.client 2>$null | Select-String -Pattern 'versionCode=(\d+)' | Select-Object -First 1
-    if ($line -and $line.Matches[0].Groups[1].Value) { return [int]$line.Matches[0].Groups[1].Value }
+    # adb writes notes such as "daemon not running; starting now" to stderr; Windows PowerShell
+    # turns those into errors under 'Stop', so this read-only query must not stop the script.
+    $ErrorActionPreference = 'Continue'
+    try {
+        $devices = @(& $adb devices 2>$null | Where-Object { $_ -match "`tdevice\s*$" })
+        if ($devices.Count -ne 1) { return $null }
+        $line = & $adb shell dumpsys package com.detourvpn.client 2>$null | Select-String -Pattern 'versionCode=(\d+)' | Select-Object -First 1
+        if ($line -and $line.Matches[0].Groups[1].Value) { return [int]$line.Matches[0].Groups[1].Value }
+    } catch { }
     return $null
 }
 
