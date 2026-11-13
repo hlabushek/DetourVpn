@@ -30,11 +30,16 @@ class NativeSnapshot {
     this.networkChangeAgeMs,
     this.desiredConnected = false,
     this.transport,
+    this.stopCategory,
   });
 
   /// ADR-124: the user's persisted wish to stay connected, held natively. Only an explicit
   /// disconnect or a terminal failure clears it. False on older builds and on Windows.
   final bool desiredConnected;
+
+  /// ADR-134: why native is not running the tunnel although the user still wants it (`none`,
+  /// `background_start_refused`, ...). Null on older builds.
+  final String? stopCategory;
 
   /// ADR-124: the native supervisor's transport state (`connected`, `degraded`,
   /// `reconnecting`, `waiting_for_network`, ...). Diagnostics; null on older builds.
@@ -118,6 +123,87 @@ class InboundTrafficFreshness {
   void reset() {
     _lastBytes = null;
     _lastProgressAtMs = null;
+  }
+}
+
+/// ADR-133: data-path state from the native byte counters. Mirrors `DataPathWatch.java`; the
+/// same thresholds, so the native transport and the Dart status agree.
+enum DataPathState { unknown, flowing, quiet, stalled }
+
+/// ADR-133: inbound progress within [flowFor] means flowing. Outbound bytes of at least
+/// [stallOutboundBytes] with no inbound progress for [flowFor] is a stall. An idle phone is
+/// quiet, never stalled. A stall only changes the displayed confirmation; it never reconnects.
+class DataPathHealth {
+  DataPathHealth({
+    this.flowFor = const Duration(seconds: 120),
+    this.stallOutboundBytes = 8192,
+  });
+
+  final Duration flowFor;
+  final int stallOutboundBytes;
+  int? _lastReceived;
+  int? _lastOutbound;
+  int? _inboundAtMs;
+  int? _baseAtMs;
+  int _outboundSince = 0;
+
+  void reset() {
+    _lastReceived = null;
+    _lastOutbound = null;
+    _inboundAtMs = null;
+    _baseAtMs = null;
+    _outboundSince = 0;
+  }
+
+  /// [received] is inbound bytes and [transfer] is inbound plus outbound bytes; null or negative
+  /// means unknown and changes nothing.
+  DataPathState observe(int? received, int? transfer, int nowMs) {
+    if (received == null ||
+        transfer == null ||
+        received < 0 ||
+        transfer < 0 ||
+        transfer < received) {
+      return state(nowMs);
+    }
+    final outbound = transfer - received;
+    final lastReceived = _lastReceived;
+    final lastOutbound = _lastOutbound;
+    if (lastReceived == null ||
+        lastOutbound == null ||
+        received < lastReceived ||
+        outbound < lastOutbound) {
+      // First sample or counter reset: start a fresh baseline.
+      _lastReceived = received;
+      _lastOutbound = outbound;
+      _baseAtMs = nowMs;
+      _inboundAtMs = null;
+      _outboundSince = 0;
+      return state(nowMs);
+    }
+    if (received > lastReceived) {
+      _inboundAtMs = nowMs;
+      _outboundSince = 0;
+    } else {
+      _outboundSince += outbound - lastOutbound;
+    }
+    _lastReceived = received;
+    _lastOutbound = outbound;
+    return state(nowMs);
+  }
+
+  DataPathState state(int nowMs) {
+    final base = _baseAtMs;
+    if (base == null) return DataPathState.unknown;
+    final inbound = _inboundAtMs;
+    if (inbound != null && nowMs - inbound <= flowFor.inMilliseconds) {
+      return DataPathState.flowing;
+    }
+    final since = inbound ?? base;
+    if (nowMs - since >= flowFor.inMilliseconds &&
+        _outboundSince >= stallOutboundBytes) {
+      return DataPathState.stalled;
+    }
+    return DataPathState.quiet;
   }
 }
 
@@ -295,6 +381,9 @@ class PlatformTunnel
           ? value['networkChangeAgeMs'] as int
           : null,
       desiredConnected: value['desiredConnected'] == true,
+      stopCategory: value['stopCategory'] is String
+          ? value['stopCategory'] as String
+          : null,
       transport: value['transport'] is String
           ? value['transport'] as String
           : null,

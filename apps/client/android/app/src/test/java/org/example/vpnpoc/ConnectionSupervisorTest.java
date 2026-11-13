@@ -141,6 +141,94 @@ public class ConnectionSupervisorTest {
         assertEquals("inbound_data", ConnectionSupervisor.evidence(true, 900, true, true));
     }
 
+    /** ADR-133: a handshake-only tunnel with no inbound data is degraded, never connected. */
+    @Test public void stalledDataPathIsDegradedAndNeverRequestsRecovery() {
+        assertEquals("connected", ConnectionSupervisor.transport(true, true, false, true, true, false, false));
+        assertEquals("degraded", ConnectionSupervisor.transport(true, true, false, true, true, false, true));
+        var s = connected();
+        // The tunnel is up even while the data path is stalled: the supervisor takes no input for it.
+        assertEquals(ConnectionSupervisor.Action.NONE, s.evaluate(1000, true, false, false, true).action);
+        assertTrue("degraded keeps the user's intent", s.desired());
+    }
+
+    /** ADR-138 (H) + ADR-124: Wi-Fi to cellular, lost network, and return, as supervisor decisions. */
+    @Test public void wifiToCellularAndBackAreRecoveryDecisions() {
+        var s = connected();
+        // Wi-Fi tunnel up, the default network changes to cellular: still usable, no action.
+        assertEquals(ConnectionSupervisor.Action.NONE, s.evaluate(1000, true, false, false, true).action);
+        // Wi-Fi dies before cellular is up: the tunnel is gone and nothing usable exists.
+        s.tunnelDown("network_unavailable");
+        assertEquals("waiting_for_network", ConnectionSupervisor.transport(true, false, false, false, false, false));
+        assertEquals("waiting_for_network", s.evaluate(2000, false, false, false, false).why);
+        // Cellular becomes usable: recovery starts at once (no earlier attempt, no backoff).
+        var recover = s.evaluate(3000, false, false, false, true);
+        assertEquals(ConnectionSupervisor.Action.START_RECOVERY, recover.action);
+        s.attemptStarted(3000, 0.5);
+        // The restore fails once on cellular: the next look waits for the backoff, not a storm.
+        s.recoveryFailed("server_unreachable");
+        assertEquals(ConnectionSupervisor.Action.WAIT, s.evaluate(4000, false, false, false, true).action);
+        // Once the backoff has passed, cellular is still the usable network: try again.
+        assertEquals(ConnectionSupervisor.Action.START_RECOVERY,
+                s.evaluate(3000 + ConnectionSupervisor.BASE_DELAY_MS * 2, false, false, false, true).action);
+    }
+
+    /** ADR-134 (C): a refused background start keeps the intent and retries on the next trigger. */
+    @Test public void refusedBackgroundStartKeepsIntentAndRetriesOnTheNextTrigger() {
+        var s = connected();
+        s.tunnelDown("lease_expired");
+        assertEquals(ConnectionSupervisor.Action.START_RECOVERY,
+                s.evaluate(10_000, false, false, false, true).action);
+        s.attemptStarted(10_000, 0.5);
+        s.startRefused(10_000);
+        assertTrue("the user's intent is kept", s.desired());
+        assertEquals("background_start_refused", s.stopCategory());
+        assertEquals("a refusal is not a failed attempt, so no backoff grows", 0, s.attempts());
+        // A trigger inside the minute waits; it does not hammer the system.
+        var soon = s.evaluate(20_000, false, false, false, true);
+        assertEquals(ConnectionSupervisor.Action.WAIT, soon.action);
+        assertEquals(50_000, soon.delayMs);
+        // The next allowed trigger after the minute starts recovery.
+        assertEquals(ConnectionSupervisor.Action.START_RECOVERY,
+                s.evaluate(70_000, false, false, false, true).action);
+        // A start that is accepted clears the category; the next failure reports its own reason.
+        s.attemptStarted(70_000, 0.5);
+        assertEquals("none", s.stopCategory());
+    }
+
+    @Test public void backgroundRefusalIsTransientNotTerminal() {
+        assertFalse(ConnectionSupervisor.terminal(ConnectionSupervisor.BACKGROUND_REFUSED));
+        assertEquals("background_start_refused",
+                ConnectionSupervisor.category(ConnectionSupervisor.BACKGROUND_REFUSED));
+    }
+
+    /** ADR-134 (D): after a process kill the persisted intent alone drives the next trigger. */
+    @Test public void processRestartReconcilesPersistedIntentOnTheNextTrigger() {
+        var recover = new ConnectionSupervisor();
+        recover.restore(true);
+        // Boot, network or app-open trigger with no Dart owner and a usable network.
+        assertEquals(ConnectionSupervisor.Action.START_RECOVERY,
+                recover.evaluate(5_000, false, false, false, true).action);
+
+        var adopt = new ConnectionSupervisor();
+        adopt.restore(true);
+        // The service survived the process: the running tunnel is adopted, nothing is restarted.
+        assertEquals(ConnectionSupervisor.Action.NONE, adopt.evaluate(5_000, true, false, false, true).action);
+
+        var offline = new ConnectionSupervisor();
+        offline.restore(true);
+        assertEquals("waiting_for_network", offline.evaluate(5_000, false, false, false, false).why);
+
+        var owned = new ConnectionSupervisor();
+        owned.restore(true);
+        assertEquals("a Dart owner is never competed with", "dart_owner",
+                owned.evaluate(5_000, false, false, true, true).why);
+
+        var off = new ConnectionSupervisor();
+        off.restore(false);
+        assertEquals("no persisted intent, nothing starts",
+                ConnectionSupervisor.Action.NONE, off.evaluate(5_000, false, false, false, true).action);
+    }
+
     @Test public void unknownReasonsAreTransient() {
         assertEquals("transient", ConnectionSupervisor.category("something_new"));
         assertFalse(ConnectionSupervisor.terminal("something_new"));

@@ -82,7 +82,7 @@ final class LibboxConfigFactory {
         JSONObject tun = new JSONObject().put("type", "tun").put("tag", "tun-in")
                 .put("address", addresses).put("mtu", mtu)
                 .put("auto_route", true).put("strict_route", true).put("stack", "gvisor")
-                .put("route_address", new JSONArray().put("0.0.0.0/0").put("::/0"));
+                .put("route_address", new JSONArray().put(RoutePlan.ROUTE_ADDRESSES[0]).put(RoutePlan.ROUTE_ADDRESSES[1]));
         JSONArray rules = new JSONArray();
         rules.put(new JSONObject().put("protocol", "dns").put("action", "hijack-dns"));
         rules.put(new JSONObject().put("action", "sniff"));
@@ -112,11 +112,12 @@ final class LibboxConfigFactory {
                 rules.put(new JSONObject().put("domain_suffix", suffixDomains).put("outbound", target));
         }
 
-        var dnsServer = source.getDnsServers().iterator().next();
+        var dnsHosts = new java.util.ArrayList<String>();
+        for (var dnsServer : source.getDnsServers()) dnsHosts.add(dnsServer.getHostAddress());
         JSONArray dnsServers = new JSONArray().put(new JSONObject().put("type", "udp")
-                .put("tag", "profile-dns").put("server", dnsServer.getHostAddress()).put("detour", "awg"));
+                .put("tag", "profile-dns").put("server", RoutePlan.dnsUpstream(dnsHosts)).put("detour", "awg"));
         JSONObject dns = new JSONObject().put("servers", dnsServers).put("final", "profile-dns")
-                .put("strategy", "ipv4_only");
+                .put("strategy", RoutePlan.DNS_STRATEGY);
         JSONArray endpoints = new JSONArray().put(awg);
         JSONArray outbounds = new JSONArray()
                 .put(new JSONObject().put("type", "direct").put("tag", "direct"))

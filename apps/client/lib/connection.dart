@@ -89,6 +89,9 @@ String messageFor(String code) => switch (code) {
   'network_unavailable' || 'api_unavailable' =>
     'Нет связи с API. Проверьте сеть и повторите. Состояние узла не подтверждено.',
   'native_unavailable' => 'VPN-движок недоступен. Проверьте сборку приложения.',
+  // ADR-134: Android refused a background start; the intent is kept and recovery is retried.
+  'background_start_refused' =>
+    'Android не разрешил VPN запуститься в фоне. Подключение сохранено: приложение повторит его при следующем открытии, смене сети или перезагрузке. Если нужно, нажмите «Подключить».',
   'native_down' =>
     'Системный VPN остановлен. Проверьте разрешение или другой VPN и подключитесь снова.',
   'vpn_revoked' =>

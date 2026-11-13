@@ -41,6 +41,11 @@ public final class ClientApplication extends Application implements Tunnel {
     volatile boolean uiAttached;
     /** ADR-125: last native recovery note for diagnostics (a code, no data). */
     private String recoveryNote = "";
+    /** ADR-133: data-path evidence; touched only on the worker thread. */
+    private final DataPathWatch dataPath = new DataPathWatch();
+    /** ADR-135: tunnel check period while a window is up (was 15 s for the whole process). */
+    static final long WATCH_MS = 15_000;
+    private java.util.concurrent.ScheduledFuture<?> watchTick;
     static final String RECOVER = "org.example.vpnpoc.action.RECOVER";
     /** ADR-126: one-shot deadline check; replaces the 250 ms polling loop. */
     private java.util.concurrent.ScheduledFuture<?> deadlineCheck;
@@ -118,7 +123,7 @@ public final class ClientApplication extends Application implements Tunnel {
             }
         });
         watchNetwork();
-        worker.scheduleWithFixedDelay(this::watchTunnel, 15, 15, TimeUnit.SECONDS);
+        // ADR-135: the 15 s tunnel check is armed by setDeadline and stops when no window is up.
     }
 
     /**
@@ -144,6 +149,13 @@ public final class ClientApplication extends Application implements Tunnel {
         if (end <= 0) return;
         long delay = Math.max(0, end - SystemClock.elapsedRealtime()) + 50;
         deadlineCheck = worker.schedule(this::enforceDeadline, delay, TimeUnit.MILLISECONDS);
+        armWatch(WATCH_MS);
+    }
+
+    /** ADR-135: the one pending tunnel check; re-armed only while a window is up. Worker thread. */
+    private void armWatch(long delayMs) {
+        if (watchTick != null) watchTick.cancel(false);
+        watchTick = worker.schedule(this::watchTunnel, delayMs, TimeUnit.MILLISECONDS);
     }
 
     /**
@@ -188,8 +200,12 @@ public final class ClientApplication extends Application implements Tunnel {
             else startService(restore);
             recoveryNote = "restore_started";
         } catch (RuntimeException refused) {
-            // Android 12+ background-start limits; the next trigger tries again.
+            // ADR-134: Android 12+ background-start limits. The intent stays; the next trigger
+            // (network, app open, boot or the alarm below) tries again, at most once a minute.
             recoveryNote = "background_start_refused";
+            supervisor.startRefused(now);
+            scheduleRecoveryAlarm(ConnectionSupervisor.REFUSED_RETRY_MS);
+            return;
         }
         // If the restore never reports back (process trouble), look again after the backoff.
         scheduleRecoveryAlarm(Math.max(supervisor.backoffMs(), 60_000));
@@ -330,7 +346,8 @@ public final class ClientApplication extends Application implements Tunnel {
             enforceDeadline();
             long now = SystemClock.elapsedRealtime();
             boolean up = provider != null && deadline > 0 && provider.isUp();
-            if (!up) { watchdog.tunnelDown(); return; }
+            if (!up) { watchdog.tunnelDown(); watchTick = null; return; }
+            armWatch(WATCH_MS);
             if (!watchdog.running()) watchdog.tunnelUp(now);
             long handshake = provider.lastHandshakeSeconds();
             long wall = System.currentTimeMillis() / 1000;
@@ -733,6 +750,9 @@ public final class ClientApplication extends Application implements Tunnel {
         }
     }
 
+    /** ADR-136, worker thread: true while a headless restore engine is alive (it owns renewal). */
+    boolean restoreEngineAlive() { return recoveryEngine != null; }
+
     void stop() throws Exception {
         renewer.stop();
         cancelRestoreWake();
@@ -755,14 +775,23 @@ public final class ClientApplication extends Application implements Tunnel {
         value.put("networkValidated", physical.validated());
         value.put("handshakeAge", handshake > 0 && handshake <= now ? now - handshake : -1L);
         value.put("remainingMs", Math.max(0, deadline - SystemClock.elapsedRealtime()));
+        long transfer = -1;
+        long received = -1;
         try {
-            long transfer = up && provider.capabilities().contains("traffic-stats-advisory.v1")
-                    ? provider.transferBytes() : -1;
-            if (transfer >= 0) value.put("trafficBytes", transfer);
-            long received = up && provider.capabilities().contains("traffic-stats-advisory.v1")
-                    ? provider.receivedBytes() : -1;
-            if (received >= 0) value.put("receivedBytes", received);
+            if (up && provider.capabilities().contains("traffic-stats-advisory.v1")) {
+                transfer = provider.transferBytes();
+                received = provider.receivedBytes();
+            }
         } catch (RuntimeException | LinkageError ignored) { /* Advisory unavailable. */ }
+        if (transfer >= 0) value.put("trafficBytes", transfer);
+        if (received >= 0) value.put("receivedBytes", received);
+        // ADR-133: data-path evidence from the same advisory counters. Pure policy; no effect on
+        // recovery (see DataPathWatch).
+        long nowElapsed = SystemClock.elapsedRealtime();
+        if (up) dataPath.observe(received, transfer, nowElapsed);
+        else dataPath.reset();
+        boolean flowing = up && dataPath.flowing(nowElapsed);
+        boolean stalled = up && dataPath.stalled(nowElapsed);
         value.put("reason", reason);
         value.put("nativeRenewal", renewer.active());
         value.put("handshakeSeen", handshakes.seen());
@@ -785,9 +814,11 @@ public final class ClientApplication extends Application implements Tunnel {
         value.put("desiredConnected", supervisor.desired());
         value.put("transport", ConnectionSupervisor.transport(supervisor.desired(), tunnelUp,
                 false, network, afterChange && handshakeAge <= 180,
-                watchdog.pendingNetworkDelayMs(SystemClock.elapsedRealtime()) >= 0));
-        value.put("evidence", ConnectionSupervisor.evidence(tunnelUp, handshakeAge, afterChange, false));
+                watchdog.pendingNetworkDelayMs(SystemClock.elapsedRealtime()) >= 0, stalled));
+        value.put("evidence", ConnectionSupervisor.evidence(tunnelUp, handshakeAge, afterChange, flowing));
         value.put("failureCategory", ConnectionSupervisor.category(tunnelUp ? "" : reason));
+        // ADR-134: why native is not running a tunnel although the user still wants it.
+        value.put("stopCategory", tunnelUp ? "none" : supervisor.stopCategory());
         value.put("recoveryAttempts", (long) supervisor.attempts());
         value.put("recoveryNote", recoveryNote);
         value.put("uiAttached", uiAttached);

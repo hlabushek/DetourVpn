@@ -1107,6 +1107,41 @@ void main() {
       slow.dispose();
     },
   );
+  test(
+    'ADR-133: a fresh handshake does not hide a stalled data path, and nothing reconnects',
+    () async {
+      final stalled = WindowConnectionController(
+        api,
+        native,
+        pollInterval: const Duration(days: 1),
+        renewBeforeMs: 90000,
+        dataPathFlowFor: Duration.zero, // fake time: silence counts at once
+      )..selectedNode = node;
+      addTearDown(stalled.dispose);
+      await stalled.connect();
+      final starts = native.starts;
+      native.received = 100;
+      native.traffic = 100;
+      await stalled.refresh();
+      expect(stalled.phase, ConnectionPhase.connected);
+      // Outbound grows by well over 8 KiB, inbound stays at 100: the handshake is fresh but the
+      // return path shows no progress.
+      native.traffic = 20000;
+      await stalled.refresh();
+      expect(stalled.phase, ConnectionPhase.reconnecting);
+      expect(stalled.detail, contains('Нет входящего трафика'));
+      expect(stalled.error, isNull, reason: 'a stall is not an error');
+      expect(
+        native.starts,
+        starts,
+        reason: 'a stall never restarts the tunnel',
+      );
+      // Inbound bytes return: the status is confirmed again.
+      native.received = 101;
+      await stalled.refresh();
+      expect(stalled.phase, ConnectionPhase.connected);
+    },
+  );
   test('outbound-only traffic does not confirm a stale handshake', () async {
     await c.connect();
     await c.refresh(); // Establish the fresh-handshake barrier first.

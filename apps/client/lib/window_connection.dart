@@ -23,6 +23,7 @@ class WindowConnectionController extends ConnectionController {
     this.windowSeconds = defaultWindowSeconds,
     this.revokeWaitInterval = const Duration(seconds: 1),
     this.revokeWaitChecks = 10,
+    this.dataPathFlowFor = const Duration(seconds: 120),
     Uri? renewalOrigin,
     bool? panelVless,
   }) : _renewalOrigin = renewalOrigin,
@@ -99,6 +100,14 @@ class WindowConnectionController extends ConnectionController {
   int? _lastTraffic;
   int? _renewTrafficAnchor;
   final InboundTrafficFreshness _inboundTraffic = InboundTrafficFreshness();
+
+  /// ADR-133: outbound bytes without inbound progress. Shown as unconfirmed; never reconnects.
+  /// ADR-133: how long inbound silence may last before outbound-only traffic counts as a stall.
+  final Duration dataPathFlowFor;
+  late final DataPathHealth _dataPath = DataPathHealth(
+    flowFor: dataPathFlowFor,
+  );
+  bool _dataStalled = false;
   bool _hasEstablishedHandshake = false;
 
   /// Task 7: the native side's own memory (NativeSnapshot.handshakeSeen). Diagnostics only:
@@ -380,6 +389,8 @@ class WindowConnectionController extends ConnectionController {
     _lastTraffic = null;
     _renewTrafficAnchor = null;
     _inboundTraffic.reset();
+    _dataPath.reset();
+    _dataStalled = false;
     _hasEstablishedHandshake = false;
     _nativeHandshakeSeen = live.handshakeSeen;
     _connectedAtMs = now;
@@ -509,6 +520,8 @@ class WindowConnectionController extends ConnectionController {
       _lastTraffic = 0;
       _renewTrafficAnchor = null;
       _inboundTraffic.reset();
+      _dataPath.reset();
+      _dataStalled = false;
       _hasEstablishedHandshake = false;
       _nativeHandshakeSeen = false;
       _connectedAtMs = _clock.elapsedMilliseconds;
@@ -743,6 +756,8 @@ class WindowConnectionController extends ConnectionController {
     _lastTraffic = null;
     _renewTrafficAnchor = null;
     _inboundTraffic.reset();
+    _dataPath.reset();
+    _dataStalled = false;
     _hasEstablishedHandshake = false;
     try {
       if (_createIntent != null) await _create();
@@ -965,7 +980,9 @@ class WindowConnectionController extends ConnectionController {
       phase = confirmed
           ? ConnectionPhase.connected
           : ConnectionPhase.reconnecting;
-      detail = snapshot.confirmed
+      detail = _dataStalled
+          ? 'Нет входящего трафика через VPN, соединение может быть нарушено'
+          : snapshot.confirmed
           ? 'Свежий handshake подтверждён'
           : confirmed
           ? 'Входящий трафик через VPN подтверждён'
@@ -1143,6 +1160,15 @@ class WindowConnectionController extends ConnectionController {
 
   bool _establishedStatusConfirmed(NativeSnapshot snapshot) {
     if (snapshot.confirmed) _hasEstablishedHandshake = true;
+    // ADR-133: a fresh handshake does not prove the return path while data goes out unanswered.
+    _dataStalled =
+        _dataPath.observe(
+          snapshot.receivedBytes,
+          snapshot.trafficBytes,
+          _clock.elapsedMilliseconds,
+        ) ==
+        DataPathState.stalled;
+    if (_dataStalled) return false;
     return snapshot.confirmed ||
         (_hasEstablishedHandshake &&
             snapshot.up &&

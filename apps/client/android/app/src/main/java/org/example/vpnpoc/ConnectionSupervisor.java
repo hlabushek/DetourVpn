@@ -24,6 +24,12 @@ final class ConnectionSupervisor {
     static final long MAX_DELAY_MS = 30 * 60_000;
     /** Up this long without trouble: the retry history is forgotten. */
     static final long STABLE_MS = 10 * 60_000;
+    /**
+     * ADR-134: Android refused a background service start. The intent stays; the next allowed trigger
+     * (network, app open, boot or the alarm) tries again, but not more often than this.
+     */
+    static final String BACKGROUND_REFUSED = "background_start_refused";
+    static final long REFUSED_RETRY_MS = 60_000;
 
     enum Action { NONE, START_RECOVERY, WAIT }
 
@@ -49,6 +55,9 @@ final class ConnectionSupervisor {
     long intentGeneration() { return intentGeneration; }
     int attempts() { return attempts; }
     String lastStop() { return lastStop; }
+
+    /** ADR-134: the stop category the UI may show (Russian text lives in Flutter). */
+    String stopCategory() { return category(lastStop); }
 
     /** Persisted intent read at process start (never treated as a fresh user action). */
     void restore(boolean persistedDesired) { desired = persistedDesired; }
@@ -95,6 +104,17 @@ final class ConnectionSupervisor {
         attempts = Math.min(attempts + 1, 16);
         lastAttemptAt = now;
         nextJitter = Math.max(0, Math.min(jitterForNext, 0.999));
+        if (BACKGROUND_REFUSED.equals(lastStop)) lastStop = "";
+    }
+
+    /**
+     * ADR-134: the background start was refused before anything ran. Not a failed recovery, so the
+     * backoff does not grow; the intent is kept and the stop category says why nothing is running.
+     */
+    void startRefused(long now) {
+        attempts = Math.max(0, attempts - 1);
+        lastAttemptAt = now;
+        lastStop = BACKGROUND_REFUSED;
     }
 
     /** Delay after {@link #attempts} failed attempts: 30 s, 1, 2, 4 ... 30 min, with ±25 % jitter. */
@@ -122,7 +142,8 @@ final class ConnectionSupervisor {
         if (dartOwner) return new Decision(Action.NONE, 0, "dart_owner");
         if (terminal(lastStop)) return new Decision(Action.NONE, 0, "terminal");
         if (!networkUsable) return new Decision(Action.NONE, 0, "waiting_for_network");
-        long wait = lastAttemptAt + backoffMs() - now;
+        long gap = BACKGROUND_REFUSED.equals(lastStop) ? REFUSED_RETRY_MS : backoffMs();
+        long wait = lastAttemptAt + gap - now;
         if (wait > 0) return new Decision(Action.WAIT, wait, "backoff");
         return new Decision(Action.START_RECOVERY, 0, "recover");
     }
@@ -184,6 +205,8 @@ final class ConnectionSupervisor {
                 return "tun_failure";
             case "network_unavailable":
                 return "network_unavailable";
+            case BACKGROUND_REFUSED:
+                return BACKGROUND_REFUSED;
             case "api_unavailable":
             case "window_node_unavailable":
             case "window_activation_refused":
@@ -201,10 +224,20 @@ final class ConnectionSupervisor {
      */
     static String transport(boolean desired, boolean up, boolean connecting,
             boolean networkUsable, boolean handshakeFresh, boolean restartPending) {
+        return transport(desired, up, connecting, networkUsable, handshakeFresh, restartPending, false);
+    }
+
+    /**
+     * ADR-133: {@code dataStalled} (outbound bytes without inbound progress, see
+     * {@link DataPathWatch}) lowers an otherwise connected tunnel to "degraded". It is a display
+     * state only; nothing in the recovery policy reads it.
+     */
+    static String transport(boolean desired, boolean up, boolean connecting,
+            boolean networkUsable, boolean handshakeFresh, boolean restartPending, boolean dataStalled) {
         if (up) {
             if (!networkUsable) return "waiting_for_network";
             if (restartPending) return "reconnecting";
-            return handshakeFresh ? "connected" : "degraded";
+            return handshakeFresh && !dataStalled ? "connected" : "degraded";
         }
         if (connecting) return "connecting";
         if (!desired) return "disconnected";
