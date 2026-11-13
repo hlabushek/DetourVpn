@@ -1,6 +1,8 @@
 # ADR-139 — Keep the VPN alive with the screen off or the app closed; bounded recovery with a terminal end state
 
 **Status:** proposed 2026-11-13 (connection reliability, run 4). Device verification **not done**.
+**Amended by:** ADR-140 (the attempt budgets and the terminal `recovery_exhausted` for transient
+causes are removed; native renewal may run from the restore engine).
 **Amends:** ADR-119 (automatic reconnect had no limit), ADR-124 (adds a terminal state for exhausted
 recovery), ADR-129 (new failure category `recovery_exhausted`).
 

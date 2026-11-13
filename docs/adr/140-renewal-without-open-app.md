@@ -133,6 +133,10 @@ fences; it is out of scope here.
 - JVM: `ProtectedHttps` request/response framing and protect-before-connect; `RenewalOwner`
   transport and owner rules; `ConnectionSupervisor` endless retry, 5 min cap, network return.
 - Dart: `RecoveryBudget` slow-retry; controller keeps retrying past five attempts.
+- Build check: all app Java sources compile with `javac --release 17` against Android SDK 36 and the
+  patched tunnel sources (generated plugin registrant stubbed); no APK was built or installed.
+- `ProtectedHttps.exchange` itself (TLS over a protected socket to the real API) has no automated
+  test; only its framing and protect-before-connect are tested.
 - **Not verified on a device:** hours of uptime, screen off, app closed or killed, reboot, Lockdown.
 
 ## Owner phone steps (NOT VERIFIED — build from this branch, 900 s windows)
