@@ -29,6 +29,7 @@ const _reportableErrors = <String>{
   'network_unavailable',
   'permission_denied',
   'rate_limited',
+  'recovery_exhausted',
   'remote_revoked',
   'renew_token_invalid',
   'revoke_unconfirmed',

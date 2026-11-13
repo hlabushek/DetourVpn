@@ -13,7 +13,7 @@ final class DiagnosticReportText {
         "native_engine_unavailable", "native_io_error", "native_permission_error",
         "native_restart_failed", "native_service_state_invalid", "native_start_failed",
         "native_unavailable", "network_unavailable", "permission_denied", "rate_limited",
-        "remote_revoked", "renew_token_invalid", "revoke_unconfirmed", "session_device_mismatch",
+        "recovery_exhausted", "remote_revoked", "renew_token_invalid", "revoke_unconfirmed", "session_device_mismatch",
         "session_erasure_failed", "session_expired", "session_storage_failed",
         "tunnel_config_not_ready", "tunnel_exists", "tunnel_idempotency_conflict",
         "tunnel_node_capacity", "tunnel_node_unavailable", "tunnel_profile_unavailable",

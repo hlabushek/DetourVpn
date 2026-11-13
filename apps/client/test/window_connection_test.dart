@@ -7,6 +7,7 @@ import 'package:vpn_client/api.dart';
 import 'package:vpn_client/connection.dart';
 import 'package:vpn_client/native_tunnel.dart';
 import 'package:vpn_client/platform_info.dart';
+import 'package:vpn_client/recovery_budget.dart';
 import 'package:vpn_client/settings_screen.dart';
 import 'package:vpn_client/split_apps.dart';
 import 'package:vpn_client/window_connection.dart';
@@ -1418,8 +1419,8 @@ void main() {
     await Future<void>.delayed(const Duration(milliseconds: 300));
     expect(native.up, false);
   });
-  test('auto reconnect has no hard cap and survives failing attempts', () async {
-    // Every create fails transiently: the old limit stopped after 4 tries in 10 minutes.
+  test('ADR-139: automatic reconnect is budgeted and ends in recovery_exhausted', () async {
+    // Every create fails transiently. Before ADR-139 this retried forever.
     final failing = _FailingCreates(api);
     final retrying = WindowConnectionController(
       failing,
@@ -1434,17 +1435,44 @@ void main() {
     await retrying.refresh();
     expect(retrying.error, 'lease_expired');
     failing.fail = true;
-    // Backoff 5, 12.5, 37.5, 75 ms ...: at least five attempts within ~1 s.
-    await Future<void>.delayed(const Duration(milliseconds: 1200));
-    expect(failing.failedCreates, greaterThanOrEqualTo(5));
+    // Five automatic attempts (5, 12.5, 37.5, 75, 150 ms), then the terminal state.
+    await Future<void>.delayed(const Duration(milliseconds: 1000));
+    expect(failing.failedCreates, RecoveryBudget.defaultMaxAttempts);
     expect(retrying.phase, ConnectionPhase.failed);
-    await retrying.disconnect();
+    expect(retrying.error, 'recovery_exhausted');
     final after = failing.failedCreates;
     await Future<void>.delayed(const Duration(milliseconds: 400));
     expect(
       failing.failedCreates,
       after,
-    ); // a user disconnect cancels the retries
+      reason: 'nothing retries after the terminal state',
+    );
+    // The terminal state never blocks the user's own tap: it makes a real attempt. (A manual
+    // attempt that fails is not retried automatically, as before ADR-139.)
+    await retrying.connect();
+    expect(failing.failedCreates, after + 1);
+    expect(retrying.error, 'window_node_unavailable');
+  });
+
+  test('ADR-139: a user disconnect cancels the automatic attempts', () async {
+    final failing = _FailingCreates(api);
+    final retrying = WindowConnectionController(
+      failing,
+      native,
+      pollInterval: const Duration(days: 1),
+      renewBeforeMs: 90000,
+      autoReconnectDelay: const Duration(milliseconds: 20),
+    )..selectedNode = node;
+    addTearDown(retrying.dispose);
+    await retrying.connect();
+    native.remaining = 0;
+    await retrying.refresh();
+    failing.fail = true;
+    await Future<void>.delayed(const Duration(milliseconds: 30));
+    await retrying.disconnect();
+    final after = failing.failedCreates;
+    await Future<void>.delayed(const Duration(milliseconds: 200));
+    expect(failing.failedCreates, after);
   });
   test('lost VPN consent is reported and never reconnected', () async {
     final auto = WindowConnectionController(

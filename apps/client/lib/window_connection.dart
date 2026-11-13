@@ -11,6 +11,7 @@ import 'diagnostic_report.dart';
 import 'native_tunnel.dart';
 import 'panel_servers.dart';
 import 'platform_info.dart';
+import 'recovery_budget.dart';
 
 /// Explicit v3 selection, never falls back to the bounded v2 protocol.
 class WindowConnectionController extends ConnectionController {
@@ -54,7 +55,8 @@ class WindowConnectionController extends ConnectionController {
   /// ADR-124: native still holds the user's wish to be connected, but the running tunnel could
   /// not be adopted (or none runs). The next refresh reconnects without a tap.
   bool _resumeWanted = false;
-  final List<int> _autoReconnectAt = [];
+  /// ADR-139: automatic attempts left in this failure streak. Spent → terminal 'recovery_exhausted'.
+  final RecoveryBudget _recovery = RecoveryBudget();
   static const root = '/api/v1/window-tunnels';
   static const budgetBytes = int.fromEnvironment(
     'VPN_WINDOW_BUDGET_BYTES',
@@ -395,6 +397,7 @@ class WindowConnectionController extends ConnectionController {
     _hasEstablishedHandshake = false;
     _nativeHandshakeSeen = live.handshakeSeen;
     _connectedAtMs = now;
+    _recovery.reset(); // ADR-139: a running tunnel is a successful window.
     remotePending = false;
     error = null;
     diagnosticStage = null;
@@ -426,7 +429,11 @@ class WindowConnectionController extends ConnectionController {
     _working = true;
     final version = ++_version;
     _reconnectAfterCleanup = false;
-    if (!_autoReconnecting) _activationRetries = 0;
+    if (!_autoReconnecting) {
+      _activationRetries = 0;
+      // ADR-139: a user tap starts a fresh streak of automatic attempts.
+      _recovery.reset();
+    }
     error = null;
     diagnosticStage = null;
     phase = ConnectionPhase.connecting;
@@ -527,6 +534,7 @@ class WindowConnectionController extends ConnectionController {
       _nativeHandshakeSeen = false;
       _connectedAtMs = _clock.elapsedMilliseconds;
       _activationRetries = 0;
+      _recovery.reset(); // ADR-139: a new window is up; the next failure starts a fresh streak.
       diagnosticStage = null;
       diagnosticHandshake = null;
       diagnosticHandshakeAge = null;
@@ -1080,10 +1088,6 @@ class WindowConnectionController extends ConnectionController {
   };
   bool _autoReconnecting = false;
 
-  /// Backoff multipliers of [autoReconnectDelay] by attempts in the last 10 minutes
-  /// (2 s, 5 s, 15 s, 30 s, 60 s, then every 2 min with the default delay).
-  static const _backoff = [1, 2.5, 7.5, 15, 30, 60];
-
   /// Why the tunnel is gone. Only a window that really ran out is 'lease_expired'; if the phone
   /// stopped the VPN while time was left (another VPN, system toggle, service restart) say so.
   String _stopCode(NativeSnapshot snapshot) =>
@@ -1095,16 +1099,17 @@ class WindowConnectionController extends ConnectionController {
       ? 'native_down'
       : 'lease_expired';
 
-  /// The tunnel ended without the user pressing Disconnect: connect again on our own with
-  /// backoff and no hard limit (ADR-099). A failed attempt reserves no quota; a user disconnect
-  /// bumps the version and cancels every pending attempt.
+  /// The tunnel ended without the user pressing Disconnect: connect again on our own, with
+  /// backoff and a bounded budget (ADR-139; ADR-099 had no limit). A failed attempt reserves no
+  /// quota; a user disconnect bumps the version and cancels every pending attempt.
   void _scheduleAutoReconnect(int version) {
-    final now = _clock.elapsedMilliseconds;
-    _autoReconnectAt.removeWhere((t) => now - t > 600000);
     final base = autoReconnectDelay;
     if (base == null) return;
-    final step = _backoff[min(_autoReconnectAt.length, _backoff.length - 1)];
-    _autoReconnectAt.add(now);
+    final step = _recovery.take();
+    if (step == null) {
+      _exhaustRecovery();
+      return;
+    }
     final delay = Duration(microseconds: (base.inMicroseconds * step).round());
     Future<void> fire() async {
       if (_dead ||
@@ -1127,6 +1132,18 @@ class WindowConnectionController extends ConnectionController {
     }
 
     unawaited(Future<void>.delayed(delay, fire));
+  }
+
+  /// ADR-139: the automatic budget is spent. This is the terminal failed state of the streak:
+  /// no further timer is scheduled, and the native "stay connected" wish ends so native does not
+  /// start its own background retries. Only a user tap (which resets the budget) reconnects.
+  void _exhaustRecovery() {
+    phase = ConnectionPhase.failed;
+    error = 'recovery_exhausted';
+    _reconnectAfterCleanup = false;
+    _resumeWanted = false;
+    _emit();
+    unawaited(_endUserIntent());
   }
 
   /// ADR-124: the app was reopened (or its UI engine recreated) while the user still wanted
