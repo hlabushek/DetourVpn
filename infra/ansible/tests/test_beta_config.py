@@ -170,3 +170,11 @@ def test_beta_backup_service_uses_a_private_single_archive_slot() -> None:
     assert "OnCalendar=*-*-* 03:17:00 UTC" in timer
     assert "Persistent=true" in timer
     assert "Unit=detourvpn-beta-backup.service" in timer
+
+
+def test_beta_ingress_proxies_the_app_update_routes_to_the_api() -> None:
+    # ADR-107: the app checks and downloads its update through /api/v1/app/*. The publish script
+    # adds this line only on a live host, so the committed template must carry it too.
+    caddy = (BETA / "Caddyfile.ip").read_text(encoding="utf-8")
+    api_block = caddy.split("@beta_api {", maxsplit=1)[1].split("\n\t}", maxsplit=1)[0]
+    assert "\t\tpath /api/v1/app/*" in api_block.splitlines()

@@ -38,6 +38,7 @@ https://{$DETOURVPN_BETA_IP} {
 	@beta_api {
 		path /api/v1/auth/* /api/v1/me /api/v1/me/delete /api/v1/devices /api/v1/devices/*
 		path /api/v1/nodes /api/v1/quota /api/v1/quota/*
+		path /api/v1/app/*
 		path /api/v1/tunnels /api/v1/tunnels/* /api/v1/window-tunnels /api/v1/window-tunnels/*
 		path /api/v1/plans /api/v1/subscriptions /api/v1/rewards/* /api/v1/referrals /api/v1/referrals/*
 		path /admin /admin/* /api/admin/v1/*
