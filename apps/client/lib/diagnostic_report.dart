@@ -74,6 +74,18 @@ const _reportableErrors = <String>{
   'window_replay_conflict',
   'window_runtime_mismatch',
   'window_tunnels_unavailable',
+  'renewal_too_late',
+  'refresh_reused',
+  'connection_fenced',
+  'runtime_unavailable',
+  'device_traffic_cap_reached',
+  'recovery_failed',
+  'session_missing',
+  'node_validation_failed',
+  'invalid_origin',
+  'background_start_refused',
+  'not_found',
+  'forbidden',
 };
 
 const _reportableStages = <String>{

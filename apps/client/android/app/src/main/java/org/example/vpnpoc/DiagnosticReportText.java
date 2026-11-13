@@ -27,7 +27,11 @@ final class DiagnosticReportText {
         "window_node_unavailable", "window_not_active", "window_not_found", "window_not_renewable",
         "window_operator_inventory_conflict", "window_operator_manifest_changed",
         "window_receipt_conflict", "window_receipt_not_found", "window_reconciliation_required",
-        "window_replay_conflict", "window_runtime_mismatch", "window_tunnels_unavailable");
+        "window_replay_conflict", "window_runtime_mismatch", "window_tunnels_unavailable",
+        "renewal_too_late", "refresh_reused", "connection_fenced", "runtime_unavailable",
+        "device_traffic_cap_reached", "recovery_failed", "session_missing",
+        "node_validation_failed", "invalid_origin", "background_start_refused", "not_found",
+        "forbidden");
 
     private static final Set<String> STAGES = Set.of(
         "android_vpn_permission", "connection_reconcile", "device_key_read",
