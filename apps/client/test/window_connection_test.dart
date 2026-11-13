@@ -1458,7 +1458,132 @@ void main() {
     expect(api.renewKeys, isEmpty);
     expect(api.deletes, 1);
   });
+
+  // ADR-124: user intent is separate from engine stops.
+  group('ADR-124 user intent', () {
+    late IntentNative intent;
+    late WindowConnectionController ui;
+    setUp(() {
+      intent = IntentNative()..age = 0;
+      ui = WindowConnectionController(
+        api,
+        intent,
+        pollInterval: const Duration(days: 1),
+        renewBeforeMs: 90000,
+        autoReconnectDelay: const Duration(milliseconds: 5),
+      )..selectedNode = node;
+      addTearDown(ui.dispose);
+    });
+
+    test(
+      'an explicit disconnect ends the native intent before stopping',
+      () async {
+        await ui.connect();
+        expect(ui.phase, isNot(ConnectionPhase.failed));
+        intent.order.clear();
+        await ui.disconnect();
+        expect(intent.intentEnds, 1);
+        expect(intent.order.first, 'endIntent');
+        expect(intent.order.skip(1), everyElement('disconnect'));
+        expect(ui.phase, ConnectionPhase.disconnected);
+      },
+    );
+
+    test('a server switch is not a user disconnect', () async {
+      await ui.connect();
+      api.freshCreates = true;
+      ui.nodes = [
+        NodeOption(node, 'TEST ONLY A', 'test', 'available'),
+        NodeOption(otherNode, 'TEST ONLY B', 'test', 'available'),
+      ];
+      await ui.switchNode(otherNode);
+      expect(intent.intentEnds, 0);
+    });
+
+    test('a reopened UI resumes when native still wants the VPN', () async {
+      // The window ended while no UI engine was attached; the tunnel is gone but the user
+      // never pressed Disconnect.
+      intent.desired = true;
+      intent.up = false;
+      final creates = api.creates;
+      await ui.refresh();
+      expect(ui.phase, ConnectionPhase.reconnecting);
+      expect(ui.detail, 'Восстанавливается подключение');
+      await Future<void>.delayed(const Duration(milliseconds: 200));
+      expect(api.creates, greaterThan(creates));
+      expect(intent.intentEnds, 0);
+    });
+
+    test('a reopened UI stays off when the user had disconnected', () async {
+      intent.desired = false;
+      final creates = api.creates;
+      await ui.refresh();
+      await Future<void>.delayed(const Duration(milliseconds: 100));
+      expect(api.creates, creates);
+      expect(ui.phase, isNot(ConnectionPhase.reconnecting));
+    });
+
+    test('a disconnect during the resume delay cancels it for good', () async {
+      intent.desired = true;
+      final creates = api.creates;
+      await ui.refresh();
+      await ui.disconnect();
+      await Future<void>.delayed(const Duration(milliseconds: 100));
+      expect(api.creates, creates);
+      expect(intent.intentEnds, 1);
+    });
+
+    test('a manual connect that fails for good ends the intent', () async {
+      intent.allowed = false; // VPN permission denied: needs the user
+      await ui.connect();
+      expect(ui.error, 'permission_denied');
+      expect(intent.intentEnds, 1);
+    });
+
+    test('a recoverable stop keeps the intent and reconnects', () async {
+      await ui.connect();
+      intent.up = false;
+      intent.reason = 'native_restart_failed';
+      await ui.refresh();
+      expect(ui.error, 'native_down');
+      expect(intent.intentEnds, 0);
+    });
+  });
 }
+
+/// TEST ONLY native with the ADR-124 intent channel; records calls, holds no state.
+class IntentNative extends Native implements UserIntentHost {
+  bool desired = false;
+  int intentEnds = 0;
+  final order = <String>[];
+  @override
+  Future<void> endUserIntent() async {
+    intentEnds++;
+    desired = false;
+    order.add('endIntent');
+  }
+
+  @override
+  Future<void> disconnect() async {
+    order.add('disconnect');
+    await super.disconnect();
+  }
+
+  @override
+  Future<NativeSnapshot> snapshot() async {
+    final base = await super.snapshot();
+    return NativeSnapshot(
+      up: base.up,
+      network: base.network,
+      handshakeAge: base.handshakeAge,
+      remainingMs: base.remainingMs,
+      reason: base.reason,
+      desiredConnected: desired,
+    );
+  }
+}
+
+const otherNode = '66666666-6666-4666-8666-666666666666';
 
 /// TEST ONLY: delegates to [WindowsApi] but can fail every connection create transiently.
 class _FailingCreates implements TunnelApi {

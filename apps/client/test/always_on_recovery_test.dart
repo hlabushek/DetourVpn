@@ -184,6 +184,24 @@ void main() {
     createApi: (origin, store) => api,
   );
 
+  test('ADR-125: a failed restore tells native why', () async {
+    final args = <Object?>[];
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(channel, (call) async {
+          if (call.method == 'bootstrapFailed') args.add(call.arguments);
+          return null;
+        });
+    await runAlwaysOnRecoveryWithDependencies(
+      store: _EmptySessionStore(),
+      native: _RecoveryNative(),
+      readSelectedNode: () async => _node,
+      createApi: (origin, sessionStore) => _RecoveryApi(availableNode: true),
+    );
+    expect(args, [
+      {'code': 'session_missing'},
+    ]);
+  });
+
   test(
     'missing encrypted session keeps the tunnel down and rejects recovery',
     () async {

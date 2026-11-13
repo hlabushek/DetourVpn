@@ -35,8 +35,17 @@ public final class ClientApplication extends Application implements Tunnel {
     final NativeRenewer renewer = new NativeRenewer(this);
     /** ADR-099; touched only on the worker thread. */
     private final TunnelWatchdog watchdog = new TunnelWatchdog();
-    private android.net.Network defaultNetwork;
-    private boolean defaultNetworkLost;
+    /** ADR-124: user intent, stop reasons and the native recovery trigger; worker thread only. */
+    final ConnectionSupervisor supervisor = new ConnectionSupervisor();
+    /** ADR-125: a UI Flutter engine is attached and its controller owns reconnects. */
+    volatile boolean uiAttached;
+    /** ADR-125: last native recovery note for diagnostics (a code, no data). */
+    private String recoveryNote = "";
+    static final String RECOVER = "org.example.vpnpoc.action.RECOVER";
+    /** ADR-126: one-shot deadline check; replaces the 250 ms polling loop. */
+    private java.util.concurrent.ScheduledFuture<?> deadlineCheck;
+    /** ADR-127: the default physical network; worker thread only. */
+    private final PhysicalNetwork physical = new PhysicalNetwork();
     /** ADR-122: elapsed-realtime of the last default-network change, -1 if none; worker thread. */
     private long lastNetworkChangeAt = -1;
     private java.util.concurrent.ScheduledFuture<?> pendingCheck;
@@ -92,6 +101,7 @@ public final class ClientApplication extends Application implements Tunnel {
                 stopAlwaysOnService(service);
             }
         });
+        worker.execute(() -> supervisor.restore(wantsConnected(this)));
         worker.execute(() -> {
             String initStage = "vault";
             try {
@@ -109,13 +119,128 @@ public final class ClientApplication extends Application implements Tunnel {
         });
         watchNetwork();
         worker.scheduleWithFixedDelay(this::watchTunnel, 15, 15, TimeUnit.SECONDS);
-        worker.scheduleWithFixedDelay(() -> {
-            if (deadline > 0 && SystemClock.elapsedRealtime() >= deadline) {
-                observeHandshake();
-                try { stop(); reason = "lease_expired"; }
-                catch (Exception ignored) { reason = "native_disconnect_failed"; }
+    }
+
+    /**
+     * ADR-126, worker thread. Fail closed once the monotonic deadline has passed. Called from the
+     * one-shot deadline task and from every event that runs after the CPU slept (watchdog tick,
+     * network callbacks, alarms, channel calls), so a delayed timer can never keep a window alive:
+     * elapsed-realtime counts deep sleep, and the node removes the peer at not_after anyway.
+     */
+    void enforceDeadline() {
+        if (deadline > 0 && SystemClock.elapsedRealtime() >= deadline) {
+            observeHandshake();
+            try { stop(); reason = "lease_expired"; }
+            catch (Exception ignored) { reason = "native_disconnect_failed"; }
+            stopped(reason);
+        }
+    }
+
+    /** Worker thread. Sets the native deadline and (re)arms its one-shot check. */
+    void setDeadline(long end) {
+        deadline = end;
+        if (deadlineCheck != null) deadlineCheck.cancel(false);
+        deadlineCheck = null;
+        if (end <= 0) return;
+        long delay = Math.max(0, end - SystemClock.elapsedRealtime()) + 50;
+        deadlineCheck = worker.schedule(this::enforceDeadline, delay, TimeUnit.MILLISECONDS);
+    }
+
+    /**
+     * ADR-124, worker thread. The tunnel stopped without a user disconnect. A terminal reason
+     * ends the user's intent; otherwise the supervisor decides whether native starts recovery.
+     */
+    void stopped(String why) {
+        if (supervisor.tunnelDown(why)) setWantsConnected(this, false);
+        evaluateRecovery();
+    }
+
+    /** ADR-124/125, worker thread. Native recovery runs only when no Dart controller owns it. */
+    void evaluateRecovery() {
+        long now = SystemClock.elapsedRealtime();
+        boolean up = provider != null && provider.isUp() && deadline > 0;
+        var decision = supervisor.evaluate(now, up, false,
+                uiAttached || recoveryEngine != null, physical.usable());
+        switch (decision.action) {
+            case START_RECOVERY:
+                startRecovery(now);
+                break;
+            case WAIT:
+                scheduleRecoveryAlarm(decision.delayMs);
+                break;
+            default:
+                cancelRecoveryAlarm();
+        }
+    }
+
+    private void startRecovery(long now) {
+        if (VpnService.prepare(this) != null) {
+            reason = "vpn_revoked";
+            if (supervisor.tunnelDown(reason)) setWantsConnected(this, false);
+            cancelRecoveryAlarm();
+            return;
+        }
+        supervisor.attemptStarted(now, java.util.concurrent.ThreadLocalRandom.current().nextDouble());
+        try {
+            android.content.Intent restore = new android.content.Intent(this, GoBackend.VpnService.class)
+                    .setAction(GoBackend.VpnService.RESTORE_ACTION);
+            if (android.os.Build.VERSION.SDK_INT >= 26) startForegroundService(restore);
+            else startService(restore);
+            recoveryNote = "restore_started";
+        } catch (RuntimeException refused) {
+            // Android 12+ background-start limits; the next trigger tries again.
+            recoveryNote = "background_start_refused";
+        }
+        // If the restore never reports back (process trouble), look again after the backoff.
+        scheduleRecoveryAlarm(Math.max(supervisor.backoffMs(), 60_000));
+    }
+
+    private void scheduleRecoveryAlarm(long delayMs) {
+        try {
+            alarms().setAndAllowWhileIdle(android.app.AlarmManager.ELAPSED_REALTIME_WAKEUP,
+                    SystemClock.elapsedRealtime() + Math.max(1_000, delayMs), recoveryIntent());
+        } catch (RuntimeException ignored) {
+            // Network and UI triggers still re-evaluate.
+        }
+    }
+
+    private void cancelRecoveryAlarm() {
+        try { alarms().cancel(recoveryIntent()); } catch (RuntimeException ignored) { }
+    }
+
+    private android.app.PendingIntent recoveryIntent() {
+        android.content.Intent intent = new android.content.Intent(this, RenewAlarmReceiver.class)
+                .setAction(RECOVER);
+        return android.app.PendingIntent.getBroadcast(this, 2, intent,
+                android.app.PendingIntent.FLAG_UPDATE_CURRENT
+                        | android.app.PendingIntent.FLAG_IMMUTABLE);
+    }
+
+    /** Alarm receiver entry point (ADR-125). */
+    void wakeRecovery(Runnable done) {
+        worker.execute(() -> {
+            try {
+                enforceDeadline();
+                evaluateRecovery();
+            } finally {
+                done.run();
             }
-        }, 250, 250, TimeUnit.MILLISECONDS);
+        });
+    }
+
+    /** ADR-125: the UI engine attached or detached. Detaching is not a disconnect. */
+    void uiEngine(boolean attached) {
+        uiAttached = attached;
+        worker.execute(this::evaluateRecovery);
+    }
+
+    /** ADR-124: explicit user disconnect (UI channel `setIntent false`). Worker thread. */
+    void userDisconnect() {
+        generation.incrementAndGet();
+        supervisor.userDisconnected();
+        setWantsConnected(this, false);
+        cancelRecoveryAlarm();
+        if (recoveryEngine != null) stopAlwaysOnRecovery();
     }
 
     /** Worker thread. One reading for {@link #handshakes}; never throws. */
@@ -126,28 +251,53 @@ public final class ClientApplication extends Application implements Tunnel {
         } catch (RuntimeException | LinkageError ignored) { /* Diagnostics only. */ }
     }
 
-    /** Default-network changes (Wi-Fi <-> mobile, reconnects) feed the watchdog. */
+    /**
+     * ADR-127: default physical network changes (Wi-Fi <-> mobile, loss and return, a new local
+     * address on the same network) feed the watchdog; a network becoming usable re-checks at once.
+     * The app's own UID is outside the VPN, so this callback sees the physical network.
+     */
     private void watchNetwork() {
         try {
             ConnectivityManager manager = (ConnectivityManager) getSystemService(CONNECTIVITY_SERVICE);
             manager.registerDefaultNetworkCallback(new ConnectivityManager.NetworkCallback() {
                 @Override public void onAvailable(android.net.Network network) {
+                    NetworkCapabilities caps = null;
+                    try { caps = manager.getNetworkCapabilities(network); }
+                    catch (RuntimeException ignored) { /* Capabilities callback follows. */ }
+                    final NetworkCapabilities known = caps;
                     worker.execute(() -> {
-                        boolean changed = defaultNetworkLost
-                                || (defaultNetwork != null && !defaultNetwork.equals(network));
-                        defaultNetwork = network;
-                        defaultNetworkLost = false;
-                        if (changed) {
-                            lastNetworkChangeAt = SystemClock.elapsedRealtime();
-                            watchdog.networkChanged(lastNetworkChangeAt);
-                            scheduleWatch(TunnelWatchdog.SETTLE_MS + 500);
+                        boolean changed = physical.available(network.toString(),
+                                known == null || hasInternet(known), known != null && captive(known),
+                                known != null && validated(known));
+                        if (changed) networkPathChanged();
+                        else scheduleWatch(500);
+                        evaluateRecovery();
+                    });
+                }
+                @Override public void onCapabilitiesChanged(android.net.Network network,
+                        NetworkCapabilities caps) {
+                    boolean internet = hasInternet(caps);
+                    boolean portal = captive(caps);
+                    boolean valid = validated(caps);
+                    worker.execute(() -> {
+                        if (physical.capabilities(network.toString(), internet, portal, valid)) {
+                            scheduleWatch(500);
+                            evaluateRecovery();
                         }
                     });
                 }
-                @Override public void onLost(android.net.Network network) {
+                @Override public void onLinkPropertiesChanged(android.net.Network network,
+                        android.net.LinkProperties properties) {
+                    var addresses = new java.util.TreeSet<String>();
+                    for (var address : properties.getLinkAddresses())
+                        addresses.add(address.getAddress().getHostAddress());
                     worker.execute(() -> {
-                        if (network.equals(defaultNetwork)) defaultNetworkLost = true;
+                        if (physical.linkAddresses(network.toString(), addresses))
+                            networkPathChanged();
                     });
+                }
+                @Override public void onLost(android.net.Network network) {
+                    worker.execute(() -> physical.lost(network.toString()));
                 }
             });
         } catch (RuntimeException unavailable) {
@@ -155,9 +305,29 @@ public final class ClientApplication extends Application implements Tunnel {
         }
     }
 
+    private static boolean hasInternet(NetworkCapabilities caps) {
+        return caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET);
+    }
+
+    private static boolean captive(NetworkCapabilities caps) {
+        return caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_CAPTIVE_PORTAL);
+    }
+
+    private static boolean validated(NetworkCapabilities caps) {
+        return caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED);
+    }
+
+    /** Worker thread. The encrypted transport's path may have moved: verify it after settling. */
+    private void networkPathChanged() {
+        lastNetworkChangeAt = SystemClock.elapsedRealtime();
+        watchdog.networkChanged(lastNetworkChangeAt);
+        scheduleWatch(TunnelWatchdog.SETTLE_MS + 500);
+    }
+
     /** Worker thread. Recreates a stalled tunnel in place; fail-closed if that fails. */
     private void watchTunnel() {
         try {
+            enforceDeadline();
             long now = SystemClock.elapsedRealtime();
             boolean up = provider != null && deadline > 0 && provider.isUp();
             if (!up) { watchdog.tunnelDown(); return; }
@@ -166,7 +336,7 @@ public final class ClientApplication extends Application implements Tunnel {
             long wall = System.currentTimeMillis() / 1000;
             handshakes.observe(handshake, wall);
             long age = handshake > 0 && handshake <= wall ? (wall - handshake) * 1000 : -1;
-            if (!watchdog.shouldRestart(now, age, hasValidatedNetwork())) {
+            if (!watchdog.shouldRestart(now, age, physical.usable())) {
                 schedulePendingWatch(now);
                 return;
             }
@@ -179,6 +349,7 @@ public final class ClientApplication extends Application implements Tunnel {
                 try { stop(); } catch (Exception ignored) { /* Already down. */ }
                 reason = "native_restart_failed";
                 watchdog.tunnelDown();
+                stopped(reason);
             }
         } catch (RuntimeException ignored) {
             // A watchdog bug must never take the tunnel down by itself.
@@ -195,17 +366,6 @@ public final class ClientApplication extends Application implements Tunnel {
     private void scheduleWatch(long delayMs) {
         if (pendingCheck != null) pendingCheck.cancel(false);
         pendingCheck = worker.schedule(this::watchTunnel, delayMs, TimeUnit.MILLISECONDS);
-    }
-
-    private boolean hasValidatedNetwork() {
-        ConnectivityManager manager = (ConnectivityManager) getSystemService(CONNECTIVITY_SERVICE);
-        for (var candidate : manager.getAllNetworks()) {
-            NetworkCapabilities caps = manager.getNetworkCapabilities(candidate);
-            if (caps != null && caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_NOT_VPN)
-                    && caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
-                    && caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)) return true;
-        }
-        return false;
     }
 
     void startAlwaysOnRecovery(VpnService service) {
@@ -252,8 +412,15 @@ public final class ClientApplication extends Application implements Tunnel {
             return;
         }
         if (call.method.equals("bootstrapFailed")) {
+            // ADR-125: the restore engine says why; a terminal code ends the user's intent.
+            String failed = call.arguments instanceof Map ? call.argument("code") : null;
+            String code = failed != null && failed.matches("[a-z_]{1,64}") ? failed : "recovery_failed";
             result.success(null);
-            worker.execute(this::stopAlwaysOnRecovery);
+            worker.execute(() -> {
+                stopAlwaysOnRecovery();
+                if (supervisor.recoveryFailed(code)) setWantsConnected(this, false);
+                evaluateRecovery();
+            });
             return;
         }
         if (call.method.equals("bootstrapComplete")) {
@@ -324,7 +491,7 @@ public final class ClientApplication extends Application implements Tunnel {
                                 ((Number) call.argument("generation")).longValue(),
                                 submittedAt + ((Number) call.argument("remainingMs")).longValue(),
                                 SystemClock.elapsedRealtime());
-                        deadline = window.deadline;
+                        setDeadline(window.deadline);
                         holdCpu();
                         scheduleRestoreWake();
                         break;
@@ -339,7 +506,7 @@ public final class ClientApplication extends Application implements Tunnel {
                         window.start(call.argument("connection"), call.argument("runtime"),
                                 ((Number) call.argument("generation")).longValue(), end,
                                 SystemClock.elapsedRealtime());
-                        deadline = end;
+                        setDeadline(end);
                         handshakes.reset();
                         try {
                             provider.connect(config);
@@ -485,12 +652,13 @@ public final class ClientApplication extends Application implements Tunnel {
                 setWantsConnected(this, false);
                 renewer.stop();
                 reason = "vpn_revoked";
+                supervisor.tunnelDown(reason);
             }
             if (service == null || recoveryService != service) return;
             cancelRestoreWake();
             recoveryChannel = null;
             generation.incrementAndGet();
-            deadline = 0;
+            setDeadline(0);
             window.clear();
             recoveryService = null;
             ProtectedApiRelay relay = protectedRelay;
@@ -536,6 +704,7 @@ public final class ClientApplication extends Application implements Tunnel {
      */
     long[] renewalView(long appGeneration) throws Exception {
         return worker.submit(() -> {
+            enforceDeadline();
             if (generation.get() != appGeneration || provider == null || !provider.isUp()
                     || deadline <= 0)
                 throw new IllegalStateException();
@@ -556,7 +725,7 @@ public final class ClientApplication extends Application implements Tunnel {
                 if (generation.get() != appGeneration || provider == null || !provider.isUp())
                     throw new IllegalStateException();
                 window.advance(connection, runtime, version, end, SystemClock.elapsedRealtime());
-                deadline = window.deadline;
+                setDeadline(window.deadline);
                 return null;
             }).get(5, TimeUnit.SECONDS);
         } catch (java.util.concurrent.ExecutionException failure) {
@@ -569,18 +738,21 @@ public final class ClientApplication extends Application implements Tunnel {
         cancelRestoreWake();
         releaseCpu();
         if (provider != null) provider.disconnect();
-        deadline = 0;
+        setDeadline(0);
         window.clear();
     }
     Map<String, Object> snapshot() {
         if (provider == null) throw new IllegalStateException();
+        enforceDeadline();
         boolean up = provider.isUp();
         long handshake = up ? provider.lastHandshakeSeconds() : 0;
         long now = System.currentTimeMillis() / 1000;
         handshakes.observe(handshake, now);
-        boolean network = hasValidatedNetwork();
+        // ADR-127: a usable physical network (INTERNET, no captive portal); validation separate.
+        boolean network = physical.usable();
         Map<String, Object> value = new HashMap<>();
         value.put("up", up); value.put("network", network);
+        value.put("networkValidated", physical.validated());
         value.put("handshakeAge", handshake > 0 && handshake <= now ? now - handshake : -1L);
         value.put("remainingMs", Math.max(0, deadline - SystemClock.elapsedRealtime()));
         try {
@@ -605,8 +777,30 @@ public final class ClientApplication extends Application implements Tunnel {
             value.put("windowGeneration", window.generation);
         }
         value.put("tunnelRestarts", (long) tunnelRestarts);
+        // ADR-124/128: additive, authoritative native state. Codes only; no endpoint or key.
+        long changeAge = lastNetworkChangeAt < 0 ? -1 : SystemClock.elapsedRealtime() - lastNetworkChangeAt;
+        long handshakeAge = handshake > 0 && handshake <= now ? now - handshake : -1;
+        boolean afterChange = handshakeAge >= 0 && (changeAge < 0 || handshakeAge * 1000 < changeAge);
+        boolean tunnelUp = up && deadline > 0;
+        value.put("desiredConnected", supervisor.desired());
+        value.put("transport", ConnectionSupervisor.transport(supervisor.desired(), tunnelUp,
+                false, network, afterChange && handshakeAge <= 180,
+                watchdog.pendingNetworkDelayMs(SystemClock.elapsedRealtime()) >= 0));
+        value.put("evidence", ConnectionSupervisor.evidence(tunnelUp, handshakeAge, afterChange, false));
+        value.put("failureCategory", ConnectionSupervisor.category(tunnelUp ? "" : reason));
+        value.put("recoveryAttempts", (long) supervisor.attempts());
+        value.put("recoveryNote", recoveryNote);
+        value.put("uiAttached", uiAttached);
         return value;
     }
+    /** ADR-124: the native supervisor line for the diagnostic report. Worker thread. */
+    String diagnosticLine() {
+        Map<String, Object> state = snapshot();
+        return DiagnosticReportText.nativeLine((String) state.get("transport"),
+                (String) state.get("evidence"), (String) state.get("failureCategory"),
+                supervisor.desired(), physical.validated(), supervisor.attempts(), tunnelRestarts);
+    }
+
     @Override public String getName() { return "i013"; }
     @Override public void onStateChange(State state) { /* Status is read from serialized backend. */ }
 }

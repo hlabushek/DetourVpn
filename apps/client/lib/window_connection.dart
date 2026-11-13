@@ -48,6 +48,10 @@ class WindowConnectionController extends ConnectionController {
   static const maxActivationRetries = 3;
   int _activationRetries = 0;
   bool _switching = false;
+
+  /// ADR-124: native still holds the user's wish to be connected, but the running tunnel could
+  /// not be adopted (or none runs). The next refresh reconnects without a tap.
+  bool _resumeWanted = false;
   final List<int> _autoReconnectAt = [];
   static const root = '/api/v1/window-tunnels';
   static const budgetBytes = int.fromEnvironment(
@@ -257,6 +261,7 @@ class WindowConnectionController extends ConnectionController {
         live.connectionId != null &&
         live.windowGeneration != null;
     if (!adoptable) {
+      _resumeWanted = live?.desiredConnected == true;
       diagnosticStage = 'native_disconnect';
       await native.disconnect();
     }
@@ -283,6 +288,7 @@ class WindowConnectionController extends ConnectionController {
         _synced = true;
         return true;
       }
+      _resumeWanted = live.desiredConnected;
       diagnosticStage = 'native_disconnect';
       await native.disconnect();
       diagnosticStage = 'connection_reconcile';
@@ -437,7 +443,9 @@ class WindowConnectionController extends ConnectionController {
       // public key before asking the API to enumerate connections for it.
       await _ensureDevice();
       if (_cancelled(version)) return;
-      if (await _reconcile()) {
+      final adopted = await _reconcile();
+      _resumeWanted = false; // This connect is the resume.
+      if (adopted) {
         // ADR-117: the VPN was still running; keep it, the next refresh confirms it.
         startPolling();
         return;
@@ -527,8 +535,13 @@ class WindowConnectionController extends ConnectionController {
         // ADR-099: an automatic reconnect that hit a temporary failure keeps trying.
         if (activation
             ? _activationRetries <= maxActivationRetries
-            : _autoReconnecting && _retryCodes.contains(error))
+            : _autoReconnecting && _retryCodes.contains(error)) {
           _scheduleAutoReconnect(version);
+        } else {
+          // ADR-124: a failure nobody retries ends the native "stay connected" wish, so the
+          // phone does not try again in the background behind the user's back.
+          await _endUserIntent();
+        }
       }
     }
   }
@@ -750,14 +763,29 @@ class WindowConnectionController extends ConnectionController {
     unawaited(refreshQuota());
   }
 
+  /// ADR-124: ends the native "stay connected" wish. Best effort; never throws.
+  Future<void> _endUserIntent() async {
+    final host = native;
+    if (host is! UserIntentHost) return;
+    try {
+      await (host as UserIntentHost).endUserIntent();
+    } catch (_) {
+      /* The engine stop that follows still happens. */
+    }
+  }
+
+  /// [user]: an explicit disconnect (button, sign-out). It also ends the native "stay
+  /// connected" wish, which cancels any background recovery for good. A server switch is not.
   @override
-  Future<void> disconnect() async {
+  Future<void> disconnect({bool user = true}) async {
     if (_closed) return;
     _closed = true;
     ++_version;
     _reconnectAfterCleanup = false;
+    _resumeWanted = false;
     _emit();
     try {
+      if (user) await _endUserIntent();
       await native.disconnect();
       await _connectWork;
       await _refreshWork;
@@ -818,7 +846,13 @@ class WindowConnectionController extends ConnectionController {
       // its local public key. Bind first so the per-device reconciliation query
       // can safely return this phone's prior connections (if any).
       await _reconcile();
-      if (_cancelled(version) || _id == null) return;
+      if (_cancelled(version)) return;
+      if (_resumeWanted && !hasLease) {
+        _resumeWanted = false;
+        _scheduleResume(version);
+        return;
+      }
+      if (_id == null) return;
       var snapshot = await native.snapshot();
       if (_cancelled(version)) return;
       // Read before any stop check below, so a window that just ended still reports it.
@@ -969,6 +1003,8 @@ class WindowConnectionController extends ConnectionController {
           } else {
             _reconnectAfterCleanup = true;
           }
+        } else {
+          await _endUserIntent(); // ADR-124: terminal for this connection.
         }
       }
     }
@@ -1046,6 +1082,32 @@ class WindowConnectionController extends ConnectionController {
     unawaited(Future<void>.delayed(delay, fire));
   }
 
+  /// ADR-124: the app was reopened (or its UI engine recreated) while the user still wanted
+  /// the VPN and nothing adoptable was running: connect again without a tap.
+  void _scheduleResume(int version) {
+    final base = autoReconnectDelay;
+    if (base == null) return;
+    error = null;
+    phase = ConnectionPhase.reconnecting;
+    detail = 'Восстанавливается подключение';
+    _emit();
+    Future<void> fire() async {
+      if (_dead || _version != version || hasLease) return;
+      if (_working || _polling) {
+        unawaited(Future<void>.delayed(base, fire));
+        return;
+      }
+      _autoReconnecting = true;
+      try {
+        await connect();
+      } finally {
+        _autoReconnecting = false;
+      }
+    }
+
+    unawaited(Future<void>.delayed(base, fire));
+  }
+
   /// ADR-119: choose another server. While connected or connecting: stop, settle the old
   /// connection (a pending create keeps its idempotency key), then connect to the new server.
   /// A switch while another one runs is ignored.
@@ -1066,7 +1128,7 @@ class WindowConnectionController extends ConnectionController {
       return;
     _switching = true;
     try {
-      await disconnect();
+      await disconnect(user: false);
       if (_dead) return;
       await _refreshWork;
       if (_dead) return;

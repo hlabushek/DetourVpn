@@ -16,6 +16,9 @@ public final class RenewAlarmReceiver extends BroadcastReceiver {
         } else if (ClientApplication.WAKE_RESTORE.equals(intent.getAction())) {
             PendingResult pending = goAsync();
             app.wakeRestore(pending::finish); // ADR-121
+        } else if (ClientApplication.RECOVER.equals(intent.getAction())) {
+            PendingResult pending = goAsync();
+            app.wakeRecovery(pending::finish); // ADR-125
         }
     }
 }

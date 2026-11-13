@@ -28,7 +28,17 @@ class NativeSnapshot {
     this.windowGeneration,
     this.restoreActive = false,
     this.networkChangeAgeMs,
+    this.desiredConnected = false,
+    this.transport,
   });
+
+  /// ADR-124: the user's persisted wish to stay connected, held natively. Only an explicit
+  /// disconnect or a terminal failure clears it. False on older builds and on Windows.
+  final bool desiredConnected;
+
+  /// ADR-124: the native supervisor's transport state (`connected`, `degraded`,
+  /// `reconnecting`, `waiting_for_network`, ...). Diagnostics; null on older builds.
+  final String? transport;
 
   /// ADR-122: milliseconds since the phone's default network last changed; null if never or
   /// unknown (older native builds, Windows).
@@ -127,6 +137,12 @@ abstract interface class NativeRenewalHost {
   Future<bool> startNativeRenewal(Map<String, Object?> args);
 }
 
+/// ADR-124: an explicit user disconnect ends the native "stay connected" intent. A plain
+/// [NativeTunnel.disconnect] only stops the engine (cleanups and server switches use it too).
+abstract interface class UserIntentHost {
+  Future<void> endUserIntent();
+}
+
 /// ADR-121: end the restore engine and keep its running tunnel for the app UI.
 abstract interface class RestoreHandover {
   /// True only if the restore engine was ended and the tunnel is still up.
@@ -160,8 +176,21 @@ class PlatformTunnel
         NodePreferenceStore,
         NativeRenewalHost,
         RestoreHandover,
+        UserIntentHost,
         VlessNative {
   static const channel = MethodChannel('project.vpn/tunnel.v1');
+
+  @override
+  Future<void> endUserIntent() async {
+    try {
+      await channel.invokeMethod<void>('setIntent', {'connected': false});
+    } on PlatformException {
+      // The disconnect that follows still stops the engine.
+    } on MissingPluginException {
+      // Windows and older builds have no native intent.
+    }
+  }
+
   @override
   Future<bool> adoptRestore() async {
     try {
@@ -264,6 +293,10 @@ class PlatformTunnel
           value['networkChangeAgeMs'] is int &&
               (value['networkChangeAgeMs'] as int) >= 0
           ? value['networkChangeAgeMs'] as int
+          : null,
+      desiredConnected: value['desiredConnected'] == true,
+      transport: value['transport'] is String
+          ? value['transport'] as String
           : null,
     );
   }

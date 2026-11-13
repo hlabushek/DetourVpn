@@ -40,4 +40,29 @@ final class DiagnosticReportText {
         return "DetourVpn — отчёт диагностики\nКод: " + code + "\nЭтап: " + stage
                 + (handshake == null ? "" : "\nHandshake: " + handshake);
     }
+
+    private static final Set<String> TRANSPORTS = Set.of("disconnected", "connecting", "connected",
+            "degraded", "reconnecting", "waiting_for_network", "failed");
+    private static final Set<String> EVIDENCE = Set.of("none", "core_running", "inbound_data",
+            "peer_handshake", "peer_and_inbound_data");
+    private static final Set<String> CATEGORIES = Set.of("none", "transient", "user_stop",
+            "permission_revoked", "auth_rejected", "quota_exhausted", "invalid_config",
+            "window_expired", "native_core_failure", "tun_failure", "network_unavailable",
+            "server_unreachable");
+
+    /**
+     * ADR-124/128: one line of native supervisor state, appended natively at share time. Fixed
+     * code sets and small counters only: no address, key, account or traffic data.
+     */
+    static String nativeLine(String transport, String evidence, String category, boolean desired,
+            boolean networkValidated, long recoveryAttempts, long tunnelRestarts) {
+        if (!TRANSPORTS.contains(transport) || !EVIDENCE.contains(evidence)
+                || !CATEGORIES.contains(category) || recoveryAttempts < 0 || tunnelRestarts < 0)
+            throw new IllegalArgumentException();
+        return "\nVPN: " + transport + ", " + evidence + ", " + category
+                + ", intent=" + (desired ? "on" : "off")
+                + ", validated=" + (networkValidated ? "yes" : "no")
+                + ", recoveries=" + Math.min(recoveryAttempts, 99)
+                + ", restarts=" + Math.min(tunnelRestarts, 999);
+    }
 }

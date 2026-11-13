@@ -68,6 +68,7 @@ public final class ClientActivity extends FlutterActivity {
     }
     @Override public void configureFlutterEngine(FlutterEngine engine) {
         super.configureFlutterEngine(engine);
+        owner().uiEngine(true); // ADR-125: this engine's controller owns reconnects while attached.
         new MethodChannel(engine.getDartExecutor().getBinaryMessenger(), "project.vpn/tunnel.v1")
             .setMethodCallHandler(this::handle);
     }
@@ -187,29 +188,44 @@ public final class ClientActivity extends FlutterActivity {
                 result.error("diagnostic_report_invalid", "Отчёт диагностики недоступен", null);
                 return;
             }
-            try {
-                Intent report = new Intent(Intent.ACTION_SEND);
-                report.setType("text/plain");
-                report.putExtra(Intent.EXTRA_TEXT, reportText);
-                startActivity(Intent.createChooser(report, "Поделиться диагностикой"));
-                result.success(null);
-            } catch (RuntimeException unavailable) {
-                result.error("diagnostic_share_unavailable", "Не удалось открыть отправку отчёта", null);
-            }
+            // ADR-124: the native state line is read on the worker that owns it.
+            ClientApplication shared = owner();
+            shared.worker.execute(() -> {
+                String nativeState = "";
+                try { nativeState = shared.diagnosticLine(); }
+                catch (RuntimeException unavailable) { /* Report without the native line. */ }
+                String text = reportText + nativeState;
+                runOnUiThread(() -> {
+                    try {
+                        Intent report = new Intent(Intent.ACTION_SEND);
+                        report.setType("text/plain");
+                        report.putExtra(Intent.EXTRA_TEXT, text);
+                        startActivity(Intent.createChooser(report, "Поделиться диагностикой"));
+                        result.success(null);
+                    } catch (RuntimeException unavailable) {
+                        result.error("diagnostic_share_unavailable", "Не удалось открыть отправку отчёта", null);
+                    }
+                });
+            });
             return;
         }
         if (!java.util.Set.of("publicKey", "prove", "connect", "connectWindow", "advanceWindow",
                 "disconnect", "snapshot", "sessionRead", "sessionWrite", "pendingLoginRead",
                 "pendingLoginWrite", "splitRead", "splitModeRead", "splitLastModeRead",
                 "splitWrite", "splitDomainsRead", "apps", "nodeRead", "nodeWrite",
-                "startNativeRenewal", "adoptRestore", "dnsRead", "dnsWrite").contains(call.method)) {
+                "startNativeRenewal", "adoptRestore", "dnsRead", "dnsWrite", "setIntent").contains(call.method)) {
             result.notImplemented(); return;
         }
         ClientApplication app = owner();
-        if (call.method.equals("disconnect")) {
+        // ADR-124: `disconnect` only stops the engine (also used by cleanups and switches); the
+        // user's intent ends only with `setIntent {connected: false}` or a terminal failure.
+        boolean userStop = call.method.equals("setIntent");
+        if (userStop && !Boolean.FALSE.equals(call.argument("connected"))) {
+            result.error("native_operation_failed", "Операция VPN не выполнена", null);
+            return;
+        }
+        if (call.method.equals("disconnect") || userStop) {
             app.generation.incrementAndGet();
-            // Any app-side disconnect (button, logout, failed lease) ends the restore intent.
-            ClientApplication.setWantsConnected(app, false);
             if (permissionResult != null) { permissionResult.success(false); permissionResult = null; }
         }
         final long generation = app.generation.get();
@@ -336,7 +352,7 @@ public final class ClientActivity extends FlutterActivity {
                         app.window.advance(call.argument("connection"), call.argument("runtime"),
                             ((Number) call.argument("generation")).longValue(),
                             submittedAt + ((Number) call.argument("remainingMs")).longValue(), SystemClock.elapsedRealtime());
-                        app.deadline = app.window.deadline;
+                        app.setDeadline(app.window.deadline);
                         break;
                     case "startNativeRenewal":
                         // ADR-097: only for the tunnel this call raced against; a disconnect in
@@ -357,6 +373,7 @@ public final class ClientActivity extends FlutterActivity {
                         call.argument("ephemeralKey"), call.argument("transcript")); break;
                     case "snapshot": value = app.snapshot(); break;
                     case "disconnect": app.stop(); break;
+                    case "setIntent": app.userDisconnect(); break;
                     case "connect":
                     case "connectWindow":
                         boolean renewable = call.method.equals("connectWindow");
@@ -369,7 +386,7 @@ public final class ClientActivity extends FlutterActivity {
                         if (SystemClock.elapsedRealtime() >= deadline) throw new IllegalStateException();
                         if (renewable) app.window.start(call.argument("connection"), call.argument("runtime"),
                             ((Number) call.argument("generation")).longValue(), deadline, SystemClock.elapsedRealtime());
-                        app.deadline = deadline;
+                        app.setDeadline(deadline);
                         try {
                             app.provider.connect(config);
                             if (generation != app.generation.get() || SystemClock.elapsedRealtime() >= deadline) {
@@ -379,6 +396,7 @@ public final class ClientActivity extends FlutterActivity {
                         } catch (Exception failure) { app.stop(); throw failure; }
                         if (renewable) {
                             ClientApplication.setWantsConnected(app, true);
+                            app.supervisor.userConnected(); // ADR-124
                             runOnUiThread(this::askBatteryExemption);
                         }
                         break;
@@ -595,6 +613,7 @@ public final class ClientActivity extends FlutterActivity {
     }
     @Override public void cleanUpFlutterEngine(FlutterEngine engine) {
         if (permissionResult != null) { permissionResult.success(false); permissionResult = null; }
+        owner().uiEngine(false); // ADR-125: not a disconnect; native may start recovery later.
         super.cleanUpFlutterEngine(engine);
     }
 }

@@ -123,7 +123,8 @@ class DiagnosticReportButton extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'В отчёте только код ошибки, этап и был ли handshake. Он не содержит данных '
+              'В отчёте только код ошибки, этап, был ли handshake и коды состояния VPN '
+              '(на Android). Он не содержит данных '
               'аккаунта, ключей, адресов или истории трафика. '
               '${isWindowsClient ? 'Отчёт будет скопирован в буфер обмена, ничего не отправляется автоматически.' : 'Отправка начнётся только после выбора приложения Android.'}',
             ),

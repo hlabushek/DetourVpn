@@ -91,7 +91,12 @@ Future<void> _runAlwaysOnRecovery({
 
     // Keep the controller alive to renew the lease and enforce its monotonic deadline.
     await Completer<void>().future;
-  } catch (_) {
+  } catch (e) {
+    // ADR-125: tell native why, so a terminal reason (session, quota) ends the user's wish
+    // instead of being retried in the background.
+    final code = e is ClientError && e.code != 'recovery_failed'
+        ? e.code
+        : controller?.error ?? 'recovery_failed';
     controller?.dispose();
     try {
       await native.disconnect();
@@ -99,7 +104,9 @@ Future<void> _runAlwaysOnRecovery({
       // The native deadline and Android Lockdown remain the final fail-closed boundary.
     }
     try {
-      await _recoveryChannel.invokeMethod<void>('bootstrapFailed');
+      await _recoveryChannel.invokeMethod<void>('bootstrapFailed', {
+        'code': code,
+      });
     } catch (_) {
       // If the channel is unavailable, the Android service remains non-sticky.
     }

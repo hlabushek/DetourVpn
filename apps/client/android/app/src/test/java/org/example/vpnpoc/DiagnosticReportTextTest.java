@@ -29,4 +29,15 @@ public class DiagnosticReportTextTest {
         assertThrows(IllegalArgumentException.class,
             () -> DiagnosticReportText.format("a".repeat(65), "lease_create"));
     }
+
+    @Test public void nativeLineUsesOnlyFixedCodes() {
+        assertEquals("\nVPN: degraded, core_running, transient, intent=on, validated=no,"
+                + " recoveries=2, restarts=3",
+                DiagnosticReportText.nativeLine("degraded", "core_running", "transient", true,
+                        false, 2, 3));
+        assertThrows(IllegalArgumentException.class, () -> DiagnosticReportText.nativeLine(
+                "10.0.0.1", "none", "none", false, false, 0, 0));
+        assertThrows(IllegalArgumentException.class, () -> DiagnosticReportText.nativeLine(
+                "connected", "end_to_end_verified", "none", false, false, 0, 0));
+    }
 }
