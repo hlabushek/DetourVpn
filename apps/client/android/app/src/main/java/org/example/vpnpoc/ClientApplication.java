@@ -180,6 +180,13 @@ public final class ClientApplication extends Application implements Tunnel {
             case WAIT:
                 scheduleRecoveryAlarm(decision.delayMs);
                 break;
+            case EXHAUSTED:
+                // ADR-139: terminal. The supervisor already cleared the intent; persist it so a
+                // process restart or boot does not start again, and say why in the snapshot.
+                setWantsConnected(this, false);
+                recoveryNote = ConnectionSupervisor.EXHAUSTED;
+                cancelRecoveryAlarm();
+                break;
             default:
                 cancelRecoveryAlarm();
         }

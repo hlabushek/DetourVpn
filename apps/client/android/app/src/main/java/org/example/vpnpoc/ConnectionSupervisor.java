@@ -30,8 +30,16 @@ final class ConnectionSupervisor {
      */
     static final String BACKGROUND_REFUSED = "background_start_refused";
     static final long REFUSED_RETRY_MS = 60_000;
+    /**
+     * ADR-139: recovery attempts per failure streak (reset after {@link #STABLE_MS} up). With the
+     * 30 s doubling backoff this spans about 1.5 h; then the supervisor ends the intent with
+     * {@link #EXHAUSTED} instead of retrying forever.
+     */
+    static final int MAX_ATTEMPTS = 8;
+    static final String EXHAUSTED = "recovery_exhausted";
 
-    enum Action { NONE, START_RECOVERY, WAIT }
+    /** {@link #EXHAUSTED}: the caller must persist the cleared intent and cancel the alarm. */
+    enum Action { NONE, START_RECOVERY, WAIT, EXHAUSTED }
 
     /** One decision; {@link #delayMs} is set for {@link Action#WAIT}. */
     static final class Decision {
@@ -101,7 +109,7 @@ final class ConnectionSupervisor {
     boolean recoveryFailed(String code) { return tunnelDown(code == null ? "recovery_failed" : code); }
 
     void attemptStarted(long now, double jitterForNext) {
-        attempts = Math.min(attempts + 1, 16);
+        attempts = Math.min(attempts + 1, MAX_ATTEMPTS + 8);
         lastAttemptAt = now;
         nextJitter = Math.max(0, Math.min(jitterForNext, 0.999));
         if (BACKGROUND_REFUSED.equals(lastStop)) lastStop = "";
@@ -141,6 +149,13 @@ final class ConnectionSupervisor {
         if (connecting) return new Decision(Action.NONE, 0, "connecting");
         if (dartOwner) return new Decision(Action.NONE, 0, "dart_owner");
         if (terminal(lastStop)) return new Decision(Action.NONE, 0, "terminal");
+        if (attempts >= MAX_ATTEMPTS) {
+            // ADR-139: the budget is spent. Terminal: no further native start for this intent.
+            desired = false;
+            lastStop = EXHAUSTED;
+            intentGeneration++;
+            return new Decision(Action.EXHAUSTED, 0, "exhausted");
+        }
         if (!networkUsable) return new Decision(Action.NONE, 0, "waiting_for_network");
         long gap = BACKGROUND_REFUSED.equals(lastStop) ? REFUSED_RETRY_MS : backoffMs();
         long wait = lastAttemptAt + gap - now;
@@ -150,7 +165,8 @@ final class ConnectionSupervisor {
 
     /**
      * Stop reasons after which reconnecting cannot help without the user: lost VPN consent,
-     * rejected credentials, exhausted quota, an invalid profile or device, a user stop.
+     * rejected credentials, exhausted quota, an invalid profile or device, a user stop, or a spent
+     * recovery budget (ADR-139).
      */
     static boolean terminal(String reason) {
         switch (category(reason)) {
@@ -159,6 +175,7 @@ final class ConnectionSupervisor {
             case "quota_exhausted":
             case "invalid_config":
             case "user_stop":
+            case EXHAUSTED:
                 return true;
             default:
                 return false;
@@ -207,6 +224,8 @@ final class ConnectionSupervisor {
                 return "network_unavailable";
             case BACKGROUND_REFUSED:
                 return BACKGROUND_REFUSED;
+            case EXHAUSTED:
+                return EXHAUSTED;
             case "api_unavailable":
             case "window_node_unavailable":
             case "window_activation_refused":

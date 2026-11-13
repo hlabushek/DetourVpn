@@ -234,4 +234,61 @@ public class ConnectionSupervisorTest {
         assertFalse(ConnectionSupervisor.terminal("something_new"));
         assertFalse(ConnectionSupervisor.terminal(""));
     }
+
+    /** ADR-139: a spent budget ends the intent in a terminal, named state instead of retrying. */
+    @Test public void recoveryBudgetEndsInTerminalExhaustedState() {
+        var s = connected();
+        s.tunnelDown("lease_expired");
+        long now = 0;
+        for (int i = 0; i < ConnectionSupervisor.MAX_ATTEMPTS; i++) {
+            var d = s.evaluate(now, false, false, false, true);
+            if (d.action == ConnectionSupervisor.Action.WAIT) {
+                now += d.delayMs;
+                d = s.evaluate(now, false, false, false, true);
+            }
+            assertEquals("attempt " + i, ConnectionSupervisor.Action.START_RECOVERY, d.action);
+            s.attemptStarted(now, 0.5);
+            assertFalse(s.recoveryFailed("api_unavailable"));
+        }
+        long generation = s.intentGeneration();
+        var end = s.evaluate(now + ConnectionSupervisor.MAX_DELAY_MS * 2, false, false, false, true);
+        assertEquals(ConnectionSupervisor.Action.EXHAUSTED, end.action);
+        assertFalse("the intent is cleared", s.desired());
+        assertTrue("work for the old intent is fenced", s.intentGeneration() > generation);
+        assertEquals("recovery_exhausted", s.lastStop());
+        assertEquals("recovery_exhausted", s.stopCategory());
+        assertTrue(ConnectionSupervisor.terminal("recovery_exhausted"));
+        // Stays terminal on every later trigger (alarm, network, boot): nothing starts again.
+        assertEquals(ConnectionSupervisor.Action.NONE,
+                s.evaluate(now + 10 * ConnectionSupervisor.MAX_DELAY_MS, false, false, false, true).action);
+    }
+
+    @Test public void attachedDartOwnerKeepsItsOwnBudgetAndNativeDoesNotExhaustIt() {
+        var s = connected();
+        s.tunnelDown("lease_expired");
+        for (int i = 0; i < ConnectionSupervisor.MAX_ATTEMPTS; i++) s.attemptStarted(0, 0.5);
+        assertEquals("dart_owner", s.evaluate(1, false, false, true, true).why);
+        assertTrue(s.desired());
+    }
+
+    @Test public void userConnectAfterExhaustionStartsAFreshStreak() {
+        var s = connected();
+        s.tunnelDown("lease_expired");
+        for (int i = 0; i < ConnectionSupervisor.MAX_ATTEMPTS; i++) s.attemptStarted(0, 0.5);
+        assertEquals(ConnectionSupervisor.Action.EXHAUSTED, s.evaluate(1, false, false, false, true).action);
+        s.userConnected();
+        assertTrue(s.desired());
+        assertEquals(0, s.attempts());
+        assertEquals("", s.lastStop());
+        s.tunnelDown("lease_expired");
+        assertEquals(ConnectionSupervisor.Action.START_RECOVERY,
+                s.evaluate(2, false, false, false, true).action);
+    }
+
+    @Test public void offlineDoesNotHideAnExhaustedBudget() {
+        var s = connected();
+        s.tunnelDown("native_restart_failed");
+        for (int i = 0; i < ConnectionSupervisor.MAX_ATTEMPTS; i++) s.attemptStarted(0, 0.5);
+        assertEquals(ConnectionSupervisor.Action.EXHAUSTED, s.evaluate(1, false, false, false, false).action);
+    }
 }
