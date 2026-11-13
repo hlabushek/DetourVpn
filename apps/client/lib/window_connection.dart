@@ -55,6 +55,10 @@ class WindowConnectionController extends ConnectionController {
   /// ADR-124: native still holds the user's wish to be connected, but the running tunnel could
   /// not be adopted (or none runs). The next refresh reconnects without a tap.
   bool _resumeWanted = false;
+
+  /// ADR-139: native reported a spent recovery budget at startup; shown as the terminal state.
+  bool _nativeExhausted = false;
+
   /// ADR-139: automatic attempts left in this failure streak. Spent → terminal 'recovery_exhausted'.
   final RecoveryBudget _recovery = RecoveryBudget();
   static const root = '/api/v1/window-tunnels';
@@ -264,6 +268,14 @@ class WindowConnectionController extends ConnectionController {
     } catch (_) {
       live = null;
     }
+    if (live != null) {
+      alwaysOnStatus = live.alwaysOn ?? alwaysOnStatus;
+      // ADR-139: native spent its background budget while no UI was open; say so once.
+      _nativeExhausted =
+          !live.up &&
+          !live.desiredConnected &&
+          live.stopCategory == 'recovery_exhausted';
+    }
     final adoptable =
         live != null &&
         live.up &&
@@ -464,6 +476,7 @@ class WindowConnectionController extends ConnectionController {
       if (_cancelled(version)) return;
       final adopted = await _reconcile();
       _resumeWanted = false; // This connect is the resume.
+      _nativeExhausted = false; // The user tapped: a fresh streak.
       if (adopted) {
         // ADR-117: the VPN was still running; keep it, the next refresh confirms it.
         startPolling();
@@ -534,7 +547,8 @@ class WindowConnectionController extends ConnectionController {
       _nativeHandshakeSeen = false;
       _connectedAtMs = _clock.elapsedMilliseconds;
       _activationRetries = 0;
-      _recovery.reset(); // ADR-139: a new window is up; the next failure starts a fresh streak.
+      // ADR-139: a new window is up; the next failure starts a fresh streak.
+      _recovery.reset();
       diagnosticStage = null;
       diagnosticHandshake = null;
       diagnosticHandshakeAge = null;
@@ -855,6 +869,7 @@ class WindowConnectionController extends ConnectionController {
 
   /// Coarse, fixed-category context for the diagnostic report (no address, key or traffic).
   void _recordContext(NativeSnapshot snapshot) {
+    alwaysOnStatus = snapshot.alwaysOn ?? alwaysOnStatus;
     // Age unknown although a handshake was seen earlier: record nothing rather than guess.
     diagnosticHandshakeAge = snapshot.handshakeAge >= 0
         ? handshakeAgeBucket(snapshot.handshakeAge)
@@ -893,6 +908,12 @@ class WindowConnectionController extends ConnectionController {
       if (_resumeWanted && !hasLease) {
         _resumeWanted = false;
         _scheduleResume(version);
+        return;
+      }
+      if (_nativeExhausted && !hasLease) {
+        _nativeExhausted = false;
+        phase = ConnectionPhase.failed;
+        error = 'recovery_exhausted';
         return;
       }
       if (_id == null) return;

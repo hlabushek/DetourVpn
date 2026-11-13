@@ -18,6 +18,16 @@ enum ConnectionPhase {
   failed,
 }
 
+/// ADR-139: Russian hint for the Always-on VPN setting; null when there is nothing to say
+/// (on, unknown, or not reported). Never changes connection state.
+String? alwaysOnHint(String? status) => switch (status) {
+  'off' =>
+    'Постоянная VPN выключена. Чтобы VPN продолжал работать при выключенном экране, после закрытия приложения и после перезагрузки, включите её: Настройки → Сеть и интернет → VPN → DetourVPN (значок шестерёнки) → «Постоянная VPN». На Samsung: Настройки → Подключения → Другие настройки → VPN. Также разрешите DetourVPN работу без ограничений батареи.',
+  'lockdown' =>
+    'Включена блокировка соединений без VPN. В этом режиме подключение продлевается только из приложения, поэтому при закрытом приложении VPN может остановиться. Если это происходит, выключите «Блокировать соединения без VPN» в настройках VPN Android (Настройки → Сеть и интернет → VPN → DetourVPN), оставив «Постоянная VPN» включённой.',
+  _ => null,
+};
+
 String messageFor(String code) => switch (code) {
   'window_node_required' => 'Выберите сервер перед подключением.',
   'window_tunnels_unavailable' || 'window_node_unavailable' =>
@@ -218,6 +228,10 @@ class ConnectionController extends ChangeNotifier {
   String? diagnosticWindow;
   String? diagnosticNetworkChange;
   String detail = 'VPN выключен';
+
+  /// ADR-139: Always-on VPN setting reported by native (`on`, `off`, `lockdown`, `unknown`);
+  /// null where the platform does not report it. Display only.
+  String? alwaysOnStatus;
   final QuotaController quota;
   int? get availableBytes => quota.snapshot?.available;
   DateTime? get quotaUpdatedAt => quota.updatedAt;

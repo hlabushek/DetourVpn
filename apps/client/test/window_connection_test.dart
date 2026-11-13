@@ -1419,40 +1419,43 @@ void main() {
     await Future<void>.delayed(const Duration(milliseconds: 300));
     expect(native.up, false);
   });
-  test('ADR-139: automatic reconnect is budgeted and ends in recovery_exhausted', () async {
-    // Every create fails transiently. Before ADR-139 this retried forever.
-    final failing = _FailingCreates(api);
-    final retrying = WindowConnectionController(
-      failing,
-      native,
-      pollInterval: const Duration(days: 1),
-      renewBeforeMs: 90000,
-      autoReconnectDelay: const Duration(milliseconds: 5),
-    )..selectedNode = node;
-    addTearDown(retrying.dispose);
-    await retrying.connect();
-    native.remaining = 0;
-    await retrying.refresh();
-    expect(retrying.error, 'lease_expired');
-    failing.fail = true;
-    // Five automatic attempts (5, 12.5, 37.5, 75, 150 ms), then the terminal state.
-    await Future<void>.delayed(const Duration(milliseconds: 1000));
-    expect(failing.failedCreates, RecoveryBudget.defaultMaxAttempts);
-    expect(retrying.phase, ConnectionPhase.failed);
-    expect(retrying.error, 'recovery_exhausted');
-    final after = failing.failedCreates;
-    await Future<void>.delayed(const Duration(milliseconds: 400));
-    expect(
-      failing.failedCreates,
-      after,
-      reason: 'nothing retries after the terminal state',
-    );
-    // The terminal state never blocks the user's own tap: it makes a real attempt. (A manual
-    // attempt that fails is not retried automatically, as before ADR-139.)
-    await retrying.connect();
-    expect(failing.failedCreates, after + 1);
-    expect(retrying.error, 'window_node_unavailable');
-  });
+  test(
+    'ADR-139: automatic reconnect is budgeted and ends in recovery_exhausted',
+    () async {
+      // Every create fails transiently. Before ADR-139 this retried forever.
+      final failing = _FailingCreates(api);
+      final retrying = WindowConnectionController(
+        failing,
+        native,
+        pollInterval: const Duration(days: 1),
+        renewBeforeMs: 90000,
+        autoReconnectDelay: const Duration(milliseconds: 5),
+      )..selectedNode = node;
+      addTearDown(retrying.dispose);
+      await retrying.connect();
+      native.remaining = 0;
+      await retrying.refresh();
+      expect(retrying.error, 'lease_expired');
+      failing.fail = true;
+      // Five automatic attempts (5, 12.5, 37.5, 75, 150 ms), then the terminal state.
+      await Future<void>.delayed(const Duration(milliseconds: 1000));
+      expect(failing.failedCreates, RecoveryBudget.defaultMaxAttempts);
+      expect(retrying.phase, ConnectionPhase.failed);
+      expect(retrying.error, 'recovery_exhausted');
+      final after = failing.failedCreates;
+      await Future<void>.delayed(const Duration(milliseconds: 400));
+      expect(
+        failing.failedCreates,
+        after,
+        reason: 'nothing retries after the terminal state',
+      );
+      // The terminal state never blocks the user's own tap: it makes a real attempt. (A manual
+      // attempt that fails is not retried automatically, as before ADR-139.)
+      await retrying.connect();
+      expect(failing.failedCreates, after + 1);
+      expect(retrying.error, 'window_node_unavailable');
+    },
+  );
 
   test('ADR-139: a user disconnect cancels the automatic attempts', () async {
     final failing = _FailingCreates(api);
@@ -1596,6 +1599,29 @@ void main() {
       expect(intent.intentEnds, 1);
     });
 
+    test(
+      'ADR-139: a budget native spent in the background is shown as the terminal state',
+      () async {
+        intent
+          ..desired = false
+          ..up = false
+          ..stopCategory = 'recovery_exhausted';
+        final creates = api.creates;
+        await ui.refresh();
+        await Future<void>.delayed(const Duration(milliseconds: 50));
+        expect(ui.phase, ConnectionPhase.failed);
+        expect(ui.error, 'recovery_exhausted');
+        expect(api.creates, creates, reason: 'nothing reconnects by itself');
+      },
+    );
+
+    test('ADR-139: the Always-on status reaches the UI', () async {
+      intent.alwaysOn = 'off';
+      await ui.refresh();
+      expect(ui.alwaysOnStatus, 'off');
+      expect(alwaysOnHint(ui.alwaysOnStatus), contains('Постоянная VPN'));
+    });
+
     test('a manual connect that fails for good ends the intent', () async {
       intent.allowed = false; // VPN permission denied: needs the user
       await ui.connect();
@@ -1617,6 +1643,8 @@ void main() {
 /// TEST ONLY native with the ADR-124 intent channel; records calls, holds no state.
 class IntentNative extends Native implements UserIntentHost {
   bool desired = false;
+  String? stopCategory;
+  String? alwaysOn;
   int intentEnds = 0;
   final order = <String>[];
   @override
@@ -1642,6 +1670,8 @@ class IntentNative extends Native implements UserIntentHost {
       remainingMs: base.remainingMs,
       reason: base.reason,
       desiredConnected: desired,
+      stopCategory: stopCategory,
+      alwaysOn: alwaysOn,
     );
   }
 }

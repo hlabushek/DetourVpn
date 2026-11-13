@@ -291,6 +291,11 @@ class ConnectionScreen extends StatelessWidget {
                 ),
               ),
             ),
+            // ADR-139: Always-on VPN status, only when native reported it off or in Lockdown.
+            if (alwaysOnHint(c.alwaysOnStatus) case final hint?) ...[
+              const SizedBox(height: 16),
+              OrbitNotice(text: hint),
+            ],
             if (c.error != null) ...[
               const SizedBox(height: 16),
               OrbitNotice(

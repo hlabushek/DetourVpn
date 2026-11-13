@@ -28,7 +28,10 @@ class RecoveryBudget {
   /// Spends one attempt. Returns the delay multiplier for it, or null when the budget is spent.
   double? take() {
     if (exhausted) return null;
-    final multiplier = multipliers[_used < multipliers.length ? _used : multipliers.length - 1];
+    final multiplier =
+        multipliers[_used < multipliers.length
+            ? _used
+            : multipliers.length - 1];
     _used++;
     return multiplier;
   }

@@ -31,7 +31,12 @@ class NativeSnapshot {
     this.desiredConnected = false,
     this.transport,
     this.stopCategory,
+    this.alwaysOn,
   });
+
+  /// ADR-139: the Always-on VPN setting as native last read it (`on`, `off`, `lockdown`,
+  /// `unknown`). Null on older builds and on Windows.
+  final String? alwaysOn;
 
   /// ADR-124: the user's persisted wish to stay connected, held natively. Only an explicit
   /// disconnect or a terminal failure clears it. False on older builds and on Windows.
@@ -383,6 +388,10 @@ class PlatformTunnel
       desiredConnected: value['desiredConnected'] == true,
       stopCategory: value['stopCategory'] is String
           ? value['stopCategory'] as String
+          : null,
+      alwaysOn:
+          const {'on', 'off', 'lockdown', 'unknown'}.contains(value['alwaysOn'])
+          ? value['alwaysOn'] as String
           : null,
       transport: value['transport'] is String
           ? value['transport'] as String

@@ -64,6 +64,8 @@ public final class ClientApplication extends Application implements Tunnel {
     private volatile MethodChannel recoveryChannel;
     /** ADR-121: Lockdown seen on an Always-on start; native HTTPS cannot get out then. */
     volatile boolean lockdown;
+    /** ADR-139: last Always-on setting read from a service instance ({@link AlwaysOnStatus}). */
+    private volatile String alwaysOn = AlwaysOnStatus.UNKNOWN;
     static final String WAKE_RESTORE = "org.example.vpnpoc.action.WAKE_RESTORE";
     private static final long RESTORE_WAKE_LOCK_MS = 45_000L;
     long deadline;
@@ -100,12 +102,16 @@ public final class ClientApplication extends Application implements Tunnel {
         super.onCreate();
         GoBackend.setAlwaysOnCallback(new GoBackend.AlwaysOnCallback() {
             @Override public void alwaysOnTriggered(GoBackend.VpnService service) {
+                observeAlwaysOn(service);
                 startAlwaysOnRecovery(service);
             }
             @Override public void alwaysOnStopped(GoBackend.VpnService service) {
+                observeAlwaysOn(service);
                 stopAlwaysOnService(service);
             }
         });
+        alwaysOn = AlwaysOnStatus.sanitize(
+                getSharedPreferences("connection", MODE_PRIVATE).getString("always_on", null));
         worker.execute(() -> supervisor.restore(wantsConnected(this)));
         worker.execute(() -> {
             String initStage = "vault";
@@ -165,6 +171,28 @@ public final class ClientApplication extends Application implements Tunnel {
     void stopped(String why) {
         if (supervisor.tunnelDown(why)) setWantsConnected(this, false);
         evaluateRecovery();
+    }
+
+    /**
+     * ADR-139: read the Always-on setting from a service instance (the only place Android exposes
+     * it) and remember it, so the UI can show it. Never throws; never changes recovery decisions.
+     */
+    private void observeAlwaysOn(VpnService service) {
+        if (service == null) return;
+        String value;
+        try {
+            if (android.os.Build.VERSION.SDK_INT >= 29) {
+                value = AlwaysOnStatus.of(true, service.isAlwaysOn(), service.isLockdownEnabled());
+            } else {
+                value = AlwaysOnStatus.of(false, false, false);
+            }
+        } catch (RuntimeException unavailable) {
+            return;
+        }
+        alwaysOn = value;
+        try {
+            getSharedPreferences("connection", MODE_PRIVATE).edit().putString("always_on", value).apply();
+        } catch (RuntimeException ignored) { /* Display only. */ }
     }
 
     /** ADR-124/125, worker thread. Native recovery runs only when no Dart controller owns it. */
@@ -828,6 +856,7 @@ public final class ClientApplication extends Application implements Tunnel {
         value.put("stopCategory", tunnelUp ? "none" : supervisor.stopCategory());
         value.put("recoveryAttempts", (long) supervisor.attempts());
         value.put("recoveryNote", recoveryNote);
+        value.put("alwaysOn", alwaysOn); // ADR-139: on | off | lockdown | unknown.
         value.put("uiAttached", uiAttached);
         return value;
     }

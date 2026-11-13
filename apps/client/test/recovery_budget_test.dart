@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:vpn_client/connection.dart';
 import 'package:vpn_client/recovery_budget.dart';
 
 /// ADR-139: the automatic recovery budget is finite and deterministic.
@@ -39,5 +40,22 @@ void main() {
     final steps = [for (var i = 0; i < 8; i++) budget.take()];
     expect(steps.last, 30.0);
     expect(steps.every((s) => s != null && s <= 30.0), isTrue);
+  });
+
+  test('recovery_exhausted has its own message with one action', () {
+    final text = messageFor('recovery_exhausted');
+    expect(text, contains('«Подключить»'));
+    expect(text, isNot(messageFor('some_unknown_code')));
+  });
+
+  test('Always-on hint: path when off, Lockdown warning, silent otherwise', () {
+    expect(alwaysOnHint('off'), contains('Настройки → Сеть и интернет → VPN'));
+    expect(
+      alwaysOnHint('lockdown'),
+      contains('Блокировать соединения без VPN'),
+    );
+    expect(alwaysOnHint('on'), isNull);
+    expect(alwaysOnHint('unknown'), isNull);
+    expect(alwaysOnHint(null), isNull);
   });
 }
