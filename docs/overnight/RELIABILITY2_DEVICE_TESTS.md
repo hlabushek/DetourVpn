@@ -76,6 +76,41 @@ This is hard to force; do it with mobile data off for longer than a window.
 After test B (overnight), Settings → Battery → DetourVPN usage. **Expected:** low single-digit
 percent. Record the number.
 
+## Run 3 additions (new checks; steps A to J above stay as they are)
+
+### F. Data path silent (ADR-133)
+1. Connect and keep one browser tab loading a page. Use a test node where the server drops
+   inbound packets (if no such node exists, this test cannot be run; say so).
+   **Expected:** after about 2 minutes the status reads "Нет входящего трафика через VPN" and
+   the transport is shown as not connected. The VPN does not restart by itself. A healthy node
+   shows "Свежий handshake подтверждён" or "Входящий трафик через VPN подтверждён".
+
+### K. Background start refused (ADR-134)
+1. Connect, then disable battery optimisation for the app only if you need a control case.
+   Keep the battery optimisation ON (default). Lock the phone for 30 minutes with the window
+   ending in the background.
+   **Expected:** if Android refuses the start, the app shows the Russian text starting «Android не
+   разрешил VPN запуститься в фоне». When you open the app or change networks, the VPN comes back
+   without tapping «Подключить». Record which trigger brought it back.
+
+### L. Process killed after a window stops (ADR-134 D)
+1. Connect, lock the phone, and force-stop the app from Settings → Apps.
+   **Expected:** the VPN does not come back while the app is stopped. Open the app: it reconnects
+   by itself if you had not pressed «Отключить». Pressing «Отключить» before the force-stop must
+   keep it off.
+
+### M. Renewal owner (ADR-136)
+1. Connect, reboot the phone, and open the app only after the first renewal period (about 15
+   minutes). **Expected:** the window keeps being renewed (the status stays connected) and the
+   app does not disconnect when it opens. This is the device proof of ADR-136 hand-over; device
+   test B is the longer run.
+
+### N. Tunnel check battery (ADR-135)
+1. Disconnect, then wait 30 minutes with the app open in the background. Use the battery
+   statistics from `RELIABILITY3_BATTERY.md`. **Expected:** no wake-ups from the app while
+   disconnected. The number is recorded; do not compare it with any other number unless the
+   device and Android version are the same.
+
 ## What counts as proof
 Only these phone results. Unit tests and the build prove the logic and that it compiles, not
 that Android behaves as expected on your phone.
