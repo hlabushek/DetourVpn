@@ -13,7 +13,10 @@ param(
     # Skip the version bump and commit (use when they are already done).
     [switch]$SkipVersionBump,
     # Do not install the APK on the USB-connected phone.
-    [switch]$NoInstall
+    [switch]$NoInstall,
+    # Skip the build: use the APK already built from HEAD at apps/client/build (after a passphrase or
+    # manifest failure). Check the APK time against `git log -1` before using this.
+    [switch]$SkipBuild
 )
 # Release 0.1.0-beta.32 (version code 33) of the Android client as an in-app update (ADR-107).
 # Contains the diagnostic-report fixes (renewal_too_late and other window codes shown by name).
@@ -115,7 +118,11 @@ if (-not $SkipVersionBump) {
 # ---- 3. signed APK -----------------------------------------------------------
 Step 'Signed APK (keystore passwords are typed into hidden prompts)'
 $doInstall = -not $NoInstall
-Run 'release_beta.ps1 (NoDeploy)' { & (Join-Path $root 'scripts\release_beta.ps1') -NoDeploy -Install:$doInstall }
+if ($SkipBuild) {
+    Write-Host 'Build skipped (-SkipBuild): using the APK already built at apps/client/build.'
+} else {
+    Run 'release_beta.ps1 (NoDeploy)' { & (Join-Path $root 'scripts\release_beta.ps1') -NoDeploy -Install:$doInstall }
+}
 if (-not (Test-Path -LiteralPath $Apk)) { throw "Signed APK not found at $Apk" }
 $apkItem = Get-Item -LiteralPath $Apk
 $sha = (Get-FileHash -LiteralPath $Apk -Algorithm SHA256).Hash.ToLowerInvariant()
