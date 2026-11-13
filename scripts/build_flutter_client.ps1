@@ -120,6 +120,8 @@ New-Item -ItemType Directory -Force -Path (Join-Path $taskBuildRoot 'apps\androi
 foreach ($taskName in @('build.gradle.kts', 'gradle.lockfile')) {
     Copy-Item -LiteralPath (Join-Path $taskRoot "apps\android\tunnel\$taskName") -Destination (Join-Path $taskBuildRoot "apps\android\tunnel\$taskName")
 }
+# ADR-127: the reviewed patch text is checked by a unit test (RestartInPlacePatchTest).
+Copy-ClientBuildSource (Join-Path $taskRoot 'apps\android\patches') (Join-Path $taskBuildRoot 'apps\android\patches')
 Copy-ClientBuildSource $taskPreparedSdkSource (Join-Path $taskBuildRoot '.cache\i-011\sdk-go-only')
 $taskSourceClient = $taskClient
 $taskClient = Join-Path $taskBuildRoot 'apps\client'

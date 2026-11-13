@@ -121,7 +121,7 @@
          final State originalState = getState(tunnel);
  
          if (state == State.TOGGLE)
-@@ -319,9 +318,41 @@
+@@ -319,9 +318,45 @@
          return getState(tunnel);
      }
  
@@ -138,6 +138,10 @@
 +        if (tunnel == null || config == null || old < 0)
 +            throw new IllegalStateException("tunnel_not_up");
 +        try {
++            // ADR-127: setStateInternal returns early while a handle is set ("already up"), which
++            // made this a no-op. Clear it so a new interface and device are really created; the
++            // old device stays open until the new one is up, then it is closed below.
++            currentTunnelHandle = -1;
 +            setStateInternal(tunnel, config, State.UP);
 +        } catch (final Exception e) {
 +            final int fresh = currentTunnelHandle;
@@ -164,7 +168,7 @@
  
          if (state == State.UP) {
              if (config == null)
-@@ -332,7 +363,7 @@
+@@ -332,7 +367,7 @@
  
              final VpnService service;
              if (!vpnService.isDone()) {
@@ -173,7 +177,7 @@
                  context.startService(new Intent(context, VpnService.class));
              }
  
-@@ -346,7 +377,7 @@
+@@ -346,7 +381,7 @@
              service.setOwner(this);
  
              if (currentTunnelHandle != -1) {
@@ -182,7 +186,7 @@
                  return;
              }
  
-@@ -359,7 +390,7 @@
+@@ -359,7 +394,7 @@
                          continue;
                      if (ep.getResolved().orElse(null) == null) {
                          if (i < DNS_RESOLUTION_RETRIES - 1) {
@@ -191,7 +195,7 @@
                              Thread.sleep(1000);
                              continue dnsRetry;
                          } else
-@@ -417,7 +448,7 @@
+@@ -417,7 +452,7 @@
              try (final ParcelFileDescriptor tun = builder.establish()) {
                  if (tun == null)
                      throw new BackendException(Reason.TUN_CREATION_ERROR);
@@ -200,7 +204,7 @@
                  currentTunnelHandle = awgTurnOn(tunnel.getName(), tun.detachFd(), goConfig);
              }
              if (currentTunnelHandle < 0)
-@@ -426,13 +457,17 @@
+@@ -426,13 +461,17 @@
              currentTunnel = tunnel;
              currentConfig = config;
  
@@ -222,7 +226,7 @@
                  return;
              }
              stopStatusJob();
-@@ -454,7 +489,8 @@
+@@ -454,7 +493,8 @@
       * system's Always-On VPN mode.
       */
      public interface AlwaysOnCallback {
@@ -232,7 +236,7 @@
      }
  
      // TODO: When we finally drop API 21 and move to API 24, delete this and replace with the ordinary CompletableFuture.
-@@ -490,6 +526,8 @@
+@@ -490,6 +530,8 @@
       * {@link android.net.VpnService} implementation for {@link GoBackend}
       */
      public static class VpnService extends android.net.VpnService {
@@ -241,7 +245,7 @@
          @Nullable private GoBackend owner;
  
          public Builder getBuilder() {
-@@ -498,13 +536,33 @@
+@@ -498,13 +540,33 @@
  
          @Override
          public void onCreate() {
@@ -276,7 +280,7 @@
                  final Tunnel tunnel = owner.currentTunnel;
                  if (tunnel != null) {
                      if (owner.currentTunnelHandle != -1)
-@@ -515,6 +573,9 @@
+@@ -515,6 +577,9 @@
                      tunnel.onStateChange(State.DOWN);
                  }
              }
@@ -286,7 +290,7 @@
              vpnService = vpnService.newIncompleteFuture();
              super.onDestroy();
          }
-@@ -522,12 +583,16 @@
+@@ -522,12 +587,16 @@
          @Override
          public int onStartCommand(@Nullable final Intent intent, final int flags, final int startId) {
              vpnService.complete(this);
