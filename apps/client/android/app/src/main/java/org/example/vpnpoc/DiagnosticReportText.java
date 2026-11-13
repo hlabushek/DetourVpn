@@ -18,11 +18,16 @@ final class DiagnosticReportText {
         "tunnel_config_not_ready", "tunnel_exists", "tunnel_idempotency_conflict",
         "tunnel_node_capacity", "tunnel_node_unavailable", "tunnel_profile_unavailable",
         "tunnel_recovery_not_ready", "unauthorized", "unknown_error", "vpn_revoked",
-        "window_activation_refused", "window_connection_exists", "window_epoch_conflict",
-        "window_expired", "window_generation_conflict", "window_idempotency_conflict",
-        "window_inconsistent", "window_node_capacity", "window_node_required",
+        "window_activation_refused", "window_connection_exists", "window_deadline_not_advanced",
+        "window_duration_invalid", "window_epoch_compare_failed", "window_epoch_conflict",
+        "window_expired", "window_funding_conflict", "window_funding_deadline",
+        "window_generation_conflict", "window_idempotency_conflict", "window_inconsistent",
+        "window_legacy_tunnel_active", "window_manifest_protocol_conflict",
+        "window_manifest_unavailable", "window_node_capacity", "window_node_required",
         "window_node_unavailable", "window_not_active", "window_not_found", "window_not_renewable",
-        "window_reconciliation_required", "window_tunnels_unavailable");
+        "window_operator_inventory_conflict", "window_operator_manifest_changed",
+        "window_receipt_conflict", "window_receipt_not_found", "window_reconciliation_required",
+        "window_replay_conflict", "window_runtime_mismatch", "window_tunnels_unavailable");
 
     private static final Set<String> STAGES = Set.of(
         "android_vpn_permission", "connection_reconcile", "device_key_read",
