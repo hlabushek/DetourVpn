@@ -1,8 +1,7 @@
 [CmdletBinding()]
 param(
-    # Required: HTTPS address where the release APK will be downloadable, for example
-    # https://<PUBLIC_HOST>/api/v1/app/download/detourvpn-0.1.0-beta.32.apk
-    [Parameter(Mandatory = $true)]
+    # Optional: HTTPS address where the release APK will be downloadable. Default: the beta API
+    # origin used by scripts/enable_app_update.ps1 plus /api/v1/app/download/<apk file name>.
     [string]$ApkUrl,
     # Required: Russian release notes as a plain text file (shown in the update dialog).
     [Parameter(Mandatory = $true)]
@@ -51,6 +50,14 @@ $Pubspec = Join-Path $root 'apps\client\pubspec.yaml'
 $Gradle = Join-Path $root 'apps\client\android\app\build.gradle.kts'
 $Apk = Join-Path $root 'apps\client\build\app\outputs\flutter-apk\app-release.apk'
 $OutDir = Join-Path $env:LOCALAPPDATA "ProjectVpn\updates\beta32"
+if (-not $ApkUrl) {
+    # Same beta API origin as scripts/enable_app_update.ps1, so the host is not typed by hand.
+    $enableScript = Get-Content -LiteralPath (Join-Path $root 'scripts\enable_app_update.ps1') -Raw
+    $origin = [regex]::Match($enableScript, "\[string\]\`$ApiOrigin = '([^']+)'").Groups[1].Value
+    if (-not $origin) { throw 'Could not read ApiOrigin from scripts/enable_app_update.ps1. Pass -ApkUrl explicitly.' }
+    $ApkUrl = "$($origin.TrimEnd('/'))/api/v1/app/download/detourvpn-$VersionName.apk"
+    Write-Host 'ApkUrl taken from scripts/enable_app_update.ps1 (ApiOrigin).'
+}
 
 function Step([string]$Title) { Write-Host ''; Write-Host "=== $Title ===" -ForegroundColor Cyan }
 function Run([string]$Name, [scriptblock]$Block) {
