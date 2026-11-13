@@ -208,6 +208,12 @@ class ConnectionController extends ChangeNotifier {
   /// Task 7: whether this app saw a confirmed handshake before the last failure
   /// ('confirmed' / 'not_seen'); null when unknown. Fixed category, safe to export.
   String? diagnosticHandshake;
+
+  /// Coarse failure context for the diagnostic report (fixed categories, see
+  /// diagnostic_report.dart); null when not recorded.
+  String? diagnosticHandshakeAge;
+  String? diagnosticWindow;
+  String? diagnosticNetworkChange;
   String detail = 'VPN выключен';
   final QuotaController quota;
   int? get availableBytes => quota.snapshot?.available;

@@ -54,6 +54,7 @@ void main() {
       expect(calls, isEmpty); // there is no share sheet on Windows
       expect(clipboard, contains('Код: invalid_response'));
       expect(clipboard, contains('Этап: lease_create'));
+      expect(clipboard, contains('Что сделать:')); // Russian hint, no "unknown"
     },
   );
 
@@ -92,6 +93,115 @@ void main() {
 
     expect(nativeErrors, equals({...dartErrors, 'unknown_error'}));
     expect(nativeStages, equals({...dartStages, 'unknown'}));
+
+    // Coarse context sets and Russian hint texts must also match.
+    for (final name in ['HandshakeAges', 'Windows', 'NetworkChanges']) {
+      final dart = values(
+        sourceBlock(dartSource, 'const _reportable$name = <String>\\{(.*?)\\}'),
+        "'",
+      );
+      final java = values(
+        sourceBlock(
+          javaSource,
+          '${name.replaceAllMapped(RegExp('[A-Z]'), (m) => m.start == 0 ? m[0]! : '_${m[0]}').toUpperCase()} = Set\\.of\\((.*?)\\);',
+        ),
+        '"',
+      );
+      expect(java, equals(dart), reason: name);
+    }
+    final dartHints = <String, String>{
+      for (final m in RegExp(
+        r"'([a-z_]+)':\s*((?:'[^']*'\s*)+),",
+      ).allMatches(sourceBlock(dartSource, r'diagnosticHints = <String, String>\{(.*?)\n\};')))
+        m.group(1)!: RegExp(
+          r"'([^']*)'",
+        ).allMatches(m.group(2)!).map((x) => x.group(1)!).join(),
+    };
+    final javaHintBlock = sourceBlock(
+      javaSource,
+      r'HINTS = java\.util\.Map\.of\((.*?)\);',
+    );
+    final javaHints = <String, String>{
+      for (final m in RegExp(
+        r'"([a-z_]+)",\s*((?:"[^"]*"\s*\+?\s*)+)',
+      ).allMatches(javaHintBlock))
+        m.group(1)!: RegExp(
+          r'"([^"]*)"',
+        ).allMatches(m.group(2)!).map((x) => x.group(1)!).join(),
+    };
+    expect(dartHints, isNotEmpty);
+    expect(javaHints, equals(dartHints));
+  });
+
+  test('handshake age is rounded into fixed ranges', () {
+    expect(handshakeAgeBucket(-1), 'never');
+    expect(handshakeAgeBucket(59), 'under_1m');
+    expect(handshakeAgeBucket(60), 'm1_to_5');
+    expect(handshakeAgeBucket(299), 'm1_to_5');
+    expect(handshakeAgeBucket(300), 'm5_to_30');
+    expect(handshakeAgeBucket(1799), 'm5_to_30');
+    expect(handshakeAgeBucket(1800), 'm30_to_120');
+    expect(handshakeAgeBucket(7200), 'over_2h');
+    expect(networkChangeBucket(null), 'none');
+    expect(networkChangeBucket(59999), 'recent');
+    expect(networkChangeBucket(60000), 'earlier');
+    expect(windowBucket(null), 'unknown');
+    expect(windowBucket(1), 'open');
+    expect(windowBucket(0), 'ended');
+  });
+
+  test('new stages and context are reported with a Russian hint, not unknown', () {
+    for (final stage in [
+      'window_renewal',
+      'window_advance',
+      'tunnel_restart',
+      'tunnel_monitor',
+      'network_change',
+      'session_resume',
+      'panel_profile',
+    ]) {
+      final report = DiagnosticReport.fromError(
+        'renewal_too_late',
+        stage,
+        handshake: 'confirmed',
+        handshakeAge: 'm5_to_30',
+        window: 'open',
+        networkChange: 'recent',
+      );
+      expect(report.stage, stage);
+      expect(report.text, contains('Время с handshake: m5_to_30'));
+      expect(report.text, contains('Окно: open'));
+      expect(report.text, contains('Смена сети: recent'));
+      expect(report.text, contains('окно не удалось продлить'));
+      expect(report.text, isNot(contains('unknown')));
+    }
+  });
+
+  test('context values outside the fixed sets are dropped', () {
+    final report = DiagnosticReport.fromError(
+      'native_down',
+      'tunnel_monitor',
+      handshakeAge: '4242s',
+      window: 'https://host',
+      networkChange: 'wifi-home',
+    );
+    expect(report.handshakeAge, isNull);
+    expect(report.window, isNull);
+    expect(report.networkChange, isNull);
+    expect(report.text, contains('Android остановил туннель'));
+  });
+
+  test('hint key follows the code, renewal stages win over network codes', () {
+    expect(diagnosticHintKey('vpn_revoked', 'tunnel_monitor'), 'vpn_permission');
+    expect(diagnosticHintKey('session_expired', 'unknown'), 'login_needed');
+    expect(diagnosticHintKey('network_unavailable', 'window_renewal'), 'renewal_failed');
+    expect(diagnosticHintKey('network_unavailable', 'tunnel_monitor'), 'network_lost');
+    expect(diagnosticHintKey('lease_expired', 'tunnel_monitor'), 'window_ended');
+    expect(diagnosticHintKey('invalid_response', 'unknown'), 'general');
+    for (final key in ['vpn_permission','login_needed','network_lost','server_busy',
+        'quota_out','renewal_failed','tunnel_dropped','window_ended','general']) {
+      expect(diagnosticHints.containsKey(key), isTrue);
+    }
   });
 
   test('report reduces unknown server values to fixed categories', () {
@@ -104,7 +214,8 @@ void main() {
     expect(report.stage, 'unknown');
     expect(
       report.text,
-      'DetourVpn — отчёт диагностики\nКод: unknown_error\nЭтап: unknown',
+      'DetourVpn — отчёт диагностики\nКод: unknown_error\nЭтап: unknown\n'
+      '${diagnosticHints['general']}',
     );
   });
 
@@ -114,10 +225,7 @@ void main() {
       'lease_poll',
       handshake: 'not_seen',
     );
-    expect(
-      seen.text.split(String.fromCharCode(10)).last,
-      'Handshake: not_seen',
-    );
+    expect(seen.text.split(String.fromCharCode(10)), contains('Handshake: not_seen'));
     final unknown = DiagnosticReport.fromError(
       'lease_expired',
       'lease_poll',
@@ -166,7 +274,8 @@ void main() {
     expect(calls, isEmpty);
     expect(
       find.text(
-        'DetourVpn — отчёт диагностики\nКод: invalid_response\nЭтап: lease_create',
+        'DetourVpn — отчёт диагностики\nКод: invalid_response\nЭтап: lease_create\n'
+        '${diagnosticHints['general']}',
       ),
       findsOneWidget,
     );
@@ -184,6 +293,7 @@ void main() {
     expect(calls.single.arguments, {
       'code': 'invalid_response',
       'stage': 'lease_create',
+      'hint': 'general',
     });
   });
 }

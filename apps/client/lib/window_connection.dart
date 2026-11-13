@@ -7,6 +7,7 @@ import 'package:flutter/services.dart';
 import 'api.dart';
 import 'country_flag.dart';
 import 'connection.dart';
+import 'diagnostic_report.dart';
 import 'native_tunnel.dart';
 import 'panel_servers.dart';
 import 'platform_info.dart';
@@ -528,6 +529,9 @@ class WindowConnectionController extends ConnectionController {
       _activationRetries = 0;
       diagnosticStage = null;
       diagnosticHandshake = null;
+      diagnosticHandshakeAge = null;
+      diagnosticWindow = null;
+      diagnosticNetworkChange = null;
       detail = 'Ожидается handshake';
       await _startNativeRenewal(grant);
       if (_cancelled(version)) return;
@@ -592,6 +596,9 @@ class WindowConnectionController extends ConnectionController {
     _connectedAtMs = _clock.elapsedMilliseconds;
     diagnosticStage = null;
     diagnosticHandshake = null;
+    diagnosticHandshakeAge = null;
+    diagnosticWindow = null;
+    diagnosticNetworkChange = null;
     phase = ConnectionPhase.connected;
     detail = 'Подключено к серверу из панели';
     startPolling();
@@ -810,6 +817,7 @@ class WindowConnectionController extends ConnectionController {
       if (!remotePending) error = null;
     } catch (_) {
       error = 'native_disconnect_failed';
+      diagnosticStage = 'native_disconnect';
       phase = ConnectionPhase.failed;
     } finally {
       _closed = false;
@@ -836,6 +844,18 @@ class WindowConnectionController extends ConnectionController {
       !_hasEstablishedHandshake &&
       _clock.elapsedMilliseconds - _connectedAtMs >=
           handshakeHintAfter.inMilliseconds;
+
+  /// Coarse, fixed-category context for the diagnostic report (no address, key or traffic).
+  void _recordContext(NativeSnapshot snapshot) {
+    // Age unknown although a handshake was seen earlier: record nothing rather than guess.
+    diagnosticHandshakeAge = snapshot.handshakeAge >= 0
+        ? handshakeAgeBucket(snapshot.handshakeAge)
+        : (snapshot.handshakeSeen || _hasEstablishedHandshake
+              ? null
+              : 'never');
+    diagnosticWindow = windowBucket(snapshot.remainingMs);
+    diagnosticNetworkChange = networkChangeBucket(snapshot.networkChangeAgeMs);
+  }
 
   Future<void> _refresh(int version) async {
     try {
@@ -868,8 +888,10 @@ class WindowConnectionController extends ConnectionController {
         return;
       }
       if (_id == null) return;
+      diagnosticStage = 'tunnel_monitor';
       var snapshot = await native.snapshot();
       if (_cancelled(version)) return;
+      _recordContext(snapshot);
       // Read before any stop check below, so a window that just ended still reports it.
       if (snapshot.handshakeSeen) _nativeHandshakeSeen = true;
       // While native renews, its deadline is authoritative: Dart timers may have slept.
@@ -919,6 +941,7 @@ class WindowConnectionController extends ConnectionController {
         // counted conservatively in the next window's advisory estimate.
         _renewTrafficAnchor = traffic != null && traffic >= 0 ? traffic : null;
       }
+      diagnosticStage = _renewIntent != null ? 'window_renewal' : 'tunnel_monitor';
       var value = await api.call('GET', '$root/$_id');
       if (_cancelled(version)) return;
       if (_renewIntent != null) {
@@ -954,6 +977,7 @@ class WindowConnectionController extends ConnectionController {
         _renewIntent = null;
       } else if (grant['generation'] != _grant!['generation']) {
         final end = _bound(grant);
+        diagnosticStage = 'window_advance';
         if (end <= _deadline)
           throw const ClientError('window_generation_conflict');
         await _native.advanceWindow(grant, end - _clock.elapsedMilliseconds);
@@ -969,8 +993,10 @@ class WindowConnectionController extends ConnectionController {
         _renewTrafficAnchor = null;
         _renewIntent = null;
       }
+      diagnosticStage = 'tunnel_monitor';
       snapshot = await native.snapshot();
       if (_cancelled(version)) return;
+      _recordContext(snapshot);
       if (!snapshot.up ||
           snapshot.remainingMs <= 0 ||
           _clock.elapsedMilliseconds >= _deadline)
@@ -1000,6 +1026,10 @@ class WindowConnectionController extends ConnectionController {
       // API response failure.
       final code = e is ClientError ? e.code : 'native_unavailable';
       error = code;
+      if (diagnosticNetworkChange == 'recent' &&
+          diagnosticStage == 'tunnel_monitor') {
+        diagnosticStage = 'network_change';
+      }
       // Task 7: recorded before cleanup resets it. The native memory also counts a handshake
       // that happened while the app was asleep (Android VPN process, Windows controller).
       diagnosticHandshake = _hasEstablishedHandshake || _nativeHandshakeSeen
@@ -1105,6 +1135,7 @@ class WindowConnectionController extends ConnectionController {
     final base = autoReconnectDelay;
     if (base == null) return;
     error = null;
+    diagnosticStage = 'session_resume';
     phase = ConnectionPhase.reconnecting;
     detail = 'Восстанавливается подключение';
     _emit();
