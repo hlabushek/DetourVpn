@@ -130,3 +130,30 @@ check our server and offer the latest build. Existing code: no version or update
   verified build, or the server has none published) or a failure text that names Android 13+.
 - No new endpoint, permission or data. Tests: `app_update_test.dart` (statuses, 6-hour limit,
   one dialog at a time, Settings row). Not verified on a device.
+
+## Amendment 2026-11-13 — why updates did not work, and the fix
+Diagnosis from the code (no device or server was accessed):
+1. **Ingress.** The beta Caddy template (`infra/beta/Caddyfile.ip`) is a path allowlist and did not
+   list `/api/v1/app/*`. Only `scripts/publish_beta_app_update.py --execute` adds that line, and
+   only on the live host. A host deployed from the template therefore answers 404 for the
+   manifest and the APK even though the API routes exist. Fixed: the template carries the line
+   (test `test_beta_ingress_proxies_the_app_update_routes_to_the_api`); the publish script
+   already skips the insert when the line is present.
+2. **Nothing published.** No signed manifest or APK for 0.1.0-beta.32 is on the beta host yet
+   (owner-run step). Until it is, the API returns 404 `update_unavailable` and every phone is told
+   it has the latest version. Not a code defect; see the owner steps below.
+3. **Button placement and visibility.** «Проверить обновления» already existed, but only in
+   Settings (gear icon in the top bar), and only in builds made with
+   `--dart-define=VPN_API_ORIGIN` (`main.dart`: no API → no updater → no row). The release
+   scripts pass it; a build without it has no row. The installed version was not shown anywhere,
+   so the user could not tell what to expect. Fixed: the row shows «Установлена версия X (код N)»
+   (new native call `appVersionName`). Settings was kept as the place: Profile is account-only
+   by design (`profile_screen.dart` header), device settings live behind the gear.
+4. **Wording.** Up to date: «Установлена последняя версия DetourVPN.» Available: dialog
+   «Доступна версия X.» with «Скачать». The flow after «Скачать» is unchanged: Java re-verifies
+   the Ed25519 signature, downloads over HTTPS without redirects, checks size, SHA-256, package
+   name and exact version code, then opens the system installer through `UpdateApkProvider`;
+   it opens the «install unknown apps» screen first when that is not allowed.
+
+Not verified here: a real download from the beta host, the unknown-sources screen, the system
+installer and the update itself on a phone, and whether the live Caddyfile already has the line.
