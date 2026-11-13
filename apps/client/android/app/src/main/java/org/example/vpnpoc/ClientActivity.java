@@ -188,9 +188,12 @@ public final class ClientActivity extends FlutterActivity {
             String code = call.argument("code");
             String stage = call.argument("stage");
             String handshake = call.argument("handshake");
+            String hint = call.argument("hint");
             final String reportText;
             try {
-                reportText = DiagnosticReportText.format(code, stage, handshake);
+                reportText = DiagnosticReportText.format(code, stage, handshake,
+                        call.argument("handshakeAge"), call.argument("window"),
+                        call.argument("networkChange"), hint == null ? "general" : hint);
             } catch (IllegalArgumentException invalidReport) {
                 result.error("diagnostic_report_invalid", "Отчёт диагностики недоступен", null);
                 return;

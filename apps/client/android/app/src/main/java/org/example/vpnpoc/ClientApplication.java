@@ -827,9 +827,16 @@ public final class ClientApplication extends Application implements Tunnel {
     /** ADR-124: the native supervisor line for the diagnostic report. Worker thread. */
     String diagnosticLine() {
         Map<String, Object> state = snapshot();
+        String device = "";
+        try {
+            android.os.PowerManager power = (android.os.PowerManager) getSystemService(POWER_SERVICE);
+            if (power != null) device = DiagnosticReportText.deviceLine(power.isInteractive(),
+                    power.isDeviceIdleMode());
+        } catch (RuntimeException unavailable) { /* Report without the device line. */ }
         return DiagnosticReportText.nativeLine((String) state.get("transport"),
                 (String) state.get("evidence"), (String) state.get("failureCategory"),
-                supervisor.desired(), physical.validated(), supervisor.attempts(), tunnelRestarts);
+                supervisor.desired(), physical.validated(), supervisor.attempts(), tunnelRestarts)
+                + device;
     }
 
     @Override public String getName() { return "i013"; }

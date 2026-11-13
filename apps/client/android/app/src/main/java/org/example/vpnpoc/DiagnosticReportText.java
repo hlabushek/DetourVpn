@@ -37,8 +37,46 @@ final class DiagnosticReportText {
         "android_vpn_permission", "connection_reconcile", "device_key_read",
         "device_registration", "key_challenge", "key_proof", "lease_create", "lease_poll",
         "lease_validation", "native_disconnect", "native_tunnel_start", "old_lease_cleanup",
-        "selected_node", "unknown"
+        "panel_profile", "selected_node", "network_change", "session_resume", "tunnel_monitor",
+        "tunnel_restart", "window_advance", "window_renewal", "unknown"
     );
+
+    /** Coarse context categories; the same sets as in diagnostic_report.dart. */
+    private static final Set<String> HANDSHAKE_AGES = Set.of("never", "under_1m", "m1_to_5",
+            "m5_to_30", "m30_to_120", "over_2h");
+    private static final Set<String> WINDOWS = Set.of("open", "ended", "unknown");
+    private static final Set<String> NETWORK_CHANGES = Set.of("none", "recent", "earlier");
+
+    /** Russian explanation texts by hint key; kept equal to diagnosticHints in Dart (sync test). */
+    private static final java.util.Map<String, String> HINTS = java.util.Map.of(
+        "vpn_permission", "Вероятно, Android отозвал разрешение VPN (включили другой VPN или отключили). "
+            + "Что сделать: подключитесь заново и подтвердите запрос Android.",
+        "login_needed", "Вероятно, вход в аккаунт устарел или устройство отозвано. "
+            + "Что сделать: войдите заново и подключитесь.",
+        "network_lost", "Вероятно, не было сети или сервис недоступен. "
+            + "Что сделать: проверьте интернет, подождите минуту и подключитесь заново.",
+        "server_busy", "Вероятно, сервер временно занят или недоступен. "
+            + "Что сделать: подождите пару минут и подключитесь заново.",
+        "quota_out", "Вероятно, закончился доступный трафик или лимит. "
+            + "Что сделать: проверьте остаток на главном экране.",
+        "renewal_failed", "Вероятно, окно не удалось продлить вовремя (телефон мог спать). "
+            + "Что сделать: подключитесь заново и напишите, как долго телефон был без работы.",
+        "tunnel_dropped", "Вероятно, Android остановил туннель или перезапуск не удался. "
+            + "Что сделать: подключитесь заново; если повторяется, отключите экономию батареи для приложения.",
+        "window_ended", "Вероятно, окно подключения закончилось. "
+            + "Что сделать: подключитесь заново.",
+        "general", "Причина по этому коду не определена. "
+            + "Что сделать: отправьте этот отчёт и напишите, что делали перед сбоем.");
+
+    /** Rounds seconds since the last handshake into a fixed range (negative = no handshake). */
+    static String handshakeAgeBucket(long seconds) {
+        if (seconds < 0) return "never";
+        if (seconds < 60) return "under_1m";
+        if (seconds < 300) return "m1_to_5";
+        if (seconds < 1800) return "m5_to_30";
+        if (seconds < 7200) return "m30_to_120";
+        return "over_2h";
+    }
 
     /** Task 7: whether the app saw a confirmed handshake; null omits the line. */
     private static final Set<String> HANDSHAKES = Set.of("confirmed", "not_seen");
@@ -46,11 +84,34 @@ final class DiagnosticReportText {
     static String format(String code, String stage) { return format(code, stage, null); }
 
     static String format(String code, String stage, String handshake) {
+        return format(code, stage, handshake, null, null, null, "general");
+    }
+
+    /**
+     * Every optional value is checked against a fixed set; anything else rejects the whole
+     * report. The hint key selects a Russian explanation; it never carries free text.
+     */
+    static String format(String code, String stage, String handshake, String handshakeAge,
+            String window, String networkChange, String hint) {
         if (code == null || stage == null || !ERROR_CODES.contains(code) || !STAGES.contains(stage)
-                || (handshake != null && !HANDSHAKES.contains(handshake)))
+                || (handshake != null && !HANDSHAKES.contains(handshake))
+                || (handshakeAge != null && !HANDSHAKE_AGES.contains(handshakeAge))
+                || (window != null && !WINDOWS.contains(window))
+                || (networkChange != null && !NETWORK_CHANGES.contains(networkChange))
+                || hint == null || !HINTS.containsKey(hint))
             throw new IllegalArgumentException();
         return "DetourVpn — отчёт диагностики\nКод: " + code + "\nЭтап: " + stage
-                + (handshake == null ? "" : "\nHandshake: " + handshake);
+                + (handshake == null ? "" : "\nHandshake: " + handshake)
+                + (handshakeAge == null ? "" : "\nВремя с handshake: " + handshakeAge)
+                + (window == null ? "" : "\nОкно: " + window)
+                + (networkChange == null ? "" : "\nСмена сети: " + networkChange)
+                + "\n" + HINTS.get(hint);
+    }
+
+    /** Screen and Doze state at share time; booleans only. */
+    static String deviceLine(boolean screenOn, boolean dozing) {
+        return "\nУстройство: экран=" + (screenOn ? "вкл" : "выкл")
+                + ", doze=" + (dozing ? "да" : "нет");
     }
 
     private static final Set<String> TRANSPORTS = Set.of("disconnected", "connecting", "connected",
