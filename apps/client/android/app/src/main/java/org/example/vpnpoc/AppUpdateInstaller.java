@@ -39,6 +39,11 @@ final class AppUpdateInstaller {
         return versionCode(info);
     }
 
+    /** The installed versionName (for display only; decisions use the version code). */
+    static String installedVersionName(Context context) throws PackageManager.NameNotFoundException {
+        return context.getPackageManager().getPackageInfo(context.getPackageName(), 0).versionName;
+    }
+
     @SuppressWarnings("deprecation")
     private static long versionCode(PackageInfo info) {
         return Build.VERSION.SDK_INT >= 28 ? info.getLongVersionCode() : info.versionCode;

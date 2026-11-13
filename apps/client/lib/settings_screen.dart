@@ -18,9 +18,13 @@ class SettingsScreen extends StatelessWidget {
     required this.onTheme,
     required this.controller,
     this.onCheckUpdates,
+    this.installedVersion,
   });
   final VoidCallback onTheme;
   final ConnectionController? controller;
+
+  /// Installed version label (see `installedVersionLabel`); null while unknown.
+  final String? installedVersion;
 
   /// ADR-107: manual update check; null hides the row (Windows, tests without an updater).
   /// The result is null when a check or an update dialog is already in progress.
@@ -180,7 +184,9 @@ class SettingsScreen extends StatelessWidget {
           NavRow(
             icon: Icons.system_update_outlined,
             title: 'Проверить обновления',
-            subtitle: 'Новые версии также проверяются при запуске приложения',
+            subtitle: installedVersion == null
+                ? 'Новые версии также проверяются при запуске приложения'
+                : 'Установлена версия $installedVersion',
             onTap: () => _checkUpdates(context),
           ),
         ],

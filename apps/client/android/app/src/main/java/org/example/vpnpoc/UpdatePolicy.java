@@ -8,7 +8,7 @@ import java.util.Locale;
 
 /**
  * Decision and integrity rules for the in-app updater (ADR-107). Pure logic: no UI, no network,
- * no install. The installer, dialog and FileProvider are NOT implemented yet.
+ * no install. Download and hand-off live in AppUpdateInstaller and UpdateApkProvider.
  */
 final class UpdatePolicy {
     enum Decision { NONE, OPTIONAL, BLOCKING }

@@ -83,10 +83,22 @@ class _VpnAppState extends State<VpnApp> with WidgetsBindingObserver {
     if (widget.api != null && widget.updates != null) {
       _updates = UpdateScheduler(widget.api!, widget.updates!);
       unawaited(_runUpdateCheck(manual: false));
+      unawaited(_loadInstalledVersion(widget.updates!));
     }
   }
 
   UpdateScheduler? _updates;
+
+  /// Shown in Settings next to «Проверить обновления», e.g. "0.1.0-beta.31 (код 32)".
+  String? _installedVersion;
+
+  Future<void> _loadInstalledVersion(UpdateNative native) async {
+    final label = installedVersionLabel(
+      await native.installedVersionName(),
+      await native.installedVersionCode(),
+    );
+    if (mounted && label != null) setState(() => _installedVersion = label);
+  }
 
   final _navigator = GlobalKey<NavigatorState>();
 
@@ -329,6 +341,7 @@ class _VpnAppState extends State<VpnApp> with WidgetsBindingObserver {
         onCheckUpdates: _updates == null
             ? null
             : () => _runUpdateCheck(manual: true),
+        installedVersion: _installedVersion,
       ),
     ),
   );

@@ -70,6 +70,8 @@ class FakeUpdateNative implements UpdateNative {
   @override
   Future<int?> installedVersionCode() async => installed;
   @override
+  Future<String?> installedVersionName() async => 'test-$installed';
+  @override
   Future<String?> verifyManifest(SignedManifest signed) async {
     verified.add(signed);
     return verifies ? utf8.decode(base64.decode(signed.payload)) : null;
@@ -221,7 +223,7 @@ void main() {
     await tester.binding.handlePopRoute();
     await tester.pumpAndSettle();
     expect(find.text('Нужно обновить приложение'), findsOneWidget);
-    await tester.tap(find.text('Обновить'));
+    await tester.tap(find.text('Скачать'));
     await tester.pumpAndSettle();
     expect(native.installs, 1);
     expect(
@@ -253,7 +255,7 @@ void main() {
       signedOf(manifest()),
     );
     await open(tester, offer, native);
-    await tester.tap(find.text('Обновить'));
+    await tester.tap(find.text('Скачать'));
     await tester.pumpAndSettle();
     expect(
       find.text(
@@ -271,7 +273,7 @@ void main() {
       signedOf(manifest()),
     );
     await open(tester, offer, native);
-    await tester.tap(find.text('Обновить'));
+    await tester.tap(find.text('Скачать'));
     await tester.pumpAndSettle();
     expect(
       find.text(
@@ -400,7 +402,10 @@ void main() {
     await tester.tap(find.text('Проверить обновления'));
     await settle(tester);
     expect(checks, 1);
-    expect(find.text('У вас последняя версия DetourVPN.'), findsOneWidget);
+    expect(
+      find.text('Установлена последняя версия DetourVPN.'),
+      findsOneWidget,
+    );
   });
 
   testWidgets('Settings: no updater, no row', (tester) async {
@@ -410,4 +415,68 @@ void main() {
     await settle(tester);
     expect(find.text('Проверить обновления'), findsNothing);
   });
+
+  group('installed version', () {
+    test('label combines name and code, drops unusable values', () {
+      expect(
+        installedVersionLabel('0.1.0-beta.31', 32),
+        '0.1.0-beta.31 (код 32)',
+      );
+      expect(installedVersionLabel(' 0.1.0 ', null), '0.1.0');
+      expect(installedVersionLabel(null, 32), 'код 32');
+      expect(installedVersionLabel('', 0), isNull);
+      expect(installedVersionLabel('bad\nname', -1), isNull);
+    });
+
+    testWidgets('Settings shows the installed version on the update row', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: SettingsScreen(
+            onTheme: () {},
+            controller: null,
+            onCheckUpdates: () async =>
+                const UpdateCheck(UpdateCheckStatus.upToDate),
+            installedVersion: '0.1.0-beta.31 (код 32)',
+          ),
+        ),
+      );
+      await settle(tester);
+      expect(
+        find.text('Установлена версия 0.1.0-beta.31 (код 32)'),
+        findsOneWidget,
+      );
+    });
+  });
+
+  testWidgets('an available version is named and offers «Скачать»', (
+    tester,
+  ) async {
+    final native = FakeUpdateNative(27);
+    final offer = UpdateOffer(
+      UpdateManifest.parse(manifest())!,
+      UpdateDecision.optional,
+      signedOf(manifest()),
+    );
+    await open(tester, offer, native);
+    expect(find.text('Доступна версия 0.1.0-beta.29.'), findsOneWidget);
+    await tester.tap(find.text('Скачать'));
+    await tester.pumpAndSettle();
+    expect(native.installs, 1);
+  });
+
+  test(
+    'a manual check of an older or equal manifest never offers a download',
+    () async {
+      for (final installed in [28, 29]) {
+        final result = await checkForUpdateDetailed(
+          FakeApi(envelope(manifest(code: 28))),
+          FakeUpdateNative(installed),
+        );
+        expect(result.status, UpdateCheckStatus.upToDate);
+        expect(result.offer, isNull);
+      }
+    },
+  );
 }

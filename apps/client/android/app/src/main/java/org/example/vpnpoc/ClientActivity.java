@@ -168,6 +168,13 @@ public final class ClientActivity extends FlutterActivity {
             }
             return;
         }
+        if (call.method.equals("appVersionName")) {
+            try { result.success(AppUpdateInstaller.installedVersionName(this)); }
+            catch (PackageManager.NameNotFoundException | RuntimeException unavailable) {
+                result.error("app_version_unavailable", "Версия приложения недоступна", null);
+            }
+            return;
+        }
         if (call.method.equals("appUpdateVerify")) {
             // ADR-107: the manifest counts only if its Ed25519 signature verifies here.
             result.success(verifiedUpdatePayload(call));

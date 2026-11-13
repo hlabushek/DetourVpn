@@ -128,6 +128,9 @@ class SignedManifest {
 abstract interface class UpdateNative {
   Future<int?> installedVersionCode();
 
+  /// The installed `versionName` (for example `0.1.0-beta.31`), shown to the user. Null if unknown.
+  Future<String?> installedVersionName();
+
   /// The verified manifest JSON text, or `null` when the signature does not verify (also on
   /// Android below 13, which has no platform Ed25519, and while no key is configured).
   Future<String?> verifyManifest(SignedManifest signed);
@@ -145,6 +148,16 @@ class PlatformUpdateNative implements UpdateNative {
     try {
       final value = await _channel.invokeMethod<Object>('appVersionCode');
       return value is int ? value : null;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  @override
+  Future<String?> installedVersionName() async {
+    try {
+      final value = await _channel.invokeMethod<Object>('appVersionName');
+      return value is String && value.isNotEmpty ? value : null;
     } catch (_) {
       return null;
     }
@@ -236,9 +249,24 @@ Future<UpdateCheck> checkForUpdateDetailed(
   }
 }
 
+/// "0.1.0-beta.31 (код 32)", the name alone, or null when the platform gave nothing usable.
+String? installedVersionLabel(String? name, int? code) {
+  final cleanName = name?.trim();
+  final hasName =
+      cleanName != null &&
+      cleanName.isNotEmpty &&
+      cleanName.length <= 64 &&
+      !cleanName.contains(RegExp(r'[\x00-\x1f]'));
+  final hasCode = code != null && code > 0;
+  if (hasName && hasCode) return '$cleanName (код $code)';
+  if (hasName) return cleanName;
+  if (hasCode) return 'код $code';
+  return null;
+}
+
 /// Russian text for a manual check that offered nothing.
 String updateCheckText(UpdateCheckStatus status) => switch (status) {
-  UpdateCheckStatus.upToDate => 'У вас последняя версия DetourVPN.',
+  UpdateCheckStatus.upToDate => 'Установлена последняя версия DetourVPN.',
   UpdateCheckStatus.failed =>
     'Не удалось проверить обновления. Проверьте интернет и попробуйте ещё раз. '
         'Обновление из приложения работает на Android 13 и новее.',
@@ -296,7 +324,7 @@ class UpdateScheduler {
 String updateOutcomeText(String outcome) => switch (outcome) {
   'installer_opened' => 'Подтвердите установку в системном окне Android.',
   'install_permission_required' =>
-    'Разрешите DetourVPN устанавливать приложения в открывшихся настройках, затем вернитесь и нажмите «Обновить» ещё раз.',
+    'Разрешите DetourVPN устанавливать приложения в открывшихся настройках, затем вернитесь и нажмите «Скачать» ещё раз.',
   'hash_mismatch' || 'size_mismatch' || 'package_mismatch' =>
     'Загруженный файл не прошёл проверку и удалён. Попробуйте позже.',
   'not_newer' => 'У вас уже установлена актуальная версия.',
@@ -365,7 +393,7 @@ class _UpdateDialogState extends State<_UpdateDialog> {
             Text(
               blocking
                   ? 'Эта версия DetourVPN больше не поддерживается. Установите версию ${widget.offer.manifest.versionName}, чтобы продолжить.'
-                  : 'Вышла версия ${widget.offer.manifest.versionName}.',
+                  : 'Доступна версия ${widget.offer.manifest.versionName}.',
             ),
             if (notes.isNotEmpty) ...[const SizedBox(height: 12), Text(notes)],
             if (status != null) ...[
@@ -383,7 +411,7 @@ class _UpdateDialogState extends State<_UpdateDialog> {
           ),
         FilledButton(
           onPressed: busy ? null : _update,
-          child: Text(busy ? 'Загрузка…' : 'Обновить'),
+          child: Text(busy ? 'Загрузка…' : 'Скачать'),
         ),
       ],
     );
