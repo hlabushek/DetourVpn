@@ -67,6 +67,8 @@ if (-not (Test-Path -LiteralPath $KeyPath)) { throw "Signing key not found outsi
 $keyInside = (Resolve-Path -LiteralPath $KeyPath).Path.StartsWith($root, [StringComparison]::OrdinalIgnoreCase)
 if ($keyInside) { throw 'The signing key is inside the repository. Move it out before releasing.' }
 if (-not $ApkUrl.StartsWith('https://')) { throw 'ApkUrl must be HTTPS.' }
+if ($ApkUrl -match '[<>]') { throw 'ApkUrl still has angle brackets (< >). Replace the placeholder with the real host, without < >.' }
+if ([IO.Path]::GetFileName($ApkUrl) -notmatch '^detourvpn-[0-9.]+(-beta\.[0-9]+)?\.apk$') { throw 'ApkUrl must end with the APK file name, for example detourvpn-0.1.0-beta.32.apk.' }
 
 # Any modified tracked file blocks the release, except the two version files.
 $modified = @(git diff --name-only | Where-Object { $_ -and $_ -notin @('apps/client/pubspec.yaml', 'apps/client/android/app/build.gradle.kts') })
