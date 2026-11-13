@@ -1,39 +1,41 @@
-/// ADR-139: a bounded budget for automatic recovery. Pure Dart (no timers, no platform types),
-/// so the rule is unit-tested without a clock.
+/// ADR-139/140: the pace of automatic recovery. Pure Dart (no timers, no platform types), so the
+/// rule is unit-tested without a clock.
 ///
-/// One failure streak gets [maxAttempts] automatic attempts. Each attempt waits
-/// `base * multiplier`, with the multipliers below (2 s, 5 s, 15 s, 30 s, 60 s with the default
-/// base). When the budget is spent [take] returns null: the caller must end in a terminal failed
-/// state, not keep retrying. A successful window and a user tap call [reset].
+/// A failure streak starts with [fastAttempts] quick attempts, each waiting `base * multiplier`
+/// (2 s, 5 s, 15 s, 30 s, 60 s with the default base). ADR-140: after that it keeps retrying at the
+/// last step (60 s) for as long as the user wants the VPN; [take] never ends the streak. Only a
+/// terminal cause, which the caller decides, stops the retries. A successful window and a user tap
+/// call [reset].
 class RecoveryBudget {
-  RecoveryBudget({this.maxAttempts = defaultMaxAttempts});
+  RecoveryBudget({this.fastAttempts = defaultFastAttempts})
+    : assert(fastAttempts >= 1);
 
-  /// Five automatic attempts in a streak; the previous code had no limit.
-  static const defaultMaxAttempts = 5;
+  /// Quick attempts at the start of a streak (ADR-139 kept the number, ADR-140 removed the end).
+  static const defaultFastAttempts = 5;
 
-  /// Delay multipliers by attempt number (the last one is reused only if [maxAttempts] is larger).
+  /// Delay multipliers by attempt number; the last one is reused for every later attempt.
   static const multipliers = [1.0, 2.5, 7.5, 15.0, 30.0];
 
-  final int maxAttempts;
+  final int fastAttempts;
   int _used = 0;
 
-  /// Automatic attempts used in the current streak.
+  /// Automatic attempts made in the current streak.
   int get used => _used;
 
-  /// Attempts left before the terminal state.
-  int get remaining => maxAttempts - _used < 0 ? 0 : maxAttempts - _used;
+  /// The quick steps are spent; attempts continue at the slow pace.
+  bool get slow => _used >= fastAttempts;
 
-  bool get exhausted => _used >= maxAttempts;
-
-  /// Spends one attempt. Returns the delay multiplier for it, or null when the budget is spent.
-  double? take() {
-    if (exhausted) return null;
-    final multiplier =
-        multipliers[_used < multipliers.length
-            ? _used
-            : multipliers.length - 1];
+  /// Spends one attempt and returns its delay multiplier. Never null: a wanted connection keeps
+  /// retrying (ADR-140).
+  double take() {
+    final last =
+        (fastAttempts < multipliers.length
+            ? fastAttempts
+            : multipliers.length) -
+        1;
+    final index = _used < last ? _used : last;
     _used++;
-    return multiplier;
+    return multipliers[index];
   }
 
   /// A successful window or an explicit user tap starts a fresh streak.

@@ -59,7 +59,7 @@ class WindowConnectionController extends ConnectionController {
   /// ADR-139: native reported a spent recovery budget at startup; shown as the terminal state.
   bool _nativeExhausted = false;
 
-  /// ADR-139: automatic attempts left in this failure streak. Spent → terminal 'recovery_exhausted'.
+  /// ADR-139/140: pace of automatic attempts in this failure streak (quick steps, then 60 s).
   final RecoveryBudget _recovery = RecoveryBudget();
   static const root = '/api/v1/window-tunnels';
   static const budgetBytes = int.fromEnvironment(
@@ -1121,16 +1121,13 @@ class WindowConnectionController extends ConnectionController {
       : 'lease_expired';
 
   /// The tunnel ended without the user pressing Disconnect: connect again on our own, with
-  /// backoff and a bounded budget (ADR-139; ADR-099 had no limit). A failed attempt reserves no
-  /// quota; a user disconnect bumps the version and cancels every pending attempt.
+  /// backoff (ADR-099). ADR-140: no attempt budget; after the quick steps it retries every
+  /// 60 s while the cause is transient. A failed attempt reserves no quota; a user disconnect
+  /// bumps the version and cancels every pending attempt.
   void _scheduleAutoReconnect(int version) {
     final base = autoReconnectDelay;
     if (base == null) return;
     final step = _recovery.take();
-    if (step == null) {
-      _exhaustRecovery();
-      return;
-    }
     final delay = Duration(microseconds: (base.inMicroseconds * step).round());
     Future<void> fire() async {
       if (_dead ||
@@ -1153,18 +1150,6 @@ class WindowConnectionController extends ConnectionController {
     }
 
     unawaited(Future<void>.delayed(delay, fire));
-  }
-
-  /// ADR-139: the automatic budget is spent. This is the terminal failed state of the streak:
-  /// no further timer is scheduled, and the native "stay connected" wish ends so native does not
-  /// start its own background retries. Only a user tap (which resets the budget) reconnects.
-  void _exhaustRecovery() {
-    phase = ConnectionPhase.failed;
-    error = 'recovery_exhausted';
-    _reconnectAfterCleanup = false;
-    _resumeWanted = false;
-    _emit();
-    unawaited(_endUserIntent());
   }
 
   /// ADR-124: the app was reopened (or its UI engine recreated) while the user still wanted

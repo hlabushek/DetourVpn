@@ -2,44 +2,45 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:vpn_client/connection.dart';
 import 'package:vpn_client/recovery_budget.dart';
 
-/// ADR-139: the automatic recovery budget is finite and deterministic.
+/// ADR-139/140: the automatic recovery pace is deterministic and never ends a wanted connection.
 void main() {
-  test('one streak gets exactly maxAttempts automatic attempts', () {
-    final budget = RecoveryBudget(maxAttempts: 3);
+  test('ADR-140: quick steps first, then the slow step forever', () {
+    final budget = RecoveryBudget(fastAttempts: 3);
     expect(budget.take(), 1.0);
     expect(budget.take(), 2.5);
     expect(budget.take(), 7.5);
-    expect(budget.exhausted, isTrue);
-    expect(budget.take(), isNull, reason: 'the terminal state, not a retry');
-    expect(budget.take(), isNull);
-    expect(budget.used, 3);
-    expect(budget.remaining, 0);
+    expect(budget.slow, isTrue);
+    for (var i = 0; i < 100; i++) {
+      expect(budget.take(), 7.5, reason: 'never ends, never grows');
+    }
+    expect(budget.used, 103);
   });
 
-  test('the default budget is five attempts with bounded delays', () {
+  test('the default streak is five quick steps then 30x the base', () {
     final budget = RecoveryBudget();
-    expect(RecoveryBudget.defaultMaxAttempts, 5);
+    expect(RecoveryBudget.defaultFastAttempts, 5);
     final steps = [for (var i = 0; i < 5; i++) budget.take()];
     expect(steps, [1.0, 2.5, 7.5, 15.0, 30.0]);
-    expect(budget.take(), isNull);
+    expect(budget.slow, isTrue);
+    expect(budget.take(), 30.0);
   });
 
   test('reset starts a fresh streak (successful window or user tap)', () {
-    final budget = RecoveryBudget(maxAttempts: 2);
+    final budget = RecoveryBudget(fastAttempts: 2);
     budget.take();
     budget.take();
-    expect(budget.exhausted, isTrue);
+    expect(budget.slow, isTrue);
     budget.reset();
-    expect(budget.exhausted, isFalse);
-    expect(budget.remaining, 2);
+    expect(budget.slow, isFalse);
+    expect(budget.used, 0);
     expect(budget.take(), 1.0);
   });
 
-  test('a long streak keeps the last multiplier and never grows', () {
-    final budget = RecoveryBudget(maxAttempts: 8);
-    final steps = [for (var i = 0; i < 8; i++) budget.take()];
+  test('more quick steps than multipliers reuse the last multiplier', () {
+    final budget = RecoveryBudget(fastAttempts: 8);
+    final steps = [for (var i = 0; i < 12; i++) budget.take()];
     expect(steps.last, 30.0);
-    expect(steps.every((s) => s != null && s <= 30.0), isTrue);
+    expect(steps.every((s) => s <= 30.0), isTrue);
   });
 
   test('recovery_exhausted has its own message with one action', () {

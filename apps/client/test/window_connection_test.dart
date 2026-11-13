@@ -1420,9 +1420,10 @@ void main() {
     expect(native.up, false);
   });
   test(
-    'ADR-139: automatic reconnect is budgeted and ends in recovery_exhausted',
+    'ADR-140: automatic reconnect keeps retrying past the quick steps',
     () async {
-      // Every create fails transiently. Before ADR-139 this retried forever.
+      // Every create fails transiently. ADR-139 ended this in recovery_exhausted; ADR-140 keeps
+      // retrying at the slow step while the user wants the VPN.
       final failing = _FailingCreates(api);
       final retrying = WindowConnectionController(
         failing,
@@ -1437,23 +1438,27 @@ void main() {
       await retrying.refresh();
       expect(retrying.error, 'lease_expired');
       failing.fail = true;
-      // Five automatic attempts (5, 12.5, 37.5, 75, 150 ms), then the terminal state.
+      // Five quick attempts (5, 12.5, 37.5, 75, 150 ms), then one every 150 ms.
       await Future<void>.delayed(const Duration(milliseconds: 1000));
-      expect(failing.failedCreates, RecoveryBudget.defaultMaxAttempts);
+      expect(
+        failing.failedCreates,
+        greaterThan(RecoveryBudget.defaultFastAttempts),
+      );
       expect(retrying.phase, ConnectionPhase.failed);
-      expect(retrying.error, 'recovery_exhausted');
+      expect(retrying.error, isNot('recovery_exhausted'));
       final after = failing.failedCreates;
       await Future<void>.delayed(const Duration(milliseconds: 400));
       expect(
         failing.failedCreates,
-        after,
-        reason: 'nothing retries after the terminal state',
+        greaterThan(after),
+        reason: 'still retrying',
       );
-      // The terminal state never blocks the user's own tap: it makes a real attempt. (A manual
-      // attempt that fails is not retried automatically, as before ADR-139.)
-      await retrying.connect();
-      expect(failing.failedCreates, after + 1);
-      expect(retrying.error, 'window_node_unavailable');
+      // The cause clears: the next slow attempt reaches the API by itself, without a tap.
+      final creates = api.creates;
+      failing.fail = false;
+      await Future<void>.delayed(const Duration(milliseconds: 400));
+      expect(api.creates, greaterThan(creates));
+      await retrying.disconnect();
     },
   );
 
