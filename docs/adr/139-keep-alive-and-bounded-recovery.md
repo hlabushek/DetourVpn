@@ -59,13 +59,23 @@ recovery), ADR-129 (new failure category `recovery_exhausted`).
      background attempts.
    - Both budgets count only failed attempts; neither changes what a window costs (a failed attempt
      reserves no quota, ADR-099/130).
-3. **Always-on status** is shown when the platform exposes it: the native snapshot gets the additive
-   key `alwaysOn` (`VpnService.isAlwaysOn()`, read where the service instance exists). When it is
-   `false` the UI shows a Russian hint with the Android path: Настройки → Сеть и интернет → VPN →
-   DetourVPN → значок настроек → «Всегда включён». The hint does not change the state machine.
-4. **Diagnostic allowlists** get `recovery_exhausted` in both `diagnostic_report.dart` and
+3. **Always-on status** is shown when the platform exposes it. Android exposes it only on a
+   running `VpnService` instance (`isAlwaysOn()`, `isLockdownEnabled()`, API 29+). Native reads it
+   whenever it gets an instance (`alwaysOnTriggered`: Always-on start, sticky restart, restore;
+   `alwaysOnStopped`: service destroyed), persists the last value, and reports the additive snapshot
+   key `alwaysOn` = `on` | `off` | `lockdown` | `unknown` (`AlwaysOnStatus`). Before the first read
+   (fresh install, UI-only connects without a stop yet) it is `unknown` and nothing is shown. When
+   it is `off` the home screen shows a Russian hint with the Android path (Настройки → Сеть и
+   интернет → VPN → DetourVPN → шестерёнка → «Постоянная VPN»; Samsung path included) and the
+   battery exemption. When it is `lockdown` the hint warns that renewal then needs the app open.
+   The hint never changes the state machine. A UI-started tunnel does not expose the GoBackend
+   service instance to app code; exposing it would need a change to the tunnel patch, not done.
+4. **A reopened UI shows native exhaustion.** If native spent its budget while no UI was open, the
+   snapshot says `stopCategory = recovery_exhausted` and `desiredConnected = false`; the UI shows
+   the terminal failed state with the same reason and message instead of a silent «VPN выключен».
+5. **Diagnostic allowlists** get `recovery_exhausted` in both `diagnostic_report.dart` and
    `DiagnosticReportText.java` (kept identical by the existing test).
-5. Existing reason codes are unchanged.
+6. Existing reason codes are unchanged.
 
 ## State machine (summary)
 | From | Event | To | Reason / action for the tester |
@@ -106,5 +116,33 @@ recovery), ADR-129 (new failure category `recovery_exhausted`).
 ## Verification status
 - Unit tests: `RecoveryBudget` and the controller's exhaustion path (Dart); `ConnectionSupervisor`
   budget and `EXHAUSTED` transition, `RenewalOwner` lockdown/restore rules (JVM).
-- **Not verified on a device.** Physical steps are in the final report of this change; they are
-  the only evidence that screen-off, app-killed and reboot behaviour works.
+- Build check: native sources compile against Android SDK 36 (`javac`); no APK was built or installed.
+- **Not verified on a device.** The steps below are the only evidence that screen-off, app-killed
+  and reboot behaviour works.
+
+## Owner phone steps (NOT VERIFIED — run on a real phone with a build from this branch)
+Record for each test only: pass/fail, minutes until a drop (if any), the status text shown, and the
+diagnostic code. No addresses, keys or traffic in notes.
+
+0. Preparation: install the build; Настройки → Приложения → DetourVPN → Батарея → «Без
+   ограничений». Open the app and note the Always-on hint (shown only if Android reported `off` or
+   Lockdown; nothing is shown while the status is still unknown).
+1. **Screen off (app open in background).** Connect, wait for «VPN активен». Press the power button
+   once (screen off, phone stays on). Leave it 30 min on the charger, then 30 min off the charger.
+   Wake the phone: the VPN key icon is in the status bar, a website loads, and the app shows
+   «VPN активен» without a tap. Fail: icon gone, or the app shows a failed state (note its code).
+2. **App closed.** Connect. Open Recents and swipe DetourVPN away. Screen off for 30 min. Wake:
+   the key icon is present and a website loads. Then open the app: it shows the running VPN
+   (adopted), not a new connect.
+3. **App killed by Android, then recovery.** Connect, then Настройки → Сеть и интернет → VPN →
+   DetourVPN → turn «Постоянная VPN» on (Lockdown off). Swipe the app away; screen off for 30 min.
+   Expected: VPN still up. Repeat once with «Блокировать соединения без VPN» on and record whether
+   it drops; this is the documented Lockdown limit, not a pass/fail of this change.
+4. **Reboot.** With «Постоянная VPN» on and the VPN connected, restart the phone and unlock it.
+   Within 2 min the key icon appears and a website loads without opening the app.
+5. **Terminal state.** Connect, then turn on airplane mode for 5 min with the app open. Expected:
+   the status ends in the failed state with «Не удалось восстановить подключение…» (code
+   `recovery_exhausted`) within about 2 min, not an endless «Восстанавливается подключение». Turn
+   airplane mode off and tap «Подключить» once: it connects.
+6. **Force-stop (expected limit).** Настройки → Приложения → DetourVPN → «Остановить». The VPN
+   stops and stays off until the app is opened. This is a platform limit, not a failure.
