@@ -235,60 +235,89 @@ public class ConnectionSupervisorTest {
         assertFalse(ConnectionSupervisor.terminal(""));
     }
 
-    /** ADR-139: a spent budget ends the intent in a terminal, named state instead of retrying. */
-    @Test public void recoveryBudgetEndsInTerminalExhaustedState() {
+    /**
+     * ADR-140: a wanted connection is never given up for a transient cause. Hours of failures keep
+     * retrying, never further apart than the 5 min cap, and the intent stays.
+     */
+    @Test public void transientFailuresRetryForHoursWithoutATerminalState() {
         var s = connected();
         s.tunnelDown("lease_expired");
         long now = 0;
-        for (int i = 0; i < ConnectionSupervisor.MAX_ATTEMPTS; i++) {
+        int starts = 0;
+        long generation = s.intentGeneration();
+        while (now < 4 * 60 * 60_000L) {
             var d = s.evaluate(now, false, false, false, true);
             if (d.action == ConnectionSupervisor.Action.WAIT) {
+                assertTrue("never more than the cap plus jitter",
+                        d.delayMs <= ConnectionSupervisor.MAX_DELAY_MS * 5 / 4);
                 now += d.delayMs;
-                d = s.evaluate(now, false, false, false, true);
+                continue;
             }
-            assertEquals("attempt " + i, ConnectionSupervisor.Action.START_RECOVERY, d.action);
-            s.attemptStarted(now, 0.5);
+            assertEquals(ConnectionSupervisor.Action.START_RECOVERY, d.action);
+            s.attemptStarted(now, 0.999);
+            starts++;
             assertFalse(s.recoveryFailed("api_unavailable"));
         }
-        long generation = s.intentGeneration();
-        var end = s.evaluate(now + ConnectionSupervisor.MAX_DELAY_MS * 2, false, false, false, true);
-        assertEquals(ConnectionSupervisor.Action.EXHAUSTED, end.action);
-        assertFalse("the intent is cleared", s.desired());
-        assertTrue("work for the old intent is fenced", s.intentGeneration() > generation);
-        assertEquals("recovery_exhausted", s.lastStop());
-        assertEquals("recovery_exhausted", s.stopCategory());
-        assertTrue(ConnectionSupervisor.terminal("recovery_exhausted"));
-        // Stays terminal on every later trigger (alarm, network, boot): nothing starts again.
-        assertEquals(ConnectionSupervisor.Action.NONE,
-                s.evaluate(now + 10 * ConnectionSupervisor.MAX_DELAY_MS, false, false, false, true).action);
+        assertTrue("about one attempt per cap interval over four hours", starts >= 40);
+        assertTrue(s.desired());
+        assertEquals(generation, s.intentGeneration());
+        assertFalse(ConnectionSupervisor.terminal("api_unavailable"));
+        assertEquals(5 * 60_000L, ConnectionSupervisor.MAX_DELAY_MS);
     }
 
-    @Test public void attachedDartOwnerKeepsItsOwnBudgetAndNativeDoesNotExhaustIt() {
+    @Test public void offlineAttemptsAreNotCountedAndTheReturnRetriesAtOnce() {
         var s = connected();
         s.tunnelDown("lease_expired");
-        for (int i = 0; i < ConnectionSupervisor.MAX_ATTEMPTS; i++) s.attemptStarted(0, 0.5);
+        for (int i = 0; i < 10; i++) {
+            s.attemptStarted(0, 0.5);
+            s.recoveryFailed("network_unavailable");
+        }
+        int attempts = s.attempts();
+        for (long t = 1_000; t < 60 * 60_000L; t += 60_000)
+            assertEquals("waiting_for_network", s.evaluate(t, false, false, false, false).why);
+        assertEquals("waiting does not spend attempts", attempts, s.attempts());
+        var back = s.evaluate(60 * 60_000L, false, false, false, true);
+        assertEquals(ConnectionSupervisor.Action.START_RECOVERY, back.action);
+        assertEquals("network_returned", back.why);
+        assertTrue(s.desired());
+    }
+
+    @Test public void aFlappingNetworkDoesNotStartAttemptsBackToBack() {
+        var s = connected();
+        s.tunnelDown("lease_expired");
+        s.attemptStarted(100_000, 0.5);
+        s.recoveryFailed("network_unavailable");
+        s.evaluate(101_000, false, false, false, false);
+        var back = s.evaluate(102_000, false, false, false, true);
+        assertEquals(ConnectionSupervisor.Action.WAIT, back.action);
+        assertEquals(ConnectionSupervisor.NETWORK_RETURN_GAP_MS - 2_000, back.delayMs);
+        assertEquals(ConnectionSupervisor.Action.START_RECOVERY,
+                s.evaluate(110_000, false, false, false, true).action);
+        s.attemptStarted(110_000, 0.5);
+        // Without another network loss the normal backoff applies again.
+        assertEquals(ConnectionSupervisor.Action.WAIT,
+                s.evaluate(111_000, false, false, false, true).action);
+    }
+
+    @Test public void attachedDartOwnerKeepsNativeOut() {
+        var s = connected();
+        s.tunnelDown("lease_expired");
+        for (int i = 0; i < 20; i++) s.attemptStarted(0, 0.5);
         assertEquals("dart_owner", s.evaluate(1, false, false, true, true).why);
         assertTrue(s.desired());
     }
 
-    @Test public void userConnectAfterExhaustionStartsAFreshStreak() {
+    @Test public void legacyExhaustedReasonStaysNamedAndTerminal() {
+        assertEquals("recovery_exhausted", ConnectionSupervisor.category("recovery_exhausted"));
+        assertTrue(ConnectionSupervisor.terminal("recovery_exhausted"));
         var s = connected();
-        s.tunnelDown("lease_expired");
-        for (int i = 0; i < ConnectionSupervisor.MAX_ATTEMPTS; i++) s.attemptStarted(0, 0.5);
-        assertEquals(ConnectionSupervisor.Action.EXHAUSTED, s.evaluate(1, false, false, false, true).action);
+        assertTrue(s.tunnelDown("recovery_exhausted"));
+        assertFalse(s.desired());
         s.userConnected();
         assertTrue(s.desired());
         assertEquals(0, s.attempts());
-        assertEquals("", s.lastStop());
         s.tunnelDown("lease_expired");
         assertEquals(ConnectionSupervisor.Action.START_RECOVERY,
                 s.evaluate(2, false, false, false, true).action);
-    }
-
-    @Test public void offlineDoesNotHideAnExhaustedBudget() {
-        var s = connected();
-        s.tunnelDown("native_restart_failed");
-        for (int i = 0; i < ConnectionSupervisor.MAX_ATTEMPTS; i++) s.attemptStarted(0, 0.5);
-        assertEquals(ConnectionSupervisor.Action.EXHAUSTED, s.evaluate(1, false, false, false, false).action);
     }
 }

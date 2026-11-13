@@ -21,7 +21,8 @@ package org.example.vpnpoc;
 final class ConnectionSupervisor {
     /** First retry delay; doubles per failed attempt up to {@link #MAX_DELAY_MS}. */
     static final long BASE_DELAY_MS = 30_000;
-    static final long MAX_DELAY_MS = 30 * 60_000;
+    /** ADR-140: the VPN stays wanted for hours, so a retry is never further away than this. */
+    static final long MAX_DELAY_MS = 5 * 60_000;
     /** Up this long without trouble: the retry history is forgotten. */
     static final long STABLE_MS = 10 * 60_000;
     /**
@@ -30,16 +31,15 @@ final class ConnectionSupervisor {
      */
     static final String BACKGROUND_REFUSED = "background_start_refused";
     static final long REFUSED_RETRY_MS = 60_000;
+    /** ADR-140: a returning network retries at once, but a flapping one not more often than this. */
+    static final long NETWORK_RETURN_GAP_MS = 10_000;
     /**
-     * ADR-139: recovery attempts per failure streak (reset after {@link #STABLE_MS} up). With the
-     * 30 s doubling backoff this spans about 1.5 h; then the supervisor ends the intent with
-     * {@link #EXHAUSTED} instead of retrying forever.
+     * ADR-139 reason code, kept so a state reported by an older build is still named. ADR-140: no
+     * attempt budget ends a wanted connection any more, so nothing here produces it.
      */
-    static final int MAX_ATTEMPTS = 8;
     static final String EXHAUSTED = "recovery_exhausted";
 
-    /** {@link #EXHAUSTED}: the caller must persist the cleared intent and cancel the alarm. */
-    enum Action { NONE, START_RECOVERY, WAIT, EXHAUSTED }
+    enum Action { NONE, START_RECOVERY, WAIT }
 
     /** One decision; {@link #delayMs} is set for {@link Action#WAIT}. */
     static final class Decision {
@@ -58,6 +58,8 @@ final class ConnectionSupervisor {
     private long upSince = -1;
     private String lastStop = "";
     private double nextJitter = 0.5;
+    /** ADR-140: recovery was held for a missing network; its return skips the backoff once. */
+    private boolean heldForNetwork;
 
     boolean desired() { return desired; }
     long intentGeneration() { return intentGeneration; }
@@ -109,7 +111,7 @@ final class ConnectionSupervisor {
     boolean recoveryFailed(String code) { return tunnelDown(code == null ? "recovery_failed" : code); }
 
     void attemptStarted(long now, double jitterForNext) {
-        attempts = Math.min(attempts + 1, MAX_ATTEMPTS + 8);
+        attempts = Math.min(attempts + 1, 16);
         lastAttemptAt = now;
         nextJitter = Math.max(0, Math.min(jitterForNext, 0.999));
         if (BACKGROUND_REFUSED.equals(lastStop)) lastStop = "";
@@ -125,7 +127,7 @@ final class ConnectionSupervisor {
         lastStop = BACKGROUND_REFUSED;
     }
 
-    /** Delay after {@link #attempts} failed attempts: 30 s, 1, 2, 4 ... 30 min, with ±25 % jitter. */
+    /** Delay after {@link #attempts} failed attempts: 30 s, 1, 2, 4, 5 min, with ±25 % jitter. */
     long backoffMs() {
         if (attempts == 0) return 0;
         long base = Math.min(MAX_DELAY_MS, BASE_DELAY_MS << Math.min(attempts - 1, 10));
@@ -141,6 +143,7 @@ final class ConnectionSupervisor {
     Decision evaluate(long now, boolean tunnelUp, boolean connecting, boolean dartOwner,
             boolean networkUsable) {
         if (tunnelUp) {
+            heldForNetwork = false;
             tunnelUp(now);
             if (now - upSince >= STABLE_MS) attempts = 0;
             return new Decision(Action.NONE, 0, "up");
@@ -149,14 +152,19 @@ final class ConnectionSupervisor {
         if (connecting) return new Decision(Action.NONE, 0, "connecting");
         if (dartOwner) return new Decision(Action.NONE, 0, "dart_owner");
         if (terminal(lastStop)) return new Decision(Action.NONE, 0, "terminal");
-        if (attempts >= MAX_ATTEMPTS) {
-            // ADR-139: the budget is spent. Terminal: no further native start for this intent.
-            desired = false;
-            lastStop = EXHAUSTED;
-            intentGeneration++;
-            return new Decision(Action.EXHAUSTED, 0, "exhausted");
+        // ADR-140: no attempt budget. Without a network nothing is attempted or counted; the
+        // network callback re-evaluates, and its return retries at once instead of after backoff.
+        if (!networkUsable) {
+            heldForNetwork = true;
+            return new Decision(Action.NONE, 0, "waiting_for_network");
         }
-        if (!networkUsable) return new Decision(Action.NONE, 0, "waiting_for_network");
+        if (heldForNetwork && !BACKGROUND_REFUSED.equals(lastStop)) {
+            long flap = lastAttemptAt + NETWORK_RETURN_GAP_MS - now;
+            if (flap > 0) return new Decision(Action.WAIT, flap, "network_returned");
+            heldForNetwork = false;
+            return new Decision(Action.START_RECOVERY, 0, "network_returned");
+        }
+        heldForNetwork = false;
         long gap = BACKGROUND_REFUSED.equals(lastStop) ? REFUSED_RETRY_MS : backoffMs();
         long wait = lastAttemptAt + gap - now;
         if (wait > 0) return new Decision(Action.WAIT, wait, "backoff");
@@ -165,8 +173,8 @@ final class ConnectionSupervisor {
 
     /**
      * Stop reasons after which reconnecting cannot help without the user: lost VPN consent,
-     * rejected credentials, exhausted quota, an invalid profile or device, a user stop, or a spent
-     * recovery budget (ADR-139).
+     * rejected credentials, exhausted quota, an invalid profile or device, or a user stop.
+     * ADR-140: a legacy {@link #EXHAUSTED} stays terminal so an older build's end state is kept.
      */
     static boolean terminal(String reason) {
         switch (category(reason)) {
