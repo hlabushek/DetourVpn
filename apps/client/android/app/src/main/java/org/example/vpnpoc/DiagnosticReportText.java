@@ -6,20 +6,23 @@ final class DiagnosticReportText {
     private DiagnosticReportText() { }
 
     private static final Set<String> ERROR_CODES = Set.of(
-        "admission_closed", "api_unavailable", "device_clock_skew", "device_conflict", "device_limit_reached",
-        "device_revoked", "insufficient_quota", "insufficient_window_funding",
-        "invalid_response", "lease_expired", "login_failed", "native_config_invalid",
-        "native_disconnect_failed", "native_down", "native_engine_unavailable",
-        "native_io_error", "native_permission_error", "native_service_state_invalid",
-        "native_start_failed", "native_unavailable", "network_unavailable", "permission_denied",
-        "rate_limited", "remote_revoked", "revoke_unconfirmed", "session_device_mismatch",
+        "admission_closed", "api_unavailable", "device_clock_skew", "device_conflict",
+        "device_limit_reached", "device_revoked", "insufficient_quota",
+        "insufficient_window_funding", "invalid_response", "lease_expired", "login_failed",
+        "native_config_invalid", "native_disconnect_failed", "native_down",
+        "native_engine_unavailable", "native_io_error", "native_permission_error",
+        "native_restart_failed", "native_service_state_invalid", "native_start_failed",
+        "native_unavailable", "network_unavailable", "permission_denied", "rate_limited",
+        "remote_revoked", "renew_token_invalid", "revoke_unconfirmed", "session_device_mismatch",
         "session_erasure_failed", "session_expired", "session_storage_failed",
+        "tunnel_config_not_ready", "tunnel_exists", "tunnel_idempotency_conflict",
         "tunnel_node_capacity", "tunnel_node_unavailable", "tunnel_profile_unavailable",
         "tunnel_recovery_not_ready", "unauthorized", "unknown_error", "vpn_revoked",
-        "window_activation_refused", "window_generation_conflict", "window_node_required",
-        "window_node_unavailable",
-        "window_not_active", "window_tunnels_unavailable"
-    );
+        "window_activation_refused", "window_connection_exists", "window_epoch_conflict",
+        "window_expired", "window_generation_conflict", "window_idempotency_conflict",
+        "window_inconsistent", "window_node_capacity", "window_node_required",
+        "window_node_unavailable", "window_not_active", "window_not_found", "window_not_renewable",
+        "window_reconciliation_required", "window_tunnels_unavailable");
 
     private static final Set<String> STAGES = Set.of(
         "android_vpn_permission", "connection_reconcile", "device_key_read",
