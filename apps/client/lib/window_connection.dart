@@ -873,9 +873,7 @@ class WindowConnectionController extends ConnectionController {
     // Age unknown although a handshake was seen earlier: record nothing rather than guess.
     diagnosticHandshakeAge = snapshot.handshakeAge >= 0
         ? handshakeAgeBucket(snapshot.handshakeAge)
-        : (snapshot.handshakeSeen || _hasEstablishedHandshake
-              ? null
-              : 'never');
+        : (snapshot.handshakeSeen || _hasEstablishedHandshake ? null : 'never');
     diagnosticWindow = windowBucket(snapshot.remainingMs);
     diagnosticNetworkChange = networkChangeBucket(snapshot.networkChangeAgeMs);
   }
@@ -970,7 +968,9 @@ class WindowConnectionController extends ConnectionController {
         // counted conservatively in the next window's advisory estimate.
         _renewTrafficAnchor = traffic != null && traffic >= 0 ? traffic : null;
       }
-      diagnosticStage = _renewIntent != null ? 'window_renewal' : 'tunnel_monitor';
+      diagnosticStage = _renewIntent != null
+          ? 'window_renewal'
+          : 'tunnel_monitor';
       var value = await api.call('GET', '$root/$_id');
       if (_cancelled(version)) return;
       if (_renewIntent != null) {
