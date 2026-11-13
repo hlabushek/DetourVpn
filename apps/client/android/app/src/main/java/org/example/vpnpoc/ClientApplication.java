@@ -62,8 +62,13 @@ public final class ClientApplication extends Application implements Tunnel {
     private volatile FlutterEngine recoveryEngine;
     /** ADR-121: the restore engine's channel, used to wake its Dart controller. */
     private volatile MethodChannel recoveryChannel;
-    /** ADR-121: Lockdown seen on an Always-on start; native HTTPS cannot get out then. */
+    /** ADR-121: Lockdown seen on an Always-on start; plain native HTTPS cannot get out then. */
     volatile boolean lockdown;
+    /**
+     * ADR-140: the VPN service instance Android handed us (Always-on start, sticky restart,
+     * restore), kept until that instance stops. Only used to protect() native renewal sockets.
+     */
+    volatile VpnService protector;
     /** ADR-139: last Always-on setting read from a service instance ({@link AlwaysOnStatus}). */
     private volatile String alwaysOn = AlwaysOnStatus.UNKNOWN;
     static final String WAKE_RESTORE = "org.example.vpnpoc.action.WAKE_RESTORE";
@@ -102,10 +107,12 @@ public final class ClientApplication extends Application implements Tunnel {
         super.onCreate();
         GoBackend.setAlwaysOnCallback(new GoBackend.AlwaysOnCallback() {
             @Override public void alwaysOnTriggered(GoBackend.VpnService service) {
+                if (service != null) protector = service;
                 observeAlwaysOn(service);
                 startAlwaysOnRecovery(service);
             }
             @Override public void alwaysOnStopped(GoBackend.VpnService service) {
+                if (protector == service) protector = null;
                 observeAlwaysOn(service);
                 stopAlwaysOnService(service);
             }
@@ -479,13 +486,9 @@ public final class ClientApplication extends Application implements Tunnel {
             result.success(null);
             return;
         }
-        // ADR-117: the restore path keeps Dart-driven renewal (Lockdown would need protect()).
-        // Answer "not started" instead of notImplemented, which Dart cannot treat as a refusal.
-        if (call.method.equals("startNativeRenewal")) {
-            result.success(false);
-            return;
-        }
-        if (!java.util.Set.of("protectedRelayRead", "sessionRead", "sessionWrite", "nodeRead",
+        // ADR-140: the restore engine may hand renewal to native (protected sockets under
+        // Lockdown), so renewal no longer waits for Dart timers in Doze.
+        if (!java.util.Set.of("startNativeRenewal", "protectedRelayRead", "sessionRead", "sessionWrite", "nodeRead",
                 "publicKey", "prove", "permission", "connectWindow", "advanceWindow",
                 "disconnect", "snapshot").contains(call.method)) {
             result.notImplemented();
@@ -498,6 +501,18 @@ public final class ClientApplication extends Application implements Tunnel {
             try {
                 Object value = null;
                 switch (call.method) {
+                    case "startNativeRenewal":
+                        if (generation != this.generation.get() || provider == null
+                                || !provider.isUp() || deadline <= 0)
+                            throw new IllegalStateException();
+                        if (!RenewalOwner.nativeMayStart(true, recoveryEngine != null, lockdown,
+                                protector != null)) {
+                            value = false; // Dart restore keeps renewing.
+                            break;
+                        }
+                        renewer.start(call.arguments(), generation);
+                        value = true;
+                        break;
                     case "protectedRelayRead":
                         if (protectedRelay == null || recoveryService == null)
                             throw new IllegalStateException();

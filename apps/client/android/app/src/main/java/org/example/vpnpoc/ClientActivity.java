@@ -369,9 +369,10 @@ public final class ClientActivity extends FlutterActivity {
                         // between bumps the generation and the renewer refuses to start.
                         if (generation != app.generation.get() || !app.provider.isUp()
                                 || app.deadline <= 0) throw new IllegalStateException();
-                        // ADR-121: under Lockdown native HTTPS cannot get out; Dart keeps renewing.
-                        if (!RenewalOwner.nativeMayStart(app.restoreEngineAlive(), app.lockdown)) {
-                            // ADR-136: a restore engine is the single owner; Dart keeps renewing.
+                        // ADR-136/140: an unadopted restore engine owns renewal; under Lockdown
+                        // native needs a protected path. A refusal keeps Dart renewing.
+                        if (!RenewalOwner.nativeMayStart(false, app.restoreEngineAlive(),
+                                app.lockdown, app.protector != null)) {
                             value = false;
                             break;
                         }

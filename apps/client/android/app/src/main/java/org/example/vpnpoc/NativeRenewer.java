@@ -4,6 +4,7 @@ import android.app.AlarmManager;
 import android.app.PendingIntent;
 import android.content.Context;
 import android.content.Intent;
+import android.net.VpnService;
 import android.os.PowerManager;
 import android.os.SystemClock;
 import java.io.ByteArrayOutputStream;
@@ -277,8 +278,26 @@ final class NativeRenewer {
     }
 
     private Response call(State s, String method, String suffix, JSONObject body) throws Exception {
+        String path = "/api/v1/window-tunnels/" + s.plan.connection + suffix;
+        // ADR-140: under Lockdown only a protect()ed socket leaves; otherwise the app's own
+        // package is outside its VPN and plain platform HTTPS uses the physical network.
+        VpnService protector = app.protector;
+        switch (RenewalOwner.transport(app.lockdown, protector != null)) {
+            case PROTECTED: {
+                String host = ProtectedApiRelay.validateApiOrigin(s.origin);
+                byte[] bytes = body == null ? null : body.toString().getBytes(StandardCharsets.UTF_8);
+                ProtectedHttps.Result result = ProtectedHttps.exchange(protector::protect, host,
+                        method, path, s.token, bytes, TIMEOUT_MS);
+                return new Response(result.status,
+                        result.body.isEmpty() ? new JSONObject() : new JSONObject(result.body));
+            }
+            case NONE:
+                throw new java.io.IOException("no_protected_path"); // Transient; window decides.
+            default:
+                break;
+        }
         String base = s.origin.toString().replaceAll("/+$", "");
-        URL url = new URL(base + "/api/v1/window-tunnels/" + s.plan.connection + suffix);
+        URL url = new URL(base + path);
         HttpURLConnection connection = (HttpURLConnection) url.openConnection();
         try {
             connection.setInstanceFollowRedirects(false);

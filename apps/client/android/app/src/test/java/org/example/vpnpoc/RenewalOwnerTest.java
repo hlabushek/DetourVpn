@@ -6,22 +6,49 @@ import static org.junit.Assert.assertTrue;
 
 import org.junit.Test;
 
-/** ADR-136: one renewal owner per window. */
+/** ADR-136/140: one renewal owner per window, and the native transport choice. */
 public class RenewalOwnerTest {
-    @Test public void nativeRenewalMayStartOnlyWithoutRestoreEngineAndLockdown() {
-        assertTrue(RenewalOwner.nativeMayStart(false, false));
-        assertFalse("a restore engine owns renewal", RenewalOwner.nativeMayStart(true, false));
-        assertFalse("Lockdown keeps renewal in Dart", RenewalOwner.nativeMayStart(false, true));
-        assertFalse(RenewalOwner.nativeMayStart(true, true));
+    @Test public void transportIsDirectWithoutLockdownAndProtectedOnlyWithAnInstance() {
+        assertEquals(RenewalOwner.Transport.DIRECT, RenewalOwner.transport(false, false));
+        assertEquals("no protection needed: the app is outside its own VPN",
+                RenewalOwner.Transport.DIRECT, RenewalOwner.transport(false, true));
+        assertEquals(RenewalOwner.Transport.PROTECTED, RenewalOwner.transport(true, true));
+        assertEquals("Lockdown without a VpnService instance has no way out",
+                RenewalOwner.Transport.NONE, RenewalOwner.transport(true, false));
     }
 
-    @Test public void theUiAdoptionSequenceNeverHasTwoOwners() {
-        // Restore engine alive: Dart restore is the single owner.
-        assertEquals(1, RenewalOwner.owners(false, false, true));
-        // Hand-over: adoptRestore destroys the restore engine first, then the UI and native take over.
-        assertFalse(RenewalOwner.conflict(false, true, false));
-        assertEquals("after the hand-over native is the single owner, the UI only observes", 1,
-                RenewalOwner.owners(true, false, false));
+    @Test public void uiChannelMayNotStartNativeWhileAnUnadoptedRestoreEngineLives() {
+        assertTrue(RenewalOwner.nativeMayStart(false, false, false, false));
+        assertFalse("adopt the restore engine first",
+                RenewalOwner.nativeMayStart(false, true, false, true));
+        assertFalse("UI-started tunnel under Lockdown: renewal needs the app open",
+                RenewalOwner.nativeMayStart(false, false, true, false));
+        assertTrue(RenewalOwner.nativeMayStart(false, false, true, true));
+    }
+
+    /** ADR-140: after a kill, Always-on start or boot, renewal no longer depends on Dart timers. */
+    @Test public void restoreEngineMayHandRenewalToNative() {
+        assertTrue(RenewalOwner.nativeMayStart(true, true, false, true));
+        assertTrue("restore under Lockdown uses the protected path",
+                RenewalOwner.nativeMayStart(true, true, true, true));
+        assertFalse(RenewalOwner.nativeMayStart(true, true, true, false));
+    }
+
+    @Test public void dartOnlyObservesWhileNativeRenews() {
+        assertTrue(RenewalOwner.dartRenews(true, false));
+        assertFalse(RenewalOwner.dartRenews(true, true));
+        assertFalse(RenewalOwner.dartRenews(false, false));
+    }
+
+    @Test public void everyHandOverLeavesExactlyOneOwner() {
+        // Restore engine alive and renewing: single owner.
+        assertEquals(1, RenewalOwner.owners(false, false, RenewalOwner.dartRenews(true, false)));
+        // Restore engine hands to native: restore observes, native owns.
+        assertEquals(1, RenewalOwner.owners(true, false, RenewalOwner.dartRenews(true, true)));
+        // UI adopts (restore engine destroyed) while native renews: the UI observes.
+        assertEquals(1, RenewalOwner.owners(true, RenewalOwner.dartRenews(true, true), false));
+        // App closed, no Lockdown: native renews alone.
+        assertEquals(1, RenewalOwner.owners(true, false, false));
     }
 
     @Test public void anyTwoOwnersAreAConflict() {
@@ -30,28 +57,5 @@ public class RenewalOwnerTest {
         assertTrue(RenewalOwner.conflict(false, true, true));
         assertTrue(RenewalOwner.conflict(true, true, true));
         assertFalse(RenewalOwner.conflict(false, false, false));
-    }
-
-    /**
-     * ADR-139: the app-closed case. With the UI gone, native renewal is the only owner that keeps a
-     * window alive without Dart; under Lockdown it is refused, so only the restore engine renews
-     * (alarm wake-ups, Doze-limited). Never two owners.
-     */
-    @Test public void appClosedLeavesExactlyOneOwnerOrNone() {
-        // App closed, no Lockdown: native renews alone.
-        assertTrue(RenewalOwner.nativeMayStart(false, false));
-        assertEquals(1, RenewalOwner.owners(true, false, false));
-        // App closed under Lockdown: native refused; the restore engine is the only owner.
-        assertFalse(RenewalOwner.nativeMayStart(true, true));
-        assertEquals(1, RenewalOwner.owners(false, false, true));
-        // App closed, Lockdown, no restore engine: no owner, the window ends (ADR-139 limit).
-        assertFalse(RenewalOwner.nativeMayStart(false, true));
-        assertEquals(0, RenewalOwner.owners(false, false, false));
-    }
-
-    @Test public void uiReopenOverNativeRenewalIsAConflictTheUiMustNotCreate() {
-        // The reopened UI observes; it must not also renew while native renews.
-        assertTrue(RenewalOwner.conflict(true, true, false));
-        assertFalse(RenewalOwner.conflict(true, false, false));
     }
 }
