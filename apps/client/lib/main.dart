@@ -36,14 +36,12 @@ void main() {
     /* Explicit setup screen. */
   }
   // ADR-107: the in-app updater exists only in the Android client.
-  const windowsBuild = bool.fromEnvironment('VPN_WINDOW_TUNNELS');
   runApp(
     VpnApp(
       api: api,
       native: PlatformTunnel(),
-      updates: isWindowsClient || windowsBuild
-          ? null
-          : const PlatformUpdateNative(),
+      // Window-tunnel builds (the signed beta) are Android too: only Windows lacks the updater.
+      updates: isWindowsClient ? null : const PlatformUpdateNative(),
     ),
   );
 }
