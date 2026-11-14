@@ -105,15 +105,21 @@ class _VpnAppState extends State<VpnApp> with WidgetsBindingObserver {
   Future<UpdateCheck?> _runUpdateCheck({required bool manual}) async {
     final scheduler = _updates;
     if (scheduler == null) return null;
-    return scheduler.run(
-      manual: manual,
-      show: (offer) async {
-        final context = _navigator.currentContext;
-        if (!mounted || context == null || !context.mounted) return;
-        await showUpdateDialog(context, offer, scheduler.native);
-      },
-    );
+    return scheduler.run(manual: manual, show: _showUpdate);
   }
+
+  Future<void> _showUpdate(UpdateOffer offer) async {
+    final scheduler = _updates;
+    final context = _navigator.currentContext;
+    if (scheduler == null || !mounted || context == null || !context.mounted) {
+      return;
+    }
+    await showUpdateDialog(context, offer, scheduler.native);
+  }
+
+  /// The home-screen banner opens the same dialog and download flow as Settings.
+  void _openUpdateBanner(UpdateOffer offer) =>
+      unawaited(_updates?.present(offer, _showUpdate));
 
   /// ADR-100: no network at startup must not sign the user out. Temporary failures are retried
   /// (about 30 s in total) and the saved session is kept for the next resume or launch; only a
@@ -323,6 +329,7 @@ class _VpnAppState extends State<VpnApp> with WidgetsBindingObserver {
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     connection?.dispose();
+    _updates?.bannerOffer.dispose();
     widget.api?.close();
     super.dispose();
   }
@@ -407,6 +414,8 @@ class _VpnAppState extends State<VpnApp> with WidgetsBindingObserver {
           controller: connection!,
           onSignOut: signOut,
           onOpenTraffic: () => _selectTab(1),
+          updateOffer: _updates?.bannerOffer,
+          onOpenUpdate: _openUpdateBanner,
         ),
       },
     );

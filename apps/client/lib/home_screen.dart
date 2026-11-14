@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
+import 'app_update.dart';
 import 'connection.dart';
 import 'country_flag.dart';
 import 'diagnostic_report.dart';
@@ -25,8 +26,17 @@ class ConnectionScreen extends StatelessWidget {
     required this.controller,
     required this.onSignOut,
     this.onOpenTraffic,
+    this.updateOffer,
+    this.onOpenUpdate,
   });
   final ConnectionController controller;
+
+  /// The newer build found by the last update check (ADR-107); null hides the banner. Null as a
+  /// whole where there is no updater (Windows, tests).
+  final ValueListenable<UpdateOffer?>? updateOffer;
+
+  /// Opens the same update dialog and download flow as Settings.
+  final void Function(UpdateOffer offer)? onOpenUpdate;
   final Future<void> Function() onSignOut;
 
   /// Switches to the Traffic tab. Without it (standalone use) the traffic
@@ -149,6 +159,19 @@ class ConnectionScreen extends StatelessWidget {
             32 + GlassNavInset.of(context),
           ),
           children: [
+            if (updateOffer != null && onOpenUpdate != null)
+              ValueListenableBuilder<UpdateOffer?>(
+                valueListenable: updateOffer!,
+                builder: (context, offer, _) => offer == null
+                    ? const SizedBox.shrink()
+                    : Padding(
+                        padding: const EdgeInsets.only(bottom: 12),
+                        child: UpdateBanner(
+                          offer: offer,
+                          onOpen: () => onOpenUpdate!(offer),
+                        ),
+                      ),
+              ),
             Semantics(
               liveRegion: true,
               child: OrbitSwitcher(
@@ -356,4 +379,37 @@ class ConnectionScreen extends StatelessWidget {
       );
     },
   );
+}
+
+/// Compact home-screen notice that a newer build is published; the button opens the update dialog.
+class UpdateBanner extends StatelessWidget {
+  const UpdateBanner({super.key, required this.offer, required this.onOpen});
+  final UpdateOffer offer;
+  final VoidCallback onOpen;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = OrbitTokens.of(context);
+    return Semantics(
+      liveRegion: true,
+      child: OrbitPanel(
+        key: const ValueKey('update-banner'),
+        tone: t.accent,
+        padding: const EdgeInsets.fromLTRB(16, 8, 8, 8),
+        child: Row(
+          children: [
+            Icon(Icons.system_update_outlined, color: t.accent, size: 22),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                updateBannerText(offer),
+                style: Theme.of(context).textTheme.bodyMedium,
+              ),
+            ),
+            TextButton(onPressed: onOpen, child: const Text('Обновить')),
+          ],
+        ),
+      ),
+    );
+  }
 }

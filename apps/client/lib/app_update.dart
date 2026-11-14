@@ -273,6 +273,21 @@ String updateCheckText(UpdateCheckStatus status) => switch (status) {
   UpdateCheckStatus.available => 'Доступно обновление.',
 };
 
+/// The offer the home-screen banner shows after [result]. A newer build replaces it, "up to date"
+/// clears it, and a failed check keeps the previous one (a failed check proves nothing).
+UpdateOffer? nextBannerOffer(UpdateOffer? previous, UpdateCheck result) =>
+    switch (result.status) {
+      UpdateCheckStatus.available => result.offer,
+      UpdateCheckStatus.upToDate => null,
+      UpdateCheckStatus.failed => previous,
+    };
+
+/// Banner text: the version and whether the installed one is still supported.
+String updateBannerText(UpdateOffer offer) =>
+    offer.decision == UpdateDecision.blocking
+    ? 'Нужно обновить приложение до версии ${offer.manifest.versionName}'
+    : 'Доступна новая версия ${offer.manifest.versionName}';
+
 /// When to check: at start, when the app returns to the screen (at most every [autoEvery]),
 /// and whenever the user asks. One check at a time; no second dialog while one is open.
 class UpdateScheduler {
@@ -289,6 +304,10 @@ class UpdateScheduler {
   DateTime? _lastCheck;
   bool _running = false;
   bool _showing = false;
+
+  /// The offer from the last check that worked; null until a check found a newer build.
+  /// Drives the home-screen banner.
+  final ValueNotifier<UpdateOffer?> bannerOffer = ValueNotifier(null);
 
   bool get dueForAuto =>
       _lastCheck == null || _now().difference(_lastCheck!) >= autoEvery;
@@ -308,6 +327,7 @@ class UpdateScheduler {
     } finally {
       _running = false;
     }
+    bannerOffer.value = nextBannerOffer(bannerOffer.value, result);
     final offer = result.offer;
     if (offer != null) {
       _showing = true;
@@ -318,6 +338,21 @@ class UpdateScheduler {
       }
     }
     return result;
+  }
+
+  /// Opens [show] for an offer already found (the home-screen banner). Skipped while a check or
+  /// another update dialog is in progress, like [run].
+  Future<void> present(
+    UpdateOffer offer,
+    Future<void> Function(UpdateOffer offer) show,
+  ) async {
+    if (_running || _showing) return;
+    _showing = true;
+    try {
+      await show(offer);
+    } finally {
+      _showing = false;
+    }
   }
 }
 
