@@ -3,7 +3,10 @@ import 'package:vpn_client/native_tunnel.dart';
 
 void main() {
   test('snapshot failure stage accepts only lowercase stage codes', () {
-    expect(nativeFailureStage('native_watchdog_restart'), 'native_watchdog_restart');
+    expect(
+      nativeFailureStage('native_watchdog_restart'),
+      'native_watchdog_restart',
+    );
     expect(nativeFailureStage('native_renewal'), 'native_renewal');
     // Older native builds send no key; "" means no failure is recorded.
     expect(nativeFailureStage(null), isNull);
