@@ -13,6 +13,12 @@ Future<Set<String>> readNativeCapabilities() async {
   }
 }
 
+/// The snapshot's `failureStage`: a lowercase stage code, or null for "" / missing / other types.
+String? nativeFailureStage(Object? value) {
+  if (value is! String) return null;
+  return RegExp(r'^[a-z_]{1,64}$').hasMatch(value) ? value : null;
+}
+
 class NativeSnapshot {
   const NativeSnapshot({
     required this.up,
@@ -32,7 +38,13 @@ class NativeSnapshot {
     this.transport,
     this.stopCategory,
     this.alwaysOn,
+    this.failureStage,
   });
+
+  /// The native step that failed first in the current window (for example `native_watchdog_restart`,
+  /// `native_renewal`). Set only by a native build that names failures; null when none or older.
+  /// Used for the diagnostic stage while the tunnel is down.
+  final String? failureStage;
 
   /// ADR-139: the Always-on VPN setting as native last read it (`on`, `off`, `lockdown`,
   /// `unknown`). Null on older builds and on Windows.
@@ -393,6 +405,7 @@ class PlatformTunnel
           const {'on', 'off', 'lockdown', 'unknown'}.contains(value['alwaysOn'])
           ? value['alwaysOn'] as String
           : null,
+      failureStage: nativeFailureStage(value['failureStage']),
       transport: value['transport'] is String
           ? value['transport'] as String
           : null,

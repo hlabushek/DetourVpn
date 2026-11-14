@@ -59,6 +59,9 @@ class WindowConnectionController extends ConnectionController {
   /// ADR-139: native reported a spent recovery budget at startup; shown as the terminal state.
   bool _nativeExhausted = false;
 
+  /// The native step that failed while no UI ran (from the startup snapshot); null when none.
+  String? _nativeFailureStage;
+
   /// ADR-139/140: pace of automatic attempts in this failure streak (quick steps, then 60 s).
   final RecoveryBudget _recovery = RecoveryBudget();
   static const root = '/api/v1/window-tunnels';
@@ -275,6 +278,7 @@ class WindowConnectionController extends ConnectionController {
           !live.up &&
           !live.desiredConnected &&
           live.stopCategory == 'recovery_exhausted';
+      _nativeFailureStage = live.up ? null : live.failureStage;
     }
     final adoptable =
         live != null &&
@@ -411,8 +415,9 @@ class WindowConnectionController extends ConnectionController {
     _connectedAtMs = now;
     _recovery.reset(); // ADR-139: a running tunnel is a successful window.
     remotePending = false;
+    // A recorded failure keeps its stage until the next step sets a new one.
+    if (error == null) diagnosticStage = null;
     error = null;
-    diagnosticStage = null;
     phase = ConnectionPhase.reconnecting;
     detail = 'VPN продолжает работать, проверяется связь';
     // ADR-121: renewal moves from the ended restore engine to native renewal (or to this UI).
@@ -446,8 +451,9 @@ class WindowConnectionController extends ConnectionController {
       // ADR-139: a user tap starts a fresh streak of automatic attempts.
       _recovery.reset();
     }
+    // A recorded failure keeps its stage until the next step sets a new one.
+    if (error == null) diagnosticStage = null;
     error = null;
-    diagnosticStage = null;
     phase = ConnectionPhase.connecting;
     _emit();
     final work = _connect(version);
@@ -549,7 +555,7 @@ class WindowConnectionController extends ConnectionController {
       _activationRetries = 0;
       // ADR-139: a new window is up; the next failure starts a fresh streak.
       _recovery.reset();
-      diagnosticStage = null;
+      if (error == null) diagnosticStage = null;
       diagnosticHandshake = null;
       diagnosticHandshakeAge = null;
       diagnosticWindow = null;
@@ -616,7 +622,7 @@ class WindowConnectionController extends ConnectionController {
     }
     _panelUp = true;
     _connectedAtMs = _clock.elapsedMilliseconds;
-    diagnosticStage = null;
+    if (error == null) diagnosticStage = null;
     diagnosticHandshake = null;
     diagnosticHandshakeAge = null;
     diagnosticWindow = null;
@@ -870,6 +876,11 @@ class WindowConnectionController extends ConnectionController {
   /// Coarse, fixed-category context for the diagnostic report (no address, key or traffic).
   void _recordContext(NativeSnapshot snapshot) {
     alwaysOnStatus = snapshot.alwaysOn ?? alwaysOnStatus;
+    // A tunnel that native stopped names the native step that failed (background failures never
+    // reach Dart's own steps). A running tunnel keeps the Dart step.
+    if (!snapshot.up && snapshot.failureStage != null) {
+      diagnosticStage = snapshot.failureStage;
+    }
     // Age unknown although a handshake was seen earlier: record nothing rather than guess.
     diagnosticHandshakeAge = snapshot.handshakeAge >= 0
         ? handshakeAgeBucket(snapshot.handshakeAge)
@@ -911,6 +922,8 @@ class WindowConnectionController extends ConnectionController {
       if (_nativeExhausted && !hasLease) {
         _nativeExhausted = false;
         phase = ConnectionPhase.failed;
+        // Native gave up its restore budget; name the native step it failed in last.
+        diagnosticStage = _nativeFailureStage ?? 'native_restore';
         error = 'recovery_exhausted';
         return;
       }

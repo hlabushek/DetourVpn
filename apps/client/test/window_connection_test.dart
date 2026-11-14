@@ -30,6 +30,9 @@ class Native extends FakeNative implements WindowNative {
   /// ADR-122: milliseconds since the phone's network changed (null = never).
   int? networkChange;
 
+  /// The native step that failed (snapshot `failureStage`); null on older builds.
+  String? failureStage;
+
   /// ADR-123: the time the controller gave the last started window, in milliseconds.
   int? windowMs;
   bool failPublicKey = false;
@@ -50,6 +53,7 @@ class Native extends FakeNative implements WindowNative {
     reason: reason,
     handshakeSeen: seen,
     networkChangeAgeMs: networkChange,
+    failureStage: failureStage,
   );
   @override
   Future<void> connectWindow(
@@ -1500,6 +1504,27 @@ void main() {
     await Future<void>.delayed(const Duration(milliseconds: 200));
     expect(api.creates, creates);
   });
+  test('a background native failure names its step, not unknown', () async {
+    final w = WindowConnectionController(
+      api,
+      native,
+      pollInterval: const Duration(days: 1),
+      renewBeforeMs: 90000,
+    )..selectedNode = node;
+    addTearDown(w.dispose);
+    await w.connect();
+    native.up = false;
+    native.reason = 'native_restart_failed';
+    native.failureStage = 'native_watchdog_restart';
+    await w.refresh();
+    expect(w.error, 'native_down');
+    expect(w.diagnosticStage, 'native_watchdog_restart');
+    // Nothing new happened since: the named step stays until the next step sets its own.
+    await w.refresh();
+    expect(w.error, 'native_down');
+    expect(w.diagnosticStage, 'native_watchdog_restart');
+  });
+
   test('a tunnel the phone dropped early reconnects by itself', () async {
     final auto = WindowConnectionController(
       api,
