@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 
 import 'app_update.dart';
 import 'connection.dart';
+import 'connection_status.dart';
 import 'country_flag.dart';
 import 'diagnostic_report.dart';
 import 'orbit_widgets.dart';
@@ -192,6 +193,10 @@ class ConnectionScreen extends StatelessWidget {
                   ],
                 ),
               ),
+            ),
+            Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: ConnectionLiveStatus(controller: c),
             ),
             const SizedBox(height: 8),
             // Second tap target for the same action as the bottom button. No ripple,

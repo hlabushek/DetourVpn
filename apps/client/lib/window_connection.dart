@@ -560,6 +560,7 @@ class WindowConnectionController extends ConnectionController {
       diagnosticHandshakeAge = null;
       diagnosticWindow = null;
       diagnosticNetworkChange = null;
+      _clearStatus();
       detail = 'Ожидается handshake';
       await _startNativeRenewal(grant);
       if (_cancelled(version)) return;
@@ -627,6 +628,7 @@ class WindowConnectionController extends ConnectionController {
     diagnosticHandshakeAge = null;
     diagnosticWindow = null;
     diagnosticNetworkChange = null;
+    _clearStatus();
     phase = ConnectionPhase.connected;
     detail = 'Подключено к серверу из панели';
     startPolling();
@@ -887,7 +889,20 @@ class WindowConnectionController extends ConnectionController {
         : (snapshot.handshakeSeen || _hasEstablishedHandshake ? null : 'never');
     diagnosticWindow = windowBucket(snapshot.remainingMs);
     diagnosticNetworkChange = networkChangeBucket(snapshot.networkChangeAgeMs);
+    statusHandshakeAgeSec = snapshot.handshakeAge;
+    statusRemainingMs = snapshot.remainingMs;
+    statusSampledAt = DateTime.now();
   }
+
+  void _clearStatus() {
+    statusHandshakeAgeSec = null;
+    statusRemainingMs = null;
+    statusSampledAt = null;
+  }
+
+  /// Same rule as native renewal (NativeRenewal.renewBeforeMs) and [_renewBefore] above.
+  @override
+  int? get renewLeadMs => _panelUp ? null : _renewBefore;
 
   Future<void> _refresh(int version) async {
     try {

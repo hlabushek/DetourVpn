@@ -227,6 +227,16 @@ class ConnectionController extends ChangeNotifier {
   String? diagnosticHandshakeAge;
   String? diagnosticWindow;
   String? diagnosticNetworkChange;
+
+  /// Home-screen status line: the last native snapshot's handshake age in seconds (negative =
+  /// none yet), window remaining in ms, and when they were read. Display only; never an input to
+  /// connection decisions. Null where not recorded (no window tunnel, new window).
+  int? statusHandshakeAgeSec;
+  int? statusRemainingMs;
+  DateTime? statusSampledAt;
+
+  /// How long before the window ends its renewal starts; null where windows are not renewed.
+  int? get renewLeadMs => null;
   String detail = 'VPN выключен';
 
   /// ADR-139: Always-on VPN setting reported by native (`on`, `off`, `lockdown`, `unknown`);
