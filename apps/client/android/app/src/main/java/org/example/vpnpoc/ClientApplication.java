@@ -75,6 +75,12 @@ public final class ClientApplication extends Application implements Tunnel {
     private static final long RESTORE_WAKE_LOCK_MS = 45_000L;
     long deadline;
     String reason = "";
+    /**
+     * The native step that failed first in this window: a stage code from the diagnostic
+     * allowlist, never data. Kept until a window starts again, so a report can name the step
+     * when Dart is not running. Read by snapshot(). Written from several threads (benign race).
+     */
+    private volatile String failureStage = "";
     // Task 7: whether a handshake happened since the last connect, seen natively (Dart may sleep).
     final HandshakeMemory handshakes = new HandshakeMemory();
     // Window renewals are driven from Dart timers. Without this the CPU may sleep with the screen
@@ -131,6 +137,7 @@ public final class ClientApplication extends Application implements Tunnel {
                 reason = "";
             } catch (Exception | LinkageError failure) {
                 reason = "native_unavailable";
+                failedAt("native_init");
                 android.util.Log.e("DetourVpnNativeInit", "stage=" + initStage
                         + " failure=" + failure.getClass().getSimpleName());
             }
@@ -148,10 +155,18 @@ public final class ClientApplication extends Application implements Tunnel {
     void enforceDeadline() {
         if (deadline > 0 && SystemClock.elapsedRealtime() >= deadline) {
             observeHandshake();
-            try { stop(); reason = "lease_expired"; }
-            catch (Exception ignored) { reason = "native_disconnect_failed"; }
+            try { stop(); reason = "lease_expired"; failedAt("native_deadline"); }
+            catch (Exception ignored) { reason = "native_disconnect_failed"; failedAt("native_disconnect"); }
             stopped(reason);
         }
+    }
+
+    /**
+     * Names the native step that failed. The first failure of a window stays the named step, so a
+     * failed renewal is not replaced by the deadline it leads to.
+     */
+    void failedAt(String stage) {
+        if (failureStage.isEmpty()) failureStage = stage;
     }
 
     /** Worker thread. Sets the native deadline and (re)arms its one-shot check. */
@@ -223,6 +238,7 @@ public final class ClientApplication extends Application implements Tunnel {
     private void startRecovery(long now) {
         if (VpnService.prepare(this) != null) {
             reason = "vpn_revoked";
+            failedAt("android_vpn_permission");
             if (supervisor.tunnelDown(reason)) setWantsConnected(this, false);
             cancelRecoveryAlarm();
             return;
@@ -238,6 +254,7 @@ public final class ClientApplication extends Application implements Tunnel {
             // ADR-134: Android 12+ background-start limits. The intent stays; the next trigger
             // (network, app open, boot or the alarm below) tries again, at most once a minute.
             recoveryNote = "background_start_refused";
+            failedAt("native_restore");
             supervisor.startRefused(now);
             scheduleRecoveryAlarm(ConnectionSupervisor.REFUSED_RETRY_MS);
             return;
@@ -288,6 +305,7 @@ public final class ClientApplication extends Application implements Tunnel {
     /** ADR-124: explicit user disconnect (UI channel `setIntent false`). Worker thread. */
     void userDisconnect() {
         generation.incrementAndGet();
+        failureStage = "";
         supervisor.userDisconnected();
         setWantsConnected(this, false);
         cancelRecoveryAlarm();
@@ -400,6 +418,7 @@ public final class ClientApplication extends Application implements Tunnel {
             } catch (Exception | LinkageError failed) {
                 try { stop(); } catch (Exception ignored) { /* Already down. */ }
                 reason = "native_restart_failed";
+                failedAt("native_watchdog_restart");
                 watchdog.tunnelDown();
                 stopped(reason);
             }
@@ -451,6 +470,7 @@ public final class ClientApplication extends Application implements Tunnel {
                 engine.getDartExecutor().executeDartEntrypoint(
                         new DartExecutor.DartEntrypoint(bundle, "alwaysOnRecoveryMain"));
             } catch (Exception | LinkageError failure) {
+                failedAt("native_restore");
                 stopAlwaysOnRecovery();
             }
         });
@@ -469,6 +489,7 @@ public final class ClientApplication extends Application implements Tunnel {
             String code = failed != null && failed.matches("[a-z_]{1,64}") ? failed : "recovery_failed";
             result.success(null);
             worker.execute(() -> {
+                failedAt("native_restore");
                 stopAlwaysOnRecovery();
                 if (supervisor.recoveryFailed(code)) setWantsConnected(this, false);
                 evaluateRecovery();
@@ -552,6 +573,7 @@ public final class ClientApplication extends Application implements Tunnel {
                                 submittedAt + ((Number) call.argument("remainingMs")).longValue(),
                                 SystemClock.elapsedRealtime());
                         setDeadline(window.deadline);
+                        failureStage = "";
                         holdCpu();
                         scheduleRestoreWake();
                         break;
@@ -576,6 +598,7 @@ public final class ClientApplication extends Application implements Tunnel {
                                 throw new IllegalStateException();
                             }
                             reason = "";
+                            failureStage = "";
                             holdCpu();
                             scheduleRestoreWake();
                         } catch (Exception failure) {
@@ -680,7 +703,7 @@ public final class ClientApplication extends Application implements Tunnel {
 
     private void stopAlwaysOnRecovery() {
         cancelRestoreWake();
-        try { stop(); } catch (Exception ignored) { reason = "native_disconnect_failed"; }
+        try { stop(); } catch (Exception ignored) { reason = "native_disconnect_failed"; failedAt("native_disconnect"); }
         ProtectedApiRelay relay = protectedRelay;
         protectedRelay = null;
         if (relay != null) relay.close();
@@ -712,6 +735,7 @@ public final class ClientApplication extends Application implements Tunnel {
                 setWantsConnected(this, false);
                 renewer.stop();
                 reason = "vpn_revoked";
+                failedAt("android_vpn_permission");
                 supervisor.tunnelDown(reason);
             }
             if (service == null || recoveryService != service) return;
@@ -786,6 +810,7 @@ public final class ClientApplication extends Application implements Tunnel {
                     throw new IllegalStateException();
                 window.advance(connection, runtime, version, end, SystemClock.elapsedRealtime());
                 setDeadline(window.deadline);
+                failureStage = "";
                 return null;
             }).get(5, TimeUnit.SECONDS);
         } catch (java.util.concurrent.ExecutionException failure) {
@@ -866,6 +891,8 @@ public final class ClientApplication extends Application implements Tunnel {
         value.put("recoveryNote", recoveryNote);
         value.put("alwaysOn", alwaysOn); // ADR-139: on | off | lockdown | unknown.
         value.put("uiAttached", uiAttached);
+        // Additive: the native step that failed in this window ("" = none). Older Dart ignores it.
+        value.put("failureStage", failureStage);
         return value;
     }
     /** ADR-124: the native supervisor line for the diagnostic report. Worker thread. */

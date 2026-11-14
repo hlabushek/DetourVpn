@@ -240,6 +240,8 @@ final class NativeRenewer {
     private void finish(State s, String reason) {
         if (state != s) return;
         stoppedReason = reason;
+        // The window's renewal failed; a tunnel that stopped under us is not a renewal failure.
+        if (!"tunnel_stopped".equals(reason)) app.failedAt("native_renewal");
         stop();
     }
 
