@@ -806,6 +806,15 @@ class WindowConnectionController extends ConnectionController {
     return deadline;
   }
 
+  /// Last error code of a failed server revoke (DELETE/create settlement), for the diagnostic
+  /// report. Cleared once the lease is gone. Never holds identifiers, only a fixed code.
+  String? revokeErrorCode;
+
+  void _recordRevokeFailure(String code) {
+    revokeErrorCode = code;
+    diagnosticStage = 'revoke_delete';
+  }
+
   Future<void> _cleanup() async {
     await native.disconnect();
     _panelUp = false;
@@ -822,18 +831,33 @@ class WindowConnectionController extends ConnectionController {
     try {
       if (_createIntent != null) await _create();
       if (_id != null) {
-        final value = await api.call('DELETE', '$root/$_id');
-        if (value['state'] == 'closed') _id = null;
+        try {
+          final value = await api.call('DELETE', '$root/$_id');
+          if (value['state'] == 'closed') _id = null;
+        } on ClientError catch (e) {
+          // The server no longer knows this connection (already closed or revoked): nothing
+          // is left to revoke, so drop the stale id instead of blocking a new connection.
+          if (e.code == 'not_found') {
+            _id = null;
+          } else {
+            _recordRevokeFailure(e.code);
+          }
+        }
       }
-    } catch (_) {
+    } catch (e) {
       /* Retain the original admission intent until closure. */
+      _recordRevokeFailure(e is ClientError ? e.code : 'revoke_failed');
     }
     remotePending = hasLease;
     if (remotePending) {
       error ??= 'revoke_unconfirmed';
       startPolling();
-    } else if (error == 'revoke_unconfirmed') {
-      error = null;
+    } else {
+      revokeErrorCode = null;
+      if (error == 'revoke_unconfirmed') {
+        error = null;
+        if (diagnosticStage == 'revoke_delete') diagnosticStage = null;
+      }
     }
     unawaited(refreshQuota());
   }

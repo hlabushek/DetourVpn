@@ -154,6 +154,7 @@ class WindowsApi implements TunnelApi {
   bool denied = false;
   bool oldConnection = false;
   bool failDeletes = false;
+  bool deleteNotFound = false;
   String meter = 'kernel-outer-ip.v1';
   int slot = 1;
   bool deviceBound = false;
@@ -231,6 +232,7 @@ class WindowsApi implements TunnelApi {
     if (method == 'DELETE') {
       deletes++;
       deletedNodes.add(nodeId);
+      if (deleteNotFound) throw const ClientError('not_found');
       if (failDeletes) throw const ClientError('network_unavailable');
       if (pendingDeletes > 0) {
         pendingDeletes--;
@@ -1298,6 +1300,45 @@ void main() {
       await c.refresh();
       expect(c.hasLease, false);
       expect(c.remotePending, false);
+      expect(c.error, isNull);
+    },
+  );
+  test('DELETE answering closed clears the local connection id', () async {
+    await c.connect();
+    await c.disconnect();
+    expect(api.deletes, 1);
+    expect(c.hasLease, false);
+    expect(c.remotePending, false);
+    expect(c.revokeErrorCode, isNull);
+  });
+  test('DELETE answering 404 not_found clears the stale connection id', () async {
+    await c.connect();
+    api.deleteNotFound = true;
+    await c.disconnect();
+    expect(api.deletes, 1);
+    expect(c.hasLease, false);
+    expect(c.remotePending, false);
+    expect(c.error, isNull);
+    expect(c.revokeErrorCode, isNull);
+  });
+  test(
+    'DELETE network failure is recorded, keeps the id and polling continues',
+    () async {
+      await c.connect();
+      api.failDeletes = true;
+      await c.disconnect();
+      expect(c.hasLease, true);
+      expect(c.remotePending, true);
+      expect(c.error, 'revoke_unconfirmed');
+      expect(c.revokeErrorCode, 'network_unavailable');
+      expect(c.diagnosticStage, 'revoke_delete');
+      final before = api.deletes;
+      await c.refresh();
+      expect(api.deletes, greaterThan(before));
+      api.failDeletes = false;
+      await c.refresh();
+      expect(c.hasLease, false);
+      expect(c.revokeErrorCode, isNull);
       expect(c.error, isNull);
     },
   );
