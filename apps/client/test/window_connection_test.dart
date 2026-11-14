@@ -1311,16 +1311,19 @@ void main() {
     expect(c.remotePending, false);
     expect(c.revokeErrorCode, isNull);
   });
-  test('DELETE answering 404 not_found clears the stale connection id', () async {
-    await c.connect();
-    api.deleteNotFound = true;
-    await c.disconnect();
-    expect(api.deletes, 1);
-    expect(c.hasLease, false);
-    expect(c.remotePending, false);
-    expect(c.error, isNull);
-    expect(c.revokeErrorCode, isNull);
-  });
+  test(
+    'DELETE answering 404 not_found clears the stale connection id',
+    () async {
+      await c.connect();
+      api.deleteNotFound = true;
+      await c.disconnect();
+      expect(api.deletes, 1);
+      expect(c.hasLease, false);
+      expect(c.remotePending, false);
+      expect(c.error, isNull);
+      expect(c.revokeErrorCode, isNull);
+    },
+  );
   test(
     'DELETE network failure is recorded, keeps the id and polling continues',
     () async {
