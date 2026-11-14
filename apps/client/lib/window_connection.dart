@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 
 import 'api.dart';
 import 'country_flag.dart';
+import 'connected_since.dart';
 import 'connection.dart';
 import 'diagnostic_report.dart';
 import 'native_tunnel.dart';
@@ -145,7 +146,29 @@ class WindowConnectionController extends ConnectionController {
   @override
   bool get canRecover => false; // Unknown holds require operator reconciliation.
   void _emit() {
-    if (!_dead) notifyListeners();
+    if (_dead) return;
+    _trackConnectedSince();
+    notifyListeners();
+  }
+
+  /// Home-screen timer only: follows the live connection id and keeps its start across restarts.
+  late final ConnectedSinceTracker _connectedSince = ConnectedSinceTracker(
+    native is ConnectedSinceStore ? native as ConnectedSinceStore : null,
+  );
+
+  @override
+  int? get connectedSinceMs => _connectedSince.sinceMs;
+
+  void _trackConnectedSince() {
+    final live =
+        phase == ConnectionPhase.connected ||
+        phase == ConnectionPhase.reconnecting;
+    final id = live ? (_id ?? (_panelUp ? 'panel' : null)) : null;
+    unawaited(
+      _connectedSince.observe(id).then((changed) {
+        if (changed && !_dead) notifyListeners();
+      }),
+    );
   }
 
   /// A new OTP session is a new server-side family even when this controller

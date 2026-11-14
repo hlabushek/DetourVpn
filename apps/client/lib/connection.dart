@@ -237,6 +237,9 @@ class ConnectionController extends ChangeNotifier {
 
   /// How long before the window ends its renewal starts; null where windows are not renewed.
   int? get renewLeadMs => null;
+
+  /// Epoch ms when the current connection was first seen up (home-screen timer); null when none.
+  int? get connectedSinceMs => null;
   String detail = 'VPN выключен';
 
   /// ADR-139: Always-on VPN setting reported by native (`on`, `off`, `lockdown`, `unknown`);

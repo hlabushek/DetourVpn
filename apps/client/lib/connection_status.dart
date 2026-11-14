@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import 'connected_since.dart';
 import 'connection.dart';
 
 /// Short Russian duration: «12 с», «3 мин 5 с», «1 ч 2 мин». Negative values count as zero.
@@ -45,7 +46,7 @@ String? renewalStatusText(
 bool showsLiveStatus(ConnectionPhase phase) =>
     phase == ConnectionPhase.connected || phase == ConnectionPhase.reconnecting;
 
-/// Live lines under the connection title: last handshake and next renewal. Re-renders every second
+/// Live lines under the connection title: connection timer, last handshake and next renewal. Re-renders every second
 /// only while visible (the app in the foreground and this widget mounted).
 class ConnectionLiveStatus extends StatefulWidget {
   const ConnectionLiveStatus({super.key, required this.controller});
@@ -98,10 +99,15 @@ class _ConnectionLiveStatusState extends State<ConnectionLiveStatus>
   Widget build(BuildContext context) {
     final c = widget.controller;
     if (!showsLiveStatus(c.phase)) return const SizedBox.shrink();
+    final now = DateTime.now();
     final sampled = c.statusSampledAt;
     final elapsed = sampled == null
         ? 0
-        : DateTime.now().difference(sampled).inMilliseconds.clamp(0, 1 << 31);
+        : now.difference(sampled).inMilliseconds.clamp(0, 1 << 31);
+    final timer = connectedTimerText(
+      c.connectedSinceMs,
+      now.millisecondsSinceEpoch,
+    );
     final lines = [
       ?handshakeStatusText(c.statusHandshakeAgeSec, elapsedMs: elapsed),
       ?renewalStatusText(
@@ -110,12 +116,27 @@ class _ConnectionLiveStatusState extends State<ConnectionLiveStatus>
         elapsedMs: elapsed,
       ),
     ];
-    if (lines.isEmpty) return const SizedBox.shrink();
-    return Text(
-      lines.join('\n'),
-      key: const ValueKey('connection-live-status'),
-      textAlign: TextAlign.center,
-      style: Theme.of(context).textTheme.bodySmall,
+    final text = Theme.of(context).textTheme;
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (timer != null)
+          Text(
+            timer,
+            key: const ValueKey('connection-timer'),
+            textAlign: TextAlign.center,
+            style: text.titleMedium?.copyWith(
+              fontFeatures: const [FontFeature.tabularFigures()],
+            ),
+          ),
+        if (lines.isNotEmpty)
+          Text(
+            lines.join('\n'),
+            key: const ValueKey('connection-live-status'),
+            textAlign: TextAlign.center,
+            style: text.bodySmall,
+          ),
+      ],
     );
   }
 }

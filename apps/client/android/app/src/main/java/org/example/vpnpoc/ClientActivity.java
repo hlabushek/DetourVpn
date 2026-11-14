@@ -223,6 +223,7 @@ public final class ClientActivity extends FlutterActivity {
                 "disconnect", "snapshot", "sessionRead", "sessionWrite", "pendingLoginRead",
                 "pendingLoginWrite", "splitRead", "splitModeRead", "splitLastModeRead",
                 "splitWrite", "splitDomainsRead", "apps", "nodeRead", "nodeWrite",
+                "connectedSinceRead", "connectedSinceWrite",
                 "startNativeRenewal", "adoptRestore", "dnsRead", "dnsWrite", "setIntent").contains(call.method)) {
             result.notImplemented(); return;
         }
@@ -245,7 +246,8 @@ public final class ClientActivity extends FlutterActivity {
                 // Session erasure must remain available even when native SDK init fails.
                 boolean storage = call.method.equals("sessionRead") || call.method.equals("sessionWrite")
                         || call.method.equals("pendingLoginRead") || call.method.equals("pendingLoginWrite");
-                boolean preference = call.method.equals("nodeRead") || call.method.equals("nodeWrite");
+                boolean preference = call.method.equals("nodeRead") || call.method.equals("nodeWrite")
+                        || call.method.equals("connectedSinceRead") || call.method.equals("connectedSinceWrite");
                 if (storage && app.vault == null) throw new IllegalStateException();
                 if (!storage && !preference && app.provider == null) throw new IllegalStateException();
                 Object value = null;
@@ -282,6 +284,34 @@ public final class ClientActivity extends FlutterActivity {
                         else nodePreferences.putString("selected_node", selectedNode);
                         if (!nodePreferences.commit()) throw new IllegalStateException();
                         break;
+                    case "connectedSinceRead": {
+                        // Display only: when the UI first saw this connection up (home-screen timer).
+                        var since = getSharedPreferences("connection", MODE_PRIVATE);
+                        String sinceId = since.getString("connected_since_id", null);
+                        long sinceMs = since.getLong("connected_since_ms", 0);
+                        if (sinceId != null && sinceMs > 0) {
+                            java.util.Map<String, Object> sinceRecord = new java.util.HashMap<>();
+                            sinceRecord.put("id", sinceId);
+                            sinceRecord.put("sinceMs", sinceMs);
+                            value = sinceRecord;
+                        }
+                        break;
+                    }
+                    case "connectedSinceWrite": {
+                        String sinceId = call.argument("id");
+                        Number sinceMs = call.argument("sinceMs");
+                        var since = getSharedPreferences("connection", MODE_PRIVATE).edit();
+                        if (sinceId == null) {
+                            since.remove("connected_since_id").remove("connected_since_ms");
+                        } else {
+                            if (!sinceId.matches("[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}")
+                                    || sinceMs == null || sinceMs.longValue() <= 0)
+                                throw new IllegalArgumentException();
+                            since.putString("connected_since_id", sinceId).putLong("connected_since_ms", sinceMs.longValue());
+                        }
+                        if (!since.commit()) throw new IllegalStateException();
+                        break;
+                    }
                     case "apps":
                         value = installedLauncherApps(); break;
                     case "splitRead": value = selectedPackages(); break;

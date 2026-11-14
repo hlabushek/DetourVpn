@@ -1,5 +1,7 @@
 import 'package:flutter/services.dart';
 
+import 'connected_since.dart';
+
 /// Capabilities reported by the native engine (Windows only). Android has no such method, and any
 /// failure means "none": features are shown only when the engine proves it can enforce them.
 Future<Set<String>> readNativeCapabilities() async {
@@ -280,7 +282,8 @@ class PlatformTunnel
         NativeRenewalHost,
         RestoreHandover,
         UserIntentHost,
-        VlessNative {
+        VlessNative,
+        ConnectedSinceStore {
   static const channel = MethodChannel('project.vpn/tunnel.v1');
 
   @override
@@ -415,6 +418,36 @@ class PlatformTunnel
   @override
   Future<void> openLogin(String url) =>
       channel.invokeMethod<void>('openLogin', {'url': url});
+
+  @override
+  Future<ConnectedSince?> readConnectedSince() async {
+    try {
+      final value = await channel.invokeMapMethod<String, Object?>(
+        'connectedSinceRead',
+      );
+      final id = value?['id'];
+      final since = value?['sinceMs'];
+      return id is String && since is int && since > 0
+          ? ConnectedSince(id, since)
+          : null;
+    } on MissingPluginException {
+      return null; // Windows and older builds keep the timer in memory only.
+    }
+  }
+
+  @override
+  Future<void> writeConnectedSince(ConnectedSince? value) async {
+    try {
+      await channel.invokeMethod<void>(
+        'connectedSinceWrite',
+        value == null
+            ? {'id': null}
+            : {'id': value.id, 'sinceMs': value.sinceMs},
+      );
+    } on MissingPluginException {
+      // Windows and older builds keep the timer in memory only.
+    }
+  }
 
   @override
   Future<String?> readSelectedNode() =>
