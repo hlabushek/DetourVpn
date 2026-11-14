@@ -38,7 +38,10 @@ final class DiagnosticReportText {
         "device_registration", "key_challenge", "key_proof", "lease_create", "lease_poll",
         "lease_validation", "native_disconnect", "native_tunnel_start", "old_lease_cleanup",
         "panel_profile", "selected_node", "network_change", "session_resume", "tunnel_monitor",
-        "tunnel_restart", "window_advance", "window_renewal", "unknown"
+        "tunnel_restart", "window_advance", "window_renewal",
+        // Native steps that failed while Dart was not running (ClientApplication.failedAt).
+        "native_init", "native_deadline", "native_watchdog_restart", "native_renewal",
+        "native_restore", "unknown"
     );
 
     /** Coarse context categories; the same sets as in diagnostic_report.dart. */

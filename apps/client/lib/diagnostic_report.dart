@@ -111,6 +111,12 @@ const _reportableStages = <String>{
   'tunnel_restart',
   'window_advance',
   'window_renewal',
+  // Native steps that failed while Dart was not running (ClientApplication.failedAt).
+  'native_init',
+  'native_deadline',
+  'native_watchdog_restart',
+  'native_renewal',
+  'native_restore',
 };
 
 /// Coarse context categories; values only, never a raw number, address or identifier.
@@ -236,16 +242,22 @@ String diagnosticHintKey(String code, String stage) {
   if (_loginCodes.contains(code)) return 'login_needed';
   if (_renewalCodes.contains(code) ||
       stage == 'window_renewal' ||
-      stage == 'window_advance') {
+      stage == 'window_advance' ||
+      stage == 'native_renewal') {
     return 'renewal_failed';
   }
   if (_networkCodes.contains(code)) return 'network_lost';
   if (_busyCodes.contains(code)) return 'server_busy';
   if (_quotaCodes.contains(code)) return 'quota_out';
-  if (_tunnelCodes.contains(code) || stage == 'tunnel_restart') {
+  if (_tunnelCodes.contains(code) ||
+      stage == 'tunnel_restart' ||
+      stage == 'native_watchdog_restart' ||
+      stage == 'native_restore') {
     return 'tunnel_dropped';
   }
-  if (_endedCodes.contains(code)) return 'window_ended';
+  if (_endedCodes.contains(code) || stage == 'native_deadline') {
+    return 'window_ended';
+  }
   return 'general';
 }
 

@@ -28,6 +28,18 @@ public class DiagnosticReportTextTest {
         }
     }
 
+    @Test public void nativeFailureStagesAreAccepted() {
+        for (String stage : new String[] {"native_init", "native_deadline",
+                "native_watchdog_restart", "native_renewal", "native_restore", "native_disconnect",
+                "android_vpn_permission"}) {
+            String text = DiagnosticReportText.format("native_down", stage, null, null, null,
+                    null, "tunnel_dropped");
+            assertEquals(true, text.contains("Этап: " + stage));
+        }
+        assertThrows(IllegalArgumentException.class, () -> DiagnosticReportText.format(
+                "native_down", "native_secret", null, null, null, null, "general"));
+    }
+
     @Test public void rejectsFreeTextContextAndHints() {
         assertThrows(IllegalArgumentException.class, () -> DiagnosticReportText.format(
                 "native_down", "tunnel_monitor", null, "12345s", null, null, "general"));

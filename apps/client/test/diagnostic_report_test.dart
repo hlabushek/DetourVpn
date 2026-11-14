@@ -183,6 +183,42 @@ void main() {
     },
   );
 
+  test('native background stages are named, never unknown', () {
+    for (final stage in [
+      'native_init',
+      'native_deadline',
+      'native_watchdog_restart',
+      'native_renewal',
+      'native_restore',
+    ]) {
+      final report = DiagnosticReport.fromError('native_down', stage);
+      expect(report.stage, stage);
+      expect(report.text, isNot(contains('Этап: unknown')));
+    }
+    expect(
+      diagnosticHintKey('native_down', 'native_renewal'),
+      'renewal_failed',
+    );
+    // A window that ran out natively reports lease_expired (window ended), not a tunnel code.
+    expect(
+      diagnosticHintKey('lease_expired', 'native_deadline'),
+      'window_ended',
+    );
+    expect(
+      diagnosticHintKey('native_down', 'native_watchdog_restart'),
+      'tunnel_dropped',
+    );
+    expect(
+      diagnosticHintKey('native_down', 'native_restore'),
+      'tunnel_dropped',
+    );
+    // An unlisted native-looking stage still falls back to unknown.
+    expect(
+      DiagnosticReport.fromError('native_down', 'native_secret').stage,
+      'unknown',
+    );
+  });
+
   test('context values outside the fixed sets are dropped', () {
     final report = DiagnosticReport.fromError(
       'native_down',
