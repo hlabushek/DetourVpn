@@ -45,6 +45,7 @@ public final class ClientActivity extends FlutterActivity {
     @Override protected void onStart() {
         super.onStart();
         recordI028Lifecycle("activity_started");
+        owner().uiForeground(true); // ADR-142: the UI controller can run; it owns reconnects.
     }
     @Override protected void onResume() {
         super.onResume();
@@ -56,6 +57,7 @@ public final class ClientActivity extends FlutterActivity {
     }
     @Override protected void onStop() {
         recordI028Lifecycle("activity_stopped");
+        owner().uiForeground(false); // ADR-142: Dart sleeps in Doze; native owns recovery.
         super.onStop();
     }
     @Override protected void onDestroy() {

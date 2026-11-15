@@ -39,6 +39,11 @@ public final class ClientApplication extends Application implements Tunnel {
     final ConnectionSupervisor supervisor = new ConnectionSupervisor();
     /** ADR-125: a UI Flutter engine is attached and its controller owns reconnects. */
     volatile boolean uiAttached;
+    /**
+     * ADR-142: the UI Activity is started (between onStart and onStop). Only then can its Dart
+     * controller run timers; a stopped Activity sleeps in Doze, so native owns recovery.
+     */
+    volatile boolean uiForeground;
     /** ADR-125: last native recovery note for diagnostics (a code, no data). */
     private String recoveryNote = "";
     /** ADR-133: data-path evidence; touched only on the worker thread. */
@@ -178,6 +183,7 @@ public final class ClientApplication extends Application implements Tunnel {
         if (deadlineCheck != null) deadlineCheck.cancel(false);
         deadlineCheck = null;
         if (end <= 0) return;
+        supervisor.tunnelUp(SystemClock.elapsedRealtime()); // ADR-142: start of the up period.
         long delay = Math.max(0, end - SystemClock.elapsedRealtime()) + 50;
         deadlineCheck = worker.schedule(this::enforceDeadline, delay, TimeUnit.MILLISECONDS);
         armWatch(WATCH_MS);
@@ -194,7 +200,9 @@ public final class ClientApplication extends Application implements Tunnel {
      * ends the user's intent; otherwise the supervisor decides whether native starts recovery.
      */
     void stopped(String why) {
-        if (supervisor.tunnelDown(why)) setWantsConnected(this, false);
+        // ADR-142: a stop after a stable window starts recovery at once (same wake-up).
+        if (supervisor.tunnelDown(why, SystemClock.elapsedRealtime()))
+            setWantsConnected(this, false);
         evaluateRecovery();
     }
 
@@ -227,8 +235,10 @@ public final class ClientApplication extends Application implements Tunnel {
     void evaluateRecovery() {
         long now = SystemClock.elapsedRealtime();
         boolean up = provider != null && provider.isUp() && deadline > 0;
+        // ADR-142: a stopped Activity's Dart controller cannot run in Doze; native owns then.
         var decision = supervisor.evaluate(now, up, false,
-                uiAttached || recoveryEngine != null, physical.usable());
+                ConnectionSupervisor.dartOwnsRecovery(uiForeground, recoveryEngine != null),
+                physical.usable());
         switch (decision.action) {
             case START_RECOVERY:
                 startRecovery(now);
@@ -305,6 +315,13 @@ public final class ClientApplication extends Application implements Tunnel {
     /** ADR-125: the UI engine attached or detached. Detaching is not a disconnect. */
     void uiEngine(boolean attached) {
         uiAttached = attached;
+        if (!attached) uiForeground = false;
+        worker.execute(this::evaluateRecovery);
+    }
+
+    /** ADR-142: Activity onStart (true) / onStop (false). Re-evaluates who owns recovery. */
+    void uiForeground(boolean started) {
+        uiForeground = started && uiAttached;
         worker.execute(this::evaluateRecovery);
     }
 
@@ -899,6 +916,7 @@ public final class ClientApplication extends Application implements Tunnel {
         value.put("recoveryNote", recoveryNote);
         value.put("alwaysOn", alwaysOn); // ADR-139: on | off | lockdown | unknown.
         value.put("uiAttached", uiAttached);
+        value.put("uiForeground", uiForeground); // ADR-142: diagnostics only.
         // Additive: the native step that failed in this window ("" = none). Older Dart ignores it.
         value.put("failureStage", failureStage);
         return value;

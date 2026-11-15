@@ -76,6 +76,48 @@ public class ConnectionSupervisorTest {
         assertEquals("connecting", s.evaluate(1, false, true, false, true).why);
     }
 
+    /** ADR-142: only a Dart controller that can run owns recovery. */
+    @Test public void stoppedUiActivityHandsRecoveryToNative() {
+        assertTrue(ConnectionSupervisor.dartOwnsRecovery(true, false));  // app visible
+        assertTrue(ConnectionSupervisor.dartOwnsRecovery(false, true));  // restore engine alive
+        assertTrue(ConnectionSupervisor.dartOwnsRecovery(true, true));
+        assertFalse(ConnectionSupervisor.dartOwnsRecovery(false, false)); // screen off / Home
+        var s = connected();
+        s.tunnelDown("lease_expired", 1);
+        boolean stoppedUi = ConnectionSupervisor.dartOwnsRecovery(false, false);
+        assertEquals(ConnectionSupervisor.Action.START_RECOVERY,
+                s.evaluate(2, false, false, stoppedUi, true).action);
+        s.attemptStarted(2, 0.5);
+        // The restore engine now runs; the UI coming back does not start a second owner.
+        boolean restoring = ConnectionSupervisor.dartOwnsRecovery(true, true);
+        assertEquals("dart_owner", s.evaluate(3, false, false, restoring, true).why);
+    }
+
+    /** ADR-142: an expiry after a stable window recovers in the same wake-up, despite old backoff. */
+    @Test public void expiryAfterStableWindowRecoversAtOnce() {
+        var s = connected();
+        s.tunnelDown("native_restart_failed", 0);
+        for (int i = 0; i < 5; i++) s.attemptStarted(0, 0.5);
+        s.tunnelUp(1_000);
+        long expiry = 1_000 + ConnectionSupervisor.STABLE_MS + 60_000;
+        assertFalse(s.tunnelDown("lease_expired", expiry));
+        assertEquals(0, s.attempts());
+        assertEquals(ConnectionSupervisor.Action.START_RECOVERY,
+                s.evaluate(expiry, false, false, false, true).action);
+    }
+
+    /** ADR-142: a tunnel that flaps (up briefly) keeps its backoff. */
+    @Test public void shortUpPeriodKeepsBackoff() {
+        var s = connected();
+        s.tunnelDown("native_restart_failed", 0);
+        s.attemptStarted(0, 0.5);
+        s.tunnelUp(1_000);
+        s.tunnelDown("native_restart_failed", 5_000);
+        assertEquals(1, s.attempts());
+        assertEquals(ConnectionSupervisor.Action.WAIT,
+                s.evaluate(5_000, false, false, false, true).action);
+    }
+
     @Test public void explicitDisconnectDuringRecoveryCancelsItForGood() {
         var s = connected();
         s.tunnelDown("lease_expired");

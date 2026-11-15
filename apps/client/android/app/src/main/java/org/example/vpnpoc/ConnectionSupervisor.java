@@ -84,12 +84,36 @@ final class ConnectionSupervisor {
     long userDisconnected() {
         desired = false;
         attempts = 0;
+        upSince = -1;
         lastStop = "user_stop";
         return ++intentGeneration;
     }
 
     void tunnelUp(long now) {
         if (upSince < 0) upSince = now;
+    }
+
+    /**
+     * ADR-142: who owns reconnecting. A Dart controller owns it only while it can actually run:
+     * the UI engine while the Activity is started (visible), or a headless restore engine. A UI
+     * engine whose Activity is merely stopped (screen off, Home) sleeps in Doze, so native owns
+     * recovery then; the UI reconciles and adopts when it is started again (ADR-121).
+     */
+    static boolean dartOwnsRecovery(boolean uiForeground, boolean restoreEngineAlive) {
+        return uiForeground || restoreEngineAlive;
+    }
+
+    /**
+     * ADR-142: the tunnel stopped at {@code now}. A tunnel that had been up for {@link #STABLE_MS}
+     * starts a fresh streak, so the first recovery runs at once instead of waiting for an old
+     * backoff (and for another Doze-deferred alarm).
+     */
+    boolean tunnelDown(String reason, long now) {
+        if (upSince >= 0 && now - upSince >= STABLE_MS) {
+            attempts = 0;
+            lastAttemptAt = Long.MIN_VALUE / 2;
+        }
+        return tunnelDown(reason);
     }
 
     /**
