@@ -12,14 +12,30 @@ public class NativeRenewalTest {
         return new NativeRenewal(C, R, W, 1, 16777216, seconds);
     }
 
-    @Test public void longWindowsRenewAfterAThirdAndShortOnesKeepLegacyThreshold() {
-        assertEquals(600000, plan(900).renewBeforeMs());
+    /** ADR-142: long windows renew 2 min after the grant; 90 s windows keep 55 s. */
+    @Test public void longWindowsRenewTwoMinutesAfterGrantAndShortOnesKeepLegacyThreshold() {
+        assertEquals(780000, plan(900).renewBeforeMs());
         assertEquals(55000, plan(90).renewBeforeMs());
+        assertEquals(55000, plan(120).renewBeforeMs());
         NativeRenewal p = plan(900);
-        assertFalse(p.due(600001, -1));
-        assertTrue(p.due(600000, -1));
-        assertEquals(1000, p.idleDelayMs(600500));
-        assertEquals(300000, p.idleDelayMs(900000));
+        assertFalse(p.due(780001, -1));
+        assertTrue(p.due(780000, -1));
+        assertEquals(1000, p.idleDelayMs(780500));
+        assertEquals(120000, p.idleDelayMs(900000));
+    }
+
+    /**
+     * ADR-142: when the planned check runs on time and its burst fails, at least 12 minutes of the
+     * window are left for retries (was about 9.5); when that check is deferred by a 9-minute Doze
+     * gap measured from the planned time, a failed burst still leaves time for another wake-up.
+     */
+    @Test public void marginLeavesRoomForRetriesAfterAFailedBurst() {
+        NativeRenewal p = plan(900);
+        long window = 900000 - NativeRenewal.SAFETY_MS;
+        long planned = p.idleDelayMs(window);
+        assertTrue(window - planned - NativeRenewal.BURST_BUDGET_MS >= 12 * 60000);
+        long deferred = planned + 9 * 60000;
+        assertTrue(window - deferred - NativeRenewal.BURST_BUDGET_MS > 3 * 60000);
     }
 
     @Test public void halfTheBudgetTriggersRenewalAndCounterResetRebaselines() {

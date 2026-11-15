@@ -49,7 +49,15 @@ final class NativeRenewal {
         this.windowSeconds = windowSeconds;
     }
 
-    long renewBeforeMs() { return Math.max(55000, windowSeconds * 1000L - 300000); }
+    /**
+     * ADR-142: renew about 2 min after each grant (was 5 min). In deep Doze one allow-while-idle
+     * alarm can arrive ~9 min late; with 900 s windows this leaves another alarm before expiry.
+     */
+    static final long RENEW_AFTER_GRANT_MS = 120000;
+
+    long renewBeforeMs() {
+        return Math.max(55000, windowSeconds * 1000L - RENEW_AFTER_GRANT_MS);
+    }
 
     boolean due(long remainingMs, long trafficBytes) {
         if (intentKey != null) return true;
