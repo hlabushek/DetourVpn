@@ -29,8 +29,40 @@ class WindowConnectionController extends ConnectionController {
     this.dataPathFlowFor = const Duration(seconds: 120),
     Uri? renewalOrigin,
     bool? panelVless,
+    this.nativeOwnsBackgroundRecovery = false,
   }) : _renewalOrigin = renewalOrigin,
        panelVless = panelVless ?? isWindowsClient;
+
+  /// ADR-142 (Android UI controller only): while the app is in the background, native owns
+  /// recovery, so this controller's reconnect and resume timers do nothing until it is in the
+  /// foreground again. Off for Windows and the headless restore engine.
+  final bool nativeOwnsBackgroundRecovery;
+  bool _foreground = true;
+
+  /// A reconnect or resume that came due while in the background; run when foreground again.
+  Future<void> Function()? _deferredRecovery;
+
+  /// ADR-142: native's restore engine is bringing a tunnel up; never disconnect it, adopt it.
+  bool _restorePending = false;
+  bool _awaitingRestore = false;
+
+  @visibleForTesting
+  bool get recoveryDeferred => _deferredRecovery != null;
+
+  bool get _recoveryGated => nativeOwnsBackgroundRecovery && !_foreground;
+
+  /// ADR-142: the app moved to the foreground (true) or the background (false). On return, a
+  /// controller that holds no connection reconciles first (it adopts what native restored).
+  @override
+  void appForegroundChanged(bool foreground) {
+    if (_foreground == foreground) return;
+    _foreground = foreground;
+    if (!foreground || !nativeOwnsBackgroundRecovery || _dead) return;
+    if (_id == null) _synced = false;
+    final deferred = _deferredRecovery;
+    _deferredRecovery = null;
+    if (deferred != null) unawaited(deferred());
+  }
 
   /// ADR-115: this engine can run panel servers (VLESS + Reality). Windows only today.
   final bool panelVless;
@@ -87,9 +119,9 @@ class WindowConnectionController extends ConnectionController {
   static const maxSlotId = 250;
   final int renewBeforeMs;
 
-  /// Long windows renew once a third has elapsed (10 of 15 min left), leaving
-  /// several retry chances before expiry; 90s windows keep [renewBeforeMs].
-  int get _renewBefore => max(renewBeforeMs, windowSeconds * 1000 - 300000);
+  /// Long windows: ADR-142, renew about 2 min after each grant (was 5 min), the same rule as native
+  /// NativeRenewal.renewBeforeMs, so one Doze-deferred alarm still leaves time before expiry.
+  int get _renewBefore => max(renewBeforeMs, windowSeconds * 1000 - 120000);
   Map<String, int> get _windowRequest =>
       windowSeconds == 90 ? const {} : {'window_seconds': windowSeconds};
 
@@ -287,12 +319,23 @@ class WindowConnectionController extends ConnectionController {
   /// (ADR-117) or by the restore engine (ADR-121). Otherwise stop native and revoke this device's
   /// old connections before admission. Returns true if a running tunnel was adopted.
   Future<bool> _reconcile() async {
+    _restorePending = false;
     if (_synced) return false;
     NativeSnapshot? live;
     try {
       live = await native.snapshot();
     } catch (_) {
       live = null;
+    }
+    // ADR-142: native's restore engine is still bringing a tunnel up. Never disconnect it;
+    // stay unsynced so the next refresh adopts it once it is up (ADR-121 hand-over).
+    if (live != null &&
+        live.restoreActive &&
+        !live.up &&
+        native is RestoreHandover) {
+      alwaysOnStatus = live.alwaysOn ?? alwaysOnStatus;
+      _restorePending = true;
+      return false;
     }
     if (live != null) {
       alwaysOnStatus = live.alwaysOn ?? alwaysOnStatus;
@@ -506,6 +549,10 @@ class WindowConnectionController extends ConnectionController {
       final adopted = await _reconcile();
       _resumeWanted = false; // This connect is the resume.
       _nativeExhausted = false; // The user tapped: a fresh streak.
+      if (_restorePending) {
+        _waitForRestore();
+        return;
+      }
       if (adopted) {
         // ADR-117: the VPN was still running; keep it, the next refresh confirms it.
         startPolling();
@@ -974,8 +1021,21 @@ class WindowConnectionController extends ConnectionController {
       // Fresh OTP sessions are not bound to a device until this phone registers
       // its local public key. Bind first so the per-device reconciliation query
       // can safely return this phone's prior connections (if any).
-      await _reconcile();
+      final adopted = await _reconcile();
       if (_cancelled(version)) return;
+      if (_restorePending) {
+        _waitForRestore();
+        return;
+      }
+      if (_awaitingRestore) {
+        // ADR-142: the restore ended. Adopted, resumed below, or nothing is wanted any more:
+        // never leave the reconnecting state behind.
+        _awaitingRestore = false;
+        if (!adopted && !_resumeWanted && !hasLease) {
+          phase = ConnectionPhase.disconnected;
+          detail = 'VPN на телефоне выключен';
+        }
+      }
       if (_resumeWanted && !hasLease) {
         _resumeWanted = false;
         _scheduleResume(version);
@@ -1211,6 +1271,11 @@ class WindowConnectionController extends ConnectionController {
           !_retryCodes.contains(error)) {
         return;
       }
+      // ADR-142: in the background native owns recovery; try again only once in the foreground.
+      if (_recoveryGated) {
+        _deferredRecovery = fire;
+        return;
+      }
       // ADR-119: a refresh in flight would make connect() return without trying; wait for it.
       if (_working || _polling) {
         unawaited(Future<void>.delayed(base, fire));
@@ -1227,6 +1292,18 @@ class WindowConnectionController extends ConnectionController {
     unawaited(Future<void>.delayed(delay, fire));
   }
 
+  /// ADR-142: native's restore engine is connecting. Show it as reconnecting and let the poll
+  /// reconcile again; the running tunnel is then adopted, a failed restore resumes normally.
+  void _waitForRestore() {
+    _awaitingRestore = true;
+    error = null;
+    diagnosticStage = 'session_resume';
+    phase = ConnectionPhase.reconnecting;
+    detail = 'Восстанавливается подключение';
+    startPolling();
+    _emit();
+  }
+
   /// ADR-124: the app was reopened (or its UI engine recreated) while the user still wanted
   /// the VPN and nothing adoptable was running: connect again without a tap.
   void _scheduleResume(int version) {
@@ -1239,6 +1316,11 @@ class WindowConnectionController extends ConnectionController {
     _emit();
     Future<void> fire() async {
       if (_dead || _version != version || hasLease) return;
+      if (_recoveryGated) {
+        _deferredRecovery =
+            fire; // ADR-142: native owns recovery in the background.
+        return;
+      }
       if (_working || _polling) {
         unawaited(Future<void>.delayed(base, fire));
         return;

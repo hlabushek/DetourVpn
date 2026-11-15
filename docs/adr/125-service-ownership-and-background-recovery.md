@@ -1,6 +1,8 @@
 # ADR-125 — Foreground service ownership and background recovery
 
 **Status:** proposed 2026-11-13 (connection rewrite, overnight run 2).
+**Amended by:** ADR-142 (the UI engine owns reconnects only while its Activity is started, between
+`onStart` and `onStop`; an attached engine in a stopped Activity no longer blocks native recovery).
 
 ## Facts (verified in code)
 - The VPN runs in `org.amnezia.awg.backend.GoBackend$VpnService` (our patched copy): foreground

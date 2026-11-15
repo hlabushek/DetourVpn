@@ -238,6 +238,9 @@ class ConnectionController extends ChangeNotifier {
   /// How long before the window ends its renewal starts; null where windows are not renewed.
   int? get renewLeadMs => null;
 
+  /// ADR-142: the app moved to the foreground or the background. No-op by default.
+  void appForegroundChanged(bool foreground) {}
+
   /// Epoch ms when the current connection was first seen up (home-screen timer); null when none.
   int? get connectedSinceMs => null;
   String detail = 'VPN выключен';

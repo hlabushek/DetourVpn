@@ -165,6 +165,11 @@ class _VpnAppState extends State<VpnApp> with WidgetsBindingObserver {
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
+    // ADR-142: matches the Activity's onStart/onStop, where native takes over recovery.
+    // `inactive` (shade, dialogs) is still in the foreground.
+    connection?.appForegroundChanged(
+      state == AppLifecycleState.resumed || state == AppLifecycleState.inactive,
+    );
     if (state == AppLifecycleState.resumed &&
         showLogin &&
         _sessionKept &&
@@ -201,6 +206,8 @@ class _VpnAppState extends State<VpnApp> with WidgetsBindingObserver {
             ? WindowConnectionController(
                 widget.api!,
                 widget.native as WindowNative,
+                // ADR-142: on Android native owns recovery while the app is in the background.
+                nativeOwnsBackgroundRecovery: !isWindowsClient,
               )
             : ConnectionController(widget.api!, widget.native));
     if (value is WindowConnectionController) {

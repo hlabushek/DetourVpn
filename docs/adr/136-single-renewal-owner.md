@@ -1,6 +1,9 @@
 # ADR-136 — One renewal owner per window; no native renewal for the restore engine
 
 **Status:** accepted 2026-11-13 (connection reliability run 3, item B; ADR-121 follow-up).
+**Amended by:** ADR-140 (the restore engine may hand renewal to native); ADR-142 (the *recovery*
+owner follows the Activity lifecycle: Dart UI while the Activity is started, native and its restore
+engine while it is stopped; still one owner at a time; renewal ownership unchanged).
 
 ## Context
 ADR-121 leaves the restore engine renewing from Dart timers, woken by a 4-minute alarm. The run-2 report

@@ -1712,6 +1712,109 @@ void main() {
       expect(intent.intentEnds, 0);
     });
   });
+
+  // ADR-142: on Android a backgrounded UI controller leaves recovery to native.
+  group('ADR-142 background recovery owner', () {
+    WindowConnectionController android({bool gate = true, NativeTunnel? on}) {
+      final value = WindowConnectionController(
+        api,
+        (on ?? native) as WindowNative,
+        pollInterval: const Duration(days: 1),
+        renewBeforeMs: 90000,
+        autoReconnectDelay: const Duration(milliseconds: 20),
+        nativeOwnsBackgroundRecovery: gate,
+      )..selectedNode = node;
+      addTearDown(value.dispose);
+      return value;
+    }
+
+    test(
+      'a backgrounded UI does not reconnect; it does once in the foreground',
+      () async {
+        final ui = android();
+        await ui.connect();
+        final creates = api.creates;
+        ui.appForegroundChanged(false);
+        native.remaining = 0;
+        await ui.refresh();
+        expect(ui.error, 'lease_expired');
+        await Future<void>.delayed(const Duration(milliseconds: 300));
+        expect(
+          api.creates,
+          creates,
+          reason: 'native owns recovery in the background',
+        );
+        expect(ui.recoveryDeferred, isTrue);
+        native.remaining = 59000;
+        ui.appForegroundChanged(true);
+        await Future<void>.delayed(const Duration(milliseconds: 300));
+        expect(api.creates, greaterThan(creates));
+        expect(ui.recoveryDeferred, isFalse);
+        await ui.disconnect();
+      },
+    );
+
+    test(
+      'Windows and the restore engine keep reconnecting in the background',
+      () async {
+        final ui = android(gate: false);
+        await ui.connect();
+        final creates = api.creates;
+        ui.appForegroundChanged(false);
+        native.remaining = 0;
+        await ui.refresh();
+        await Future<void>.delayed(const Duration(milliseconds: 300));
+        expect(api.creates, greaterThan(creates));
+        await ui.disconnect();
+      },
+    );
+
+    test(
+      'a restore engine that is still connecting is never disconnected',
+      () async {
+        final restoring = HandoverNative()
+          ..age = 0
+          ..up = false
+          ..restoreActive = true;
+        final ui = android(on: restoring);
+        await ui.connect();
+        expect(restoring.stops, 0, reason: 'the restore tunnel is not stopped');
+        expect(api.creates, 0, reason: 'no competing connection');
+        expect(ui.phase, ConnectionPhase.reconnecting);
+        expect(ui.detail, 'Восстанавливается подключение');
+        // The restore engine brought the tunnel up; the next poll adopts it.
+        restoring
+          ..up = true
+          ..heldConnection = connection
+          ..heldGeneration = 1
+          ..remaining = 500000;
+        api.oldConnection = true;
+        await ui.refresh();
+        expect(restoring.handovers, 1);
+        expect(restoring.stops, 0);
+        expect(api.creates, 0);
+        expect(ui.hasLease, isTrue);
+      },
+    );
+
+    test(
+      'a restore that failed does not leave a stuck reconnecting state',
+      () async {
+        final restoring = HandoverNative()
+          ..age = 0
+          ..up = false
+          ..restoreActive = true;
+        final ui = android(on: restoring);
+        await ui.connect();
+        expect(ui.phase, ConnectionPhase.reconnecting);
+        restoring.restoreActive =
+            false; // bootstrapFailed; native no longer wants the VPN
+        await ui.refresh();
+        expect(ui.phase, ConnectionPhase.disconnected);
+        expect(api.creates, 0);
+      },
+    );
+  });
 }
 
 /// TEST ONLY native with the ADR-124 intent channel; records calls, holds no state.

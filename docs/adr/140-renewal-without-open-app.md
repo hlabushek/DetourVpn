@@ -4,6 +4,8 @@
 **not done**.
 **Amends:** ADR-121 (native renewal through protected sockets), ADR-136 (the restore engine may hand
 renewal to native), ADR-139 (no attempt budget ends a wanted connection).
+**Amended by:** ADR-142 (long windows renew about 2 min after each grant, not 5 min; recovery
+ownership follows the Activity lifecycle).
 
 ## Requirement (owner)
 The VPN keeps working for several hours with the screen off and with the app closed or killed (the
