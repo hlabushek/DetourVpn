@@ -2,7 +2,8 @@
 
 **Status:** proposed 2026-11-13 (connection reliability, run 4). Device verification **not done**.
 **Amended by:** ADR-140 (the attempt budgets and the terminal `recovery_exhausted` for transient
-causes are removed; native renewal may run from the restore engine).
+causes are removed; native renewal may run from the restore engine); ADR-141 (Always-on is read
+only while the VPN is established; reads on start/stop said "off" falsely).
 **Amends:** ADR-119 (automatic reconnect had no limit), ADR-124 (adds a terminal state for exhausted
 recovery), ADR-129 (new failure category `recovery_exhausted`).
 

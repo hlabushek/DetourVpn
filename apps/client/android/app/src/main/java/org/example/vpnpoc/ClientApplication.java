@@ -112,19 +112,22 @@ public final class ClientApplication extends Application implements Tunnel {
     @Override public void onCreate() {
         super.onCreate();
         GoBackend.setAlwaysOnCallback(new GoBackend.AlwaysOnCallback() {
+            // ADR-141: no Always-on read here. Before establish() and in onDestroy Android answers
+            // isAlwaysOn() == false whatever the setting is; snapshot() reads it while up.
             @Override public void alwaysOnTriggered(GoBackend.VpnService service) {
                 if (service != null) protector = service;
-                observeAlwaysOn(service);
                 startAlwaysOnRecovery(service);
             }
             @Override public void alwaysOnStopped(GoBackend.VpnService service) {
                 if (protector == service) protector = null;
-                observeAlwaysOn(service);
                 stopAlwaysOnService(service);
             }
         });
-        alwaysOn = AlwaysOnStatus.sanitize(
-                getSharedPreferences("connection", MODE_PRIVATE).getString("always_on", null));
+        var connectionPrefs = getSharedPreferences("connection", MODE_PRIVATE);
+        alwaysOn = AlwaysOnStatus.sanitize(connectionPrefs.getString(AlwaysOnStatus.PREF_KEY, null));
+        // ADR-141: beta.33 and older stored false "off" readings; drop them.
+        if (connectionPrefs.contains(AlwaysOnStatus.LEGACY_PREF_KEY))
+            connectionPrefs.edit().remove(AlwaysOnStatus.LEGACY_PREF_KEY).apply();
         worker.execute(() -> supervisor.restore(wantsConnected(this)));
         worker.execute(() -> {
             String initStage = "vault";
@@ -196,24 +199,27 @@ public final class ClientApplication extends Application implements Tunnel {
     }
 
     /**
-     * ADR-139: read the Always-on setting from a service instance (the only place Android exposes
-     * it) and remember it, so the UI can show it. Never throws; never changes recovery decisions.
+     * ADR-139/141: read the Always-on setting from a service instance (the only place Android
+     * exposes it) and remember it, so the UI can show it. Worker thread. The caller passes whether
+     * this app's VPN is established right now; a read without it is discarded (see
+     * {@link AlwaysOnStatus}). Never throws; never changes recovery decisions.
      */
-    private void observeAlwaysOn(VpnService service) {
+    private void observeAlwaysOn(VpnService service, boolean vpnEstablished) {
         if (service == null) return;
         String value;
         try {
-            if (android.os.Build.VERSION.SDK_INT >= 29) {
-                value = AlwaysOnStatus.of(true, service.isAlwaysOn(), service.isLockdownEnabled());
-            } else {
-                value = AlwaysOnStatus.of(false, false, false);
-            }
+            boolean api = android.os.Build.VERSION.SDK_INT >= 29;
+            value = AlwaysOnStatus.reading(api, vpnEstablished,
+                    api && vpnEstablished && service.isAlwaysOn(),
+                    api && vpnEstablished && service.isLockdownEnabled());
         } catch (RuntimeException unavailable) {
             return;
         }
+        if (value == null || value.equals(alwaysOn)) return;
         alwaysOn = value;
         try {
-            getSharedPreferences("connection", MODE_PRIVATE).edit().putString("always_on", value).apply();
+            getSharedPreferences("connection", MODE_PRIVATE).edit()
+                    .putString(AlwaysOnStatus.PREF_KEY, value).apply();
         } catch (RuntimeException ignored) { /* Display only. */ }
     }
 
@@ -885,6 +891,8 @@ public final class ClientApplication extends Application implements Tunnel {
                 watchdog.pendingNetworkDelayMs(SystemClock.elapsedRealtime()) >= 0, stalled));
         value.put("evidence", ConnectionSupervisor.evidence(tunnelUp, handshakeAge, afterChange, flowing));
         value.put("failureCategory", ConnectionSupervisor.category(tunnelUp ? "" : reason));
+        // ADR-141: the only moment the platform's Always-on answer is meaningful.
+        if (tunnelUp) observeAlwaysOn(protector, true);
         // ADR-134: why native is not running a tunnel although the user still wants it.
         value.put("stopCategory", tunnelUp ? "none" : supervisor.stopCategory());
         value.put("recoveryAttempts", (long) supervisor.attempts());
