@@ -90,6 +90,7 @@ final class ConnectionSupervisor {
     }
 
     void tunnelUp(long now) {
+        attemptOpen = false;
         if (upSince < 0) upSince = now;
     }
 
@@ -122,6 +123,7 @@ final class ConnectionSupervisor {
      */
     boolean tunnelDown(String reason) {
         upSince = -1;
+        attemptOpen = false;
         lastStop = reason == null ? "" : reason;
         if (desired && terminal(lastStop)) {
             desired = false;
@@ -134,7 +136,56 @@ final class ConnectionSupervisor {
     /** A restore attempt ended without a tunnel. Same terminal rule as {@link #tunnelDown}. */
     boolean recoveryFailed(String code) { return tunnelDown(code == null ? "recovery_failed" : code); }
 
+    /** ADR-143: at most one attempt started by fresh signals per this gap. */
+    static final long FRESH_GAP_MS = 30_000;
+    /** ADR-143: a wake signal is evaluated this long after it arrives (an unlock may open the UI). */
+    static final long WAKE_SETTLE_MS = 2_000;
+    /** ADR-143: an attempt that has not reported back is treated as in flight this long. */
+    static final long ATTEMPT_IN_FLIGHT_MS = 60_000;
+    private long lastFreshAt = Long.MIN_VALUE / 2;
+    private boolean attemptOpen;
+
+    /** ADR-143: a recovery attempt was started and has not reported back yet. */
+    boolean attemptInFlight(long now) {
+        return attemptOpen && now - lastAttemptAt < ATTEMPT_IN_FLIGHT_MS;
+    }
+
+    /**
+     * ADR-143: the device woke (Doze exit, screen on, unlock) or the default network changed or
+     * became usable. When native owns recovery (ADR-142) and nothing is running or in flight, the
+     * backoff is cleared so the next {@link #evaluate} starts one attempt at once. Rate-limited to
+     * one per {@link #FRESH_GAP_MS}; a signal inside the gap returns WAIT with the time left, so the
+     * caller can re-signal then (coalesced). Returns NONE with the reason when it does nothing.
+     */
+    Decision freshSignal(long now, boolean tunnelUp, boolean dartOwner, boolean networkUsable) {
+        if (tunnelUp) return new Decision(Action.NONE, 0, "up");
+        if (!desired) return new Decision(Action.NONE, 0, "not_desired");
+        if (terminal(lastStop)) return new Decision(Action.NONE, 0, "terminal");
+        if (dartOwner) return new Decision(Action.NONE, 0, "owner");
+        if (!networkUsable) return new Decision(Action.NONE, 0, "offline");
+        if (attemptInFlight(now)) return new Decision(Action.NONE, 0, "in_flight");
+        long gap = lastFreshAt + FRESH_GAP_MS - now;
+        if (gap > 0) return new Decision(Action.WAIT, gap, "gap");
+        lastFreshAt = now;
+        attempts = 0;
+        lastAttemptAt = Long.MIN_VALUE / 2; // also clears a held background_start_refused wait
+        heldForNetwork = false;
+        return new Decision(Action.START_RECOVERY, 0, "fresh");
+    }
+
+    /**
+     * ADR-143: whether a broadcast is a wake signal. Screen on and unlock always are; an idle-mode
+     * change is one only when the device has left that idle mode (entering idle is not).
+     */
+    static boolean wakeSignal(boolean screenOn, boolean userPresent, boolean deepIdleChanged,
+            boolean deepIdleNow, boolean lightIdleChanged, boolean lightIdleNow) {
+        if (screenOn || userPresent) return true;
+        if (deepIdleChanged && !deepIdleNow) return true;
+        return lightIdleChanged && !lightIdleNow;
+    }
+
     void attemptStarted(long now, double jitterForNext) {
+        attemptOpen = true;
         attempts = Math.min(attempts + 1, 16);
         lastAttemptAt = now;
         nextJitter = Math.max(0, Math.min(jitterForNext, 0.999));
@@ -146,6 +197,7 @@ final class ConnectionSupervisor {
      * backoff does not grow; the intent is kept and the stop category says why nothing is running.
      */
     void startRefused(long now) {
+        attemptOpen = false;
         attempts = Math.max(0, attempts - 1);
         lastAttemptAt = now;
         lastStop = BACKGROUND_REFUSED;

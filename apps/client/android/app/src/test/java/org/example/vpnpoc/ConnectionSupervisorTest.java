@@ -118,6 +118,98 @@ public class ConnectionSupervisorTest {
                 s.evaluate(5_000, false, false, false, true).action);
     }
 
+    /** ADR-143: a fresh signal clears a long backoff and recovers at once. */
+    @Test public void freshSignalResetsBackoffAndRecoversAtOnce() {
+        var s = connected();
+        s.tunnelDown("lease_expired", 1);
+        for (int i = 0; i < 6; i++) { s.attemptStarted(1_000, 0.5); s.recoveryFailed("api_unavailable"); }
+        assertEquals(ConnectionSupervisor.Action.WAIT,
+                s.evaluate(2_000, false, false, false, true).action);
+        var fresh = s.freshSignal(2_000, false, false, true);
+        assertEquals(ConnectionSupervisor.Action.START_RECOVERY, fresh.action);
+        assertEquals(0, s.attempts());
+        assertEquals(ConnectionSupervisor.Action.START_RECOVERY,
+                s.evaluate(2_000, false, false, false, true).action);
+    }
+
+    /** ADR-143: at most one fresh attempt per 30 s; a signal inside the gap waits for the rest. */
+    @Test public void freshSignalsAreRateLimited() {
+        var s = connected();
+        s.tunnelDown("lease_expired", 1);
+        assertEquals(ConnectionSupervisor.Action.START_RECOVERY,
+                s.freshSignal(10_000, false, false, true).action);
+        s.attemptStarted(10_000, 0.5);
+        s.recoveryFailed("api_unavailable");
+        var inside = s.freshSignal(25_000, false, false, true);
+        assertEquals(ConnectionSupervisor.Action.WAIT, inside.action);
+        assertEquals(15_000, inside.delayMs);
+        assertEquals("gap", inside.why);
+        assertEquals(ConnectionSupervisor.Action.START_RECOVERY,
+                s.freshSignal(40_000, false, false, true).action);
+    }
+
+    /** ADR-143: a burst of signals while an attempt runs starts nothing more. */
+    @Test public void freshSignalWaitsForAnAttemptInFlight() {
+        var s = connected();
+        s.tunnelDown("lease_expired", 1);
+        s.attemptStarted(5_000, 0.5);
+        assertEquals("in_flight", s.freshSignal(6_000, false, false, true).why);
+        assertEquals("in_flight", s.freshSignal(5_000 + ConnectionSupervisor.ATTEMPT_IN_FLIGHT_MS - 1,
+                false, false, true).why);
+        // An attempt that never reported back no longer blocks.
+        assertEquals(ConnectionSupervisor.Action.START_RECOVERY,
+                s.freshSignal(5_000 + ConnectionSupervisor.ATTEMPT_IN_FLIGHT_MS, false, false, true).action);
+    }
+
+    /** ADR-143 + ADR-142: the gate. Nothing happens unless native owns a wanted, down tunnel. */
+    @Test public void freshSignalIsGated() {
+        var up = connected();
+        assertEquals("up", up.freshSignal(1, true, false, true).why);
+
+        var owned = connected();
+        owned.tunnelDown("lease_expired", 1);
+        assertEquals("owner", owned.freshSignal(2, false,
+                ConnectionSupervisor.dartOwnsRecovery(true, false), true).why);
+        assertEquals("owner", owned.freshSignal(2, false,
+                ConnectionSupervisor.dartOwnsRecovery(false, true), true).why);
+        assertEquals("offline", owned.freshSignal(2, false, false, false).why);
+
+        var off = connected();
+        off.userDisconnected();
+        off.tunnelDown("user_stop", 1);
+        assertEquals("not_desired", off.freshSignal(2, false, false, true).why);
+
+        var terminal = connected();
+        terminal.tunnelDown("quota_exhausted", 1);
+        assertEquals(ConnectionSupervisor.Action.NONE,
+                terminal.freshSignal(2, false, false, true).action);
+    }
+
+    /** ADR-143: a refused background start is retried on a fresh signal, not after a minute. */
+    @Test public void freshSignalRetriesARefusedStart() {
+        var s = connected();
+        s.tunnelDown("lease_expired", 1);
+        s.attemptStarted(10_000, 0.5);
+        s.startRefused(10_000);
+        assertEquals(ConnectionSupervisor.Action.WAIT,
+                s.evaluate(20_000, false, false, false, true).action);
+        assertEquals(ConnectionSupervisor.Action.START_RECOVERY,
+                s.freshSignal(20_000, false, false, true).action);
+        assertEquals(ConnectionSupervisor.Action.START_RECOVERY,
+                s.evaluate(20_000, false, false, false, true).action);
+    }
+
+    /** ADR-143: entering idle is not a wake; leaving it, screen on and unlock are. */
+    @Test public void wakeSignalMapping() {
+        assertTrue(ConnectionSupervisor.wakeSignal(true, false, false, false, false, false));
+        assertTrue(ConnectionSupervisor.wakeSignal(false, true, false, false, false, false));
+        assertTrue(ConnectionSupervisor.wakeSignal(false, false, true, false, false, false));
+        assertFalse(ConnectionSupervisor.wakeSignal(false, false, true, true, false, false));
+        assertTrue(ConnectionSupervisor.wakeSignal(false, false, false, false, true, false));
+        assertFalse(ConnectionSupervisor.wakeSignal(false, false, false, false, true, true));
+        assertFalse(ConnectionSupervisor.wakeSignal(false, false, false, false, false, false));
+    }
+
     @Test public void explicitDisconnectDuringRecoveryCancelsItForGood() {
         var s = connected();
         s.tunnelDown("lease_expired");

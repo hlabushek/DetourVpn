@@ -151,7 +151,105 @@ public final class ClientApplication extends Application implements Tunnel {
             }
         });
         watchNetwork();
+        watchWake();
         // ADR-135: the 15 s tunnel check is armed by setDeadline and stops when no window is up.
+    }
+
+    /** ADR-143: pending settle of a wake signal and a coalesced re-signal; worker thread only. */
+    private java.util.concurrent.ScheduledFuture<?> pendingWake;
+    private java.util.concurrent.ScheduledFuture<?> freshRetry;
+
+    /**
+     * ADR-143: Doze exit, light-idle exit (API 33+), screen on and unlock are fresh wake signals.
+     * Registered-only broadcasts, so a runtime receiver in this process; not exported. It reaches
+     * the app only while the process runs and is not frozen (see ADR-143); the recovery alarm
+     * stays the backstop. The receiver starts nothing itself.
+     */
+    private void watchWake() {
+        try {
+            android.content.IntentFilter filter = new android.content.IntentFilter();
+            filter.addAction(android.content.Intent.ACTION_SCREEN_ON);
+            filter.addAction(android.content.Intent.ACTION_USER_PRESENT);
+            filter.addAction(PowerManager.ACTION_DEVICE_IDLE_MODE_CHANGED);
+            if (android.os.Build.VERSION.SDK_INT >= 33)
+                filter.addAction(PowerManager.ACTION_DEVICE_LIGHT_IDLE_MODE_CHANGED);
+            android.content.BroadcastReceiver receiver = new android.content.BroadcastReceiver() {
+                @Override public void onReceive(android.content.Context context,
+                        android.content.Intent intent) {
+                    onWakeBroadcast(intent == null ? null : intent.getAction());
+                }
+            };
+            if (android.os.Build.VERSION.SDK_INT >= 33) {
+                registerReceiver(receiver, filter, RECEIVER_NOT_EXPORTED);
+            } else {
+                registerReceiver(receiver, filter);
+            }
+        } catch (RuntimeException unavailable) {
+            // Alarms and network callbacks still drive recovery.
+        }
+    }
+
+    private void onWakeBroadcast(String action) {
+        if (action == null) return;
+        boolean light = false;
+        boolean lightNow = false;
+        boolean deepNow = false;
+        try {
+            PowerManager power = (PowerManager) getSystemService(POWER_SERVICE);
+            deepNow = power.isDeviceIdleMode();
+            if (android.os.Build.VERSION.SDK_INT >= 33) {
+                light = PowerManager.ACTION_DEVICE_LIGHT_IDLE_MODE_CHANGED.equals(action);
+                lightNow = power.isDeviceLightIdleMode();
+            }
+        } catch (RuntimeException unavailable) {
+            return;
+        }
+        if (!ConnectionSupervisor.wakeSignal(
+                android.content.Intent.ACTION_SCREEN_ON.equals(action),
+                android.content.Intent.ACTION_USER_PRESENT.equals(action),
+                PowerManager.ACTION_DEVICE_IDLE_MODE_CHANGED.equals(action), deepNow,
+                light, lightNow)) return;
+        // Keep the CPU up across the settle; released by its timeout.
+        try {
+            PowerManager power = (PowerManager) getSystemService(POWER_SERVICE);
+            PowerManager.WakeLock lock = power.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK,
+                    "detourvpn:wake_signal");
+            lock.setReferenceCounted(false);
+            lock.acquire(ConnectionSupervisor.WAKE_SETTLE_MS + 3_000);
+        } catch (RuntimeException ignored) { /* Best effort. */ }
+        worker.execute(() -> {
+            if (pendingWake != null) pendingWake.cancel(false); // coalesce a burst of wake events
+            pendingWake = worker.schedule(() -> freshSignal("wake"),
+                    ConnectionSupervisor.WAKE_SETTLE_MS, TimeUnit.MILLISECONDS);
+        });
+    }
+
+    /**
+     * ADR-143, worker thread. A fresh wake or network signal: when native owns recovery (ADR-142)
+     * and nothing runs, clear the backoff and recover at once; at most one such attempt per 30 s.
+     */
+    void freshSignal(String kind) {
+        enforceDeadline();
+        long now = SystemClock.elapsedRealtime();
+        boolean up = provider != null && provider.isUp() && deadline > 0;
+        var decision = supervisor.freshSignal(now, up,
+                ConnectionSupervisor.dartOwnsRecovery(uiForeground, recoveryEngine != null),
+                physical.usable());
+        switch (decision.action) {
+            case START_RECOVERY:
+                evaluateRecovery();
+                if ("restore_started".equals(recoveryNote)) recoveryNote = "fresh_" + kind;
+                break;
+            case WAIT:
+                if (freshRetry != null) freshRetry.cancel(false);
+                freshRetry = worker.schedule(() -> freshSignal(kind), decision.delayMs + 50,
+                        TimeUnit.MILLISECONDS);
+                break;
+            default:
+                // Codes only. "up" and "not_desired" are the normal case and keep the last note.
+                if (!"up".equals(decision.why) && !"not_desired".equals(decision.why))
+                    recoveryNote = "fresh_ignored_" + decision.why;
+        }
     }
 
     /**
@@ -364,6 +462,7 @@ public final class ClientApplication extends Application implements Tunnel {
                         if (changed) networkPathChanged();
                         else scheduleWatch(500);
                         evaluateRecovery();
+                        if (changed) freshSignal("network"); // ADR-143
                     });
                 }
                 @Override public void onCapabilitiesChanged(android.net.Network network,
@@ -375,6 +474,7 @@ public final class ClientApplication extends Application implements Tunnel {
                         if (physical.capabilities(network.toString(), internet, portal, valid)) {
                             scheduleWatch(500);
                             evaluateRecovery();
+                            freshSignal("network"); // ADR-143: it just became usable.
                         }
                     });
                 }
