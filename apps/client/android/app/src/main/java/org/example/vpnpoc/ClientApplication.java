@@ -56,6 +56,8 @@ public final class ClientApplication extends Application implements Tunnel {
     private java.util.concurrent.ScheduledFuture<?> deadlineCheck;
     /** ADR-127: the default physical network; worker thread only. */
     private final PhysicalNetwork physical = new PhysicalNetwork();
+    /** ADR-146: the network-callback decisions (pure, tested); worker thread only. */
+    private final NetworkCallbacks networkCallbacks = new NetworkCallbacks(physical);
     /** ADR-122: elapsed-realtime of the last default-network change, -1 if none; worker thread. */
     private long lastNetworkChangeAt = -1;
     private java.util.concurrent.ScheduledFuture<?> pendingCheck;
@@ -666,63 +668,29 @@ public final class ClientApplication extends Application implements Tunnel {
                     try { caps = manager.getNetworkCapabilities(network); }
                     catch (RuntimeException ignored) { /* Capabilities callback follows. */ }
                     final NetworkCapabilities known = caps;
-                    worker.execute(() -> {
-                        boolean wasUsable = physical.usable();
-                        boolean changed = physical.available(network.toString(),
-                                known == null || hasInternet(known), known != null && captive(known),
-                                known != null && validated(known));
-                        log("network_available", changed ? "changed" : "same");
-                        // ADR-146: a new onAvailable cancels a pending loss confirmation.
-                        if (lossCheck != null) lossCheck.cancel(false);
-                        lossCheck = null;
-                        if (!network.equals(defaultNetwork)) underlyingStale = true;
-                        defaultNetwork = network;
-                        if (changed) networkPathChanged();
-                        else scheduleWatch(TunnelWatchdog.SETTLE_MS);
-                        evaluateRecovery();
-                        // ADR-143/146: a network that became usable resets the backoff (30 s limit).
-                        if (changed || (!wasUsable && physical.usable())) freshSignal("network");
-                    });
+                    worker.execute(() -> applyNetwork(network, networkCallbacks.available(
+                            network.toString(), known == null || hasInternet(known),
+                            known != null && captive(known), known != null && validated(known))));
                 }
                 @Override public void onCapabilitiesChanged(android.net.Network network,
                         NetworkCapabilities caps) {
                     boolean internet = hasInternet(caps);
                     boolean portal = captive(caps);
                     boolean valid = validated(caps);
-                    worker.execute(() -> {
-                        if (physical.capabilities(network.toString(), internet, portal, valid)) {
-                            log("network_usable");
-                            scheduleWatch(TunnelWatchdog.SETTLE_MS);
-                            evaluateRecovery();
-                            freshSignal("network"); // ADR-143: it just became usable.
-                        }
-                    });
+                    worker.execute(() -> applyNetwork(network, networkCallbacks.capabilities(
+                            network.toString(), internet, portal, valid)));
                 }
                 @Override public void onLinkPropertiesChanged(android.net.Network network,
                         android.net.LinkProperties properties) {
                     var addresses = new java.util.TreeSet<String>();
                     for (var address : properties.getLinkAddresses())
                         addresses.add(address.getAddress().getHostAddress());
-                    worker.execute(() -> {
-                        if (physical.linkAddresses(network.toString(), addresses)) {
-                            log("network_address_changed");
-                            networkPathChanged();
-                        }
-                    });
+                    worker.execute(() -> applyNetwork(network,
+                            networkCallbacks.linkAddresses(network.toString(), addresses)));
                 }
                 @Override public void onLost(android.net.Network network) {
-                    worker.execute(() -> {
-                        long now = SystemClock.elapsedRealtime();
-                        if (!physical.lost(network.toString(), now)) return; // an older network
-                        log("network_lost");
-                        if (network.equals(defaultNetwork)) defaultNetwork = null;
-                        // ADR-146: no attempt runs while offline (physical.usable() is false), but
-                        // the tunnel is marked recovering only if no network returns within 8 s.
-                        if (lossCheck != null) lossCheck.cancel(false);
-                        lossCheck = worker.schedule(ClientApplication.this::networkLossConfirmed,
-                                PhysicalNetwork.LOSS_CONFIRM_MS + 50, TimeUnit.MILLISECONDS);
-                        publishState();
-                    });
+                    worker.execute(() -> applyNetwork(network, networkCallbacks.lost(
+                            network.toString(), SystemClock.elapsedRealtime())));
                 }
             });
         } catch (RuntimeException unavailable) {
@@ -742,10 +710,31 @@ public final class ClientApplication extends Application implements Tunnel {
         return caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED);
     }
 
+    /**
+     * ADR-146, worker thread: applies one default-network callback decision
+     * ({@link NetworkCallbacks}, unit-tested) with the Android objects held here.
+     */
+    private void applyNetwork(android.net.Network network, NetworkCallbacks.Outcome out) {
+        if (out.log != null) log(out.log, out.logDetail);
+        if (out.cancelLossTimer && lossCheck != null) lossCheck.cancel(false);
+        if (out.cancelLossTimer) lossCheck = null;
+        if (out.underlyingStale) underlyingStale = true;
+        if (out.setDefault) defaultNetwork = network;
+        if (out.clearDefault) defaultNetwork = null;
+        if (out.armLossTimer)
+            lossCheck = worker.schedule(this::networkLossConfirmed,
+                    NetworkCallbacks.LOSS_TIMER_MS, TimeUnit.MILLISECONDS);
+        if (out.pathChanged) networkPathChanged();
+        if (out.settleWatch) scheduleWatch(TunnelWatchdog.SETTLE_MS);
+        if (out.evaluateRecovery) evaluateRecovery();
+        if (out.freshSignal) freshSignal("network");
+        if (out.publishState) publishState();
+    }
+
     /** ADR-146, worker thread: the loss lasted {@link PhysicalNetwork#LOSS_CONFIRM_MS}. */
     private void networkLossConfirmed() {
         lossCheck = null;
-        if (physical.usable()) return;
+        if (!networkCallbacks.lossTimerFired()) return;
         log("network_loss_confirmed");
         publishState();
     }
@@ -826,6 +815,9 @@ public final class ClientApplication extends Application implements Tunnel {
             watchdog.restarted(now);
             log("watchdog_restart", age < 0 ? "no_handshake" : "stale_or_network");
             try {
+                // ADR-146: restart first, then set the underlying network (establish() may clear it).
+                // TODO: verify on a real device that establish() clears the underlying network and
+                // that this order is correct (ADR-146).
                 provider.restartInPlace();
                 tunnelRestarts++;
                 underlyingStale = true; // ADR-146: the new interface has no underlying network.
