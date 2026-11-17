@@ -44,6 +44,17 @@ final class AlwaysOnStatus {
         return of(true, alwaysOn, lockdown);
     }
 
+    /**
+     * ADR-149 (R6): the Lockdown flag used to choose the native renewal transport, from the same
+     * reading as the display value. A {@code null} reading (taken before {@code establish()} or
+     * after the tunnel went down) proves nothing and keeps the previous flag; it must never reset
+     * Lockdown to false, which would make native renewal pick a direct path the OS blocks.
+     */
+    static boolean lockdownAfterRead(String reading, boolean previous) {
+        if (reading == null) return previous;
+        return LOCKDOWN.equals(reading);
+    }
+
     /** A persisted value from an older or damaged store is treated as unknown. */
     static String sanitize(String stored) {
         if (OFF.equals(stored) || ON.equals(stored) || LOCKDOWN.equals(stored)) return stored;

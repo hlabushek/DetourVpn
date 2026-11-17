@@ -226,17 +226,18 @@
                  return;
              }
              stopStatusJob();
-@@ -454,7 +493,8 @@
+@@ -454,7 +493,9 @@
       * system's Always-On VPN mode.
       */
      public interface AlwaysOnCallback {
 -        void alwaysOnTriggered();
 +        void alwaysOnTriggered(VpnService service);
 +        void alwaysOnStopped(VpnService service);
++        void serviceCreated(VpnService service);
      }
  
      // TODO: When we finally drop API 21 and move to API 24, delete this and replace with the ordinary CompletableFuture.
-@@ -490,6 +530,8 @@
+@@ -490,6 +531,8 @@
       * {@link android.net.VpnService} implementation for {@link GoBackend}
       */
      public static class VpnService extends android.net.VpnService {
@@ -245,7 +246,7 @@
          @Nullable private GoBackend owner;
  
          public Builder getBuilder() {
-@@ -498,13 +540,33 @@
+@@ -498,13 +541,37 @@
  
          @Override
          public void onCreate() {
@@ -270,6 +271,10 @@
 +                notification.setContentIntent(android.app.PendingIntent.getActivity(this, 0, launch,
 +                    android.app.PendingIntent.FLAG_IMMUTABLE | android.app.PendingIntent.FLAG_UPDATE_CURRENT));
 +            startForeground(11, notification.build());
++            // ADR-149: every instance, including one the app started, so the app can protect()
++            // its own renewal sockets under Lockdown; cleared again by alwaysOnStopped.
++            if (alwaysOnCallback != null)
++                alwaysOnCallback.serviceCreated(this);
 +            vpnService.complete(this);
          }
  
@@ -280,7 +285,7 @@
                  final Tunnel tunnel = owner.currentTunnel;
                  if (tunnel != null) {
                      if (owner.currentTunnelHandle != -1)
-@@ -515,6 +577,9 @@
+@@ -515,6 +582,9 @@
                      tunnel.onStateChange(State.DOWN);
                  }
              }
@@ -290,7 +295,7 @@
              vpnService = vpnService.newIncompleteFuture();
              super.onDestroy();
          }
-@@ -522,12 +587,16 @@
+@@ -522,12 +592,16 @@
          @Override
          public int onStartCommand(@Nullable final Intent intent, final int flags, final int startId) {
              vpnService.complete(this);

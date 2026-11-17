@@ -82,11 +82,18 @@ public final class ClientApplication extends Application implements Tunnel {
     private volatile FlutterEngine recoveryEngine;
     /** ADR-121: the restore engine's channel, used to wake its Dart controller. */
     private volatile MethodChannel recoveryChannel;
-    /** ADR-121: Lockdown seen on an Always-on start; plain native HTTPS cannot get out then. */
+    /**
+     * ADR-121/149: Lockdown is on; plain native HTTPS cannot get out then. ADR-149 (R6): set only
+     * from a read while this app's VPN is established ({@link AlwaysOnStatus#lockdownAfterRead}),
+     * never from a read before establish(), which Android always answers with false.
+     */
     volatile boolean lockdown;
     /**
-     * ADR-140: the VPN service instance Android handed us (Always-on start, sticky restart,
-     * restore), kept until that instance stops. Only used to protect() native renewal sockets.
+     * ADR-140/149: the VPN service instance of this app (any start: UI connect, Always-on, sticky
+     * restart, restore), kept until that instance stops ({@link ServiceProtector}). Used only to
+     * protect() native renewal sockets to the API origin under Lockdown (ADR-140), for
+     * setUnderlyingNetworks (ADR-146) and for the Always-on read (ADR-141). Never handed to Dart,
+     * and never used to exempt any other socket or app from the VPN.
      */
     volatile VpnService protector;
     /** ADR-139: last Always-on setting read from a service instance ({@link AlwaysOnStatus}). */
@@ -169,11 +176,17 @@ public final class ClientApplication extends Application implements Tunnel {
             // ADR-141: no Always-on read here. Before establish() and in onDestroy Android answers
             // isAlwaysOn() == false whatever the setting is; snapshot() reads it while up.
             @Override public void alwaysOnTriggered(GoBackend.VpnService service) {
-                if (service != null) protector = service;
+                protector = ServiceProtector.created(protector, service);
                 startAlwaysOnRecovery(service);
             }
+            // ADR-149 (6.1): also the instance a UI connect started, so a UI-started tunnel can
+            // renew natively under Lockdown and get setUnderlyingNetworks. Main thread, like
+            // alwaysOnStopped, so the two never reorder.
+            @Override public void serviceCreated(GoBackend.VpnService service) {
+                protector = ServiceProtector.created(protector, service);
+            }
             @Override public void alwaysOnStopped(GoBackend.VpnService service) {
-                if (protector == service) protector = null;
+                protector = ServiceProtector.stopped(protector, service);
                 stopAlwaysOnService(service);
             }
         });
@@ -289,6 +302,9 @@ public final class ClientApplication extends Application implements Tunnel {
         failoverRequested = false; // ADR-148: a restore engine read it before this window.
         underlyingStale = true; // ADR-146: establish() starts with no underlying network set.
         applyUnderlying();
+        // ADR-149 (R6): read Lockdown now that establish() is done, before Dart can ask for
+        // native renewal on this window (same worker queue), instead of on the next 15 s tick.
+        observeAlwaysOn(protector, tunnelUpNow());
         updateDozeAids(); // ADR-147: the VPN service is up; the companion stops.
         publishState();
     }
@@ -559,6 +575,8 @@ public final class ClientApplication extends Application implements Tunnel {
         } catch (RuntimeException unavailable) {
             return;
         }
+        // ADR-149 (R6): the renewal transport follows the same rule as the display value.
+        lockdown = AlwaysOnStatus.lockdownAfterRead(value, lockdown);
         if (value == null || value.equals(alwaysOn)) return;
         alwaysOn = value;
         try {
@@ -930,8 +948,8 @@ public final class ClientApplication extends Application implements Tunnel {
      * ADR-146, worker thread. Tells Android which physical network carries the tunnel, so metering
      * and validation of the VPN network follow the real path. Must run after every establish()
      * (window start, restart in place): a new interface starts with no underlying network. Needs
-     * the service instance, which native holds only for tunnels started by Always-on, boot or
-     * native recovery ({@link #protector}); otherwise it is skipped and Android keeps its default
+     * the service instance ({@link #protector}); since ADR-149 native holds it for UI-started
+     * tunnels too. If it is still missing the call is skipped and Android keeps its default
      * behaviour (tracking the default network). Only codes are logged, never a network id.
      * Never throws.
      */
@@ -1123,7 +1141,8 @@ public final class ClientApplication extends Application implements Tunnel {
                         || provider == null) {
                     throw new IllegalStateException("recovery_unavailable");
                 }
-                if (android.os.Build.VERSION.SDK_INT >= 29) lockdown = service.isLockdownEnabled();
+                // ADR-149 (R6): no Lockdown read here. Before establish() Android answers false
+                // whatever the setting is; beginWindow() reads it once the tunnel is up.
                 String saved = vault.read("session");
                 if (saved == null) throw new IllegalStateException("session_missing");
                 var session = new org.json.JSONObject(saved);

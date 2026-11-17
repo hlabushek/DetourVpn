@@ -1,8 +1,14 @@
 # Handover — connection survivability plan
 
-**Where we are:** Phases 0 to 5 are committed locally (ADR-144 to ADR-148), plus the Phase 4
-test gaps (`fd7ad24`). **Next is Phase 6, which has not been started.** Wait for the owner's
-go-ahead before starting it.
+**Where we are:** Phases 0 to 6 are **CODE COMPLETE** and committed locally (ADR-144 to
+ADR-149), plus the Phase 4 test gaps (`fd7ad24`). **The plan is NOT verified on a device.** There
+was no APK build, no Gradle run of any kind, no device or phone run, and no Google Play policy
+check. Every result comes from Dart tests, `flutter analyze` on an ASCII copy and the javac +
+JUnit substitute for the Android unit tests. "Code complete" does not mean "working".
+
+**Before any build:** Phase 6 changed `apps/android/patches/go-only.patch` and its pinned hash.
+The prepared SDK tree in `.cache` (`sdk-go-only-c5-20261113`) is now stale; a build against it
+fails the hash check by design. Prepare a fresh tree first (ADR-149 "Owner steps", step 1).
 
 - Branch: `claude/connection-reliability` (worktree `.claude/worktrees/fixes-before-beta-0eeeba`),
   not pushed.
@@ -12,9 +18,9 @@ go-ahead before starting it.
 - Phase 4 (network roaming): the commit on top of `b5766b1`, ADR-146
   (`docs/adr/146-network-roaming.md`): 0.5 s action on a new network, 8 s loss confirmation,
   `setUnderlyingNetworks` after each establish, backoff reset on a returning network, two
-  restarts per change then a new lease. Known gap: `setUnderlyingNetworks` runs only when native
-  holds the service (`protector`: Always-on, boot, sticky or native recovery starts); UI-started
-  tunnels skip it until Phase 6.1.
+  restarts per change then a new lease. The former gap (UI-started tunnels had no `protector`, so
+  `setUnderlyingNetworks` was skipped) is closed in code by Phase 6.1 (ADR-149); not verified on a
+  device.
 - Phase 4 test gaps: commit `fd7ad24`. The network-callback decisions moved into the pure
   `NetworkCallbacks` helper (behaviour unchanged) with `NetworkCallbacksTest` (8 s loss timer,
   cancel on `onAvailable`, shorter loss). A TODO at the `restartInPlace` call site asks for a
@@ -35,20 +41,32 @@ go-ahead before starting it.
   - 3.5 the only new wake lock is the backstop's, bounded to 10 s.
 - Phase 5 (dead-peer and silent-drop detection): the commit after `8d46858`, ADR-148
   (`docs/adr/148-dead-peer-and-silent-drop-detection.md`). See the Phase 5 section below.
-- ADRs of this plan: ADR-144, ADR-145, ADR-146, ADR-147, ADR-148.
+- Phase 6 (system integration): the commit after `5f1af00`, ADR-149
+  (`docs/adr/149-lockdown-boot-and-update-integration.md`). See the Phase 6 section below.
+- ADRs of this plan: ADR-144, ADR-145, ADR-146, ADR-147, ADR-148, ADR-149.
 - Master plan: `C:\Users\JetGame\.claude\plans\pasted-content-id-2a60-act-as-prancy-nest.md`
   (audit, phases, owner decisions).
 - Owner decisions (2026-11-17):
   - longer server window than 900 s: **yes** (Phase 3.1);
   - direct boot: **option (a)**, keep `BOOT_COMPLETED`, rely on Lockdown, document it;
   - automatic node failover on a confirmed dead peer: **yes** (Phase 5.2).
-- Order of phases: 0 → 1 → 2 → 4 → 3 → 5 (done locally) → 6 (next).
+- Order of phases: 0 → 1 → 2 → 4 → 3 → 5 → 6 (all code complete locally; none device-verified).
 - Nothing has been verified on a phone. Every client result so far comes from unit tests (Dart
   tests and the javac + JUnit substitute below), not from Gradle or a device. The Phase 3 server
   change has no test run at all.
+- Open TODOs (owner-requested, in code and ADRs):
+  - health probe URL is still `none` (`DEAD_PEER_PROBE_URL` in the manifest; ADR-148/149): needs a
+    real project-owned https health endpoint before the probe can run;
+  - the health probe may never run on Android (the app excludes its own package from the VPN;
+    Android may refuse the bind, `bind_refused`): needs a device check and a routing decision
+    (`TunnelProbeRunner`, manifest, ADR-148/149);
+  - restart order after `restartInPlace` / `setUnderlyingNetworks` (ADR-146,
+    `ClientApplication.restartTunnel`);
+  - Play Store exact-alarm and `systemExempted` policy check (ADR-147, manifest,
+    `NativeRenewer.schedule`).
 
 ## Rules for the next agent
-- One phase at a time, with one ADR per phase in `docs/adr/` (next free number: 149).
+- One phase at a time, with one ADR per phase in `docs/adr/` (next free number: 150).
 - Commit locally with the owner's OK. No push.
 - No `flutter build`, no `gradlew assemble`, no release or deploy scripts, no adb or device tests,
   and no server changes without explicit approval.
@@ -68,7 +86,7 @@ go-ahead before starting it.
   (for example the session scratchpad) and run it there. The only expected finding is the
   `assets/orbit/` warning, because that folder is not copied. Do not change code to work around
   the path.
-- `flutter test` works in place: 315 tests passed at the Phase 5 commit (310 before it).
+- `flutter test` works in place: 315 tests passed at the Phase 5 and Phase 6 commits (310 before).
 - **No Gradle wrapper in `apps/client/android` — on purpose, not generated.**
   - `scripts/build_flutter_client.ps1` builds from a temporary ASCII copy. It puts a wrapper there
     from `apps/android/gradle/wrapper/gradle-wrapper.jar` (SHA-256 pinned in the script) and
@@ -87,7 +105,11 @@ go-ahead before starting it.
        `GeneratedPluginRegistrant.java`, which is replaced by an empty stub;
      - plus `apps/android/app/src/main/java/**`, except `MainActivity`, `PocApplication`,
        `LibboxProviderV1` and `LibboxVpnService` (the same exclusions as Gradle);
-     - plus `.cache/i-011/sdk-go-only-c5-20261113/tunnel/src/main/java/**`;
+     - plus the patched tunnel sources. Up to Phase 5 that was
+       `.cache/i-011/sdk-go-only-c5-20261113/tunnel/src/main/java/**`. Since Phase 6 the patch
+       differs from `c5`, so use a tree with the current patch applied (Phase 6 used a scratch
+       copy: `git archive` of the pinned SDK revision from `.cache/i-011/awg-android`, then
+       `git apply` of `go-only.patch`, outside the repository);
      - classpath:
        - `android-36/android.jar`;
        - `flutter_embedding_debug-1.0.0-*.jar`;
@@ -97,11 +119,12 @@ go-ahead before starting it.
        - `lifecycle-common-2.7.0`;
        - the `lifecycle-runtime-2.7.0` `classes.jar` (all from `~/.gradle/caches`).
   2. Run all tests in both `src/test/java` trees with JUnit 4.13.2 and hamcrest-core 1.3.
-  3. Run `RestartInPlacePatchTest` from `apps/client/android/app`, because it reads
-     `../../../android/patches/go-only.patch`.
+  3. Run `RestartInPlacePatchTest` and (since Phase 6) `SystemIntegrationWiringTest` from
+     `apps/client/android/app`, because they read files relative to it.
   4. Expected result at the Phase 5 commit: 238 tests pass (235 in the main run plus 3
      `RestartInPlacePatchTest`). It was 194 at the Phase 4 commit, 202 after `fd7ad24` and 209
-     at the Phase 3 commit.
+     at the Phase 3 commit. At the Phase 6 commit: 253 (246 in the main run plus 7 from
+     `apps/client/android/app`: 3 `RestartInPlacePatchTest` + 4 `SystemIntegrationWiringTest`).
   5. The `find` results under Git Bash are POSIX paths; convert each jar with `cygpath -w`
      before joining the `;`-separated classpath for the Windows `javac.exe`.
 
@@ -145,7 +168,22 @@ What was **not** run or verified:
 - no real network probe behaviour (DNS, TLS, timeout) and no Play policy check.
 See ADR-148 "Known limitations" and "Owner steps".
 
-## Phase 6 — system integration (next; not started)
-From the master plan, section "Phase 6" (6.1 Lockdown read after `establish()` and a `protector`
-for UI-started tunnels, 6.2 direct boot option (a) as decided, 6.3 `MY_PACKAGE_REPLACED`). One ADR
-(149). Wait for the owner's go-ahead.
+## Phase 6 — system integration (recorded in ADR-149; committed locally; CODE COMPLETE, NOT verified)
+- 6.1 Lockdown is read only after `establish()` with the `AlwaysOnStatus` rule
+  (`lockdownAfterRead`; read in `beginWindow()` and on the watch tick; the pre-establish read in
+  `startAlwaysOnRecovery` is gone, R6). GoBackend now reports every service instance
+  (`serviceCreated`, a `go-only.patch` change with a new pinned hash), so UI-started tunnels get a
+  `protector` (`ServiceProtector`): native renewal under Lockdown and `setUnderlyingNetworks` work
+  for them in code. The protector's uses are unchanged (ADR-140/141/146).
+- 6.2 Option (a): `BOOT_COMPLETED` kept; not direct-boot aware; no device-protected token. Without
+  Lockdown, traffic before the first unlock is unprotected (documented trade-off).
+- 6.3 `MY_PACKAGE_REPLACED` added to `BootReceiver`, through the same pure gate as boot
+  (`RestoreTrigger`): restores only when the user left the VPN connected and consent is ours.
+What was run for it: the Java substitute against a scratch SDK tree with the new patch (253
+passed: 246 + 7), `flutter test` (315 passed, no Dart change) and `flutter analyze` on an ASCII
+copy (only the expected `assets/orbit/` warning).
+What was **not** run or verified:
+- no APK, no Gradle (no manifest merge, lint or `testDebugUnitTest`), no device run;
+- no Lockdown, protector, reboot or app-update scenario on a phone;
+- no Play policy check;
+- the shared `.cache` prepared SDK tree was not regenerated (owner step, ADR-149).

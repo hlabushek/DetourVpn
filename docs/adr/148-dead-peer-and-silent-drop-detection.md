@@ -95,6 +95,15 @@ opt-in per ADR.
   more than the server's minimum (see TECHNICAL_SPEC.md retention). Choosing and deploying it is an
   owner step (see below); it was not done here.
 
+> **TODO (owner, open as of ADR-149):** the health probe URL is still `none`. The probe cannot run
+> until a real project-owned `https` health endpoint exists and is set in
+> `DEAD_PEER_PROBE_URL` (`AndroidManifest.xml`).
+>
+> **TODO (device + routing decision, open as of ADR-149):** the health probe may never run on
+> Android at all, because the app excludes its own package from its VPN and Android may refuse to
+> bind the probe socket to the VPN network (`bind_refused`). This needs a device check and then a
+> routing decision (see "Known limitations").
+
 ## Assumptions
 
 - The tunnel carries the probe like any other traffic, so its answer is evidence of the data path.
