@@ -27,6 +27,9 @@ class WindowConnectionController extends ConnectionController {
     this.revokeWaitInterval = const Duration(seconds: 1),
     this.revokeWaitChecks = 10,
     this.dataPathFlowFor = const Duration(seconds: 120),
+    this.handshakeTimeout = const Duration(seconds: 20),
+    this.snapshotRetryDelay = const Duration(milliseconds: 500),
+    this.snapshotAttempts = 3,
     Uri? renewalOrigin,
     bool? panelVless,
     this.nativeOwnsBackgroundRecovery = false,
@@ -40,6 +43,38 @@ class WindowConnectionController extends ConnectionController {
       );
     }
   }
+
+  /// ADR-145 (2.4): a window this controller started with `connectWindow` must show a handshake
+  /// within this time, or it fails with `handshake_not_established` (retried once on a new lease).
+  final Duration handshakeTimeout;
+  bool _awaitingFirstHandshake = false;
+  int _handshakeRetries = 0;
+  static const maxHandshakeRetries = 1;
+
+  /// ADR-145 (2.2): a failed `snapshot()` during reconcile is retried this many times, this far
+  /// apart; then the native state is unknown and nothing is stopped.
+  final Duration snapshotRetryDelay;
+  final int snapshotAttempts;
+
+  /// ADR-145 (2.3): the node saved on this phone. Applied once the node list has it, so a node
+  /// list that failed to load at startup does not lose the user's choice.
+  String? _preferredNode;
+
+  /// ADR-145 (2.3): select the saved node now if the list has it, otherwise after a refresh.
+  void preferNode(String id) {
+    _preferredNode = id;
+    selectNode(id);
+  }
+
+  /// A node refresh may still provide a node to connect to.
+  bool get _nodeMayAppear =>
+      _preferredNode != null || nodes.isEmpty || nodesError != null;
+
+  /// ADR-145: failures that never end the user's "stay connected" wish.
+  static const _keepIntentCodes = {
+    'window_node_required',
+    'native_state_unknown',
+  };
 
   /// ADR-142 (Android UI controller only): while the app is in the background, native owns
   /// recovery, so this controller's reconnect and resume timers do nothing until it is in the
@@ -138,6 +173,7 @@ class WindowConnectionController extends ConnectionController {
     _inboundTraffic.reset();
     _dataPath.reset();
     _dataStalled = false;
+    _awaitingFirstHandshake = false;
     remotePending = false;
     _synced = false;
   }
@@ -173,6 +209,7 @@ class WindowConnectionController extends ConnectionController {
     switch (state) {
       case 'connected':
         _hasEstablishedHandshake = true;
+        _handshakeSeenNow();
         phase = ConnectionPhase.connected;
         detail = 'Связь через VPN подтверждена';
       case 'connecting':
@@ -182,6 +219,12 @@ class WindowConnectionController extends ConnectionController {
         phase = ConnectionPhase.reconnecting;
         detail = recoveringText(reason);
     }
+  }
+
+  /// ADR-145 (2.4): the first handshake arrived; a later failure gets a fresh retry.
+  void _handshakeSeenNow() {
+    _awaitingFirstHandshake = false;
+    _handshakeRetries = 0;
   }
 
   /// ADR-144: Russian text for a native `recovering` reason.
@@ -436,6 +479,9 @@ class WindowConnectionController extends ConnectionController {
       nodes = parsed;
       nodesUpdatedAt = DateTime.parse(value['checked_at'] as String);
       nodesError = null;
+      // ADR-145 (2.3): the saved node, once the list has it.
+      final preferred = _preferredNode;
+      if (selectedNode == null && preferred != null) selectNode(preferred);
       unawaited(measureLatency());
     } catch (e) {
       nodesError = e is ClientError ? e.code : 'invalid_response';
@@ -474,33 +520,24 @@ class WindowConnectionController extends ConnectionController {
   Future<bool> _reconcile() async {
     _restorePending = false;
     if (_synced) return false;
-    NativeSnapshot? live;
-    try {
-      live = await native.snapshot();
-    } catch (_) {
-      live = null;
-    }
+    // ADR-145 (2.2): a snapshot that fails is "unknown", never "nothing running". Retry it;
+    // if it keeps failing, stop here without touching the tunnel and stay unsynced.
+    final live = await _reconcileSnapshot();
     // ADR-142: native's restore engine is still bringing a tunnel up. Never disconnect it;
     // stay unsynced so the next refresh adopts it once it is up (ADR-121 hand-over).
-    if (live != null &&
-        live.restoreActive &&
-        !live.up &&
-        native is RestoreHandover) {
+    if (live.restoreActive && !live.up && native is RestoreHandover) {
       alwaysOnStatus = live.alwaysOn ?? alwaysOnStatus;
       _restorePending = true;
       return false;
     }
-    if (live != null) {
-      alwaysOnStatus = live.alwaysOn ?? alwaysOnStatus;
-      // ADR-139: native spent its background budget while no UI was open; say so once.
-      _nativeExhausted =
-          !live.up &&
-          !live.desiredConnected &&
-          live.stopCategory == 'recovery_exhausted';
-      _nativeFailureStage = live.up ? null : live.failureStage;
-    }
+    alwaysOnStatus = live.alwaysOn ?? alwaysOnStatus;
+    // ADR-139: native spent its background budget while no UI was open; say so once.
+    _nativeExhausted =
+        !live.up &&
+        !live.desiredConnected &&
+        live.stopCategory == 'recovery_exhausted';
+    _nativeFailureStage = live.up ? null : live.failureStage;
     final adoptable =
-        live != null &&
         live.up &&
         (live.nativeRenewal ||
             (live.restoreActive && native is RestoreHandover)) &&
@@ -508,7 +545,7 @@ class WindowConnectionController extends ConnectionController {
         live.connectionId != null &&
         live.windowGeneration != null;
     if (!adoptable) {
-      _resumeWanted = live?.desiredConnected == true;
+      _resumeWanted = live.desiredConnected;
       diagnosticStage = 'native_disconnect';
       await native.disconnect();
     }
@@ -521,7 +558,7 @@ class WindowConnectionController extends ConnectionController {
     }
     if (adoptable) {
       final match = rows
-          .where((row) => row['id'] == live!.connectionId)
+          .where((row) => row['id'] == live.connectionId)
           .firstOrNull;
       if (match is Map<String, dynamic> && await _adopt(match, live)) {
         for (final row in rows) {
@@ -544,12 +581,28 @@ class WindowConnectionController extends ConnectionController {
       if (row['state'] != 'closed') {
         _id = _uuid(row['id']);
         remotePending = true;
-        await _cleanup();
+        // Native was stopped above; only the server row is left to revoke.
+        await _cleanup(stopNative: false);
         if (hasLease) throw const ClientError('revoke_unconfirmed');
       }
     }
     _synced = true;
     return false;
+  }
+
+  /// ADR-145 (2.2): native's state for reconcile, retried; throws `native_state_unknown`.
+  Future<NativeSnapshot> _reconcileSnapshot() async {
+    for (var attempt = 1; ; attempt++) {
+      try {
+        return await native.snapshot();
+      } catch (_) {
+        if (attempt >= snapshotAttempts || _dead) {
+          diagnosticStage = 'connection_reconcile';
+          throw const ClientError('native_state_unknown');
+        }
+        await Future<void>.delayed(snapshotRetryDelay);
+      }
+    }
   }
 
   /// ADR-117: take over a running tunnel only if the server's view of this device's connection
@@ -635,6 +688,8 @@ class WindowConnectionController extends ConnectionController {
     _dataPath.reset();
     _dataStalled = false;
     _hasEstablishedHandshake = false;
+    // ADR-145: the 20 s handshake rule is for windows this controller started, not adopted ones.
+    _awaitingFirstHandshake = false;
     _nativeHandshakeSeen = live.handshakeSeen;
     _connectedAtMs = now;
     _recovery.reset(); // ADR-139: a running tunnel is a successful window.
@@ -662,7 +717,8 @@ class WindowConnectionController extends ConnectionController {
       if (_cancelled(version)) return false;
       await Future<void>.delayed(revokeWaitInterval);
       if (_cancelled(version)) return false;
-      await _cleanup();
+      // ADR-145 (2.5): native is already stopped; only the server revoke is retried.
+      await _cleanup(stopNative: false);
     }
     if (hasLease) throw const ClientError('revoke_unconfirmed');
     return !_cancelled(version);
@@ -676,6 +732,7 @@ class WindowConnectionController extends ConnectionController {
     _reconnectAfterCleanup = false;
     if (!_autoReconnecting) {
       _activationRetries = 0;
+      _handshakeRetries = 0; // ADR-145: a user tap gets a fresh handshake retry.
       // ADR-139: a user tap starts a fresh streak of automatic attempts.
       _recovery.reset();
     }
@@ -699,6 +756,12 @@ class WindowConnectionController extends ConnectionController {
     try {
       diagnosticStage = 'selected_node';
       if (selectedNode == null) throw const ClientError('window_node_required');
+      // ADR-145 (2.1): consent first (VPN, notifications on Android 13+, the one-time battery
+      // explanation), before any API call, so no device or lease work starts for a refusal.
+      diagnosticStage = 'android_vpn_permission';
+      if (!await native.permission())
+        throw const ClientError('permission_denied');
+      if (_cancelled(version)) return;
       final chosen = nodes.where((n) => n.id == selectedNode).firstOrNull;
       if (chosen != null && chosen.isPanel) {
         await _connectPanel(version, chosen);
@@ -722,10 +785,6 @@ class WindowConnectionController extends ConnectionController {
       }
       if (_cancelled(version)) return;
       if (hasLease && !await _closeOldLease(version)) return;
-      diagnosticStage = 'android_vpn_permission';
-      if (!await native.permission())
-        throw const ClientError('permission_denied');
-      if (_cancelled(version)) return;
       diagnosticStage = 'key_challenge';
       final proof = await api.call(
         'POST',
@@ -784,6 +843,7 @@ class WindowConnectionController extends ConnectionController {
       _hasEstablishedHandshake = false;
       _nativeHandshakeSeen = false;
       _connectedAtMs = _clock.elapsedMilliseconds;
+      _awaitingFirstHandshake = true; // ADR-145 (2.4)
       _activationRetries = 0;
       // ADR-139: a new window is up; the next failure starts a fresh streak.
       _recovery.reset();
@@ -805,16 +865,28 @@ class WindowConnectionController extends ConnectionController {
             ? e.code
             : 'native_unavailable';
         phase = ConnectionPhase.failed;
-        await _cleanup();
+        // ADR-145 (2.2): native's state is unknown; never stop a tunnel that may be running.
+        await _cleanup(stopNative: error != 'native_state_unknown');
         // ADR-119: the server did not activate a new connection (revoked or not acknowledged
         // in time). Retried a few times in a row, also after a manual connect.
         final activation = error == 'window_activation_refused';
         if (activation) _activationRetries++;
-        // ADR-099: an automatic reconnect that hit a temporary failure keeps trying.
-        if (activation
-            ? _activationRetries <= maxActivationRetries
-            : _autoReconnecting && _retryCodes.contains(error)) {
+        final bool retry;
+        if (activation) {
+          retry = _activationRetries <= maxActivationRetries;
+        } else if (error == 'window_node_required') {
+          // ADR-145 (2.3): the node list or the saved node may come back with the next refresh.
+          retry = _nodeMayAppear;
+        } else if (error == 'native_state_unknown') {
+          retry = true;
+        } else {
+          // ADR-099: an automatic reconnect that hit a temporary failure keeps trying.
+          retry = _autoReconnecting && _retryCodes.contains(error);
+        }
+        if (retry) {
           _scheduleAutoReconnect(version);
+        } else if (_keepIntentCodes.contains(error)) {
+          // ADR-145: not a reason to drop the user's wish to be connected.
         } else {
           // ADR-124: a failure nobody retries ends the native "stay connected" wish, so the
           // phone does not try again in the background behind the user's back.
@@ -835,10 +907,7 @@ class WindowConnectionController extends ConnectionController {
     await _reconcile();
     if (_cancelled(version)) return;
     if (hasLease && !await _closeOldLease(version)) return;
-    diagnosticStage = 'android_vpn_permission';
-    if (!await native.permission())
-      throw const ClientError('permission_denied');
-    if (_cancelled(version)) return;
+    // Consent was asked in _connect, before any API call (ADR-145).
     diagnosticStage = 'panel_profile';
     final args = vlessProfileArgs(
       await api.call('GET', '$root/panel-servers/${node.id}/profile'),
@@ -1024,8 +1093,12 @@ class WindowConnectionController extends ConnectionController {
     diagnosticStage = 'revoke_delete';
   }
 
-  Future<void> _cleanup() async {
-    await native.disconnect();
+  /// [stopNative]: false where native is already stopped and only the server revoke is retried
+  /// (ADR-145 2.5: a pending revoke no longer stops native on every poll), or where native's
+  /// state is unknown (ADR-145 2.2).
+  Future<void> _cleanup({bool stopNative = true}) async {
+    if (stopNative) await native.disconnect();
+    _awaitingFirstHandshake = false;
     _panelUp = false;
     _grant = null;
     _config = null;
@@ -1111,6 +1184,40 @@ class WindowConnectionController extends ConnectionController {
     }
   }
 
+  /// ADR-145 (2.5): «Повторить» while a revoke is pending: one more server revoke now.
+  Future<void> retryRevoke() async {
+    if (!remotePending || _dead) return;
+    await refresh();
+  }
+
+  /// ADR-145 (2.5): «Сбросить» while a revoke is pending. Ends the user's wish, makes sure
+  /// native is stopped and forgets the local hold, so Connect and server choice work again. The
+  /// server row is not forgotten: the next connect reconciles and revokes it first, and refuses
+  /// to start a new connection while the server still holds the old one.
+  Future<void> forceReset() async {
+    if (!remotePending || busy || _dead) return;
+    ++_version;
+    _reconnectAfterCleanup = false;
+    _resumeWanted = false;
+    _deferredRecovery = null;
+    await _refreshWork;
+    pausePolling();
+    _pollWanted = false;
+    await _endUserIntent();
+    try {
+      await native.disconnect();
+    } catch (_) {
+      // The native deadline and Lockdown stay the fail-closed boundary.
+    }
+    _forgetLocalLease();
+    revokeErrorCode = null;
+    error = null;
+    if (diagnosticStage == 'revoke_delete') diagnosticStage = null;
+    phase = ConnectionPhase.disconnected;
+    detail = 'VPN на телефоне выключен';
+    _emit();
+  }
+
   @override
   Future<void> refresh() async {
     if (_polling || busy || _dead) return;
@@ -1168,7 +1275,8 @@ class WindowConnectionController extends ConnectionController {
       // native now owns. The foreground does it.
       if (_recoveryGated && (remotePending || !_synced)) return;
       if (remotePending) {
-        await _cleanup();
+        // ADR-145 (2.5): native was stopped when the revoke started; retry only the revoke.
+        await _cleanup(stopNative: false);
         // ADR-119: the stopped connection finished closing; now the reconnect can start.
         if (!hasLease && _reconnectAfterCleanup && !_cancelled(version)) {
           _reconnectAfterCleanup = false;
@@ -1254,6 +1362,18 @@ class WindowConnectionController extends ConnectionController {
         _clock.elapsedMilliseconds,
       );
       if (snapshot.confirmed) _hasEstablishedHandshake = true;
+      // ADR-145 (2.4): a window started here must show a handshake within [handshakeTimeout].
+      if (_awaitingFirstHandshake) {
+        if (snapshot.handshakeSeen ||
+            snapshot.handshakeAge >= 0 ||
+            _hasEstablishedHandshake ||
+            snapshot.state == 'connected') {
+          _handshakeSeenNow();
+        } else if (_clock.elapsedMilliseconds - _connectedAtMs >=
+            handshakeTimeout.inMilliseconds) {
+          throw const ClientError('handshake_not_established');
+        }
+      }
       final traffic = snapshot.trafficBytes;
       if (traffic != null && traffic >= 0) {
         if (_trafficBaseline == null ||
@@ -1387,6 +1507,12 @@ class WindowConnectionController extends ConnectionController {
         _backgroundFault = code;
         return;
       }
+      // ADR-145 (2.2): native's state is unknown. Stop nothing, revoke nothing; the next poll
+      // reconciles again (still unsynced).
+      if (code == 'native_state_unknown') {
+        error = code;
+        return;
+      }
       final deadlinePassed =
           _grant != null && _clock.elapsedMilliseconds >= _deadline;
       // ADR-144: an unreachable API does not mean a broken tunnel. While native still runs it,
@@ -1422,7 +1548,19 @@ class WindowConnectionController extends ConnectionController {
           (_grant != null && _clock.elapsedMilliseconds >= _deadline)) {
         phase = ConnectionPhase.failed;
         await _cleanup();
-        if (_autoReconnectCodes.contains(code)) {
+        if (code == 'handshake_not_established') {
+          // ADR-145 (2.4): one more try on a fresh lease, then a clear terminal error.
+          if (_handshakeRetries < maxHandshakeRetries) {
+            _handshakeRetries++;
+            if (!hasLease) {
+              _scheduleAutoReconnect(version);
+            } else {
+              _reconnectAfterCleanup = true;
+            }
+          } else {
+            await _endUserIntent();
+          }
+        } else if (_autoReconnectCodes.contains(code)) {
           if (!hasLease) {
             _scheduleAutoReconnect(version);
           } else {
@@ -1455,6 +1593,11 @@ class WindowConnectionController extends ConnectionController {
     // A create with an unknown outcome must be settled first; the attempt fails fast without
     // an API call until the background settlement finishes, then the next attempt connects.
     'revoke_unconfirmed',
+    // ADR-145: retried only where _connect/_refresh decided so (one handshake retry, a node
+    // that may come back, a native state that could not be read).
+    'handshake_not_established',
+    'window_node_required',
+    'native_state_unknown',
   };
   bool _autoReconnecting = false;
 
@@ -1494,6 +1637,20 @@ class WindowConnectionController extends ConnectionController {
       if (_working || _polling) {
         unawaited(Future<void>.delayed(base, fire));
         return;
+      }
+      if (error == 'window_node_required') {
+        // ADR-145 (2.3): retry after the next node refresh, and only once a node is selected.
+        await refreshNodes();
+        if (_dead ||
+            _version != version ||
+            phase != ConnectionPhase.failed ||
+            error != 'window_node_required') {
+          return;
+        }
+        if (selectedNode == null) {
+          if (_nodeMayAppear) _scheduleAutoReconnect(version);
+          return;
+        }
       }
       _autoReconnecting = true;
       try {

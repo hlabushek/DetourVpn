@@ -287,7 +287,10 @@ void main() {
   );
 
   test(
-    'old remote lease is closed before permission denial, never reused',
+    // ADR-145 (2.1) supersedes the old order (old lease closed, then consent): consent now comes
+    // before any connection API call, so a refusal reserves, registers and revokes nothing; the
+    // old row ends at its window deadline or is revoked by the next reconcile.
+    'consent is checked before any connection API call; the old lease is never reused',
     () async {
       final timeline = <String>[];
       final api = _RecoveryApi(
@@ -301,13 +304,20 @@ void main() {
 
       await runRecovery(api: api, native: native);
 
+      final consentAt = timeline.indexOf('native:permission');
+      expect(consentAt, greaterThanOrEqualTo(0));
       expect(
-        api.calls,
-        contains(('DELETE', '/api/v1/window-tunnels/$_oldConnection')),
+        timeline
+            .skip(consentAt)
+            .where(
+              (entry) => entry.startsWith('api:') && !entry.contains('/quota'),
+            ),
+        isEmpty,
+        reason: 'no connection API call after a refused consent',
       );
       expect(
-        timeline.indexOf('api:DELETE /api/v1/window-tunnels/$_oldConnection'),
-        lessThan(timeline.indexOf('native:permission')),
+        api.calls,
+        isNot(contains(('POST', '/api/v1/devices'))),
       );
       expect(api.calls, isNot(contains(('POST', '/api/v1/window-tunnels'))));
       expect(

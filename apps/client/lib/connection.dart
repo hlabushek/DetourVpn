@@ -29,7 +29,15 @@ String? alwaysOnHint(String? status) => switch (status) {
 };
 
 String messageFor(String code) => switch (code) {
-  'window_node_required' => 'Выберите сервер перед подключением.',
+  // ADR-145: the saved server may only be missing until the server list loads again.
+  'window_node_required' =>
+    'Сервер не выбран или список серверов ещё не загрузился. Выберите сервер; если он уже был выбран, приложение подключится само после обновления списка.',
+  // ADR-145 (2.4): no handshake within 20 s, also after one retry on a new connection.
+  'handshake_not_established' =>
+    'Сервер не ответил на подключение: handshake не получен за 20 секунд. Приложение один раз пробует новое подключение; если и оно не ответило, VPN остановлен. Проверьте интернет или выберите другой сервер и нажмите «Подключить».',
+  // ADR-145 (2.2): the VPN state could not be read; nothing was stopped.
+  'native_state_unknown' =>
+    'Не удалось прочитать состояние VPN на телефоне. Ничего не отключено; приложение повторит проверку автоматически.',
   'window_tunnels_unavailable' || 'window_node_unavailable' =>
     'Сервис продлеваемых подключений пока недоступен. Повторите после подготовки узла.',
   // ADR-119: one text per cause, and only promises what the app really does.

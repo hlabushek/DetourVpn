@@ -3,14 +3,26 @@ import 'package:vpn_client/primary_action.dart';
 
 void main() {
   group('resolvePrimaryAction', () {
-    test('waiting for server close disables the action', () {
+    // ADR-145 (2.5): a pending server close is no longer a dead, disabled button.
+    test('waiting for server close offers a retry of that close', () {
+      expect(
+        resolvePrimaryAction(
+          waitingForServerClose: true,
+          busy: false,
+          mustDisconnect: true,
+        ),
+        PrimaryAction.retryRevoke,
+      );
+    });
+
+    test('waiting for server close during a connect offers cancel', () {
       expect(
         resolvePrimaryAction(
           waitingForServerClose: true,
           busy: true,
           mustDisconnect: true,
         ),
-        PrimaryAction.none,
+        PrimaryAction.cancel,
       );
     });
 
@@ -79,6 +91,22 @@ void main() {
       expect(fire(PrimaryAction.cancel), isTrue);
       await Future<void>.delayed(Duration.zero);
       expect(calls, ['connect', 'disconnect', 'cancel']);
+    });
+
+    test('retryRevoke runs the retry callback, and nothing without one', () async {
+      expect(fire(PrimaryAction.retryRevoke), isFalse);
+      expect(
+        gate.dispatch(
+          PrimaryAction.retryRevoke,
+          connect: () => record('connect'),
+          disconnect: () => record('disconnect'),
+          cancel: () => record('cancel'),
+          retry: () => record('retry'),
+        ),
+        isTrue,
+      );
+      await Future<void>.delayed(Duration.zero);
+      expect(calls, ['retry']);
     });
 
     test('none is never dispatched and does not start the window', () async {

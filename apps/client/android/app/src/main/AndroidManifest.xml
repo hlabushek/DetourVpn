@@ -7,6 +7,8 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SYSTEM_EXEMPTED" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <!-- ADR-145: asked once before the first connect on Android 13+; denial never blocks it. -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <!-- ADR-107: only to hand a downloaded, SHA-256-verified update APK to the system installer. -->
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
     <application android:name="org.example.vpnpoc.ClientApplication" android:label="DetourVPN"

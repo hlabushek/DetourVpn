@@ -155,10 +155,14 @@ public final class ClientActivity extends FlutterActivity {
             return;
         }
         if (call.method.equals("permission")) {
+            // ADR-145 (2.1): the whole consent step of a connect, before any API call: VPN
+            // consent, then (once) notifications on Android 13+, then (once) the battery
+            // exemption with an explanation. Only the VPN consent decides the answer.
             if (permissionResult != null) { result.success(false); return; }
+            permissionResult = result;
             Intent intent = VpnService.prepare(this);
-            if (intent == null) result.success(true);
-            else { permissionResult = result; startActivityForResult(intent, 1301); }
+            if (intent == null) afterVpnConsent(true);
+            else startActivityForResult(intent, 1301);
             return;
         }
         if (call.method.equals("openLogin")) {
@@ -474,7 +478,7 @@ public final class ClientActivity extends FlutterActivity {
                             ClientApplication.setWantsConnected(app, true);
                             app.supervisor.userConnected(); // ADR-124
                             app.beginWindow(); // ADR-144: CPU lock, window start, state push.
-                            runOnUiThread(this::askBatteryExemption);
+                            // ADR-145: the battery prompt moved to the consent step before connect.
                         }
                         break;
                     default: throw new IllegalArgumentException();
@@ -573,18 +577,68 @@ public final class ClientActivity extends FlutterActivity {
         }
     }
 
-    /** At most twice per install: without the exemption Android sleeps the renewal timer and the 90 s window ends. */
-    private void askBatteryExemption() {
+    /** ADR-145 (2.1): after the VPN consent; a refusal answers false and asks nothing else. */
+    private void afterVpnConsent(boolean granted) {
+        if (!granted) { finishPermission(false); return; }
         try {
             var prefs = getSharedPreferences("connection", MODE_PRIVATE);
-            int asked = prefs.getInt("battery_prompted", 0);
-            android.os.PowerManager manager = (android.os.PowerManager) getSystemService(POWER_SERVICE);
-            if (asked >= 2 || manager == null || manager.isIgnoringBatteryOptimizations(getPackageName())) return;
-            prefs.edit().putInt("battery_prompted", asked + 1).apply();
-            requestBatteryExemption();
-        } catch (RuntimeException ignored) {
-            // Best effort only.
+            boolean notificationsGranted = android.os.Build.VERSION.SDK_INT < ConnectPrompts.NOTIFICATIONS_API
+                    || checkSelfPermission(NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED;
+            if (ConnectPrompts.askNotifications(android.os.Build.VERSION.SDK_INT,
+                    notificationsGranted, prefs.getBoolean("notifications_prompted", false))) {
+                prefs.edit().putBoolean("notifications_prompted", true).apply();
+                requestPermissions(new String[] {NOTIFICATIONS}, 1302);
+                return; // Continues in onRequestPermissionsResult.
+            }
+        } catch (RuntimeException unavailable) {
+            // Best effort: notifications never block a connect.
         }
+        batteryStep();
+    }
+
+    /** ADR-145 (2.1): explain the battery exemption once, then open Android's own request. */
+    private void batteryStep() {
+        try {
+            var prefs = getSharedPreferences("connection", MODE_PRIVATE);
+            android.os.PowerManager manager = (android.os.PowerManager) getSystemService(POWER_SERVICE);
+            boolean exempt = manager == null || manager.isIgnoringBatteryOptimizations(getPackageName());
+            if (!ConnectPrompts.explainBattery(exempt, prefs.getInt("battery_prompted", 0))) {
+                finishPermission(true); return;
+            }
+            prefs.edit().putInt("battery_prompted", 1).apply();
+            new android.app.AlertDialog.Builder(this)
+                .setTitle("Работа в фоне")
+                .setMessage("Чтобы VPN не отключался при выключенном экране и ночью, разрешите "
+                        + "DetourVPN работать без ограничений батареи. Android покажет запрос; "
+                        + "это можно изменить позже в настройках.")
+                .setPositiveButton("Разрешить", (dialog, which) -> {
+                    try {
+                        startActivityForResult(new Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS,
+                                Uri.parse("package:" + getPackageName())), 1303);
+                    } catch (RuntimeException unavailable) {
+                        finishPermission(true);
+                    }
+                })
+                .setNegativeButton("Не сейчас", (dialog, which) -> finishPermission(true))
+                .setOnCancelListener(dialog -> finishPermission(true))
+                .show();
+        } catch (RuntimeException unavailable) {
+            finishPermission(true); // Best effort only; the VPN consent was given.
+        }
+    }
+
+    private void finishPermission(boolean granted) {
+        if (permissionResult == null) return;
+        permissionResult.success(granted);
+        permissionResult = null;
+    }
+
+    private static final String NOTIFICATIONS = "android.permission.POST_NOTIFICATIONS";
+
+    @Override public void onRequestPermissionsResult(int request, String[] permissions, int[] results) {
+        super.onRequestPermissionsResult(request, permissions, results);
+        // A denial never blocks a connect: the VPN works, only its notification may be hidden.
+        if (request == 1302) batteryStep();
     }
 
     private static String safeFailureTypes(Throwable failure) {
@@ -684,8 +738,9 @@ public final class ClientActivity extends FlutterActivity {
     @Override protected void onActivityResult(int request, int response, Intent data) {
         super.onActivityResult(request, response, data);
         if (request == 1301 && permissionResult != null) {
-            permissionResult.success(response == RESULT_OK && VpnService.prepare(this) == null);
-            permissionResult = null;
+            afterVpnConsent(response == RESULT_OK && VpnService.prepare(this) == null);
+        } else if (request == 1303) {
+            finishPermission(true); // ADR-145: the battery answer never decides the connect.
         }
     }
     @Override public void cleanUpFlutterEngine(FlutterEngine engine) {

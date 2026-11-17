@@ -2,12 +2,13 @@ import 'dart:async';
 
 /// The single action the connection screen offers. The bottom button and the
 /// orbit both resolve to one of these and both dispatch through [PrimaryActionGate].
-enum PrimaryAction { none, cancel, disconnect, connect }
+enum PrimaryAction { none, cancel, disconnect, connect, retryRevoke }
 
 /// Pure decision, shared by the bottom button and the orbit.
 ///
 /// Order matters and mirrors the bottom button's previous rules:
-/// 1. waiting for the server to confirm a remote close → nothing (disabled);
+/// 1. waiting for the server to confirm a remote close → retry that close now (ADR-145; it
+///    was a disabled button before), or cancel while a connect is still running;
 /// 2. busy (connecting / closing) → cancel;
 /// 3. a lease or native tunnel must be torn down → disconnect;
 /// 4. otherwise → connect.
@@ -16,7 +17,9 @@ PrimaryAction resolvePrimaryAction({
   required bool busy,
   required bool mustDisconnect,
 }) {
-  if (waitingForServerClose) return PrimaryAction.none;
+  if (waitingForServerClose) {
+    return busy ? PrimaryAction.cancel : PrimaryAction.retryRevoke;
+  }
   if (busy) return PrimaryAction.cancel;
   if (mustDisconnect) return PrimaryAction.disconnect;
   return PrimaryAction.connect;
@@ -49,8 +52,10 @@ class PrimaryActionGate {
     required Future<void> Function() connect,
     required Future<void> Function() disconnect,
     required Future<void> Function() cancel,
+    Future<void> Function()? retry,
   }) {
     if (action == PrimaryAction.none) return false;
+    if (action == PrimaryAction.retryRevoke && retry == null) return false;
     final now = _now();
     final last = _lastAccepted;
     if (last != null && now.difference(last) < debounce) return false;
@@ -59,6 +64,7 @@ class PrimaryActionGate {
       PrimaryAction.connect => connect,
       PrimaryAction.disconnect => disconnect,
       PrimaryAction.cancel => cancel,
+      PrimaryAction.retryRevoke => retry!,
       PrimaryAction.none => () async {},
     };
     unawaited(run());

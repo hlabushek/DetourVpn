@@ -11,6 +11,7 @@ const _reportableErrors = <String>{
   'device_conflict',
   'device_limit_reached',
   'device_revoked',
+  'handshake_not_established',
   'insufficient_quota',
   'insufficient_window_funding',
   'invalid_response',
@@ -25,6 +26,7 @@ const _reportableErrors = <String>{
   'native_restart_failed',
   'native_service_state_invalid',
   'native_start_failed',
+  'native_state_unknown',
   'native_unavailable',
   'network_unavailable',
   'permission_denied',
@@ -214,6 +216,7 @@ const _busyCodes = <String>{
   'tunnel_node_unavailable',
   'admission_closed',
   'runtime_unavailable',
+  'handshake_not_established', // ADR-145: the server did not answer the tunnel.
 };
 const _quotaCodes = <String>{
   'insufficient_quota',

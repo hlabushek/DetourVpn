@@ -237,7 +237,8 @@ class _VpnAppState extends State<VpnApp> with WidgetsBindingObserver {
     try {
       final selected = await (widget.native as NodePreferenceStore)
           .readSelectedNode();
-      if (selected != null) value.selectNode(selected);
+      // ADR-145 (2.3): kept even if the node list failed to load; applied after a refresh.
+      if (selected != null) value.preferNode(selected);
     } catch (_) {
       // Node selection remains manual if the local preference cannot be read.
     }

@@ -106,6 +106,7 @@ class ConnectionScreen extends StatelessWidget {
         connect: c.connect,
         disconnect: c.disconnect,
         cancel: c.disconnect,
+        retry: c is WindowConnectionController ? c.retryRevoke : null,
       );
 
       final Widget action;
@@ -121,6 +122,13 @@ class ConnectionScreen extends StatelessWidget {
                   : 'Ожидание подтверждения сервера',
               textAlign: TextAlign.center,
             ),
+          );
+        case PrimaryAction.retryRevoke:
+          // ADR-145 (2.5): retry the server close now instead of a disabled button.
+          actionKey = 'retry-revoke';
+          action = FilledButton(
+            onPressed: runPrimary,
+            child: const Text('Повторить'),
           );
         case PrimaryAction.cancel:
           actionKey = 'cancel';
@@ -375,6 +383,19 @@ class ConnectionScreen extends StatelessWidget {
                           'Завершить истёкший lease со списанием резерва',
                         ),
                       ),
+                    // ADR-145 (2.5): give up waiting here; the next connect revokes it again.
+                    if (c is WindowConnectionController) ...[
+                      const SizedBox(height: 8),
+                      Text(
+                        '«Сбросить» выключает VPN и снимает ожидание в приложении. При следующем подключении приложение снова попросит сервер закрыть старое.',
+                        style: text.bodySmall,
+                      ),
+                      TextButton(
+                        key: const ValueKey('force-reset'),
+                        onPressed: c.busy ? null : c.forceReset,
+                        child: const Text('Сбросить'),
+                      ),
+                    ],
                   ],
                 ),
               ),
