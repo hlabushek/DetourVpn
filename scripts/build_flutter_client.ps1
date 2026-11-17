@@ -10,8 +10,8 @@ param(
     # ADR-084: 16 MiB window; the API accepts 64 KiB..64 MiB per window.
     [ValidateRange(65536, 67108864)]
     [int]$WindowBudgetBytes = 16777216,
-    # ADR-096: 90 keeps the legacy request. Use 900 only after every node and the API run ADR-096 code.
-    [ValidateRange(30, 900)]
+    # ADR-096: 90 keeps the legacy request. 900 and 3600 (ADR-150) only after the nodes and the API run that code.
+    [ValidateRange(30, 3600)]
     [int]$WindowSeconds = 90,
     [switch]$DeviceChecks
 )

@@ -8,8 +8,8 @@ param(
     [ValidateSet('android-arm64', 'android-arm64,android-x64')]
     [string]$TargetPlatforms = 'android-arm64',
     [switch]$PhysicalTestBuild,
-    # ADR-096: 900 only after every node and the API run ADR-096 code; 90 keeps the legacy request.
-    [ValidateRange(30, 900)]
+    # ADR-096: 90 keeps the legacy request. 900 and 3600 (ADR-150) only after the nodes and the API run that code.
+    [ValidateRange(30, 3600)]
     [int]$WindowSeconds = 90,
     [string]$FlutterSdk = (Join-Path $env:LOCALAPPDATA 'ProjectVpn\toolchains\flutter'),
     [string]$JavaHome = 'C:\Program Files\Android\Android Studio\jbr',
