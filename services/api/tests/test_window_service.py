@@ -299,7 +299,17 @@ def test_long_window_is_opt_in_and_bounded(harness: Harness) -> None:
     assert second.not_after - second.issued_at <= timedelta(seconds=900)
     # A client that sends nothing keeps the pre-existing 90s window.
     assert user.body.window_seconds == 90
-    for invalid in (29, 901):
+    # ADR-147: up to 3600 s is accepted; one second more is refused.
+    assert (
+        RenewalInput(
+            previous_window_id=first.window_id,
+            idempotency_key=uuid4(),
+            budget_bytes=BUDGET,
+            window_seconds=3600,
+        ).window_seconds
+        == 3600
+    )
+    for invalid in (29, 3601):
         with pytest.raises(ValueError):
             RenewalInput(
                 previous_window_id=first.window_id,

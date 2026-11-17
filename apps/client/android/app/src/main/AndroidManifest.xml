@@ -9,6 +9,10 @@
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <!-- ADR-145: asked once before the first connect on Android 13+; denial never blocks it. -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- ADR-147: exact allow-while-idle alarm for RENEW_WINDOW only; denial falls back to an
+         inexact alarm with an earlier margin. TODO(owner): verify Google Play policy before any
+         Play release. USE_EXACT_ALARM is deliberately not declared. -->
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
     <!-- ADR-107: only to hand a downloaded, SHA-256-verified update APK to the system installer. -->
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
     <application android:name="org.example.vpnpoc.ClientApplication" android:label="DetourVPN"
@@ -31,6 +35,12 @@
             </intent-filter>
         </activity>
         <receiver android:name="org.example.vpnpoc.RenewAlarmReceiver" android:exported="false" />
+        <!-- ADR-147: foreground only during a recovery gap (VPN wanted, no tunnel up). -->
+        <service android:name="org.example.vpnpoc.RecoveryCompanionService"
+            android:exported="false" android:foregroundServiceType="systemExempted" />
+        <!-- ADR-147: periodic 15-minute recovery backstop; bound only by the system. -->
+        <service android:name="org.example.vpnpoc.BackstopJobService"
+            android:exported="false" android:permission="android.permission.BIND_JOB_SERVICE" />
         <!-- Exported only for the protected system BOOT_COMPLETED broadcast. -->
         <receiver android:name="org.example.vpnpoc.BootReceiver" android:exported="true">
             <intent-filter><action android:name="android.intent.action.BOOT_COMPLETED" /></intent-filter>

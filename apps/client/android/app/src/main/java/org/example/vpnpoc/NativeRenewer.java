@@ -171,9 +171,10 @@ final class NativeRenewer {
         }
         if (remaining <= 0) { finish(s, "lease_expired"); return -1; }
         NativeRenewal plan = s.plan;
-        if (!plan.due(remaining, traffic)) {
-            schedule(s, Math.min(plan.idleDelayMs(remaining), NativeRenewal.AWAKE_CHECK_MS),
-                    plan.idleDelayMs(remaining));
+        boolean exact = exactAlarmAllowed(); // ADR-147: the margin follows the alarm kind.
+        if (!plan.due(remaining, traffic, exact)) {
+            schedule(s, Math.min(plan.idleDelayMs(remaining, exact), NativeRenewal.AWAKE_CHECK_MS),
+                    plan.idleDelayMs(remaining, exact), plan.idleDelayMs(remaining, false));
             return -1;
         }
         String key = plan.beginIntent(SystemClock.elapsedRealtime());
@@ -234,7 +235,7 @@ final class NativeRenewer {
 
     private void retry(State s, long remaining) {
         long delay = s.plan.backoffMs(remaining, ThreadLocalRandom.current().nextDouble());
-        schedule(s, delay, delay);
+        schedule(s, delay, delay, delay);
     }
 
     private void finish(State s, String reason) {
@@ -246,13 +247,50 @@ final class NativeRenewer {
         stop();
     }
 
-    private void schedule(State s, long awakeDelayMs, long alarmDelayMs) {
+    /**
+     * ADR-147 (3.2): whether RENEW_WINDOW may use an exact alarm now. Read on every scheduling,
+     * because the user can grant or revoke SCHEDULE_EXACT_ALARM at any time.
+     */
+    private boolean exactAlarmAllowed() {
+        try {
+            int sdk = android.os.Build.VERSION.SDK_INT;
+            return DozeSurvival.exactAlarmAllowed(sdk,
+                    sdk >= DozeSurvival.EXACT_ALARM_PERMISSION_SDK && alarms().canScheduleExactAlarms());
+        } catch (RuntimeException unavailable) {
+            return false;
+        }
+    }
+
+    /**
+     * Schedules the next renewal check: in process after {@code awakeDelayMs}, and by alarm.
+     * ADR-147 (3.2): RENEW_WINDOW (and only it) uses {@code setExactAndAllowWhileIdle} when exact
+     * alarms are allowed, after {@code exactAlarmDelayMs}. Otherwise, or if the exact call is
+     * refused, the inexact {@code setAndAllowWhileIdle} fallback fires after the earlier-margin
+     * {@code inexactAlarmDelayMs}.
+     *
+     * <p>TODO(owner, before any Play Store release): verify the Google Play policy for
+     * SCHEDULE_EXACT_ALARM / USE_EXACT_ALARM for a VPN app. Only SCHEDULE_EXACT_ALARM is declared;
+     * USE_EXACT_ALARM is restricted by Play to alarm/calendar apps and is deliberately not used.
+     */
+    private void schedule(State s, long awakeDelayMs, long exactAlarmDelayMs,
+            long inexactAlarmDelayMs) {
         if (state != s) return;
         if (next != null) next.cancel(false);
         next = io.schedule(() -> tick(s), awakeDelayMs, TimeUnit.MILLISECONDS);
+        long now = SystemClock.elapsedRealtime();
+        if (exactAlarmAllowed()) {
+            try {
+                alarms().setExactAndAllowWhileIdle(AlarmManager.ELAPSED_REALTIME_WAKEUP,
+                        now + exactAlarmDelayMs, alarmIntent());
+                return;
+            } catch (RuntimeException refused) {
+                // SecurityException: the permission was revoked since the check. Fall back below.
+                app.log("renew_alarm_fallback", "exact_refused");
+            }
+        }
         try {
             alarms().setAndAllowWhileIdle(AlarmManager.ELAPSED_REALTIME_WAKEUP,
-                    SystemClock.elapsedRealtime() + alarmDelayMs, alarmIntent());
+                    now + inexactAlarmDelayMs, alarmIntent());
         } catch (RuntimeException ignored) {
             // The in-process schedule still runs while the CPU is awake.
         }

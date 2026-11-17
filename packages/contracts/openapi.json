@@ -419,7 +419,7 @@
           },
           "window_seconds": {
             "default": 90,
-            "maximum": 900.0,
+            "maximum": 3600.0,
             "minimum": 30.0,
             "title": "Window Seconds",
             "type": "integer"
@@ -1704,7 +1704,7 @@
           },
           "window_seconds": {
             "default": 90,
-            "maximum": 900.0,
+            "maximum": 3600.0,
             "minimum": 30.0,
             "title": "Window Seconds",
             "type": "integer"

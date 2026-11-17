@@ -186,5 +186,7 @@ def test_gate_bounds_follow_contract(monkeypatch: pytest.MonkeyPatch) -> None:
     gate = object.__new__(gate_module.SlotGate)
     gate.port = 51901
     assert "timeout 900000ms" in gate.program(65536, 900_000, replace=False)
+    # ADR-147: the longer window is accepted up to the contract bound, never past it.
+    assert "timeout 3600000ms" in gate.program(65536, 3_600_000, replace=False)
     with pytest.raises(gate_module.GateError, match="invalid_window_duration"):
-        gate.program(65536, 900_001, replace=False)
+        gate.program(65536, 3_600_001, replace=False)

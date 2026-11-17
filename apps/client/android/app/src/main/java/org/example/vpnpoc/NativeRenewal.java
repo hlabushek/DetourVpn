@@ -59,9 +59,28 @@ final class NativeRenewal {
         return Math.max(55000, windowSeconds * 1000L - RENEW_AFTER_GRANT_MS);
     }
 
-    boolean due(long remainingMs, long trafficBytes) {
+    /**
+     * ADR-147 (3.2): with an exact allow-while-idle renewal alarm, renew this long before expiry
+     * instead of 2 min after the grant. 10 min still leaves room for one retry alarm that Doze
+     * throttles (about 9 min apart for allow-while-idle alarms before Android 12).
+     */
+    static final long EXACT_RENEW_BEFORE_MS = 600000;
+
+    /**
+     * ADR-147: the renewal margin for the alarm kind in use. Exact alarms use the later, tighter
+     * {@link #EXACT_RENEW_BEFORE_MS}; without the permission the inexact fallback keeps the
+     * earlier ADR-142 margin ({@link #renewBeforeMs()}). Never below the 55 s floor.
+     */
+    long renewBeforeMs(boolean exactAlarm) {
+        long inexact = renewBeforeMs();
+        return exactAlarm ? Math.max(55000, Math.min(inexact, EXACT_RENEW_BEFORE_MS)) : inexact;
+    }
+
+    boolean due(long remainingMs, long trafficBytes) { return due(remainingMs, trafficBytes, false); }
+
+    boolean due(long remainingMs, long trafficBytes, boolean exactAlarm) {
         if (intentKey != null) return true;
-        if (remainingMs <= renewBeforeMs()) return true;
+        if (remainingMs <= renewBeforeMs(exactAlarm)) return true;
         if (trafficBytes < 0) return false;
         if (trafficBaseline < 0 || trafficBytes < trafficBaseline) {
             trafficBaseline = trafficBytes; // Missing or reset counters start a fresh baseline.
@@ -71,8 +90,10 @@ final class NativeRenewal {
     }
 
     /** Delay until the next check while nothing is due; the alarm uses the time-based part. */
-    long idleDelayMs(long remainingMs) {
-        return Math.max(1000, remainingMs - renewBeforeMs());
+    long idleDelayMs(long remainingMs) { return idleDelayMs(remainingMs, false); }
+
+    long idleDelayMs(long remainingMs, boolean exactAlarm) {
+        return Math.max(1000, remainingMs - renewBeforeMs(exactAlarm));
     }
 
     /** ADR-121: wake the restore engine every 4 minutes (Doze stretches it), never past the margin. */

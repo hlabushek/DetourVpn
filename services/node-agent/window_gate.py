@@ -13,7 +13,8 @@ TABLE = "detour_window_v3"
 NFT = "/usr/sbin/nft"
 NSENTER = "/usr/bin/nsenter"
 # Mirrors vpn_api.tunnels.v3_contracts.MAX_WINDOW_SECONDS; a test pins the equality.
-MAX_WINDOW_MS = 900_000
+# ADR-147: 3600 s; the nft element timeout of an open gate is at most this long.
+MAX_WINDOW_MS = 3_600_000
 ENV = {"PATH": "/usr/sbin:/usr/bin:/sbin:/bin", "LC_ALL": "C"}
 
 

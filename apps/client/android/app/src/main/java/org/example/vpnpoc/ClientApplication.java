@@ -251,6 +251,7 @@ public final class ClientApplication extends Application implements Tunnel {
         log("window_up");
         underlyingStale = true; // ADR-146: establish() starts with no underlying network set.
         applyUnderlying();
+        updateDozeAids(); // ADR-147: the VPN service is up; the companion stops.
         publishState();
     }
 
@@ -546,7 +547,135 @@ public final class ClientApplication extends Application implements Tunnel {
             default:
                 cancelRecoveryAlarm();
         }
+        updateDozeAids();
         publishState();
+    }
+
+    /** ADR-147: the companion service was asked to start and not yet confirmed/stopped. */
+    private boolean companionRequested;
+    /** ADR-147: the companion is in the foreground (set from its main-thread lifecycle). */
+    private volatile boolean companionRunning;
+    private long companionRefusedAt = Long.MIN_VALUE / 2;
+    /** ADR-147: the periodic backstop job is known to be scheduled in this process. */
+    private boolean backstopScheduled;
+
+    /**
+     * ADR-147 (3.3, 3.4), worker thread: keep the companion foreground service only during a
+     * recovery gap, and the backstop job only while the VPN is wanted. Cheap; called after every
+     * recovery decision, window start and user disconnect.
+     */
+    private void updateDozeAids() {
+        boolean desired = supervisor.desired();
+        if (desired && !backstopScheduled) {
+            BackstopJobService.ensureScheduled(this);
+            backstopScheduled = true;
+        } else if (!desired && backstopScheduled) {
+            BackstopJobService.cancel(this);
+            backstopScheduled = false;
+        }
+        boolean wanted = DozeSurvival.companionWanted(desired, tunnelUpNow(),
+                ConnectionSupervisor.terminal(supervisor.lastStop()));
+        long now = SystemClock.elapsedRealtime();
+        if (wanted && !companionRequested && !companionRunning) {
+            if (now - companionRefusedAt < ConnectionSupervisor.REFUSED_RETRY_MS) return;
+            if (!DozeSurvival.companionMayStart(android.os.Build.VERSION.SDK_INT,
+                    exactAlarmAllowed())) {
+                companionRefusedAt = now;
+                log("companion_skipped", "fgs_type");
+                return;
+            }
+            try {
+                var start = new android.content.Intent(this, RecoveryCompanionService.class);
+                if (android.os.Build.VERSION.SDK_INT >= 26) startForegroundService(start);
+                else startService(start);
+                companionRequested = true;
+                log("companion_start");
+            } catch (RuntimeException refused) {
+                // Android 12+ background-start limits: alarms and the backstop still recover.
+                companionRefusedAt = now;
+                log("companion_refused", "background_start");
+            }
+        } else if (!wanted && (companionRequested || companionRunning)) {
+            companionRequested = false;
+            try {
+                stopService(new android.content.Intent(this, RecoveryCompanionService.class));
+                log("companion_stop");
+            } catch (RuntimeException ignored) { /* Already gone. */ }
+        }
+    }
+
+    /** ADR-147: same rule as the renewal alarm (SCHEDULE_EXACT_ALARM). Never throws. */
+    private boolean exactAlarmAllowed() {
+        try {
+            int sdk = android.os.Build.VERSION.SDK_INT;
+            return DozeSurvival.exactAlarmAllowed(sdk,
+                    sdk >= DozeSurvival.EXACT_ALARM_PERMISSION_SDK && alarms().canScheduleExactAlarms());
+        } catch (RuntimeException unavailable) {
+            return false;
+        }
+    }
+
+    /** ADR-147, main thread: the companion reached the foreground. */
+    void companionStarted() {
+        companionRunning = true;
+        // A tunnel may have come up while it was starting; re-check on the worker.
+        worker.execute(this::updateDozeAids);
+    }
+
+    /** ADR-147, main thread: the companion could not enter the foreground. */
+    void companionRefused(String why) {
+        worker.execute(() -> {
+            companionRequested = false;
+            companionRefusedAt = SystemClock.elapsedRealtime();
+            log("companion_refused", why);
+        });
+    }
+
+    /** ADR-147, main thread: the companion was destroyed. */
+    void companionStopped() {
+        companionRunning = false;
+        worker.execute(() -> companionRequested = false);
+    }
+
+    /**
+     * ADR-147 (3.4): the periodic backstop job ran (JobScheduler). Bounded wake lock; it only
+     * sends a fresh signal when the VPN is wanted, no tunnel is up and nothing is in flight.
+     * {@code done} finishes the job.
+     */
+    void backstop(Runnable done) {
+        PowerManager.WakeLock lock = null;
+        try {
+            PowerManager power = (PowerManager) getSystemService(POWER_SERVICE);
+            lock = power.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "detourvpn:backstop");
+            lock.setReferenceCounted(false);
+            lock.acquire(DozeSurvival.BACKSTOP_LOCK_MS);
+        } catch (RuntimeException ignored) { /* Best effort. */ }
+        final PowerManager.WakeLock held = lock;
+        // A job that started the process waits out the startup settle (ADR-144), as alarms do.
+        long settle = startupSettled() ? 0
+                : Math.max(0, processStart + ConnectionSupervisor.STARTUP_SETTLE_MS
+                        - SystemClock.elapsedRealtime()) + 50;
+        worker.schedule(() -> {
+            try {
+                log("backstop");
+                enforceDeadline();
+                long now = SystemClock.elapsedRealtime();
+                if (DozeSurvival.backstopSignal(supervisor.desired(), tunnelUpNow(),
+                        supervisor.attemptInFlight(now))) {
+                    freshSignal("backstop");
+                } else if (!supervisor.desired()) {
+                    // The VPN is no longer wanted (also a job left from an earlier process).
+                    BackstopJobService.cancel(this);
+                    backstopScheduled = false;
+                }
+            } catch (RuntimeException ignored) {
+                // A backstop bug must never affect the tunnel.
+            } finally {
+                try { if (held != null && held.isHeld()) held.release(); }
+                catch (RuntimeException ignored) { /* Released by its timeout. */ }
+                done.run();
+            }
+        }, settle, TimeUnit.MILLISECONDS);
     }
 
     private void startRecovery(long now) {
@@ -643,6 +772,7 @@ public final class ClientApplication extends Application implements Tunnel {
         cancelRecoveryAlarm();
         log("user_disconnect");
         if (recoveryEngine != null) stopAlwaysOnRecovery();
+        updateDozeAids(); // ADR-147: no companion and no backstop once the user disconnected.
         publishState();
     }
 

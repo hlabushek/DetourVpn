@@ -22,7 +22,10 @@ MAX_PEER_SLOT = 250
 Meter = Literal["kernel-outer-ip.v1", "kernel-inner-ip.v1"]
 # Upper bound accepted by every v3 component. Clients opt into long windows by
 # requesting window_seconds; the default keeps pre-existing clients on 90s windows.
-MAX_WINDOW_SECONDS = 900
+# ADR-147: raised from 900 so a phone in Doze needs fewer renewals per night. The node gate
+# (services/node-agent/window_gate.py MAX_WINDOW_MS) must accept the same bound before any
+# client requests more than 900 s; a test pins the equality.
+MAX_WINDOW_SECONDS = 3600
 DEFAULT_WINDOW_SECONDS = 90
 MIN_WINDOW_SECONDS = 30
 MAX_WINDOW_BYTES = 64 * 1024 * 1024
