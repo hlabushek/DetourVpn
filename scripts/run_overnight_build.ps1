@@ -178,8 +178,9 @@ Write-Host "  Keystore: $keystorePath"
 $plainPassword = Read-MaskedSecret 'Keystore password (typed as *):'
 if ([string]::IsNullOrEmpty($plainPassword)) { Stop-Overnight 'The keystore password is empty.' }
 
-$keyAlias = (Read-Host 'Key alias inside the keystore').Trim()
-if (-not $keyAlias) { Stop-Overnight 'The key alias is empty.' }
+# Default alias is the one scripts\build_beta_apk.ps1 creates the beta key with.
+$keyAlias = (Read-Host 'Key alias [Enter = detourvpn-beta]').Trim()
+if (-not $keyAlias) { $keyAlias = 'detourvpn-beta' }
 $keyPassword = Read-MaskedSecret 'Key password (typed as *; press Enter alone if it is the same as the keystore password):'
 if ([string]::IsNullOrEmpty($keyPassword)) { $keyPassword = $plainPassword }
 
