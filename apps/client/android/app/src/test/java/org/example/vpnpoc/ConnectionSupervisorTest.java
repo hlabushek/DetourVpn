@@ -448,6 +448,43 @@ public class ConnectionSupervisorTest {
         assertTrue(s.desired());
     }
 
+    /** ADR-146 (4.3): a returning network resets the backoff; offline makes no attempt. */
+    @Test public void aReturningNetworkResetsTheBackoffAndOfflineMakesNoAttempt() {
+        var s = connected();
+        s.tunnelDown("lease_expired");
+        for (int i = 0; i < 6; i++) {
+            s.attemptStarted(0, 0.5);
+            s.recoveryFailed("api_unavailable");
+        }
+        assertEquals(ConnectionSupervisor.MAX_DELAY_MS, s.backoffMs());
+        for (long t = 60_000; t < 30 * 60_000L; t += 60_000) {
+            assertEquals(ConnectionSupervisor.Action.NONE,
+                    s.evaluate(t, false, false, false, false).action);
+            assertEquals("offline", s.freshSignal(t, false, false, false).why);
+        }
+        var back = s.evaluate(30 * 60_000L, false, false, false, true);
+        assertEquals(ConnectionSupervisor.Action.START_RECOVERY, back.action);
+        assertEquals(0, s.attempts());
+        s.attemptStarted(30 * 60_000L, 0.5);
+        s.recoveryFailed("api_unavailable");
+        assertEquals("the backoff starts over", ConnectionSupervisor.BASE_DELAY_MS, s.backoffMs());
+    }
+
+    /** ADR-143/146 (4.3): fresh network signals still start at most one attempt per 30 s. */
+    @Test public void freshNetworkSignalsKeepTheThirtySecondLimit() {
+        var s = connected();
+        s.tunnelDown("lease_expired");
+        s.attemptStarted(0, 0.5);
+        s.recoveryFailed("api_unavailable");
+        assertEquals(ConnectionSupervisor.Action.START_RECOVERY,
+                s.freshSignal(100_000, false, false, true).action);
+        s.attemptStarted(100_000, 0.5);
+        s.recoveryFailed("api_unavailable");
+        var again = s.freshSignal(110_000, false, false, true);
+        assertEquals(ConnectionSupervisor.Action.WAIT, again.action);
+        assertEquals(ConnectionSupervisor.FRESH_GAP_MS - 10_000, again.delayMs);
+    }
+
     @Test public void aFlappingNetworkDoesNotStartAttemptsBackToBack() {
         var s = connected();
         s.tunnelDown("lease_expired");

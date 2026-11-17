@@ -40,6 +40,11 @@ final class ConnectionState {
         boolean desired;
         boolean tunnelUp;
         boolean networkUsable;
+        /**
+         * ADR-146: the network was lost less than {@link PhysicalNetwork#LOSS_CONFIRM_MS} ago. A
+         * running tunnel is not marked recovering for that alone until the loss is confirmed.
+         */
+        boolean networkLossPending;
         /** Seconds since the last handshake, or -1 if none in this window. */
         long handshakeAgeSeconds = -1;
         /** Milliseconds since the default network changed, or -1 if it never changed. */
@@ -82,7 +87,8 @@ final class ConnectionState {
     }
 
     private static ConnectionState whileUp(Facts f) {
-        if (!f.networkUsable) return new ConnectionState(Kind.RECOVERING, "waiting_for_network");
+        if (!f.networkUsable && !f.networkLossPending)
+            return new ConnectionState(Kind.RECOVERING, "waiting_for_network");
         if (f.restartPending) return new ConnectionState(Kind.RECOVERING, "network_changed");
         if (f.dataStalled) return new ConnectionState(Kind.RECOVERING, "data_stalled");
         boolean changed = f.networkChangeAgeMs >= 0;

@@ -264,6 +264,9 @@ final class ConnectionSupervisor {
             long flap = lastAttemptAt + NETWORK_RETURN_GAP_MS - now;
             if (flap > 0) return new Decision(Action.WAIT, flap, "network_returned");
             heldForNetwork = false;
+            // ADR-146: a returning network is a new path; failures before it say nothing about
+            // it, so the backoff starts over (the 10 s flap gap above still bounds the pace).
+            attempts = 0;
             return new Decision(Action.START_RECOVERY, 0, "network_returned");
         }
         heldForNetwork = false;

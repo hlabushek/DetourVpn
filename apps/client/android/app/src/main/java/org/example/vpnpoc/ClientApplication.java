@@ -111,6 +111,12 @@ public final class ClientApplication extends Application implements Tunnel {
     private io.flutter.plugin.common.EventChannel.EventSink stateSink;
     private String lastPublished = "";
     private String lastLoggedState = "";
+    /** ADR-146: the current default physical network (null when lost). Worker thread only. */
+    private android.net.Network defaultNetwork;
+    /** ADR-146: the VPN's underlying network must be set again (new path or new interface). */
+    private boolean underlyingStale;
+    /** ADR-146: confirms a network loss after {@link PhysicalNetwork#LOSS_CONFIRM_MS}. */
+    private java.util.concurrent.ScheduledFuture<?> lossCheck;
 
     /** ADR-144: one event-log line. Any thread. */
     void log(String event, String detail) {
@@ -241,6 +247,8 @@ public final class ClientApplication extends Application implements Tunnel {
         holdCpu();
         scheduleRestoreWake();
         log("window_up");
+        underlyingStale = true; // ADR-146: establish() starts with no underlying network set.
+        applyUnderlying();
         publishState();
     }
 
@@ -260,6 +268,7 @@ public final class ClientApplication extends Application implements Tunnel {
         facts.desired = supervisor.desired();
         facts.tunnelUp = tunnelUpNow();
         facts.networkUsable = physical.usable();
+        facts.networkLossPending = physical.lossPending(now);
         if (facts.tunnelUp) {
             try {
                 long handshake = provider.lastHandshakeSeconds();
@@ -658,14 +667,21 @@ public final class ClientApplication extends Application implements Tunnel {
                     catch (RuntimeException ignored) { /* Capabilities callback follows. */ }
                     final NetworkCapabilities known = caps;
                     worker.execute(() -> {
+                        boolean wasUsable = physical.usable();
                         boolean changed = physical.available(network.toString(),
                                 known == null || hasInternet(known), known != null && captive(known),
                                 known != null && validated(known));
                         log("network_available", changed ? "changed" : "same");
+                        // ADR-146: a new onAvailable cancels a pending loss confirmation.
+                        if (lossCheck != null) lossCheck.cancel(false);
+                        lossCheck = null;
+                        if (!network.equals(defaultNetwork)) underlyingStale = true;
+                        defaultNetwork = network;
                         if (changed) networkPathChanged();
-                        else scheduleWatch(500);
+                        else scheduleWatch(TunnelWatchdog.SETTLE_MS);
                         evaluateRecovery();
-                        if (changed) freshSignal("network"); // ADR-143
+                        // ADR-143/146: a network that became usable resets the backoff (30 s limit).
+                        if (changed || (!wasUsable && physical.usable())) freshSignal("network");
                     });
                 }
                 @Override public void onCapabilitiesChanged(android.net.Network network,
@@ -676,7 +692,7 @@ public final class ClientApplication extends Application implements Tunnel {
                     worker.execute(() -> {
                         if (physical.capabilities(network.toString(), internet, portal, valid)) {
                             log("network_usable");
-                            scheduleWatch(500);
+                            scheduleWatch(TunnelWatchdog.SETTLE_MS);
                             evaluateRecovery();
                             freshSignal("network"); // ADR-143: it just became usable.
                         }
@@ -696,8 +712,15 @@ public final class ClientApplication extends Application implements Tunnel {
                 }
                 @Override public void onLost(android.net.Network network) {
                     worker.execute(() -> {
-                        physical.lost(network.toString());
+                        long now = SystemClock.elapsedRealtime();
+                        if (!physical.lost(network.toString(), now)) return; // an older network
                         log("network_lost");
+                        if (network.equals(defaultNetwork)) defaultNetwork = null;
+                        // ADR-146: no attempt runs while offline (physical.usable() is false), but
+                        // the tunnel is marked recovering only if no network returns within 8 s.
+                        if (lossCheck != null) lossCheck.cancel(false);
+                        lossCheck = worker.schedule(ClientApplication.this::networkLossConfirmed,
+                                PhysicalNetwork.LOSS_CONFIRM_MS + 50, TimeUnit.MILLISECONDS);
                         publishState();
                     });
                 }
@@ -719,12 +742,51 @@ public final class ClientApplication extends Application implements Tunnel {
         return caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED);
     }
 
-    /** Worker thread. The encrypted transport's path may have moved: verify it after settling. */
-    private void networkPathChanged() {
-        lastNetworkChangeAt = SystemClock.elapsedRealtime();
-        watchdog.networkChanged(lastNetworkChangeAt);
-        scheduleWatch(TunnelWatchdog.SETTLE_MS + 500);
+    /** ADR-146, worker thread: the loss lasted {@link PhysicalNetwork#LOSS_CONFIRM_MS}. */
+    private void networkLossConfirmed() {
+        lossCheck = null;
+        if (physical.usable()) return;
+        log("network_loss_confirmed");
         publishState();
+    }
+
+    /**
+     * Worker thread. The encrypted transport's path may have moved: verify it once the new network
+     * held for {@link TunnelWatchdog#SETTLE_MS} (ADR-146: 0.5 s; the watch then restarts the socket
+     * and sets the underlying network at once instead of on the next 15 s tick).
+     */
+    private void networkPathChanged() {
+        long now = SystemClock.elapsedRealtime();
+        lastNetworkChangeAt = now;
+        underlyingStale = true;
+        // ADR-146: no first-tick gate; a change right after connect is verified too.
+        watchdog.networkChanged(now, tunnelUpNow() ? (windowUpAt >= 0 ? windowUpAt : now) : -1);
+        scheduleWatch(TunnelWatchdog.SETTLE_MS + 50);
+        publishState();
+    }
+
+    /**
+     * ADR-146, worker thread. Tells Android which physical network carries the tunnel, so metering
+     * and validation of the VPN network follow the real path. Must run after every establish()
+     * (window start, restart in place): a new interface starts with no underlying network. Needs
+     * the service instance, which native holds only for tunnels started by Always-on, boot or
+     * native recovery ({@link #protector}); otherwise it is skipped and Android keeps its default
+     * behaviour (tracking the default network). Only codes are logged, never a network id.
+     * Never throws.
+     */
+    private void applyUnderlying() {
+        if (!underlyingStale) return;
+        android.net.Network network = defaultNetwork;
+        VpnService service = protector;
+        if (!tunnelUpNow() || network == null || !physical.usable()) return; // stays stale
+        underlyingStale = false;
+        if (service == null) { log("underlying_skipped", "no_service"); return; }
+        try {
+            service.setUnderlyingNetworks(new android.net.Network[] {network});
+            log("underlying_set");
+        } catch (RuntimeException failed) {
+            log("underlying_failed"); // Display only; the tunnel's own socket is unaffected.
+        }
     }
 
     /** Worker thread. Recreates a stalled tunnel in place; fail-closed if that fails. */
@@ -742,7 +804,21 @@ public final class ClientApplication extends Application implements Tunnel {
             observeDataPath(now); // ADR-144: on the tick, not only when Flutter polls.
             observeAlwaysOn(protector, true); // ADR-141: meaningful only while up.
             long age = handshake > 0 && handshake <= wall ? (wall - handshake) * 1000 : -1;
-            if (!watchdog.shouldRestart(now, age, physical.usable())) {
+            var action = watchdog.decide(now, age, physical.usable());
+            if (action == TunnelWatchdog.Action.NEW_LEASE) {
+                // ADR-146: two restarts after a network change got no handshake; the window is
+                // given up so recovery (UI or native) starts a new one. Same path as a failed
+                // restart; the code is the existing "no handshake on this path" one.
+                log("watchdog_new_lease", "network_unrecovered");
+                try { stop(); } catch (Exception ignored) { /* Already down. */ }
+                reason = "handshake_not_established";
+                failedAt("native_watchdog_restart");
+                watchdog.tunnelDown();
+                stopped(reason);
+                return;
+            }
+            if (action != TunnelWatchdog.Action.RESTART) {
+                applyUnderlying(); // ADR-146: a confirmed change that needed no restart.
                 schedulePendingWatch(now);
                 publishState();
                 return;
@@ -752,6 +828,8 @@ public final class ClientApplication extends Application implements Tunnel {
             try {
                 provider.restartInPlace();
                 tunnelRestarts++;
+                underlyingStale = true; // ADR-146: the new interface has no underlying network.
+                applyUnderlying();
                 schedulePendingWatch(SystemClock.elapsedRealtime());
                 publishState();
             } catch (Exception | LinkageError failed) {

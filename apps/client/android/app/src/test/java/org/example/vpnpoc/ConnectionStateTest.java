@@ -66,6 +66,22 @@ public class ConnectionStateTest {
         assertEquals("recovering:data_stalled", of(f));
     }
 
+    /** ADR-146 (4.2): a running tunnel is marked recovering only once the loss is confirmed. */
+    @Test public void anUnconfirmedLossKeepsAWorkingTunnelConnected() {
+        var f = up();
+        f.handshakeAgeSeconds = 20;
+        f.networkUsable = false;
+        f.networkLossPending = true;
+        assertEquals("connected:verified", of(f));
+        f.networkLossPending = false;
+        assertEquals("recovering:waiting_for_network", of(f));
+        var down = new ConnectionState.Facts();
+        down.desired = true;
+        down.networkLossPending = true;
+        assertEquals("a down tunnel waits for the network at once",
+                "recovering:waiting_for_network", ConnectionState.of(down).toString());
+    }
+
     @Test public void aNewWindowWaitsForItsFirstHandshakeThenReportsIt() {
         var f = up();
         f.windowAgeMs = 5_000;

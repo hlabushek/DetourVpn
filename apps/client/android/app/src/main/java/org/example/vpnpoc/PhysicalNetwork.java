@@ -25,6 +25,14 @@ final class PhysicalNetwork {
     private boolean validated;
     private Set<String> addresses = Collections.emptySet();
     private long generation;
+    /**
+     * ADR-146: a loss is confirmed only after it lasted this long; a quick handover (Wi-Fi to
+     * mobile, a short radio gap) must not mark a working tunnel as recovering.
+     */
+    static final long LOSS_CONFIRM_MS = 8_000;
+    private static final long NO_LOSS = Long.MIN_VALUE;
+    /** Elapsed time of the unconfirmed loss of the current network, or {@link #NO_LOSS}. */
+    private long lostAt = NO_LOSS;
 
     long generation() { return generation; }
 
@@ -44,6 +52,7 @@ final class PhysicalNetwork {
         if (changed || first || lost) addresses = Collections.emptySet();
         id = network;
         lost = false;
+        lostAt = NO_LOSS; // ADR-146: a new onAvailable cancels a pending loss.
         internet = hasInternet;
         captivePortal = captive;
         validated = isValidated;
@@ -75,7 +84,22 @@ final class PhysicalNetwork {
     }
 
     /** The default network went away. Only the current one counts; late losses are ignored. */
-    void lost(String network) {
-        if (id != null && id.equals(network)) lost = true;
+    void lost(String network) { lost(network, NO_LOSS); }
+
+    /**
+     * ADR-146: the current default network went away at {@code now}. It is unusable at once (no
+     * recovery attempt or restart runs without a network), but {@link #lossPending} stays true
+     * for {@link #LOSS_CONFIRM_MS}. Returns true if this was the current network.
+     */
+    boolean lost(String network, long now) {
+        if (id == null || !id.equals(network)) return false;
+        if (!lost) lostAt = now;
+        lost = true;
+        return true;
+    }
+
+    /** ADR-146: the network was lost less than {@link #LOSS_CONFIRM_MS} ago and has not returned. */
+    boolean lossPending(long now) {
+        return lost && lostAt != NO_LOSS && now - lostAt < LOSS_CONFIRM_MS;
     }
 }

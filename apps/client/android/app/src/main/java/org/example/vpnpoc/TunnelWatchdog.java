@@ -1,36 +1,43 @@
 package org.example.vpnpoc;
 
 /**
- * Pure ADR-099/ADR-122 policy: when to recreate a running tunnel in place. No I/O. Inputs are
- * elapsed-realtime milliseconds and the handshake age (-1 when no handshake happened yet).
+ * Pure ADR-099/ADR-122/ADR-146 policy: when to recreate a running tunnel in place, and when to
+ * give up on it and ask for a new lease. No I/O. Inputs are elapsed-realtime milliseconds and the
+ * handshake age (-1 when no handshake happened yet).
  *
  * <ul>
- *   <li>After the default network changed, restart once the change settled, unless a handshake
- *       already happened on the new network. A change that cannot act yet (too soon after the last
- *       restart, or no validated network) stays pending instead of being dropped (ADR-122).</li>
- *   <li>If no handshake follows a network-change restart, try again, at most
- *       {@link #NETWORK_RETRIES} more times per change.</li>
- *   <li>With a validated network but no handshake for {@link #STALE_MS}, restart, backing off
+ *   <li>ADR-146: after the default network changed, restart once the new network held for
+ *       {@link #SETTLE_MS} (0.5 s), unless a handshake already happened on it. A change that
+ *       cannot act yet (too soon after the last restart, or no usable network) stays pending
+ *       instead of being dropped (ADR-122). A change reported before the first watch tick counts.</li>
+ *   <li>ADR-146: a handshake newer than the change (or the restart it caused) is the proof of
+ *       recovery. Without it, at most {@link #NETWORK_RESTARTS} restarts run per change; if the
+ *       last one also gets no handshake, {@link Action#NEW_LEASE} asks the caller to stop the
+ *       tunnel so recovery starts a new window.</li>
+ *   <li>With a usable network but no handshake for {@link #STALE_MS}, restart, backing off
  *       from 2 to 10 minutes while it keeps failing. Only these stall restarts raise the backoff;
- *       a fresh handshake resets it.</li>
+ *       a fresh handshake or a network change resets it.</li>
  * </ul>
  */
 final class TunnelWatchdog {
     /** Keepalive 25 s plus WireGuard rekey every 120 s: 180 s without a handshake is a stall. */
     static final long STALE_MS = 180_000;
     static final long FRESH_MS = 60_000;
-    static final long SETTLE_MS = 3_000;
+    /** ADR-146: a new usable network is acted on after this (was 3 s). */
+    static final long SETTLE_MS = 500;
     static final long NETWORK_GAP_MS = 15_000;
     static final long STALE_GAP_MS = 120_000;
     static final long MAX_GAP_MS = 600_000;
-    /** Extra restarts after a network-change restart that got no handshake (ADR-122). */
-    static final int NETWORK_RETRIES = 2;
+    /** ADR-146: restarts per network change without a handshake, then a new lease. */
+    static final int NETWORK_RESTARTS = 2;
+
+    enum Action { NONE, RESTART, NEW_LEASE }
 
     private long upSince = -1;
     private long lastRestart = Long.MIN_VALUE / 2;
     /** Pending network trigger: the change (or the restart it caused) to verify; -1 when none. */
     private long networkChangedAt = -1;
-    private int networkRetries;
+    private int networkRestarts;
     private boolean lastWasNetwork;
     private int attempts;
 
@@ -38,21 +45,28 @@ final class TunnelWatchdog {
         upSince = now;
         attempts = 0;
         networkChangedAt = -1;
-        networkRetries = 0;
+        networkRestarts = 0;
     }
 
     void tunnelDown() {
         upSince = -1;
         networkChangedAt = -1;
-        networkRetries = 0;
+        networkRestarts = 0;
     }
 
     boolean running() { return upSince >= 0; }
 
-    void networkChanged(long now) {
-        if (upSince < 0) return;
+    /**
+     * The default network changed. {@code tunnelUpSince} is when the running tunnel came up, or
+     * -1 when no tunnel runs. ADR-146: a change before the first watch tick is no longer dropped;
+     * it starts tracking the tunnel. A change also resets the stall backoff (a new path).
+     */
+    void networkChanged(long now, long tunnelUpSince) {
+        if (tunnelUpSince < 0) return;
+        if (upSince < 0) upSince = Math.min(tunnelUpSince, now);
         networkChangedAt = now;
-        networkRetries = 0;
+        networkRestarts = 0;
+        attempts = 0;
     }
 
     long staleGapMs() {
@@ -67,41 +81,49 @@ final class TunnelWatchdog {
         return Math.max(0, Math.max(settle, gap));
     }
 
-    /** Returns true if the caller should restart now; the caller then reports {@link #restarted}. */
-    boolean shouldRestart(long now, long handshakeAgeMs, boolean validatedNetwork) {
-        if (upSince < 0 || !validatedNetwork) return false; // a pending change waits
+    /** Returns true if the caller should restart now (see {@link #decide}). */
+    boolean shouldRestart(long now, long handshakeAgeMs, boolean usableNetwork) {
+        return decide(now, handshakeAgeMs, usableNetwork) == Action.RESTART;
+    }
+
+    /**
+     * What the caller should do now. After {@link Action#RESTART} it reports {@link #restarted};
+     * after {@link Action#NEW_LEASE} it stops the tunnel and reports {@link #tunnelDown}.
+     */
+    Action decide(long now, long handshakeAgeMs, boolean usableNetwork) {
+        if (upSince < 0 || !usableNetwork) return Action.NONE; // a pending change waits
         if (handshakeAgeMs >= 0 && handshakeAgeMs <= FRESH_MS) attempts = 0;
         if (networkChangedAt >= 0 && now - networkChangedAt >= SETTLE_MS) {
             long sinceChange = now - networkChangedAt;
             boolean handshakeAfterChange = handshakeAgeMs >= 0 && handshakeAgeMs < sinceChange;
             if (handshakeAfterChange) {
                 networkChangedAt = -1;
-                networkRetries = 0;
+                networkRestarts = 0;
             } else if (now - lastRestart >= NETWORK_GAP_MS) {
+                if (networkRestarts >= NETWORK_RESTARTS) {
+                    networkChangedAt = -1;
+                    networkRestarts = 0;
+                    return Action.NEW_LEASE;
+                }
                 lastWasNetwork = true;
-                return true;
+                return Action.RESTART;
             }
             // Otherwise keep it pending until the gap since the last restart has passed.
         }
         boolean stale = handshakeAgeMs < 0 ? now - upSince >= STALE_MS : handshakeAgeMs >= STALE_MS;
         if (stale && now - upSince >= STALE_MS && now - lastRestart >= staleGapMs()) {
             lastWasNetwork = false;
-            return true;
+            return Action.RESTART;
         }
-        return false;
+        return Action.NONE;
     }
 
     void restarted(long now) {
         lastRestart = now;
         if (lastWasNetwork) {
-            // Verify this restart: if no handshake follows it, the same rule restarts again.
-            if (networkRetries < NETWORK_RETRIES) {
-                networkRetries++;
-                networkChangedAt = now;
-            } else {
-                networkChangedAt = -1;
-                networkRetries = 0;
-            }
+            // Verify this restart: if no handshake follows it, restart again or ask for a lease.
+            networkRestarts++;
+            networkChangedAt = now;
         } else {
             attempts = Math.min(attempts + 1, 8);
         }
