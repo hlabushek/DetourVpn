@@ -178,12 +178,20 @@ Write-Host "  Keystore: $keystorePath"
 $plainPassword = Read-MaskedSecret 'Keystore password (typed as *):'
 if ([string]::IsNullOrEmpty($plainPassword)) { Stop-Overnight 'The keystore password is empty.' }
 
+$keyAlias = (Read-Host 'Key alias inside the keystore').Trim()
+if (-not $keyAlias) { Stop-Overnight 'The key alias is empty.' }
+$keyPassword = Read-MaskedSecret 'Key password (typed as *; press Enter alone if it is the same as the keystore password):'
+if ([string]::IsNullOrEmpty($keyPassword)) { $keyPassword = $plainPassword }
+
 # ---- Step 5: build ---------------------------------------------------------------
 Write-Host ''
 Write-Host 'Step 5: build (flutter test, debug build, Gradle unit tests and lint, then the release APK)'
 $env:DETOURVPN_BETA_KEYSTORE_PATH = $keystorePath
 $env:DETOURVPN_BETA_KEYSTORE_PASSWORD = $plainPassword
+$env:DETOURVPN_BETA_KEY_ALIAS = $keyAlias
+$env:DETOURVPN_BETA_KEY_PASSWORD = $keyPassword
 $plainPassword = $null
+$keyPassword = $null
 $buildError = $null
 try {
     & (Join-Path $root 'scripts\build_flutter_client.ps1') -ApiOrigin $apiOrigin -WindowTunnels
@@ -191,6 +199,7 @@ try {
     $buildError = $_.Exception.Message
 } finally {
     Remove-Item Env:DETOURVPN_BETA_KEYSTORE_PASSWORD -ErrorAction SilentlyContinue
+    Remove-Item Env:DETOURVPN_BETA_KEY_PASSWORD -ErrorAction SilentlyContinue
 }
 if ($buildError) { Stop-Overnight "The build failed: $buildError" }
 
