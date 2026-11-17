@@ -83,7 +83,10 @@ if (-not $PublishOnly) {
     Write-Host "branch=$branch; no other tracked changes."
 
     # ---- 2. version bump -----------------------------------------------------
-    if (-not $SkipVersionBump) {
+    $alreadyBumped = (Get-Content -LiteralPath $Pubspec -Raw) -match [regex]::Escape("version: $VersionName+$VersionCode")
+    if ($alreadyBumped) {
+        Write-Host "Version already ${VersionName}+${VersionCode}: bump skipped."
+    } elseif (-not $SkipVersionBump) {
         Step "Version bump to $VersionName (code $VersionCode)"
         $pub = Get-Content -LiteralPath $Pubspec -Raw
         if ($pub -notmatch [regex]::Escape("version: $OldPubspec")) { throw "pubspec.yaml does not have 'version: $OldPubspec'." }
