@@ -195,7 +195,8 @@ $plainPassword = $null
 $keyPassword = $null
 $buildError = $null
 try {
-    & (Join-Path $root 'scripts\build_flutter_client.ps1') -ApiOrigin $apiOrigin -WindowTunnels
+    # ADR-150: request 3600 s windows (the API and nodes accept them since the 3600 s deploy).
+    & (Join-Path $root 'scripts\build_flutter_client.ps1') -ApiOrigin $apiOrigin -WindowTunnels -WindowSeconds 3600
 } catch {
     $buildError = $_.Exception.Message
 } finally {
