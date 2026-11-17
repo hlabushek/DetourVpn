@@ -54,8 +54,9 @@ powershell -ExecutionPolicy Bypass -File .\scripts\deploy_window_3600.ps1 -Sourc
 ```
 Add `-Execute` only after reviewing the dry-run output.
 
-## Client (step 3): what has to change first
-The client does not ask for 3600 s by default, and it rejects longer windows in three places:
+## Client (step 3): done in code (ADR-150), not yet built or tested on a phone
+The three bounds below are now 3600 s, and `scripts/run_overnight_build.ps1` passes
+`-WindowSeconds 3600`. Before the change, the client rejected longer windows in three places:
 - `apps/client/lib/window_connection.dart`: `defaultWindowSeconds` is **90** (not 900), and
   `maxWindowMs = 900000`.
 - `apps/client/android/app/src/main/java/org/example/vpnpoc/WindowDeadline.java`: `MAX_MS = 900000`.

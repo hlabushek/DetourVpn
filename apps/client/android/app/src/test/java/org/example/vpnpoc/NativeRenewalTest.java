@@ -111,7 +111,8 @@ public class NativeRenewalTest {
         assertThrows(IllegalArgumentException.class,
                 () -> new NativeRenewal(C, R, W, 1, 1024, 900));
         assertThrows(IllegalArgumentException.class,
-                () -> new NativeRenewal(C, R, W, 1, 16777216, 901));
+                () -> new NativeRenewal(C, R, W, 1, 16777216, 3601));
+        new NativeRenewal(C, R, W, 1, 16777216, 3600); // ADR-150 upper bound accepted
     }
 
     /** ADR-118: retries inside one wake-up, bounded by count, time and the window margin. */

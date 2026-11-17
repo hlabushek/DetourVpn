@@ -2,8 +2,8 @@ package org.example.vpnpoc;
 
 /** Pure monotonic v3 fencing. Replays cannot reset a deadline or revive a stopped VPN. */
 final class WindowDeadline {
-    /** Mirrors the server's 900s v3 window bound. */
-    static final long MAX_MS = 900000;
+    /** Mirrors the server's 3600s v3 window bound (ADR-150). */
+    static final long MAX_MS = 3600000;
     String connection;
     String runtime;
     long generation;

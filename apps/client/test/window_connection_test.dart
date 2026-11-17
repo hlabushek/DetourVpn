@@ -1008,6 +1008,9 @@ void main() {
       expect(native.advances, 1);
     },
   );
+  test('ADR-150: the client accepts windows up to the server bound of 3600 s', () {
+    expect(WindowConnectionController.maxWindowMs, 3600000);
+  });
   test(
     'invalid registration response identifies its bounded diagnostic stage',
     () async {

@@ -39,7 +39,7 @@ final class NativeRenewal {
             long budgetBytes, int windowSeconds) {
         if (!uuid(connection) || !uuid(runtime) || !uuid(windowId) || generation < 1
                 || budgetBytes < 65536 || budgetBytes > 67108864
-                || windowSeconds < 30 || windowSeconds > 900)
+                || windowSeconds < 30 || windowSeconds > 3600)
             throw new IllegalArgumentException();
         this.connection = connection;
         this.runtime = runtime;

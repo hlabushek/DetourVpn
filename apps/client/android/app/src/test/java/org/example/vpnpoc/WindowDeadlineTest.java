@@ -24,8 +24,8 @@ public class WindowDeadlineTest {
     }
     @Test public void boundsAndNonIncreasingDeadlineFail() {
         var lease = new WindowDeadline();
-        assertThrows(IllegalStateException.class, () -> lease.start("a", "r", 1, 900001, 0));
-        new WindowDeadline().start("a", "r", 1, 900000, 0);
+        assertThrows(IllegalStateException.class, () -> lease.start("a", "r", 1, 3600001, 0));
+        new WindowDeadline().start("a", "r", 1, 3600000, 0);
         lease.start("a", "r", 1, 80000, 0);
         assertThrows(IllegalStateException.class, () -> lease.advance("a", "r", 2, 80000, 30000));
     }

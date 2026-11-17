@@ -307,7 +307,8 @@ class WindowConnectionController extends ConnectionController {
   );
   final int windowSeconds;
   final Uri? _renewalOrigin;
-  static const maxWindowMs = 900000;
+  // ADR-150: the server and nodes accept windows up to 3600 s (ADR-147 3.1).
+  static const maxWindowMs = 3600000;
 
   /// Single-peer nodes meter the outer IP and use slots 1..16; pool nodes (ADR-101) meter the
   /// inner IP and use slots 1..250. Both come from the same API contract (`v3_contracts.py`).
