@@ -51,8 +51,25 @@ Write-Host 'Step 1: prepare the c6 SDK tree'
 if (Test-Path -LiteralPath $newReceiptPath -PathType Leaf) {
     Write-Host "  Already prepared, not overwritten: $newTree"
 } else {
-    & python (Join-Path $root 'scripts\prepare_android_poc.py') --target-dir ".cache/i-011/$newTreeName"
-    if ($LASTEXITCODE -ne 0) { Stop-Overnight 'prepare_android_poc.py failed (see its output above).' }
+    # prepare_android_poc.py only accepts targets that resolve inside this worktree.
+    # In this worktree .cache is a junction to the main checkout's cache, so the tree is
+    # prepared in build\ (git-ignored) and then moved into .cache\i-011.
+    $stagingTree = Join-Path $root 'build\sdk-prep-c6'
+    $stagingReceipt = Join-Path $stagingTree 'PREPARED.json'
+    if (Test-Path -LiteralPath $stagingReceipt -PathType Leaf) {
+        Write-Host "  Reusing the staged prepared tree: $stagingTree"
+    } else {
+        if ((Test-Path -LiteralPath $stagingTree) -and @(Get-ChildItem -LiteralPath $stagingTree -Force).Count -gt 0) {
+            Stop-Overnight "The staging folder is not empty and not prepared: $stagingTree. Delete it and run again."
+        }
+        & python (Join-Path $root 'scripts\prepare_android_poc.py') --target-dir 'build/sdk-prep-c6'
+        if ($LASTEXITCODE -ne 0) { Stop-Overnight 'prepare_android_poc.py failed (see its output above).' }
+    }
+    Move-Item -LiteralPath $stagingTree -Destination $newTree
+    if (-not (Test-Path -LiteralPath $newReceiptPath -PathType Leaf)) {
+        Stop-Overnight "The move did not produce $newReceiptPath."
+    }
+    Write-Host "  Prepared and moved to: $newTree"
 }
 
 # ---- Step 2: copy the unchanged native libraries and assets from c5 --------------
