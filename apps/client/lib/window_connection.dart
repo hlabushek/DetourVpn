@@ -31,13 +31,50 @@ class WindowConnectionController extends ConnectionController {
     bool? panelVless,
     this.nativeOwnsBackgroundRecovery = false,
   }) : _renewalOrigin = renewalOrigin,
-       panelVless = panelVless ?? isWindowsClient;
+       panelVless = panelVless ?? isWindowsClient {
+    // ADR-144: the Android UI listens to native's pushed connection state.
+    final source = native;
+    if (nativeOwnsBackgroundRecovery && source is NativeStateSource) {
+      _stateEvents = (source as NativeStateSource).stateEvents().listen(
+        _onNativeState,
+      );
+    }
+  }
 
   /// ADR-142 (Android UI controller only): while the app is in the background, native owns
   /// recovery, so this controller's reconnect and resume timers do nothing until it is in the
   /// foreground again. Off for Windows and the headless restore engine.
+  /// ADR-144: in the background this controller also never stops the tunnel, revokes the
+  /// connection or reconciles; it only renews when native does not. The foreground re-syncs.
   final bool nativeOwnsBackgroundRecovery;
   bool _foreground = true;
+
+  /// ADR-144: native's pushed state stream (Android UI only) and the last state native reported
+  /// by event or snapshot. Null on Windows and older builds.
+  StreamSubscription<NativeStateEvent>? _stateEvents;
+  String? _nativeState;
+  String? _nativeReason;
+
+  /// ADR-144: native renews the window itself (last snapshot or event).
+  bool _nativeRenewing = false;
+
+  /// ADR-144: polling was paused for the background and resumes in the foreground.
+  bool _pollWanted = false;
+
+  /// ADR-144: a refresh failed in the background; the foreground re-syncs with native first.
+  String? _backgroundFault;
+
+  /// ADR-144: the last transient API failure while the tunnel kept working (diagnostics only).
+  String? lastApiError;
+
+  @visibleForTesting
+  String? get nativeState => _nativeState;
+
+  @visibleForTesting
+  String? get nativeReason => _nativeReason;
+
+  @visibleForTesting
+  bool get pollingActive => _poll != null;
 
   /// A reconnect or resume that came due while in the background; run when foreground again.
   Future<void> Function()? _deferredRecovery;
@@ -57,12 +94,123 @@ class WindowConnectionController extends ConnectionController {
   void appForegroundChanged(bool foreground) {
     if (_foreground == foreground) return;
     _foreground = foreground;
-    if (!foreground || !nativeOwnsBackgroundRecovery || _dead) return;
+    if (!nativeOwnsBackgroundRecovery || _dead) return;
+    if (!foreground) {
+      // ADR-144: no polling in the background unless this controller still renews the window.
+      if (_poll != null && !_dartRenews) {
+        pausePolling();
+        _pollWanted = true;
+      }
+      return;
+    }
+    if (_backgroundFault != null) {
+      // Native may have stopped, recovered or replaced the tunnel meanwhile: forget the local
+      // view (no stop, no revoke) and reconcile with what native holds now.
+      _backgroundFault = null;
+      _forgetLocalLease();
+    }
     if (_id == null) _synced = false;
+    if (_pollWanted) {
+      _pollWanted = false;
+      startPolling();
+    }
     final deferred = _deferredRecovery;
     _deferredRecovery = null;
     if (deferred != null) unawaited(deferred());
   }
+
+  /// ADR-144: this controller renews the window (native does not), so it must keep polling.
+  bool get _dartRenews => _id != null && !_nativeRenewing && !_panelUp;
+
+  /// ADR-144: native moved on (stopped, restored or replaced the tunnel) while this controller
+  /// was not looking. Drop the local lease view without stopping native or revoking anything;
+  /// the next reconcile adopts native's tunnel and revokes stale server rows.
+  void _forgetLocalLease() {
+    _id = null;
+    _createIntent = null;
+    _grant = null;
+    _config = null;
+    _renewIntent = null;
+    _deadline = 0;
+    _trafficBaseline = null;
+    _lastTraffic = null;
+    _renewTrafficAnchor = null;
+    _inboundTraffic.reset();
+    _dataPath.reset();
+    _dataStalled = false;
+    remotePending = false;
+    _synced = false;
+  }
+
+  /// ADR-144: a state event from native. In the foreground it updates the status at once; when
+  /// native's tunnel is not the one this controller holds, it re-syncs.
+  void _onNativeState(NativeStateEvent event) {
+    if (_dead) return;
+    _nativeState = event.state;
+    _nativeReason = event.reason;
+    _nativeRenewing = event.nativeRenewal;
+    if (_recoveryGated) return;
+    final ours =
+        _id != null &&
+        event.up &&
+        event.connectionId == _id &&
+        !busy &&
+        !_polling &&
+        !remotePending;
+    if (ours) {
+      if (_transientApiCodes.contains(error)) error = null;
+      _renderNative(event.state, event.reason);
+      _emit();
+      return;
+    }
+    if (_id == null && event.up && event.connectionId != null) _synced = false;
+    unawaited(refresh());
+  }
+
+  /// ADR-144: the displayed status from native's state (Android). Only called while this
+  /// controller holds a running tunnel; Windows keeps the Dart rule.
+  void _renderNative(String state, String reason) {
+    switch (state) {
+      case 'connected':
+        _hasEstablishedHandshake = true;
+        phase = ConnectionPhase.connected;
+        detail = 'Связь через VPN подтверждена';
+      case 'connecting':
+        phase = ConnectionPhase.connecting;
+        detail = 'Ожидается handshake';
+      default:
+        phase = ConnectionPhase.reconnecting;
+        detail = recoveringText(reason);
+    }
+  }
+
+  /// ADR-144: Russian text for a native `recovering` reason.
+  static String recoveringText(String reason) => switch (reason) {
+    'waiting_for_network' => 'Нет сети, VPN ждёт её возвращения',
+    'network_changed' => 'Сеть сменилась, восстанавливается связь',
+    'data_stalled' =>
+      'Нет входящего трафика через VPN, соединение может быть нарушено',
+    'handshake_stale' => 'Сервер давно не отвечал, связь проверяется',
+    'no_handshake' =>
+      'Handshake не получен. Нажмите «Отключить» и подключитесь заново.',
+    _ => 'Восстанавливается подключение',
+  };
+
+  /// ADR-144: render [snapshot]'s native state; false when it has none (Windows, older builds).
+  bool _applyNative(NativeSnapshot snapshot) {
+    final state = snapshot.state;
+    if (state == null) return false;
+    _nativeState = state;
+    _nativeReason = snapshot.stateReason;
+    _renderNative(state, snapshot.stateReason ?? '');
+    return true;
+  }
+
+  static const _transientApiCodes = {
+    'network_unavailable',
+    'api_unavailable',
+    'rate_limited',
+  };
 
   /// ADR-115: this engine can run panel servers (VLESS + Reality). Windows only today.
   final bool panelVless;
@@ -219,6 +367,11 @@ class WindowConnectionController extends ConnectionController {
 
   @override
   void startPolling() {
+    // ADR-144: in the background poll only while this controller renews the window itself.
+    if (_recoveryGated && !_dartRenews) {
+      _pollWanted = true;
+      return;
+    }
     _poll ??= Timer.periodic(pollInterval, (_) => unawaited(refresh()));
   }
 
@@ -446,15 +599,20 @@ class WindowConnectionController extends ConnectionController {
     // ADR-121: a restored tunnel is renewed by the restore engine; end that engine first. A
     // renewal it finished during the hand-over (one generation ahead) is applied below.
     final nativeGeneration = live.windowGeneration!;
-    final handover = !live.nativeRenewal;
+    // ADR-144 (R3): end a live restore engine on every adoption. Before, an engine that had
+    // already handed renewal to native was never ended, so it kept polling next to the UI and
+    // blocked native recovery for good.
+    final handover = live.restoreActive && native is RestoreHandover;
+    // Dart renews only when native does not; a native renewal applies its own generations.
+    final dartRenewal = handover && !live.nativeRenewal;
     if (handover) {
-      if (generation > nativeGeneration + 1) return false;
+      if (dartRenewal && generation > nativeGeneration + 1) return false;
       if (!await (native as RestoreHandover).adoptRestore()) return false;
     }
     final now = _clock.elapsedMilliseconds;
     _intentAt = now;
     var deadline = now + live.remainingMs;
-    if (handover && generation == nativeGeneration + 1) {
+    if (dartRenewal && generation == nativeGeneration + 1) {
       try {
         final end = _bound(raw, requested: false);
         if (end <= deadline) return false;
@@ -484,10 +642,14 @@ class WindowConnectionController extends ConnectionController {
     // A recorded failure keeps its stage until the next step sets a new one.
     if (error == null) diagnosticStage = null;
     error = null;
-    phase = ConnectionPhase.reconnecting;
-    detail = 'VPN продолжает работать, проверяется связь';
+    _nativeRenewing = live.nativeRenewal;
+    // ADR-144 (R2): a running tunnel keeps native's state; no forced «reconnecting» on adoption.
+    if (!_applyNative(live)) {
+      phase = ConnectionPhase.reconnecting;
+      detail = 'VPN продолжает работать, проверяется связь';
+    }
     // ADR-121: renewal moves from the ended restore engine to native renewal (or to this UI).
-    if (handover) await _startNativeRenewal(raw);
+    if (dartRenewal) await _startNativeRenewal(raw);
     return true;
   }
 
@@ -1002,6 +1164,9 @@ class WindowConnectionController extends ConnectionController {
     try {
       await _ensureDevice();
       if (_cancelled(version)) return;
+      // ADR-144: in the background never revoke or reconcile: both can stop the tunnel that
+      // native now owns. The foreground does it.
+      if (_recoveryGated && (remotePending || !_synced)) return;
       if (remotePending) {
         await _cleanup();
         // ADR-119: the stopped connection finished closing; now the reconnect can start.
@@ -1054,6 +1219,27 @@ class WindowConnectionController extends ConnectionController {
       var snapshot = await native.snapshot();
       if (_cancelled(version)) return;
       _recordContext(snapshot);
+      _nativeRenewing = snapshot.nativeRenewal;
+      if (snapshot.state != null) {
+        _nativeState = snapshot.state;
+        _nativeReason = snapshot.stateReason;
+      }
+      // ADR-144: native moved on without this controller (it restores, or runs another
+      // connection it restored meanwhile). Never stop that tunnel: forget the local view and
+      // let the next reconcile adopt it.
+      if (snapshot.state != null &&
+          ((!snapshot.up && snapshot.restoreActive) ||
+              (snapshot.up &&
+                  snapshot.connectionId != null &&
+                  snapshot.connectionId != _id))) {
+        _forgetLocalLease();
+        if (!snapshot.up) {
+          _waitForRestore();
+        } else {
+          _applyNative(snapshot);
+        }
+        return;
+      }
       // Read before any stop check below, so a window that just ended still reports it.
       if (snapshot.handshakeSeen) _nativeHandshakeSeen = true;
       // While native renews, its deadline is authoritative: Dart timers may have slept.
@@ -1119,6 +1305,8 @@ class WindowConnectionController extends ConnectionController {
         throw const ClientError('lease_expired');
       if (value['state'] == 'pending' &&
           (_renewIntent != null || snapshot.nativeRenewal)) {
+        if (_applyNative(snapshot))
+          return; // ADR-144: native's state, as below.
         final confirmed = _establishedStatusConfirmed(snapshot);
         phase = confirmed
             ? ConnectionPhase.connected
@@ -1166,6 +1354,10 @@ class WindowConnectionController extends ConnectionController {
           _clock.elapsedMilliseconds >= _deadline)
         throw ClientError(_stopCode(snapshot));
       error = null;
+      lastApiError = null;
+      // ADR-144: on Android native's state is the status (180 s handshake rule, inbound data,
+      // network change, stall); the Dart rule below remains for Windows and older builds.
+      if (_applyNative(snapshot)) return;
       final confirmed = _establishedStatusConfirmed(snapshot);
       phase = confirmed
           ? ConnectionPhase.connected
@@ -1189,6 +1381,28 @@ class WindowConnectionController extends ConnectionController {
       // reading the app-private device key) and must not be mislabeled as an
       // API response failure.
       final code = e is ClientError ? e.code : 'native_unavailable';
+      // ADR-144: in the background never stop, revoke or reconnect from here; native owns the
+      // tunnel. The foreground re-syncs with native first (appForegroundChanged).
+      if (_recoveryGated) {
+        _backgroundFault = code;
+        return;
+      }
+      final deadlinePassed =
+          _grant != null && _clock.elapsedMilliseconds >= _deadline;
+      // ADR-144: an unreachable API does not mean a broken tunnel. While native still runs it,
+      // native's state is the status and the API error is a note, not «Восстановление связи».
+      if (_transientApiCodes.contains(code) &&
+          !deadlinePassed &&
+          _nativeState != null &&
+          _id != null) {
+        lastApiError = code;
+        error = null;
+        _renderNative(_nativeState!, _nativeReason ?? '');
+        if (phase == ConnectionPhase.connected) {
+          detail = 'VPN работает, сервер временно недоступен';
+        }
+        return;
+      }
       error = code;
       if (diagnosticNetworkChange == 'recent' &&
           diagnosticStage == 'tunnel_monitor') {
@@ -1398,6 +1612,8 @@ class WindowConnectionController extends ConnectionController {
     _dead = true;
     ++_version;
     pausePolling();
+    unawaited(_stateEvents?.cancel());
+    _stateEvents = null;
     super.dispose();
   }
 }

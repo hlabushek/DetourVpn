@@ -105,6 +105,32 @@ final class ConnectionSupervisor {
     }
 
     /**
+     * ADR-144: a headless restore engine owns recovery only while it can still act: while it is
+     * bringing its first tunnel up (bounded by {@link #RESTORE_BOOTSTRAP_MS}) or while its tunnel
+     * is up. Once its tunnel is gone its Dart timers sleep in Doze, so it is ended and native owns
+     * recovery again (before, an engine that lost its tunnel blocked native recovery forever).
+     */
+    static boolean restoreEngineOwnsRecovery(boolean engineAlive, boolean bootstrapping,
+            boolean tunnelUp) {
+        return engineAlive && (bootstrapping || tunnelUp);
+    }
+
+    /** ADR-144: a restore engine that has not reported its first result by then has failed. */
+    static final long RESTORE_BOOTSTRAP_MS = 180_000;
+
+    /**
+     * ADR-144: after process start, native waits this long for the UI to say whether it is in the
+     * foreground before it starts recovery itself, so a cold app start and native recovery never
+     * race for the same connection. The first owner signal ends the wait early.
+     */
+    static final long STARTUP_SETTLE_MS = 3_000;
+
+    /** ADR-144: whether native may already decide recovery at {@code now}. */
+    static boolean startupSettled(boolean ownerSignalSeen, long processStart, long now) {
+        return ownerSignalSeen || now - processStart >= STARTUP_SETTLE_MS;
+    }
+
+    /**
      * ADR-142: the tunnel stopped at {@code now}. A tunnel that had been up for {@link #STABLE_MS}
      * starts a fresh streak, so the first recovery runs at once instead of waiting for an old
      * backoff (and for another Doze-deferred alarm).
@@ -303,6 +329,7 @@ final class ConnectionSupervisor {
                 return "native_core_failure";
             case "native_io_error":
             case "native_service_state_invalid":
+            case "service_died": // ADR-144: the VPN service stopped without a revoke or a stop.
                 return "tun_failure";
             case "network_unavailable":
                 return "network_unavailable";

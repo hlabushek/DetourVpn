@@ -93,6 +93,38 @@ public class ConnectionSupervisorTest {
         assertEquals("dart_owner", s.evaluate(3, false, false, restoring, true).why);
     }
 
+    /** ADR-144: a restore engine that lost its tunnel no longer blocks native recovery. */
+    @Test public void restoreEngineOwnsOnlyWhileBootstrappingOrUp() {
+        assertTrue(ConnectionSupervisor.restoreEngineOwnsRecovery(true, true, false));
+        assertTrue(ConnectionSupervisor.restoreEngineOwnsRecovery(true, false, true));
+        assertFalse(ConnectionSupervisor.restoreEngineOwnsRecovery(true, false, false));
+        assertFalse(ConnectionSupervisor.restoreEngineOwnsRecovery(false, true, true));
+        var s = connected();
+        s.tunnelDown("lease_expired", 1);
+        boolean owner = ConnectionSupervisor.dartOwnsRecovery(false,
+                ConnectionSupervisor.restoreEngineOwnsRecovery(true, false, false));
+        assertEquals(ConnectionSupervisor.Action.START_RECOVERY,
+                s.evaluate(2, false, false, owner, true).action);
+    }
+
+    /** ADR-144: native waits for the UI's first owner signal (bounded) after process start. */
+    @Test public void startupWaitsForTheFirstOwnerSignal() {
+        assertFalse(ConnectionSupervisor.startupSettled(false, 1_000, 2_000));
+        assertTrue(ConnectionSupervisor.startupSettled(true, 1_000, 1_001));
+        assertTrue(ConnectionSupervisor.startupSettled(false, 1_000,
+                1_000 + ConnectionSupervisor.STARTUP_SETTLE_MS));
+    }
+
+    /** ADR-144: a VPN service that died on its own is a transient stop; recovery follows. */
+    @Test public void serviceDeathIsATransientTunnelFailure() {
+        assertEquals("tun_failure", ConnectionSupervisor.category("service_died"));
+        var s = connected();
+        assertFalse(s.tunnelDown("service_died", 5));
+        assertTrue(s.desired());
+        assertEquals(ConnectionSupervisor.Action.START_RECOVERY,
+                s.evaluate(6, false, false, false, true).action);
+    }
+
     /** ADR-142: an expiry after a stable window recovers in the same wake-up, despite old backoff. */
     @Test public void expiryAfterStableWindowRecoversAtOnce() {
         var s = connected();

@@ -1728,28 +1728,39 @@ void main() {
       return value;
     }
 
+    // ADR-144 supersedes the ADR-142 version of this test: in the background the UI no longer
+    // records the failure and cleans up (stop + revoke); it leaves the tunnel to native and
+    // re-syncs with native in the foreground, which then resumes the connection.
     test(
-      'a backgrounded UI does not reconnect; it does once in the foreground',
+      'a backgrounded UI never stops, revokes or reconnects; the foreground does',
       () async {
-        final ui = android();
+        final intent = IntentNative()
+          ..age = 0
+          ..desired = true;
+        final ui = android(on: intent);
         await ui.connect();
         final creates = api.creates;
+        final deletes = api.deletes;
+        final stops = intent.stops;
         ui.appForegroundChanged(false);
-        native.remaining = 0;
+        intent.remaining = 0;
         await ui.refresh();
-        expect(ui.error, 'lease_expired');
         await Future<void>.delayed(const Duration(milliseconds: 300));
         expect(
           api.creates,
           creates,
           reason: 'native owns recovery in the background',
         );
-        expect(ui.recoveryDeferred, isTrue);
-        native.remaining = 59000;
+        expect(api.deletes, deletes, reason: 'no revoke from the background');
+        expect(intent.stops, stops, reason: 'no stop from the background');
+        // Meanwhile native stopped the expired tunnel; the user still wants the VPN.
+        intent
+          ..up = false
+          ..remaining = 59000;
         ui.appForegroundChanged(true);
+        await ui.refresh();
         await Future<void>.delayed(const Duration(milliseconds: 300));
         expect(api.creates, greaterThan(creates));
-        expect(ui.recoveryDeferred, isFalse);
         await ui.disconnect();
       },
     );
@@ -1815,6 +1826,238 @@ void main() {
       },
     );
   });
+
+  group('ADR-144 native connection state', () {
+    late StateNative state;
+    WindowConnectionController android({TunnelApi? on}) {
+      final value = WindowConnectionController(
+        on ?? api,
+        state,
+        pollInterval: const Duration(days: 1),
+        renewBeforeMs: 90000,
+        autoReconnectDelay: const Duration(milliseconds: 20),
+        nativeOwnsBackgroundRecovery: true,
+      )..selectedNode = node;
+      addTearDown(value.dispose);
+      return value;
+    }
+
+    setUp(() {
+      state = StateNative()
+        ..age = 150
+        ..restoreActive = false;
+    });
+
+    test(
+      'an idle tunnel between rekeys shows «Подключено», not «Восстановление связи»',
+      () async {
+        // The old Dart rule (handshake at most 60 s old) showed «Восстановление связи» here.
+        final ui = android();
+        await ui.connect();
+        await ui.refresh();
+        expect(ui.phase, ConnectionPhase.connected);
+        expect(ui.detail, 'Связь через VPN подтверждена');
+        expect(ui.nativeState, 'connected');
+      },
+    );
+
+    test(
+      'native recovering reasons are shown as «Восстановление связи»',
+      () async {
+        final ui = android();
+        await ui.connect();
+        final stops = state.stops; // the connect's own pre-start cleanup
+        state
+          ..stateCode = 'recovering'
+          ..reasonCode = 'network_changed';
+        await ui.refresh();
+        expect(ui.phase, ConnectionPhase.reconnecting);
+        expect(ui.detail, 'Сеть сменилась, восстанавливается связь');
+        expect(
+          state.stops,
+          stops,
+          reason: 'a recovering tunnel is native\'s job',
+        );
+      },
+    );
+
+    test('an unreachable API keeps a working tunnel «Подключено»', () async {
+      final flaky = _FlakyGets(api);
+      final ui = android(on: flaky);
+      await ui.connect();
+      final stops = state.stops;
+      flaky.fail = true;
+      await ui.refresh();
+      expect(ui.phase, ConnectionPhase.connected);
+      expect(ui.error, isNull);
+      expect(ui.lastApiError, 'network_unavailable');
+      expect(ui.detail, 'VPN работает, сервер временно недоступен');
+      expect(state.stops, stops);
+      flaky.fail = false;
+      await ui.refresh();
+      expect(ui.lastApiError, isNull);
+      expect(ui.detail, 'Связь через VPN подтверждена');
+    });
+
+    test('a pushed state event updates the status without a poll', () async {
+      final ui = android();
+      await ui.connect();
+      await ui.refresh();
+      expect(ui.phase, ConnectionPhase.connected);
+      state.push(
+        const NativeStateEvent(
+          state: 'recovering',
+          reason: 'waiting_for_network',
+          up: true,
+        ),
+        connectionId: connection,
+      );
+      await Future<void>.delayed(Duration.zero);
+      expect(ui.phase, ConnectionPhase.reconnecting);
+      expect(ui.detail, 'Нет сети, VPN ждёт её возвращения');
+    });
+
+    test(
+      'polling pauses in the background while native renews, and resumes',
+      () async {
+        final ui = android();
+        await ui.connect();
+        state.renewing = true;
+        await ui.refresh();
+        expect(ui.pollingActive, isTrue);
+        ui.appForegroundChanged(false);
+        expect(ui.pollingActive, isFalse);
+        ui.appForegroundChanged(true);
+        expect(ui.pollingActive, isTrue);
+      },
+    );
+
+    test(
+      'Dart keeps polling in the background while it renews the window itself',
+      () async {
+        final ui = android();
+        await ui.connect();
+        state.renewing = false;
+        await ui.refresh();
+        ui.appForegroundChanged(false);
+        expect(ui.pollingActive, isTrue);
+      },
+    );
+
+    test(
+      'a tunnel native restored meanwhile is adopted, never stopped',
+      () async {
+        final ui = android();
+        await ui.connect();
+        final stops = state.stops;
+        // Native replaced the connection while the UI was not looking.
+        state
+          ..heldConnection = '77777777-7777-4777-8777-777777777777'
+          ..heldGeneration = 1;
+        await ui.refresh();
+        expect(state.stops, stops, reason: 'native\'s tunnel is not stopped');
+        expect(ui.hasLease, isFalse, reason: 'the stale local view is dropped');
+        expect(
+          api.deletes,
+          0,
+          reason: 'nothing is revoked from the stale view',
+        );
+      },
+    );
+
+    test(
+      'a restore in progress makes the UI wait instead of stopping it',
+      () async {
+        final ui = android();
+        await ui.connect();
+        final stops = state.stops;
+        state
+          ..up = false
+          ..restoreActive = true;
+        await ui.refresh();
+        expect(state.stops, stops);
+        expect(ui.phase, ConnectionPhase.reconnecting);
+        expect(ui.detail, 'Восстанавливается подключение');
+      },
+    );
+
+    test(
+      'R3: a restore engine is ended on adoption even when native renews',
+      () async {
+        state
+          ..up = true
+          ..renewing = true
+          ..restoreActive = true
+          ..heldConnection = connection
+          ..heldGeneration = 1
+          ..remaining = 500000;
+        api.oldConnection = true;
+        final ui = android();
+        await ui.refresh();
+        expect(state.handovers, 1, reason: 'the engine is ended');
+        expect(state.handoffs, isEmpty, reason: 'native keeps renewing');
+        expect(state.stops, 0);
+        expect(ui.hasLease, isTrue);
+        expect(ui.phase, ConnectionPhase.connected);
+      },
+    );
+  });
+}
+
+/// TEST ONLY: native that reports the ADR-144 connection state and can push events.
+class StateNative extends HandoverNative implements NativeStateSource {
+  String stateCode = 'connected';
+  String reasonCode = 'verified';
+  final _events = StreamController<NativeStateEvent>.broadcast();
+
+  void push(NativeStateEvent event, {String? connectionId}) {
+    _events.add(
+      NativeStateEvent(
+        state: event.state,
+        reason: event.reason,
+        up: event.up,
+        connectionId: connectionId,
+      ),
+    );
+  }
+
+  @override
+  Stream<NativeStateEvent> stateEvents() => _events.stream;
+
+  @override
+  Future<NativeSnapshot> snapshot() async => NativeSnapshot(
+    up: up,
+    network: network,
+    handshakeAge: age,
+    remainingMs: remaining,
+    reason: reason,
+    nativeRenewal: renewing && up,
+    connectionId: up ? heldConnection : null,
+    windowGeneration: up ? heldGeneration : null,
+    restoreActive: restoreActive,
+    state: up ? stateCode : 'recovering',
+    stateReason: up ? reasonCode : 'restoring',
+  );
+}
+
+/// TEST ONLY: fails the connection GET with a transient network error while [fail] is set.
+class _FlakyGets implements TunnelApi {
+  _FlakyGets(this.inner);
+  final WindowsApi inner;
+  bool fail = false;
+  @override
+  Future<Map<String, dynamic>> call(
+    String method,
+    String path, [
+    Map<String, dynamic>? body,
+  ]) {
+    if (fail &&
+        method == 'GET' &&
+        path == '${WindowConnectionController.root}/$connection') {
+      throw const ClientError('network_unavailable');
+    }
+    return inner.call(method, path, body);
+  }
 }
 
 /// TEST ONLY native with the ADR-124 intent channel; records calls, holds no state.

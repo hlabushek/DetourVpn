@@ -17,6 +17,7 @@ import java.io.FileOutputStream;
 import java.nio.charset.StandardCharsets;
 import io.flutter.embedding.android.FlutterActivity;
 import io.flutter.embedding.engine.FlutterEngine;
+import io.flutter.plugin.common.EventChannel;
 import io.flutter.plugin.common.MethodCall;
 import io.flutter.plugin.common.MethodChannel;
 
@@ -73,8 +74,34 @@ public final class ClientActivity extends FlutterActivity {
         owner().uiEngine(true); // ADR-125: this engine's controller owns reconnects while attached.
         new MethodChannel(engine.getDartExecutor().getBinaryMessenger(), "project.vpn/tunnel.v1")
             .setMethodCallHandler(this::handle);
+        // ADR-144: the native connection state, pushed on every change. UI engine only; the
+        // headless restore engine has no such stream.
+        new EventChannel(engine.getDartExecutor().getBinaryMessenger(), "project.vpn/state.v1")
+            .setStreamHandler(new EventChannel.StreamHandler() {
+                @Override public void onListen(Object arguments, EventChannel.EventSink sink) {
+                    owner().stateListener(sink);
+                }
+                @Override public void onCancel(Object arguments) {
+                    owner().stateListener(null);
+                }
+            });
     }
     private void handle(MethodCall call, MethodChannel.Result result) {
+        if (call.method.equals("debugNativeState")) {
+            // ADR-144 (Phase 0): test harness dump; debuggable builds only. Codes and ages only.
+            if ((getApplicationInfo().flags & ApplicationInfo.FLAG_DEBUGGABLE) == 0) {
+                result.notImplemented(); return;
+            }
+            ClientApplication shared = owner();
+            shared.worker.execute(() -> {
+                String text;
+                try { text = shared.eventLogText(); }
+                catch (RuntimeException unavailable) { text = ""; }
+                final String answer = text;
+                runOnUiThread(() -> result.success(answer));
+            });
+            return;
+        }
         if (call.method.equals("i028PackageName")) {
             if ((getApplicationInfo().flags & ApplicationInfo.FLAG_DEBUGGABLE) == 0) {
                 result.notImplemented(); return;
@@ -395,6 +422,7 @@ public final class ClientActivity extends FlutterActivity {
                             ((Number) call.argument("generation")).longValue(),
                             submittedAt + ((Number) call.argument("remainingMs")).longValue(), SystemClock.elapsedRealtime());
                         app.setDeadline(app.window.deadline);
+                        app.windowAdvanced(); // ADR-144: same bookkeeping as the restore path.
                         break;
                     case "startNativeRenewal":
                         // ADR-097: only for the tunnel this call raced against; a disconnect in
@@ -434,6 +462,7 @@ public final class ClientActivity extends FlutterActivity {
                         if (renewable) app.window.start(call.argument("connection"), call.argument("runtime"),
                             ((Number) call.argument("generation")).longValue(), deadline, SystemClock.elapsedRealtime());
                         app.setDeadline(deadline);
+                        app.prepareWindow(); // ADR-144: same reset as the restore path (R8).
                         try {
                             app.provider.connect(config);
                             if (generation != app.generation.get() || SystemClock.elapsedRealtime() >= deadline) {
@@ -444,6 +473,7 @@ public final class ClientActivity extends FlutterActivity {
                         if (renewable) {
                             ClientApplication.setWantsConnected(app, true);
                             app.supervisor.userConnected(); // ADR-124
+                            app.beginWindow(); // ADR-144: CPU lock, window start, state push.
                             runOnUiThread(this::askBatteryExemption);
                         }
                         break;

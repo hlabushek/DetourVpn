@@ -94,6 +94,31 @@ public final class ClientApplication extends Application implements Tunnel {
     private PowerManager.WakeLock cpuLock;
     private static final long CPU_LOCK_MS = 180_000L;
 
+    /** ADR-144 (Phase 0): lifecycle events for the diagnostic report; codes only, memory only. */
+    final ConnectionEventLog events = new ConnectionEventLog();
+    /** ADR-144: process start (elapsed realtime) and whether the UI has said who owns recovery. */
+    private long processStart;
+    private volatile boolean ownerSignalSeen;
+    /**
+     * ADR-144: a restore engine is bringing its first tunnel up (from start until bootstrapComplete
+     * or bootstrapFailed, at most {@link ConnectionSupervisor#RESTORE_BOOTSTRAP_MS}). Worker thread.
+     */
+    private boolean restoreBootstrapping;
+    private java.util.concurrent.ScheduledFuture<?> bootstrapTimeout;
+    /** ADR-144: elapsed realtime the current window's tunnel came up, -1 if none. Worker thread. */
+    private long windowUpAt = -1;
+    /** ADR-144: the UI engine's state stream (main thread only) and the last state sent to it. */
+    private io.flutter.plugin.common.EventChannel.EventSink stateSink;
+    private String lastPublished = "";
+    private String lastLoggedState = "";
+
+    /** ADR-144: one event-log line. Any thread. */
+    void log(String event, String detail) {
+        events.record(SystemClock.elapsedRealtime(), event, detail);
+    }
+
+    void log(String event) { log(event, null); }
+
     private void holdCpu() {
         try {
             if (cpuLock == null) {
@@ -116,6 +141,8 @@ public final class ClientApplication extends Application implements Tunnel {
     }
     @Override public void onCreate() {
         super.onCreate();
+        processStart = SystemClock.elapsedRealtime();
+        log("process_start");
         GoBackend.setAlwaysOnCallback(new GoBackend.AlwaysOnCallback() {
             // ADR-141: no Always-on read here. Before establish() and in onDestroy Android answers
             // isAlwaysOn() == false whatever the setting is; snapshot() reads it while up.
@@ -153,6 +180,160 @@ public final class ClientApplication extends Application implements Tunnel {
         watchNetwork();
         watchWake();
         // ADR-135: the 15 s tunnel check is armed by setDeadline and stops when no window is up.
+        // ADR-144: native decides recovery only once the UI said whether it is open, or after a
+        // short bound, so a cold app start and a native restore never race (R5).
+        worker.schedule(this::evaluateRecovery, ConnectionSupervisor.STARTUP_SETTLE_MS + 50,
+                TimeUnit.MILLISECONDS);
+    }
+
+    /** ADR-144, any thread. */
+    boolean startupSettled() {
+        return ConnectionSupervisor.startupSettled(ownerSignalSeen, processStart,
+                SystemClock.elapsedRealtime());
+    }
+
+    /** ADR-144, worker thread: the tunnel of the current window is running. */
+    private boolean tunnelUpNow() {
+        return provider != null && provider.isUp() && deadline > 0;
+    }
+
+    /** ADR-142/144, worker thread: a Dart controller that can still act owns recovery. */
+    private boolean dartOwner() {
+        return ConnectionSupervisor.dartOwnsRecovery(uiForeground,
+                ConnectionSupervisor.restoreEngineOwnsRecovery(recoveryEngine != null,
+                        restoreBootstrapping, tunnelUpNow()));
+    }
+
+    /**
+     * ADR-144, worker thread. A restore engine whose tunnel is gone after its bootstrap cannot run
+     * in Doze; end it so native owns recovery (fix for an engine that blocked recovery forever).
+     */
+    private void endIdleRestoreEngine() {
+        if (recoveryEngine == null || restoreBootstrapping || tunnelUpNow()) return;
+        log("restore_ended", "tunnel_lost");
+        stopAlwaysOnRecovery();
+    }
+
+    /** ADR-144, worker thread: clears the restore bootstrap state and its timeout. */
+    private void bootstrapEnded() {
+        restoreBootstrapping = false;
+        if (bootstrapTimeout != null) bootstrapTimeout.cancel(false);
+        bootstrapTimeout = null;
+    }
+
+    /** ADR-144, worker thread, before provider.connect: forget the previous window's evidence. */
+    void prepareWindow() {
+        handshakes.reset();
+        dataPath.reset();
+        windowUpAt = -1;
+    }
+
+    /**
+     * ADR-144, worker thread: the same bookkeeping for a window started by the UI and by the
+     * restore engine (R8; before, the UI path skipped the CPU lock and the handshake reset).
+     */
+    void beginWindow() {
+        long now = SystemClock.elapsedRealtime();
+        reason = "";
+        failureStage = "";
+        windowUpAt = now;
+        supervisor.tunnelUp(now);
+        holdCpu();
+        scheduleRestoreWake();
+        log("window_up");
+        publishState();
+    }
+
+    /** ADR-144, worker thread: a renewed window was applied (UI or restore engine path). */
+    void windowAdvanced() {
+        failureStage = "";
+        holdCpu();
+        scheduleRestoreWake();
+        log("window_advanced");
+        publishState();
+    }
+
+    /** ADR-144, worker thread: the one native connection state, from facts only. */
+    ConnectionState connectionState() {
+        long now = SystemClock.elapsedRealtime();
+        var facts = new ConnectionState.Facts();
+        facts.desired = supervisor.desired();
+        facts.tunnelUp = tunnelUpNow();
+        facts.networkUsable = physical.usable();
+        if (facts.tunnelUp) {
+            try {
+                long handshake = provider.lastHandshakeSeconds();
+                long wall = System.currentTimeMillis() / 1000;
+                facts.handshakeAgeSeconds = handshake > 0 && handshake <= wall ? wall - handshake : -1;
+            } catch (RuntimeException | LinkageError unavailable) {
+                facts.handshakeAgeSeconds = -1;
+            }
+        }
+        facts.networkChangeAgeMs = lastNetworkChangeAt < 0 ? -1 : now - lastNetworkChangeAt;
+        facts.restartPending = watchdog.pendingNetworkDelayMs(now) >= 0;
+        facts.inboundFlowing = facts.tunnelUp && dataPath.flowing(now);
+        facts.dataStalled = facts.tunnelUp && dataPath.stalled(now);
+        facts.windowAgeMs = windowUpAt < 0 ? -1 : now - windowUpAt;
+        facts.restoring = (recoveryEngine != null && restoreBootstrapping)
+                || supervisor.attemptInFlight(now);
+        facts.lastStop = supervisor.lastStop();
+        return ConnectionState.of(facts);
+    }
+
+    /** ADR-144, worker thread: the state event sent to Flutter (codes and fenced ids only). */
+    private Map<String, Object> stateEvent(ConnectionState state) {
+        Map<String, Object> value = new HashMap<>();
+        value.put("state", state.kind.wire);
+        value.put("reason", state.reason);
+        value.put("desired", supervisor.desired());
+        value.put("restoreActive", recoveryEngine != null);
+        value.put("nativeRenewal", renewer.active());
+        boolean up = tunnelUpNow();
+        value.put("up", up);
+        if (up && window.connection != null) {
+            value.put("connection", window.connection);
+            value.put("windowGeneration", window.generation);
+        }
+        return value;
+    }
+
+    /**
+     * ADR-144, worker thread. Pushes the state to the UI engine when it changed (or when
+     * {@code force}). Cheap; called after every event that can change it.
+     */
+    void publishState(boolean force) {
+        if (provider == null) return;
+        ConnectionState state;
+        Map<String, Object> event;
+        try {
+            state = connectionState();
+            event = stateEvent(state);
+        } catch (RuntimeException unavailable) {
+            return; // A state bug must never affect the tunnel.
+        }
+        String key = state + "|" + event.get("connection") + "|" + event.get("windowGeneration")
+                + "|" + event.get("desired") + "|" + event.get("restoreActive")
+                + "|" + event.get("nativeRenewal");
+        boolean changed = !key.equals(lastPublished);
+        if (!changed && !force) return;
+        if (!state.toString().equals(lastLoggedState)) {
+            lastLoggedState = state.toString();
+            log("state", state.kind.wire + "_" + state.reason);
+        }
+        lastPublished = key;
+        mainThread.post(() -> {
+            var sink = stateSink;
+            if (sink == null) return;
+            try { sink.success(event); } catch (RuntimeException ignored) { /* Engine gone. */ }
+        });
+    }
+
+    void publishState() { publishState(false); }
+
+    /** ADR-144, main thread: the UI engine subscribed to (sink) or left (null) the state stream. */
+    void stateListener(io.flutter.plugin.common.EventChannel.EventSink sink) {
+        stateSink = sink;
+        if (sink != null) worker.execute(() -> publishState(true));
     }
 
     /** ADR-143: pending settle of a wake signal and a coalesced re-signal; worker thread only. */
@@ -230,13 +411,14 @@ public final class ClientApplication extends Application implements Tunnel {
      */
     void freshSignal(String kind) {
         enforceDeadline();
+        if (!startupSettled()) return; // ADR-144: the settle task evaluates shortly.
+        endIdleRestoreEngine();
         long now = SystemClock.elapsedRealtime();
-        boolean up = provider != null && provider.isUp() && deadline > 0;
-        var decision = supervisor.freshSignal(now, up,
-                ConnectionSupervisor.dartOwnsRecovery(uiForeground, recoveryEngine != null),
-                physical.usable());
+        boolean up = tunnelUpNow();
+        var decision = supervisor.freshSignal(now, up, dartOwner(), physical.usable());
         switch (decision.action) {
             case START_RECOVERY:
+                log("fresh_signal", kind);
                 evaluateRecovery();
                 if ("restore_started".equals(recoveryNote)) recoveryNote = "fresh_" + kind;
                 break;
@@ -281,7 +463,9 @@ public final class ClientApplication extends Application implements Tunnel {
         if (deadlineCheck != null) deadlineCheck.cancel(false);
         deadlineCheck = null;
         if (end <= 0) return;
-        supervisor.tunnelUp(SystemClock.elapsedRealtime()); // ADR-142: start of the up period.
+        // ADR-142: start of the up period. ADR-144: only once the tunnel really runs; a connect
+        // sets the deadline first and beginWindow() marks the start after it succeeded.
+        if (provider != null && provider.isUp()) supervisor.tunnelUp(SystemClock.elapsedRealtime());
         long delay = Math.max(0, end - SystemClock.elapsedRealtime()) + 50;
         deadlineCheck = worker.schedule(this::enforceDeadline, delay, TimeUnit.MILLISECONDS);
         armWatch(WATCH_MS);
@@ -298,9 +482,12 @@ public final class ClientApplication extends Application implements Tunnel {
      * ends the user's intent; otherwise the supervisor decides whether native starts recovery.
      */
     void stopped(String why) {
+        log("stopped", why);
+        windowUpAt = -1;
         // ADR-142: a stop after a stable window starts recovery at once (same wake-up).
         if (supervisor.tunnelDown(why, SystemClock.elapsedRealtime()))
             setWantsConnected(this, false);
+        endIdleRestoreEngine(); // ADR-144: its tunnel is gone; native owns recovery now.
         evaluateRecovery();
     }
 
@@ -331,12 +518,13 @@ public final class ClientApplication extends Application implements Tunnel {
 
     /** ADR-124/125, worker thread. Native recovery runs only when no Dart controller owns it. */
     void evaluateRecovery() {
+        // ADR-144: until the UI said whether it is open (bounded), decide nothing (R5).
+        if (!startupSettled()) return;
+        endIdleRestoreEngine();
         long now = SystemClock.elapsedRealtime();
-        boolean up = provider != null && provider.isUp() && deadline > 0;
+        boolean up = tunnelUpNow();
         // ADR-142: a stopped Activity's Dart controller cannot run in Doze; native owns then.
-        var decision = supervisor.evaluate(now, up, false,
-                ConnectionSupervisor.dartOwnsRecovery(uiForeground, recoveryEngine != null),
-                physical.usable());
+        var decision = supervisor.evaluate(now, up, false, dartOwner(), physical.usable());
         switch (decision.action) {
             case START_RECOVERY:
                 startRecovery(now);
@@ -347,9 +535,11 @@ public final class ClientApplication extends Application implements Tunnel {
             default:
                 cancelRecoveryAlarm();
         }
+        publishState();
     }
 
     private void startRecovery(long now) {
+        log("recovery_start", supervisor.stopCategory());
         if (VpnService.prepare(this) != null) {
             reason = "vpn_revoked";
             failedAt("android_vpn_permission");
@@ -368,6 +558,7 @@ public final class ClientApplication extends Application implements Tunnel {
             // ADR-134: Android 12+ background-start limits. The intent stays; the next trigger
             // (network, app open, boot or the alarm below) tries again, at most once a minute.
             recoveryNote = "background_start_refused";
+            log("recovery_refused");
             failedAt("native_restore");
             supervisor.startRefused(now);
             scheduleRecoveryAlarm(ConnectionSupervisor.REFUSED_RETRY_MS);
@@ -400,26 +591,35 @@ public final class ClientApplication extends Application implements Tunnel {
 
     /** Alarm receiver entry point (ADR-125). */
     void wakeRecovery(Runnable done) {
-        worker.execute(() -> {
+        log("alarm", "recover");
+        // ADR-144: an alarm that starts the process waits out the startup settle (the broadcast
+        // stays open meanwhile, so the process is not frozen before it decides).
+        long settle = startupSettled() ? 0
+                : Math.max(0, processStart + ConnectionSupervisor.STARTUP_SETTLE_MS
+                        - SystemClock.elapsedRealtime()) + 50;
+        worker.schedule(() -> {
             try {
                 enforceDeadline();
                 evaluateRecovery();
             } finally {
                 done.run();
             }
-        });
+        }, settle, TimeUnit.MILLISECONDS);
     }
 
     /** ADR-125: the UI engine attached or detached. Detaching is not a disconnect. */
     void uiEngine(boolean attached) {
         uiAttached = attached;
         if (!attached) uiForeground = false;
+        log("ui_engine", attached ? "attached" : "detached");
         worker.execute(this::evaluateRecovery);
     }
 
     /** ADR-142: Activity onStart (true) / onStop (false). Re-evaluates who owns recovery. */
     void uiForeground(boolean started) {
         uiForeground = started && uiAttached;
+        ownerSignalSeen = true; // ADR-144: the owner is known; native may decide from now on.
+        log("owner", uiForeground ? "ui" : "native");
         worker.execute(this::evaluateRecovery);
     }
 
@@ -430,7 +630,9 @@ public final class ClientApplication extends Application implements Tunnel {
         supervisor.userDisconnected();
         setWantsConnected(this, false);
         cancelRecoveryAlarm();
+        log("user_disconnect");
         if (recoveryEngine != null) stopAlwaysOnRecovery();
+        publishState();
     }
 
     /** Worker thread. One reading for {@link #handshakes}; never throws. */
@@ -459,6 +661,7 @@ public final class ClientApplication extends Application implements Tunnel {
                         boolean changed = physical.available(network.toString(),
                                 known == null || hasInternet(known), known != null && captive(known),
                                 known != null && validated(known));
+                        log("network_available", changed ? "changed" : "same");
                         if (changed) networkPathChanged();
                         else scheduleWatch(500);
                         evaluateRecovery();
@@ -472,6 +675,7 @@ public final class ClientApplication extends Application implements Tunnel {
                     boolean valid = validated(caps);
                     worker.execute(() -> {
                         if (physical.capabilities(network.toString(), internet, portal, valid)) {
+                            log("network_usable");
                             scheduleWatch(500);
                             evaluateRecovery();
                             freshSignal("network"); // ADR-143: it just became usable.
@@ -484,12 +688,18 @@ public final class ClientApplication extends Application implements Tunnel {
                     for (var address : properties.getLinkAddresses())
                         addresses.add(address.getAddress().getHostAddress());
                     worker.execute(() -> {
-                        if (physical.linkAddresses(network.toString(), addresses))
+                        if (physical.linkAddresses(network.toString(), addresses)) {
+                            log("network_address_changed");
                             networkPathChanged();
+                        }
                     });
                 }
                 @Override public void onLost(android.net.Network network) {
-                    worker.execute(() -> physical.lost(network.toString()));
+                    worker.execute(() -> {
+                        physical.lost(network.toString());
+                        log("network_lost");
+                        publishState();
+                    });
                 }
             });
         } catch (RuntimeException unavailable) {
@@ -514,6 +724,7 @@ public final class ClientApplication extends Application implements Tunnel {
         lastNetworkChangeAt = SystemClock.elapsedRealtime();
         watchdog.networkChanged(lastNetworkChangeAt);
         scheduleWatch(TunnelWatchdog.SETTLE_MS + 500);
+        publishState();
     }
 
     /** Worker thread. Recreates a stalled tunnel in place; fail-closed if that fails. */
@@ -522,22 +733,27 @@ public final class ClientApplication extends Application implements Tunnel {
             enforceDeadline();
             long now = SystemClock.elapsedRealtime();
             boolean up = provider != null && deadline > 0 && provider.isUp();
-            if (!up) { watchdog.tunnelDown(); watchTick = null; return; }
+            if (!up) { watchdog.tunnelDown(); watchTick = null; publishState(); return; }
             armWatch(WATCH_MS);
             if (!watchdog.running()) watchdog.tunnelUp(now);
             long handshake = provider.lastHandshakeSeconds();
             long wall = System.currentTimeMillis() / 1000;
             handshakes.observe(handshake, wall);
+            observeDataPath(now); // ADR-144: on the tick, not only when Flutter polls.
+            observeAlwaysOn(protector, true); // ADR-141: meaningful only while up.
             long age = handshake > 0 && handshake <= wall ? (wall - handshake) * 1000 : -1;
             if (!watchdog.shouldRestart(now, age, physical.usable())) {
                 schedulePendingWatch(now);
+                publishState();
                 return;
             }
             watchdog.restarted(now);
+            log("watchdog_restart", age < 0 ? "no_handshake" : "stale_or_network");
             try {
                 provider.restartInPlace();
                 tunnelRestarts++;
                 schedulePendingWatch(SystemClock.elapsedRealtime());
+                publishState();
             } catch (Exception | LinkageError failed) {
                 try { stop(); } catch (Exception ignored) { /* Already down. */ }
                 reason = "native_restart_failed";
@@ -548,6 +764,19 @@ public final class ClientApplication extends Application implements Tunnel {
         } catch (RuntimeException ignored) {
             // A watchdog bug must never take the tunnel down by itself.
         }
+    }
+
+    /** ADR-133/144, worker thread: one data-path sample from the advisory byte counters. */
+    private void observeDataPath(long now) {
+        long transfer = -1;
+        long received = -1;
+        try {
+            if (provider.capabilities().contains("traffic-stats-advisory.v1")) {
+                transfer = provider.transferBytes();
+                received = provider.receivedBytes();
+            }
+        } catch (RuntimeException | LinkageError ignored) { /* Advisory unavailable. */ }
+        dataPath.observe(received, transfer, now);
     }
 
     /** ADR-122: check again when a pending network trigger may act (not only on the 15 s tick). */
@@ -589,14 +818,36 @@ public final class ClientApplication extends Application implements Tunnel {
                 channel.setMethodCallHandler(this::handleRecoveryCall);
                 recoveryChannel = channel;
                 recoveryEngine = engine;
+                // ADR-144: the engine owns recovery while it brings its first tunnel up, bounded.
+                restoreBootstrapping = true;
+                if (bootstrapTimeout != null) bootstrapTimeout.cancel(false);
+                bootstrapTimeout = worker.schedule(() -> restoreBootstrapTimedOut(engine),
+                        ConnectionSupervisor.RESTORE_BOOTSTRAP_MS, TimeUnit.MILLISECONDS);
+                log("restore_engine_start");
                 String bundle = FlutterInjector.instance().flutterLoader().findAppBundlePath();
                 engine.getDartExecutor().executeDartEntrypoint(
                         new DartExecutor.DartEntrypoint(bundle, "alwaysOnRecoveryMain"));
             } catch (Exception | LinkageError failure) {
                 failedAt("native_restore");
+                log("restore_engine_failed", "start");
                 stopAlwaysOnRecovery();
+                evaluateRecovery(); // ADR-144: before, nothing re-evaluated after this failure.
             }
         });
+    }
+
+    /**
+     * ADR-144, worker thread. A restore engine that has not reported its first result in time is
+     * treated like a failed bootstrap, so a hung engine can never hold recovery forever.
+     */
+    private void restoreBootstrapTimedOut(FlutterEngine engine) {
+        if (recoveryEngine != engine || !restoreBootstrapping) return;
+        log("restore_engine_failed", "timeout");
+        failedAt("native_restore");
+        bootstrapEnded();
+        stopAlwaysOnRecovery();
+        if (supervisor.recoveryFailed("recovery_timeout")) setWantsConnected(this, false);
+        evaluateRecovery();
     }
 
     private void handleRecoveryCall(MethodCall call, MethodChannel.Result result) {
@@ -612,6 +863,8 @@ public final class ClientApplication extends Application implements Tunnel {
             String code = failed != null && failed.matches("[a-z_]{1,64}") ? failed : "recovery_failed";
             result.success(null);
             worker.execute(() -> {
+                log("restore_engine_failed", code);
+                bootstrapEnded();
                 failedAt("native_restore");
                 stopAlwaysOnRecovery();
                 if (supervisor.recoveryFailed(code)) setWantsConnected(this, false);
@@ -621,6 +874,12 @@ public final class ClientApplication extends Application implements Tunnel {
         }
         if (call.method.equals("bootstrapComplete")) {
             result.success(null);
+            worker.execute(() -> {
+                bootstrapEnded(); // ADR-144: from now on it owns recovery only while its tunnel is up.
+                log("restore_engine_up");
+                endIdleRestoreEngine();
+                evaluateRecovery();
+            });
             return;
         }
         // ADR-140: the restore engine may hand renewal to native (protected sockets under
@@ -685,9 +944,18 @@ public final class ClientApplication extends Application implements Tunnel {
                     case "snapshot":
                         value = snapshot();
                         break;
-                    case "disconnect":
+                    case "disconnect": {
+                        boolean wasUp = tunnelUpNow();
                         stop();
+                        // ADR-144: after its bootstrap, the restore engine dropping its tunnel
+                        // (a failed renewal, a lost lease) ends that engine; native owns recovery
+                        // from here, since the engine's Dart timers sleep in Doze.
+                        if (wasUp && !restoreBootstrapping) {
+                            reason = "restore_stopped";
+                            stopped(reason);
+                        }
                         break;
+                    }
                     case "advanceWindow":
                         if (generation != this.generation.get() || !provider.isUp())
                             throw new IllegalStateException();
@@ -696,9 +964,7 @@ public final class ClientApplication extends Application implements Tunnel {
                                 submittedAt + ((Number) call.argument("remainingMs")).longValue(),
                                 SystemClock.elapsedRealtime());
                         setDeadline(window.deadline);
-                        failureStage = "";
-                        holdCpu();
-                        scheduleRestoreWake();
+                        windowAdvanced();
                         break;
                     case "connectWindow":
                         Number duration = call.argument("remainingMs");
@@ -712,7 +978,7 @@ public final class ClientApplication extends Application implements Tunnel {
                                 ((Number) call.argument("generation")).longValue(), end,
                                 SystemClock.elapsedRealtime());
                         setDeadline(end);
-                        handshakes.reset();
+                        prepareWindow();
                         try {
                             provider.connect(config);
                             if (generation != this.generation.get()
@@ -720,10 +986,7 @@ public final class ClientApplication extends Application implements Tunnel {
                                 stop();
                                 throw new IllegalStateException();
                             }
-                            reason = "";
-                            failureStage = "";
-                            holdCpu();
-                            scheduleRestoreWake();
+                            beginWindow();
                         } catch (Exception failure) {
                             stop();
                             throw failure;
@@ -814,6 +1077,8 @@ public final class ClientApplication extends Application implements Tunnel {
         cancelRestoreWake();
         FlutterEngine engine = recoveryEngine;
         if (engine == null) return false;
+        bootstrapEnded();
+        log("restore_adopted_by_ui");
         recoveryEngine = null;
         recoveryChannel = null;
         recoveryService = null;
@@ -825,6 +1090,7 @@ public final class ClientApplication extends Application implements Tunnel {
     }
 
     private void stopAlwaysOnRecovery() {
+        bootstrapEnded();
         cancelRestoreWake();
         try { stop(); } catch (Exception ignored) { reason = "native_disconnect_failed"; failedAt("native_disconnect"); }
         ProtectedApiRelay relay = protectedRelay;
@@ -854,26 +1120,47 @@ public final class ClientApplication extends Application implements Tunnel {
         worker.execute(() -> {
             // Lost VPN consent (another VPN app took over, or the user revoked it in Settings)
             // is a wanted stop: never restore it on the next boot or restart.
-            if (VpnService.prepare(this) != null) {
+            boolean revoked = VpnService.prepare(this) != null;
+            if (revoked) {
                 setWantsConnected(this, false);
                 renewer.stop();
                 reason = "vpn_revoked";
                 failedAt("android_vpn_permission");
                 supervisor.tunnelDown(reason);
+                log("vpn_revoked");
             }
-            if (service == null || recoveryService != service) return;
+            // ADR-144 (R7): the service went away while a window was still held and nobody here
+            // stopped it (every own stop clears the deadline first, on this thread). Before, a
+            // UI-started tunnel that died this way waited for its deadline (up to 15 min).
+            boolean diedWithWindow = deadline > 0 && (provider == null || !provider.isUp());
+            boolean restoreService = service != null && recoveryService == service;
+            if (!restoreService && !diedWithWindow) return;
             cancelRestoreWake();
-            recoveryChannel = null;
             generation.incrementAndGet();
+            renewer.stop();
+            releaseCpu();
             setDeadline(0);
             window.clear();
-            recoveryService = null;
-            ProtectedApiRelay relay = protectedRelay;
-            protectedRelay = null;
-            if (relay != null) relay.close();
-            FlutterEngine engine = recoveryEngine;
-            recoveryEngine = null;
-            if (engine != null) mainThread.post(engine::destroy);
+            if (restoreService) {
+                bootstrapEnded();
+                recoveryChannel = null;
+                recoveryService = null;
+                ProtectedApiRelay relay = protectedRelay;
+                protectedRelay = null;
+                if (relay != null) relay.close();
+                FlutterEngine engine = recoveryEngine;
+                recoveryEngine = null;
+                if (engine != null) mainThread.post(engine::destroy);
+            }
+            if (revoked) {
+                stopped(reason);
+            } else if (diedWithWindow) {
+                reason = "service_died";
+                failedAt("native_service");
+                stopped(reason);
+            } else {
+                evaluateRecovery();
+            }
         });
     }
 
@@ -934,6 +1221,8 @@ public final class ClientApplication extends Application implements Tunnel {
                 window.advance(connection, runtime, version, end, SystemClock.elapsedRealtime());
                 setDeadline(window.deadline);
                 failureStage = "";
+                log("native_renewed");
+                publishState();
                 return null;
             }).get(5, TimeUnit.SECONDS);
         } catch (java.util.concurrent.ExecutionException failure) {
@@ -951,6 +1240,8 @@ public final class ClientApplication extends Application implements Tunnel {
         if (provider != null) provider.disconnect();
         setDeadline(0);
         window.clear();
+        windowUpAt = -1;
+        publishState();
     }
     Map<String, Object> snapshot() {
         if (provider == null) throw new IllegalStateException();
@@ -976,11 +1267,11 @@ public final class ClientApplication extends Application implements Tunnel {
         } catch (RuntimeException | LinkageError ignored) { /* Advisory unavailable. */ }
         if (transfer >= 0) value.put("trafficBytes", transfer);
         if (received >= 0) value.put("receivedBytes", received);
-        // ADR-133: data-path evidence from the same advisory counters. Pure policy; no effect on
-        // recovery (see DataPathWatch).
+        // ADR-133: data-path evidence from the same advisory counters. ADR-144: sampled on the
+        // native watch tick, so the state no longer depends on how often Flutter polls; a
+        // snapshot adds one more sample.
         long nowElapsed = SystemClock.elapsedRealtime();
         if (up) dataPath.observe(received, transfer, nowElapsed);
-        else dataPath.reset();
         boolean flowing = up && dataPath.flowing(nowElapsed);
         boolean stalled = up && dataPath.stalled(nowElapsed);
         value.put("reason", reason);
@@ -1008,8 +1299,10 @@ public final class ClientApplication extends Application implements Tunnel {
                 watchdog.pendingNetworkDelayMs(SystemClock.elapsedRealtime()) >= 0, stalled));
         value.put("evidence", ConnectionSupervisor.evidence(tunnelUp, handshakeAge, afterChange, flowing));
         value.put("failureCategory", ConnectionSupervisor.category(tunnelUp ? "" : reason));
-        // ADR-141: the only moment the platform's Always-on answer is meaningful.
-        if (tunnelUp) observeAlwaysOn(protector, true);
+        // ADR-144: the authoritative connection state (the same one the state stream pushes).
+        ConnectionState state = connectionState();
+        value.put("state", state.kind.wire);
+        value.put("stateReason", state.reason);
         // ADR-134: why native is not running a tunnel although the user still wants it.
         value.put("stopCategory", tunnelUp ? "none" : supervisor.stopCategory());
         value.put("recoveryAttempts", (long) supervisor.attempts());
@@ -1033,8 +1326,20 @@ public final class ClientApplication extends Application implements Tunnel {
         return DiagnosticReportText.nativeLine((String) state.get("transport"),
                 (String) state.get("evidence"), (String) state.get("failureCategory"),
                 supervisor.desired(), physical.validated(), supervisor.attempts(), tunnelRestarts)
-                + device;
+                + device + eventLogText();
     }
+
+    /** ADR-144: event-log section of the diagnostic report (codes and ages only). */
+    String eventLogText() {
+        long now = SystemClock.elapsedRealtime();
+        String state = "";
+        try { state = connectionState().toString(); } catch (RuntimeException ignored) { }
+        return "\nСостояние: " + (state.isEmpty() ? "unknown" : state)
+                + "\nЖурнал подключения (последние события):"
+                + events.format(now, EVENT_REPORT_LINES);
+    }
+
+    static final int EVENT_REPORT_LINES = 80;
 
     @Override public String getName() { return "i013"; }
     @Override public void onStateChange(State state) { /* Status is read from serialized backend. */ }

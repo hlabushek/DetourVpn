@@ -41,7 +41,18 @@ class NativeSnapshot {
     this.stopCategory,
     this.alwaysOn,
     this.failureStage,
+    this.state,
+    this.stateReason,
   });
+
+  /// ADR-144: the native connection state (`disconnected`, `connecting`, `connected`,
+  /// `recovering`, `failed`), computed natively from facts. When present (Android) it is the
+  /// only source of the displayed status; null on Windows and older builds, which keep the
+  /// Dart rule below.
+  final String? state;
+
+  /// ADR-144: the reason code of [state] (for example `verified`, `network_changed`).
+  final String? stateReason;
 
   /// The native step that failed first in the current window (for example `native_watchdog_restart`,
   /// `native_renewal`). Set only by a native build that names failures; null when none or older.
@@ -226,6 +237,76 @@ class DataPathHealth {
   }
 }
 
+/// ADR-144: the connection states native reports.
+const nativeConnectionStates = {
+  'disconnected',
+  'connecting',
+  'connected',
+  'recovering',
+  'failed',
+};
+
+/// ADR-144: a state code from native, or null for anything unknown.
+String? nativeStateCode(Object? value, Set<String> allowed) =>
+    value is String && allowed.contains(value) ? value : null;
+
+/// ADR-144: a reason code from native (lowercase, digits, underscores), or null.
+String? nativeReasonCode(Object? value) =>
+    value is String && RegExp(r'^[a-z0-9_]{1,48}$').hasMatch(value)
+    ? value
+    : null;
+
+/// ADR-144: one native connection-state event, pushed on every change (Android only).
+class NativeStateEvent {
+  const NativeStateEvent({
+    required this.state,
+    required this.reason,
+    this.desired = false,
+    this.restoreActive = false,
+    this.nativeRenewal = false,
+    this.up = false,
+    this.connectionId,
+    this.windowGeneration,
+  });
+
+  final String state;
+  final String reason;
+  final bool desired;
+  final bool restoreActive;
+  final bool nativeRenewal;
+  final bool up;
+  final String? connectionId;
+  final int? windowGeneration;
+
+  /// Null for a malformed event (it is then ignored).
+  static NativeStateEvent? fromMap(Object? raw) {
+    if (raw is! Map) return null;
+    final state = nativeStateCode(raw['state'], nativeConnectionStates);
+    final reason = nativeReasonCode(raw['reason']);
+    if (state == null || reason == null) return null;
+    final generation = raw['windowGeneration'];
+    return NativeStateEvent(
+      state: state,
+      reason: reason,
+      desired: raw['desired'] == true,
+      restoreActive: raw['restoreActive'] == true,
+      nativeRenewal: raw['nativeRenewal'] == true,
+      up: raw['up'] == true,
+      connectionId: raw['connection'] is String
+          ? raw['connection'] as String
+          : null,
+      windowGeneration: generation is int && generation >= 1
+          ? generation
+          : null,
+    );
+  }
+}
+
+/// ADR-144: native pushes its connection state. Android UI engine only.
+abstract interface class NativeStateSource {
+  Stream<NativeStateEvent> stateEvents();
+}
+
 abstract interface class NativeTunnel {
   Future<bool> permission();
   Future<String> publicKey();
@@ -283,8 +364,19 @@ class PlatformTunnel
         RestoreHandover,
         UserIntentHost,
         VlessNative,
-        ConnectedSinceStore {
+        ConnectedSinceStore,
+        NativeStateSource {
   static const channel = MethodChannel('project.vpn/tunnel.v1');
+  static const stateChannel = EventChannel('project.vpn/state.v1');
+
+  @override
+  Stream<NativeStateEvent> stateEvents() => stateChannel
+      .receiveBroadcastStream()
+      .map(NativeStateEvent.fromMap)
+      .where((event) => event != null)
+      .cast<NativeStateEvent>()
+      // Windows and older builds have no stream; the poll still works without it.
+      .handleError((Object _) {}, test: (_) => true);
 
   @override
   Future<void> endUserIntent() async {
@@ -412,6 +504,8 @@ class PlatformTunnel
       transport: value['transport'] is String
           ? value['transport'] as String
           : null,
+      state: nativeStateCode(value['state'], nativeConnectionStates),
+      stateReason: nativeReasonCode(value['stateReason']),
     );
   }
 

@@ -104,10 +104,10 @@ class _ConnectionLiveStatusState extends State<ConnectionLiveStatus>
     final elapsed = sampled == null
         ? 0
         : now.difference(sampled).inMilliseconds.clamp(0, 1 << 31);
-    final timer = connectedTimerText(
-      c.connectedSinceMs,
-      now.millisecondsSinceEpoch,
-    );
+    // ADR-144: «Подключено …» only under the «Подключено» title, never under «Восстановление связи».
+    final timer = c.phase == ConnectionPhase.connected
+        ? connectedTimerText(c.connectedSinceMs, now.millisecondsSinceEpoch)
+        : null;
     final lines = [
       ?handshakeStatusText(c.statusHandshakeAgeSec, elapsedMs: elapsed),
       ?renewalStatusText(
