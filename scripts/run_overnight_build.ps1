@@ -29,8 +29,31 @@ function Stop-Overnight([string]$Message) {
     exit 1
 }
 
+$startDir = (Get-Location).ProviderPath
 $root = Split-Path -Parent $PSScriptRoot
 Set-Location -LiteralPath $root
+
+# Reads a secret and shows one '*' per character (Read-Host -AsSecureString shows nothing).
+function Read-MaskedSecret([string]$Prompt) {
+    Write-Host -NoNewline "$Prompt "
+    $chars = New-Object System.Collections.Generic.List[char]
+    while ($true) {
+        $key = [Console]::ReadKey($true)
+        if ($key.Key -eq [ConsoleKey]::Enter) { break }
+        if ($key.Key -eq [ConsoleKey]::Backspace) {
+            if ($chars.Count -gt 0) {
+                $chars.RemoveAt($chars.Count - 1)
+                Write-Host -NoNewline "`b `b"
+            }
+            continue
+        }
+        if ([int]$key.KeyChar -lt 32) { continue }
+        $chars.Add($key.KeyChar)
+        Write-Host -NoNewline '*'
+    }
+    Write-Host ''
+    return -join $chars.ToArray()
+}
 $cacheDir = Join-Path $root '.cache\i-011'
 $oldTree = Join-Path $cacheDir $oldTreeName
 $newTree = Join-Path $cacheDir $newTreeName
@@ -131,30 +154,28 @@ if ($apiOrigin -notmatch '^https://[A-Za-z0-9.\-]+(:\d+)?$') {
 }
 
 $defaultKeystore = $env:DETOURVPN_BETA_KEYSTORE_PATH
-if ($defaultKeystore) {
-    $keystoreInput = (Read-Host "Keystore path [$defaultKeystore]").Trim()
-    if (-not $keystoreInput) { $keystoreInput = $defaultKeystore }
-} else {
-    $keystoreInput = (Read-Host 'Keystore path (absolute, outside this repository)').Trim()
+$keystorePrompt = if ($defaultKeystore) { "Keystore path [Enter = $defaultKeystore]" } else { 'Keystore path (full path, e.g. C:\keys\beta.jks; outside this repository)' }
+$keystorePath = $null
+while ($null -eq $keystorePath) {
+    $keystoreInput = (Read-Host $keystorePrompt).Trim().Trim('"')
+    if (-not $keystoreInput -and $defaultKeystore) { $keystoreInput = $defaultKeystore }
+    if (-not $keystoreInput) { Write-Host '  Enter a path.' -ForegroundColor Yellow; continue }
+    # A relative path is taken from the folder where the script was started.
+    $candidate = if ([IO.Path]::IsPathRooted($keystoreInput)) { $keystoreInput } else { Join-Path $startDir $keystoreInput }
+    $full = [IO.Path]::GetFullPath($candidate)
+    if ($full.StartsWith($root, [StringComparison]::OrdinalIgnoreCase)) {
+        Write-Host '  The keystore must be outside this repository. Try again.' -ForegroundColor Yellow
+        continue
+    }
+    if (-not (Test-Path -LiteralPath $full -PathType Leaf)) {
+        Write-Host "  File not found: $full. Try again." -ForegroundColor Yellow
+        continue
+    }
+    $keystorePath = $full
 }
-if (-not $keystoreInput -or -not [IO.Path]::IsPathRooted($keystoreInput)) {
-    Stop-Overnight 'The keystore path must be absolute.'
-}
-$keystorePath = [IO.Path]::GetFullPath($keystoreInput)
-if ($keystorePath.StartsWith($root, [StringComparison]::OrdinalIgnoreCase)) {
-    Stop-Overnight 'The keystore must be outside this repository.'
-}
-if (-not (Test-Path -LiteralPath $keystorePath -PathType Leaf)) {
-    Stop-Overnight "Keystore file not found: $keystorePath"
-}
+Write-Host "  Keystore: $keystorePath"
 
-$securePassword = Read-Host 'Keystore password (hidden)' -AsSecureString
-$bstr = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($securePassword)
-try {
-    $plainPassword = [Runtime.InteropServices.Marshal]::PtrToStringBSTR($bstr)
-} finally {
-    [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($bstr)
-}
+$plainPassword = Read-MaskedSecret 'Keystore password (typed as *):'
 if ([string]::IsNullOrEmpty($plainPassword)) { Stop-Overnight 'The keystore password is empty.' }
 
 # ---- Step 5: build ---------------------------------------------------------------
