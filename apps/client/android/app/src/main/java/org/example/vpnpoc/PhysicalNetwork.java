@@ -43,6 +43,12 @@ final class PhysicalNetwork {
     boolean captivePortal() { return !lost && id != null && captivePortal; }
 
     /**
+     * ADR-148 (5.3): the default network is behind a captive portal that is not signed in yet
+     * (CAPTIVE_PORTAL without VALIDATED). Nothing can reach the VPN node until the user signs in.
+     */
+    boolean captivePortalBlocking() { return captivePortal() && !validated; }
+
+    /**
      * A default network became available. Returns true when the transport path may have changed:
      * a different network than before, or the same one back after a loss.
      */

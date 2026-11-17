@@ -16,12 +16,17 @@ package org.example.vpnpoc;
  * </ul>
  * A stall only lowers the reported transport to "degraded". It never restarts or reconnects by
  * itself: {@link TunnelWatchdog} and {@link ConnectionSupervisor} take no input from this class.
+ * ADR-148: it is fed only from the native watch tick (through {@link DeadPeerWatch#tick}), never
+ * from a snapshot; {@link #suspect} (the same rule after {@link #SUSPECT_MS}) only asks
+ * {@link DeadPeerWatch} for an active probe, which then decides.
  */
 final class DataPathWatch {
     /** Inbound progress older than this no longer counts as flowing. */
     static final long FLOW_MS = 120_000;
     /** Outbound bytes since the last inbound progress that make silence a stall. */
     static final long STALL_OUTBOUND_BYTES = 8192;
+    /** ADR-148: outbound without inbound for this long makes a stall suspected (probe it). */
+    static final long SUSPECT_MS = 60_000;
 
     private long lastReceived = -1;
     private long lastOutbound = -1;
@@ -68,9 +73,14 @@ final class DataPathWatch {
         return inboundAt >= 0 && now - inboundAt <= FLOW_MS;
     }
 
-    boolean stalled(long now) {
+    boolean stalled(long now) { return silentFor(now, FLOW_MS); }
+
+    /** ADR-148: the stall rule after {@link #SUSPECT_MS} instead of {@link #FLOW_MS}. */
+    boolean suspect(long now) { return silentFor(now, SUSPECT_MS); }
+
+    private boolean silentFor(long now, long window) {
         if (baseAt < 0) return false;
         long since = inboundAt >= 0 ? inboundAt : baseAt;
-        return now - since >= FLOW_MS && outboundSince >= STALL_OUTBOUND_BYTES;
+        return now - since >= window && outboundSince >= STALL_OUTBOUND_BYTES;
     }
 }

@@ -46,8 +46,21 @@ public final class ClientApplication extends Application implements Tunnel {
     volatile boolean uiForeground;
     /** ADR-125: last native recovery note for diagnostics (a code, no data). */
     private String recoveryNote = "";
-    /** ADR-133: data-path evidence; touched only on the worker thread. */
-    private final DataPathWatch dataPath = new DataPathWatch();
+    /**
+     * ADR-133/148: data-path evidence and the active-probe ladder; worker thread only. Built in
+     * onCreate from the manifest config (probe off until a project-owned health URL is set).
+     */
+    private DeadPeerWatch deadPeer = new DeadPeerWatch(false, false);
+    /** ADR-148: probe URL and failover opt-in (both off by default). */
+    private DeadPeerProbe probeConfig = DeadPeerProbe.off();
+    /** ADR-148: probe I/O, off the worker thread (each probe is bounded to 5 s). */
+    private final java.util.concurrent.ExecutorService probeIo = Executors.newCachedThreadPool();
+    /**
+     * ADR-148: the probe ladder asked for failover (owner opt-in only). Read once, and cleared,
+     * by the restore engine before its next window; cleared by any window start or a user
+     * disconnect.
+     */
+    private volatile boolean failoverRequested;
     /** ADR-135: tunnel check period while a window is up (was 15 s for the whole process). */
     static final long WATCH_MS = 15_000;
     private java.util.concurrent.ScheduledFuture<?> watchTick;
@@ -151,6 +164,7 @@ public final class ClientApplication extends Application implements Tunnel {
         super.onCreate();
         processStart = SystemClock.elapsedRealtime();
         log("process_start");
+        loadProbeConfig();
         GoBackend.setAlwaysOnCallback(new GoBackend.AlwaysOnCallback() {
             // ADR-141: no Always-on read here. Before establish() and in onDestroy Android answers
             // isAlwaysOn() == false whatever the setting is; snapshot() reads it while up.
@@ -194,6 +208,29 @@ public final class ClientApplication extends Application implements Tunnel {
                 TimeUnit.MILLISECONDS);
     }
 
+    /**
+     * ADR-148, main thread in onCreate, before any worker task: the probe URL and the failover
+     * opt-in from the manifest meta-data. Missing or invalid values keep both off. The URL is
+     * never logged.
+     */
+    private void loadProbeConfig() {
+        DeadPeerProbe config = DeadPeerProbe.off();
+        try {
+            var info = getPackageManager().getApplicationInfo(getPackageName(),
+                    android.content.pm.PackageManager.GET_META_DATA);
+            android.os.Bundle meta = info.metaData;
+            if (meta != null)
+                config = DeadPeerProbe.fromConfig(meta.get(DeadPeerProbe.META_URL),
+                        meta.get(DeadPeerProbe.META_FAILOVER));
+        } catch (Exception | LinkageError unavailable) {
+            // Probe off.
+        }
+        probeConfig = config;
+        deadPeer = new DeadPeerWatch(config.enabled(), config.failoverOptIn);
+        log("probe_config", (config.enabled() ? "on" : "off")
+                + (config.failoverOptIn ? "_failover" : ""));
+    }
+
     /** ADR-144, any thread. */
     boolean startupSettled() {
         return ConnectionSupervisor.startupSettled(ownerSignalSeen, processStart,
@@ -232,7 +269,7 @@ public final class ClientApplication extends Application implements Tunnel {
     /** ADR-144, worker thread, before provider.connect: forget the previous window's evidence. */
     void prepareWindow() {
         handshakes.reset();
-        dataPath.reset();
+        deadPeer.windowStarted(); // ADR-148: the probe ladder survives a new lease.
         windowUpAt = -1;
     }
 
@@ -249,6 +286,7 @@ public final class ClientApplication extends Application implements Tunnel {
         holdCpu();
         scheduleRestoreWake();
         log("window_up");
+        failoverRequested = false; // ADR-148: a restore engine read it before this window.
         underlyingStale = true; // ADR-146: establish() starts with no underlying network set.
         applyUnderlying();
         updateDozeAids(); // ADR-147: the VPN service is up; the companion stops.
@@ -283,8 +321,9 @@ public final class ClientApplication extends Application implements Tunnel {
         }
         facts.networkChangeAgeMs = lastNetworkChangeAt < 0 ? -1 : now - lastNetworkChangeAt;
         facts.restartPending = watchdog.pendingNetworkDelayMs(now) >= 0;
-        facts.inboundFlowing = facts.tunnelUp && dataPath.flowing(now);
-        facts.dataStalled = facts.tunnelUp && dataPath.stalled(now);
+        facts.inboundFlowing = facts.tunnelUp && deadPeer.flowing(now);
+        facts.dataStalled = facts.tunnelUp && deadPeer.stalled(now);
+        facts.captivePortal = physical.captivePortalBlocking(); // ADR-148 (5.3)
         facts.windowAgeMs = windowUpAt < 0 ? -1 : now - windowUpAt;
         facts.restoring = (recoveryEngine != null && restoreBootstrapping)
                 || supervisor.attemptInFlight(now);
@@ -771,6 +810,8 @@ public final class ClientApplication extends Application implements Tunnel {
         setWantsConnected(this, false);
         cancelRecoveryAlarm();
         log("user_disconnect");
+        deadPeer.reset(); // ADR-148: the next connect starts a fresh probe ladder.
+        failoverRequested = false;
         if (recoveryEngine != null) stopAlwaysOnRecovery();
         updateDozeAids(); // ADR-147: no companion and no backstop once the user disconnected.
         publishState();
@@ -878,6 +919,7 @@ public final class ClientApplication extends Application implements Tunnel {
         long now = SystemClock.elapsedRealtime();
         lastNetworkChangeAt = now;
         underlyingStale = true;
+        deadPeer.networkChanged(); // ADR-148: earlier probe failures say nothing about this path.
         // ADR-146: no first-tick gate; a change right after connect is verified too.
         watchdog.networkChanged(now, tunnelUpNow() ? (windowUpAt >= 0 ? windowUpAt : now) : -1);
         scheduleWatch(TunnelWatchdog.SETTLE_MS + 50);
@@ -920,54 +962,75 @@ public final class ClientApplication extends Application implements Tunnel {
             long handshake = provider.lastHandshakeSeconds();
             long wall = System.currentTimeMillis() / 1000;
             handshakes.observe(handshake, wall);
-            observeDataPath(now); // ADR-144: on the tick, not only when Flutter polls.
             observeAlwaysOn(protector, true); // ADR-141: meaningful only while up.
             long age = handshake > 0 && handshake <= wall ? (wall - handshake) * 1000 : -1;
-            var action = watchdog.decide(now, age, physical.usable());
+            boolean usable = physical.usable();
+            // ADR-148: while the probe ladder owns stall recovery, the watchdog keeps only its
+            // network-change restarts.
+            var action = watchdog.decide(now, age, usable, !deadPeer.ownsStallRecovery(now));
             if (action == TunnelWatchdog.Action.NEW_LEASE) {
                 // ADR-146: two restarts after a network change got no handshake; the window is
                 // given up so recovery (UI or native) starts a new one. Same path as a failed
                 // restart; the code is the existing "no handshake on this path" one.
                 log("watchdog_new_lease", "network_unrecovered");
-                try { stop(); } catch (Exception ignored) { /* Already down. */ }
-                reason = "handshake_not_established";
-                failedAt("native_watchdog_restart");
-                watchdog.tunnelDown();
-                stopped(reason);
+                giveUpWindow("handshake_not_established");
                 return;
             }
-            if (action != TunnelWatchdog.Action.RESTART) {
-                applyUnderlying(); // ADR-146: a confirmed change that needed no restart.
-                schedulePendingWatch(now);
-                publishState();
+            if (action == TunnelWatchdog.Action.RESTART) {
+                watchdog.restarted(now);
+                log("watchdog_restart", age < 0 ? "no_handshake" : "stale_or_network");
+                restartTunnel();
                 return;
             }
-            watchdog.restarted(now);
-            log("watchdog_restart", age < 0 ? "no_handshake" : "stale_or_network");
-            try {
-                // ADR-146: restart first, then set the underlying network (establish() may clear it).
-                // TODO: verify on a real device that establish() clears the underlying network and
-                // that this order is correct (ADR-146).
-                provider.restartInPlace();
-                tunnelRestarts++;
-                underlyingStale = true; // ADR-146: the new interface has no underlying network.
-                applyUnderlying();
-                schedulePendingWatch(SystemClock.elapsedRealtime());
-                publishState();
-            } catch (Exception | LinkageError failed) {
-                try { stop(); } catch (Exception ignored) { /* Already down. */ }
-                reason = "native_restart_failed";
-                failedAt("native_watchdog_restart");
-                watchdog.tunnelDown();
-                stopped(reason);
-            }
+            // ADR-148 (5.1): the data path is fed here, on the native tick, and nowhere else.
+            long[] counters = trafficCounters();
+            var probe = deadPeer.tick(now, counters[1], counters[0], age,
+                    windowUpAt < 0 ? -1 : now - windowUpAt, usable);
+            if (probe == DeadPeerWatch.Action.PROBE) startProbe(deadPeer.probeId());
+            else if (probe != DeadPeerWatch.Action.NONE) escalate(probe); // a lost result
+            if (!tunnelUpNow()) return;
+            applyUnderlying(); // ADR-146: a confirmed change that needed no restart.
+            schedulePendingWatch(now);
+            publishState();
         } catch (RuntimeException ignored) {
             // A watchdog bug must never take the tunnel down by itself.
         }
     }
 
-    /** ADR-133/144, worker thread: one data-path sample from the advisory byte counters. */
-    private void observeDataPath(long now) {
+    /**
+     * Worker thread: restart the running tunnel in place (watchdog or probe ladder); fail closed
+     * if that fails.
+     */
+    private void restartTunnel() {
+        try {
+            // ADR-146: restart first, then set the underlying network (establish() may clear it).
+            // TODO: verify on a real device that establish() clears the underlying network and
+            // that this order is correct (ADR-146).
+            provider.restartInPlace();
+            tunnelRestarts++;
+            underlyingStale = true; // ADR-146: the new interface has no underlying network.
+            applyUnderlying();
+            schedulePendingWatch(SystemClock.elapsedRealtime());
+            publishState();
+        } catch (Exception | LinkageError failed) {
+            giveUpWindow("native_restart_failed");
+        }
+    }
+
+    /**
+     * Worker thread: stop this window with {@code why} so recovery (UI or native) starts a new
+     * one. The same path for the watchdog's new-lease step, a failed restart and the probe ladder.
+     */
+    private void giveUpWindow(String why) {
+        try { stop(); } catch (Exception ignored) { /* Already down. */ }
+        reason = why;
+        failedAt("native_watchdog_restart");
+        watchdog.tunnelDown();
+        stopped(why);
+    }
+
+    /** ADR-133/148, worker thread: [transfer, received] advisory byte counters, -1 if unknown. */
+    private long[] trafficCounters() {
         long transfer = -1;
         long received = -1;
         try {
@@ -976,7 +1039,64 @@ public final class ClientApplication extends Application implements Tunnel {
                 received = provider.receivedBytes();
             }
         } catch (RuntimeException | LinkageError ignored) { /* Advisory unavailable. */ }
-        dataPath.observe(received, transfer, now);
+        return new long[] {transfer, received};
+    }
+
+    /**
+     * ADR-148 (5.2), worker thread: one probe through the tunnel to the configured project-owned
+     * health URL. Its result comes back on the worker thread. Codes only in the log.
+     */
+    private void startProbe(long id) {
+        String url = probeConfig.url;
+        if (url == null) return;
+        log("probe_start");
+        TunnelProbeRunner.run(this, url, probeIo, worker,
+                (result, code) -> worker.execute(() -> probeFinished(id, result, code)));
+    }
+
+    /** ADR-148, worker thread: the probe's result and the escalation step it leads to. */
+    private void probeFinished(long id, DeadPeerWatch.ProbeResult result, String code) {
+        try {
+            log("probe_" + result.name().toLowerCase(java.util.Locale.ROOT), code);
+            var action = deadPeer.probeResult(SystemClock.elapsedRealtime(), id, result);
+            if (!tunnelUpNow()) return; // the window ended meanwhile; nothing to escalate
+            if (action != DeadPeerWatch.Action.NONE) {
+                escalate(action);
+                return;
+            }
+            // One failure: the second probe follows shortly, not on the next 15 s tick.
+            if (result == DeadPeerWatch.ProbeResult.FAIL
+                    && deadPeer.step() < DeadPeerWatch.STEP_EXHAUSTED
+                    && (pendingCheck == null || pendingCheck.isDone()))
+                scheduleWatch(DeadPeerWatch.PROBE_RETRY_MS + 50);
+            publishState();
+        } catch (RuntimeException ignored) {
+            // A probe bug must never take the tunnel down by itself.
+        }
+    }
+
+    /** ADR-148, worker thread: one escalation step of the probe ladder. */
+    private void escalate(DeadPeerWatch.Action action) {
+        switch (action) {
+            case RESTART:
+                log("probe_restart");
+                watchdog.restartedByProbe(SystemClock.elapsedRealtime());
+                restartTunnel();
+                break;
+            case NEW_LEASE:
+                log("probe_new_lease");
+                giveUpWindow("dead_peer");
+                break;
+            case FAILOVER:
+                // Reached only with the owner's opt-in (DeadPeerWatch). The restore engine picks
+                // another available node for its next window; the user's saved node is kept.
+                log("probe_failover");
+                failoverRequested = true;
+                giveUpWindow("dead_peer_failover");
+                break;
+            default:
+                break;
+        }
     }
 
     /** ADR-122: check again when a pending network trigger may act (not only on the 15 s tick). */
@@ -1085,7 +1205,7 @@ public final class ClientApplication extends Application implements Tunnel {
         // ADR-140: the restore engine may hand renewal to native (protected sockets under
         // Lockdown), so renewal no longer waits for Dart timers in Doze.
         if (!java.util.Set.of("startNativeRenewal", "protectedRelayRead", "sessionRead", "sessionWrite", "nodeRead",
-                "publicKey", "prove", "permission", "connectWindow", "advanceWindow",
+                "failoverRead", "publicKey", "prove", "permission", "connectWindow", "advanceWindow",
                 "disconnect", "snapshot").contains(call.method)) {
             result.notImplemented();
             return;
@@ -1130,6 +1250,12 @@ public final class ClientApplication extends Application implements Tunnel {
                     case "nodeRead":
                         value = getSharedPreferences("connection", MODE_PRIVATE)
                                 .getString("selected_node", null);
+                        break;
+                    case "failoverRead":
+                        // ADR-148: one-shot; set only by the opted-in probe ladder.
+                        value = failoverRequested && deadPeer.failoverOptIn();
+                        failoverRequested = false;
+                        if (Boolean.TRUE.equals(value)) log("failover_read");
                         break;
                     case "permission":
                         value = VpnService.prepare(this) == null;
@@ -1467,13 +1593,11 @@ public final class ClientApplication extends Application implements Tunnel {
         } catch (RuntimeException | LinkageError ignored) { /* Advisory unavailable. */ }
         if (transfer >= 0) value.put("trafficBytes", transfer);
         if (received >= 0) value.put("receivedBytes", received);
-        // ADR-133: data-path evidence from the same advisory counters. ADR-144: sampled on the
-        // native watch tick, so the state no longer depends on how often Flutter polls; a
-        // snapshot adds one more sample.
+        // ADR-133: data-path evidence from the same advisory counters. ADR-148 (5.1): sampled only
+        // on the native watch tick; a snapshot only reads it.
         long nowElapsed = SystemClock.elapsedRealtime();
-        if (up) dataPath.observe(received, transfer, nowElapsed);
-        boolean flowing = up && dataPath.flowing(nowElapsed);
-        boolean stalled = up && dataPath.stalled(nowElapsed);
+        boolean flowing = up && deadPeer.flowing(nowElapsed);
+        boolean stalled = up && deadPeer.stalled(nowElapsed);
         value.put("reason", reason);
         value.put("nativeRenewal", renewer.active());
         value.put("handshakeSeen", handshakes.seen());

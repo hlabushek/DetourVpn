@@ -78,4 +78,16 @@ public class DataPathWatchTest {
         assertFalse(w.stalled(10 * MIN));
         assertFalse(w.flowing(0));
     }
+
+    /** ADR-148: the same rule after 60 s only makes a stall suspected (a probe decides). */
+    @Test public void outboundWithoutInboundFor60SecondsIsSuspected() {
+        var w = new DataPathWatch();
+        w.observe(100, 150, 0);
+        w.observe(100, 150 + 9000, 30_000);
+        assertFalse(w.suspect(DataPathWatch.SUSPECT_MS - 1));
+        assertTrue(w.suspect(DataPathWatch.SUSPECT_MS));
+        assertFalse("not yet a stall", w.stalled(DataPathWatch.SUSPECT_MS));
+        w.observe(100, 150 + 100, 10 * MIN); // counter reset: a fresh baseline
+        assertFalse(w.suspect(20 * MIN));
+    }
 }

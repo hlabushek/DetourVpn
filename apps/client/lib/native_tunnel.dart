@@ -158,6 +158,10 @@ class InboundTrafficFreshness {
 
 /// ADR-133: data-path state from the native byte counters. Mirrors `DataPathWatch.java`; the
 /// same thresholds, so the native transport and the Dart status agree.
+///
+/// ADR-148 (5.1): used only where native reports no connection state (Windows, older Android
+/// builds). On Android the data path is tracked natively, from the watch tick, and this tracker is
+/// never fed: the controller renders native's state before it would be consulted.
 enum DataPathState { unknown, flowing, quiet, stalled }
 
 /// ADR-133: inbound progress within [flowFor] means flowing. Outbound bytes of at least

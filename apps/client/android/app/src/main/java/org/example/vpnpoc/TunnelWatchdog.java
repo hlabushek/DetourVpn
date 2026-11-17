@@ -91,6 +91,15 @@ final class TunnelWatchdog {
      * after {@link Action#NEW_LEASE} it stops the tunnel and reports {@link #tunnelDown}.
      */
     Action decide(long now, long handshakeAgeMs, boolean usableNetwork) {
+        return decide(now, handshakeAgeMs, usableNetwork, true);
+    }
+
+    /**
+     * ADR-148: as {@link #decide(long, long, boolean)}; with {@code staleRestarts} false the
+     * stale-handshake restart is left to the active probe ({@link DeadPeerWatch}). Network-change
+     * restarts and the new-lease step are unchanged.
+     */
+    Action decide(long now, long handshakeAgeMs, boolean usableNetwork, boolean staleRestarts) {
         if (upSince < 0 || !usableNetwork) return Action.NONE; // a pending change waits
         if (handshakeAgeMs >= 0 && handshakeAgeMs <= FRESH_MS) attempts = 0;
         if (networkChangedAt >= 0 && now - networkChangedAt >= SETTLE_MS) {
@@ -111,11 +120,21 @@ final class TunnelWatchdog {
             // Otherwise keep it pending until the gap since the last restart has passed.
         }
         boolean stale = handshakeAgeMs < 0 ? now - upSince >= STALE_MS : handshakeAgeMs >= STALE_MS;
-        if (stale && now - upSince >= STALE_MS && now - lastRestart >= staleGapMs()) {
+        if (staleRestarts && stale && now - upSince >= STALE_MS
+                && now - lastRestart >= staleGapMs()) {
             lastWasNetwork = false;
             return Action.RESTART;
         }
         return Action.NONE;
+    }
+
+    /**
+     * ADR-148: the tunnel was restarted in place by the probe ladder. It counts for the gap
+     * before a network-change restart, not for the stale backoff.
+     */
+    void restartedByProbe(long now) {
+        lastRestart = now;
+        lastWasNetwork = false;
     }
 
     void restarted(long now) {

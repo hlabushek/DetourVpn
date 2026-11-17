@@ -1881,6 +1881,48 @@ void main() {
       },
     );
 
+    test(
+      'ADR-148: a captive portal shows the sign-in hint and stops nothing',
+      () async {
+        final ui = android();
+        await ui.connect();
+        final stops = state.stops;
+        state
+          ..stateCode = 'recovering'
+          ..reasonCode = 'captive_portal';
+        await ui.refresh();
+        expect(ui.phase, ConnectionPhase.reconnecting);
+        expect(ui.detail, contains('Войдите в сеть'));
+        expect(ui.error, isNull);
+        expect(state.stops, stops, reason: 'native waits for the sign-in');
+      },
+    );
+
+    test(
+      'ADR-148 (5.1): on Android the Dart data-path tracker is never consulted',
+      () async {
+        final ui = WindowConnectionController(
+          api,
+          state,
+          pollInterval: const Duration(days: 1),
+          renewBeforeMs: 90000,
+          nativeOwnsBackgroundRecovery: true,
+          dataPathFlowFor: Duration.zero, // fake time: silence would count at once
+        )..selectedNode = node;
+        addTearDown(ui.dispose);
+        await ui.connect();
+        state
+          ..received = 100
+          ..traffic = 100;
+        await ui.refresh();
+        // Outbound grows far past 8 KiB with no inbound: the Dart rule would say «stalled».
+        state.traffic = 50000;
+        await ui.refresh();
+        expect(ui.phase, ConnectionPhase.connected);
+        expect(ui.detail, 'Связь через VPN подтверждена');
+      },
+    );
+
     test('an unreachable API keeps a working tunnel «Подключено»', () async {
       final flaky = _FlakyGets(api);
       final ui = android(on: flaky);
@@ -2035,6 +2077,8 @@ class StateNative extends HandoverNative implements NativeStateSource {
     connectionId: up ? heldConnection : null,
     windowGeneration: up ? heldGeneration : null,
     restoreActive: restoreActive,
+    trafficBytes: traffic,
+    receivedBytes: received,
     state: up ? stateCode : 'recovering',
     stateReason: up ? reasonCode : 'restoring',
   );

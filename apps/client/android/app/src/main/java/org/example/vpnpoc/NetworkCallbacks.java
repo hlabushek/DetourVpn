@@ -68,7 +68,19 @@ final class NetworkCallbacks {
     /** {@code onCapabilitiesChanged} of a network. */
     Outcome capabilities(String id, boolean internet, boolean captive, boolean validated) {
         Outcome out = new Outcome();
-        if (!physical.capabilities(id, internet, captive, validated)) return out;
+        boolean portalBefore = physical.captivePortalBlocking();
+        boolean becameUsable = physical.capabilities(id, internet, captive, validated);
+        boolean portalNow = physical.captivePortalBlocking();
+        if (portalNow && !portalBefore) {
+            // ADR-148 (5.3): show «sign in to the network»; no restart or attempt runs (unusable).
+            out.log = "network_captive_portal";
+            out.publishState = true;
+            return out;
+        }
+        if (!becameUsable) {
+            out.publishState = portalBefore && !portalNow; // the portal hint goes away
+            return out;
+        }
         out.log = "network_usable";
         out.settleWatch = true;
         out.evaluateRecovery = true;

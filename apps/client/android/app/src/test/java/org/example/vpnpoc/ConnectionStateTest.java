@@ -123,4 +123,28 @@ public class ConnectionStateTest {
         assertNotEquals(new ConnectionState(ConnectionState.Kind.RECOVERING, "a"),
                 new ConnectionState(ConnectionState.Kind.RECOVERING, "b"));
     }
+
+    /** ADR-148 (5.3): a captive portal asks the user to sign in, up or down. */
+    @Test public void aCaptivePortalShowsTheSignInHint() {
+        var f = up();
+        f.handshakeAgeSeconds = 30;
+        f.networkUsable = false;
+        f.captivePortal = true;
+        assertEquals("recovering:captive_portal", of(f));
+        f.tunnelUp = false;
+        assertEquals("recovering:captive_portal", of(f));
+        f.captivePortal = false;
+        assertEquals("recovering:waiting_for_network", of(f));
+    }
+
+    /** ADR-148: the probe ladder's stop is a transient, recovering reason, never a failure. */
+    @Test public void aDeadPeerStopIsRecovering() {
+        var f = new ConnectionState.Facts();
+        f.desired = true;
+        f.networkUsable = true;
+        f.lastStop = "dead_peer";
+        assertEquals("recovering:dead_peer", of(f));
+        f.lastStop = "dead_peer_failover";
+        assertEquals("recovering:dead_peer", of(f));
+    }
 }

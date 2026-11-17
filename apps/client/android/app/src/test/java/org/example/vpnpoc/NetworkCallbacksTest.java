@@ -122,4 +122,36 @@ public class NetworkCallbacksTest {
         assertTrue(moved.pathChanged);
         assertEquals("network_address_changed", moved.log);
     }
+
+    /** ADR-148 (5.3): CAPTIVE_PORTAL without VALIDATED: the hint, and no restart or attempt. */
+    @Test public void aCaptivePortalPublishesTheHintAndStartsNothing() {
+        callbacks.available("wifi", true, false, true);
+        var portal = callbacks.capabilities("wifi", true, true, false);
+        assertEquals("network_captive_portal", portal.log);
+        assertTrue(portal.publishState);
+        assertFalse(portal.freshSignal);
+        assertFalse(portal.evaluateRecovery);
+        assertFalse(portal.settleWatch);
+        assertFalse(portal.pathChanged);
+        assertTrue(physical.captivePortalBlocking());
+        assertFalse("no restart, probe or recovery attempt runs", physical.usable());
+        var f = new ConnectionState.Facts();
+        f.desired = true;
+        f.tunnelUp = true;
+        f.windowAgeMs = 600_000;
+        f.handshakeAgeSeconds = 30;
+        f.networkUsable = physical.usable();
+        f.captivePortal = physical.captivePortalBlocking();
+        assertEquals("recovering:captive_portal", ConnectionState.of(f).toString());
+        // Signed in: usable again; recovery resumes at once.
+        var signedIn = callbacks.capabilities("wifi", true, false, true);
+        assertEquals("network_usable", signedIn.log);
+        assertTrue(signedIn.freshSignal);
+        assertFalse(physical.captivePortalBlocking());
+    }
+
+    @Test public void aValidatedNetworkWithAPortalFlagIsNotBlocking() {
+        callbacks.available("wifi", true, true, true);
+        assertFalse(physical.captivePortalBlocking());
+    }
 }

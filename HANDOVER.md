@@ -1,8 +1,8 @@
 # Handover — connection survivability plan
 
-**Where we are:** Phases 0, 1, 2 and 4 are committed locally, plus the Phase 4 test gaps
-(`fd7ad24`), and the Phase 3 result is recorded in ADR-147 and committed locally. **Next is
-Phase 5, which has not been started.** Wait for the owner's go-ahead before starting it.
+**Where we are:** Phases 0 to 5 are committed locally (ADR-144 to ADR-148), plus the Phase 4
+test gaps (`fd7ad24`). **Next is Phase 6, which has not been started.** Wait for the owner's
+go-ahead before starting it.
 
 - Branch: `claude/connection-reliability` (worktree `.claude/worktrees/fixes-before-beta-0eeeba`),
   not pushed.
@@ -33,19 +33,22 @@ Phase 5, which has not been started.** Wait for the owner's go-ahead before star
   - 3.4 `BackstopJobService`, a 15-minute JobScheduler job (WorkManager was not added: not a
     dependency, and the Gradle lockfiles cannot be regenerated without Gradle).
   - 3.5 the only new wake lock is the backstop's, bounded to 10 s.
+- Phase 5 (dead-peer and silent-drop detection): the commit after `8d46858`, ADR-148
+  (`docs/adr/148-dead-peer-and-silent-drop-detection.md`). See the Phase 5 section below.
+- ADRs of this plan: ADR-144, ADR-145, ADR-146, ADR-147, ADR-148.
 - Master plan: `C:\Users\JetGame\.claude\plans\pasted-content-id-2a60-act-as-prancy-nest.md`
   (audit, phases, owner decisions).
 - Owner decisions (2026-11-17):
   - longer server window than 900 s: **yes** (Phase 3.1);
   - direct boot: **option (a)**, keep `BOOT_COMPLETED`, rely on Lockdown, document it;
   - automatic node failover on a confirmed dead peer: **yes** (Phase 5.2).
-- Order of phases: 0 → 1 → 2 → 4 → 3 (done locally) → 5 (next) → 6.
+- Order of phases: 0 → 1 → 2 → 4 → 3 → 5 (done locally) → 6 (next).
 - Nothing has been verified on a phone. Every client result so far comes from unit tests (Dart
   tests and the javac + JUnit substitute below), not from Gradle or a device. The Phase 3 server
   change has no test run at all.
 
 ## Rules for the next agent
-- One phase at a time, with one ADR per phase in `docs/adr/` (next free number: 148).
+- One phase at a time, with one ADR per phase in `docs/adr/` (next free number: 149).
 - Commit locally with the owner's OK. No push.
 - No `flutter build`, no `gradlew assemble`, no release or deploy scripts, no adb or device tests,
   and no server changes without explicit approval.
@@ -65,8 +68,7 @@ Phase 5, which has not been started.** Wait for the owner's go-ahead before star
   (for example the session scratchpad) and run it there. The only expected finding is the
   `assets/orbit/` warning, because that folder is not copied. Do not change code to work around
   the path.
-- `flutter test` works in place: 310 tests passed at the Phase 4 commit (no Dart change since
-  ADR-145).
+- `flutter test` works in place: 315 tests passed at the Phase 5 commit (310 before it).
 - **No Gradle wrapper in `apps/client/android` — on purpose, not generated.**
   - `scripts/build_flutter_client.ps1` builds from a temporary ASCII copy. It puts a wrapper there
     from `apps/android/gradle/wrapper/gradle-wrapper.jar` (SHA-256 pinned in the script) and
@@ -97,8 +99,9 @@ Phase 5, which has not been started.** Wait for the owner's go-ahead before star
   2. Run all tests in both `src/test/java` trees with JUnit 4.13.2 and hamcrest-core 1.3.
   3. Run `RestartInPlacePatchTest` from `apps/client/android/app`, because it reads
      `../../../android/patches/go-only.patch`.
-  4. Expected result at the Phase 3 commit: 209 tests pass (206 in the main run plus 3
-     `RestartInPlacePatchTest`). It was 194 at the Phase 4 commit and 202 after `fd7ad24`.
+  4. Expected result at the Phase 5 commit: 238 tests pass (235 in the main run plus 3
+     `RestartInPlacePatchTest`). It was 194 at the Phase 4 commit, 202 after `fd7ad24` and 209
+     at the Phase 3 commit.
   5. The `find` results under Git Bash are POSIX paths; convert each jar with `cygpath -w`
      before joining the `;`-separated classpath for the Windows `javac.exe`.
 
@@ -116,7 +119,33 @@ Open follow-ups, each needing the owner's OK:
 - only after that, let the client request windows longer than 900 s.
 See ADR-147 "Known limitations" and "Owner steps".
 
-## Phase 5 — dead-peer and silent-drop detection (next; not started)
-From the master plan, section "Phase 5" (5.1 data-path watch from the native tick only, 5.2
-active probe through the tunnel and escalation up to node failover — owner decision: yes,
-opt-in per ADR, 5.3 captive portal). One ADR (148). Wait for the owner's go-ahead.
+## Phase 5 — dead-peer and silent-drop detection (recorded in ADR-148; committed locally)
+- 5.1 `DataPathWatch` is now owned by the pure `DeadPeerWatch` and fed only from the native watch
+  tick; `snapshot()` only reads it. The Dart `DataPathHealth` tracker stays: on Android it is never
+  fed (native state is rendered first; a Dart test pins this), and it is still Windows' only rule.
+- 5.2 Suspected stall (60 s outbound without inbound, or 180 s without a handshake) → one HTTPS
+  probe through the VPN network (5 s). Pass = healthy. Two failures → restart in place, then a new
+  lease (stop reason `dead_peer`), then failover only when opted in, then exhausted (the watchdog
+  takes stalls back). `UNAVAILABLE` never escalates.
+  - Health URL placeholder: `AndroidManifest.xml` meta-data
+    `org.example.vpnpoc.DEAD_PEER_PROBE_URL` = `none` (probe off). No real endpoint anywhere.
+  - Failover opt-in: meta-data `org.example.vpnpoc.DEAD_PEER_FAILOVER` = `false` (default off).
+    When on, the restore engine uses the first other available AmneziaWG node for one window
+    (`failoverRead`, `failoverNode`); the saved node is unchanged.
+- 5.3 A captive portal (CAPTIVE_PORTAL, not VALIDATED) shows `RECOVERING{captive_portal}` with a
+  sign-in hint; nothing restarts while it blocks traffic (the network is not usable).
+What was run for it: the Java substitute (238 passed: 235 + 3), `flutter test` (315 passed) and
+`flutter analyze` on an ASCII copy (only the expected `assets/orbit/` warning).
+What was **not** run or verified:
+- no device run; no silent-drop, captive-portal or failover scenario;
+- **the probe may be unable to run on a phone at all**: the app excludes its own package from its
+  VPN (ADR-132), so binding a socket to the VPN network is probably refused, which the code reports
+  as `UNAVAILABLE` (inert, not harmful). A device run must check this first;
+- no Gradle build, manifest merge or lint (the new meta-data was not checked by aapt);
+- no real network probe behaviour (DNS, TLS, timeout) and no Play policy check.
+See ADR-148 "Known limitations" and "Owner steps".
+
+## Phase 6 — system integration (next; not started)
+From the master plan, section "Phase 6" (6.1 Lockdown read after `establish()` and a `protector`
+for UI-started tunnels, 6.2 direct boot option (a) as decided, 6.3 `MY_PACKAGE_REPLACED`). One ADR
+(149). Wait for the owner's go-ahead.

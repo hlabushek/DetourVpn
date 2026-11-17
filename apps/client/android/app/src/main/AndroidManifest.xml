@@ -50,5 +50,10 @@
             android:authorities="${applicationId}.updates"
             android:exported="false" android:grantUriPermissions="true" />
         <meta-data android:name="flutterEmbedding" android:value="2" />
+        <!-- ADR-148: PLACEHOLDER. The active probe through the tunnel is off until the owner sets a
+             project-owned HTTPS health URL here (no query, no user data). "none" is not a URL. -->
+        <meta-data android:name="org.example.vpnpoc.DEAD_PEER_PROBE_URL" android:value="none" />
+        <!-- ADR-148: node failover after the probe ladder; opt-in, default and shipped value false. -->
+        <meta-data android:name="org.example.vpnpoc.DEAD_PEER_FAILOVER" android:value="false" />
     </application>
 </manifest>

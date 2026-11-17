@@ -61,6 +61,11 @@ final class ConnectionState {
         boolean restoring;
         /** The last stop reason recorded by the supervisor ("" if none). */
         String lastStop = "";
+        /**
+         * ADR-148 (5.3): the default network is a captive portal that is not signed in
+         * ({@link PhysicalNetwork#captivePortalBlocking}). Such a network is never usable.
+         */
+        boolean captivePortal;
     }
 
     final Kind kind;
@@ -75,7 +80,7 @@ final class ConnectionState {
         if (f.tunnelUp) return whileUp(f);
         if (f.desired) {
             if (f.restoring) return new ConnectionState(Kind.RECOVERING, "restoring");
-            if (!f.networkUsable) return new ConnectionState(Kind.RECOVERING, "waiting_for_network");
+            if (!f.networkUsable) return noNetwork(f);
             String category = ConnectionSupervisor.category(f.lastStop);
             return new ConnectionState(Kind.RECOVERING,
                     "none".equals(category) ? "reconnecting" : category);
@@ -86,9 +91,14 @@ final class ConnectionState {
         return new ConnectionState(Kind.DISCONNECTED, "none");
     }
 
+    /** ADR-148 (5.3): a captive portal asks the user to sign in; otherwise wait for a network. */
+    private static ConnectionState noNetwork(Facts f) {
+        return new ConnectionState(Kind.RECOVERING,
+                f.captivePortal ? "captive_portal" : "waiting_for_network");
+    }
+
     private static ConnectionState whileUp(Facts f) {
-        if (!f.networkUsable && !f.networkLossPending)
-            return new ConnectionState(Kind.RECOVERING, "waiting_for_network");
+        if (!f.networkUsable && !f.networkLossPending) return noNetwork(f);
         if (f.restartPending) return new ConnectionState(Kind.RECOVERING, "network_changed");
         if (f.dataStalled) return new ConnectionState(Kind.RECOVERING, "data_stalled");
         boolean changed = f.networkChangeAgeMs >= 0;

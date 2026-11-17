@@ -334,6 +334,9 @@ final class ConnectionSupervisor {
             case "native_service_state_invalid":
             case "service_died": // ADR-144: the VPN service stopped without a revoke or a stop.
                 return "tun_failure";
+            case "dead_peer": // ADR-148: the probe ladder asked for a new lease (or failover).
+            case "dead_peer_failover":
+                return "dead_peer";
             case "network_unavailable":
                 return "network_unavailable";
             case BACKGROUND_REFUSED:

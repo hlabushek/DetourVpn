@@ -21,12 +21,38 @@ Future<void> runAlwaysOnRecovery() async {
     store: store,
     native: native,
     readSelectedNode: native.readSelectedNode,
+    takeFailoverRequest: _takeFailoverRequest,
     createApi: (origin, sessionStore) => Api.protected(
       origin,
       relayProvider: PlatformProtectedRelayProvider(),
       store: sessionStore,
     ),
   );
+}
+
+/// ADR-148: native's one-shot failover request (set only by the opted-in probe ladder). Any
+/// channel failure means no failover.
+Future<bool> _takeFailoverRequest() async {
+  try {
+    return await _recoveryChannel.invokeMethod<bool>('failoverRead') ?? false;
+  } catch (_) {
+    return false;
+  }
+}
+
+Future<bool> _noFailover() async => false;
+
+/// ADR-148: the node a failover window uses instead of [current]: the first other AmneziaWG node
+/// the catalog reports available (the same availability rule as a manual choice, ADR-092).
+/// Null when there is none; the caller then keeps [current].
+@visibleForTesting
+String? failoverNode(List<NodeOption> nodes, String current) {
+  for (final node in nodes) {
+    if (node.id != current && node.reason == 'available' && !node.isPanel) {
+      return node.id;
+    }
+  }
+  return null;
 }
 
 /// Injects local fakes for the startup state machine; production uses the
@@ -37,10 +63,12 @@ Future<void> runAlwaysOnRecoveryWithDependencies({
   required WindowNative native,
   required Future<String?> Function() readSelectedNode,
   required Api Function(Uri origin, SessionStore store) createApi,
+  Future<bool> Function() takeFailoverRequest = _noFailover,
 }) => _runAlwaysOnRecovery(
   store: store,
   native: native,
   readSelectedNode: readSelectedNode,
+  takeFailoverRequest: takeFailoverRequest,
   createApi: createApi,
 );
 
@@ -48,6 +76,7 @@ Future<void> _runAlwaysOnRecovery({
   required SessionStore store,
   required WindowNative native,
   required Future<String?> Function() readSelectedNode,
+  required Future<bool> Function() takeFailoverRequest,
   required Api Function(Uri origin, SessionStore store) createApi,
 }) async {
   Api? api;
@@ -72,8 +101,14 @@ Future<void> _runAlwaysOnRecovery({
     if (controller.nodesError != null) {
       throw const ClientError('node_validation_failed');
     }
-    final selected = await readSelectedNode();
-    if (selected == null) throw const ClientError('window_node_required');
+    final savedNode = await readSelectedNode();
+    if (savedNode == null) throw const ClientError('window_node_required');
+    // ADR-148: after the probe ladder gave up on the saved node (owner opt-in only), this one
+    // window uses another available node. The saved choice itself is not changed.
+    final failover = await takeFailoverRequest()
+        ? failoverNode(controller.nodes, savedNode)
+        : null;
+    final selected = failover ?? savedNode;
     controller.selectNode(selected);
     if (controller.selectedNode != selected) {
       throw const ClientError('window_node_unavailable');

@@ -147,4 +147,26 @@ public class TunnelWatchdogTest {
         assertEquals(TunnelWatchdog.Action.NONE, w.decide(115_500, 5_000, true)); // 5 s ago
         assertEquals(-1, w.pendingNetworkDelayMs(115_500));
     }
+
+    /** ADR-148: while the probe ladder owns stalls, only network-change restarts remain. */
+    @Test public void staleRestartsCanBeLeftToTheProbe() {
+        var w = new TunnelWatchdog();
+        w.tunnelUp(0);
+        assertEquals(TunnelWatchdog.Action.NONE, w.decide(400_000, 400_000, true, false));
+        assertEquals(TunnelWatchdog.Action.RESTART, w.decide(400_000, 400_000, true, true));
+        w.networkChanged(500_000, 0);
+        assertEquals("network restarts stay", TunnelWatchdog.Action.RESTART,
+                w.decide(500_600, 400_000, true, false));
+    }
+
+    @Test public void aProbeRestartDelaysANetworkRestartButNotTheStaleBackoff() {
+        var w = new TunnelWatchdog();
+        w.tunnelUp(0);
+        w.restartedByProbe(400_000);
+        assertEquals(TunnelWatchdog.STALE_GAP_MS, w.staleGapMs());
+        w.networkChanged(401_000, 0);
+        assertEquals(TunnelWatchdog.Action.NONE, w.decide(401_600, 400_000, true, false));
+        assertEquals(TunnelWatchdog.Action.RESTART,
+                w.decide(400_000 + TunnelWatchdog.NETWORK_GAP_MS, 400_000, true, false));
+    }
 }

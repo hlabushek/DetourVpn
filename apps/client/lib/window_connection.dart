@@ -236,6 +236,11 @@ class WindowConnectionController extends ConnectionController {
     'handshake_stale' => 'Сервер давно не отвечал, связь проверяется',
     'no_handshake' =>
       'Handshake не получен. Нажмите «Отключить» и подключитесь заново.',
+    // ADR-148 (5.3): nothing reaches the server until the user signs in to the network.
+    'captive_portal' =>
+      'Сеть требует входа (страница авторизации Wi-Fi). Войдите в сеть — VPN подключится сам',
+    // ADR-148 (5.2): the probe through the tunnel failed; native starts a new connection.
+    'dead_peer' => 'Сервер не отвечает, подключение создаётся заново',
     _ => 'Восстанавливается подключение',
   };
 

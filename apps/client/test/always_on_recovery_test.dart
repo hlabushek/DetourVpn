@@ -2,6 +2,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:vpn_client/always_on_recovery.dart';
 import 'package:vpn_client/api.dart';
+import 'package:vpn_client/connection.dart';
 import 'package:vpn_client/native_tunnel.dart';
 import 'package:vpn_client/session_store.dart';
 
@@ -9,6 +10,7 @@ const _origin = 'https://api.example.test';
 const _node = '11111111-1111-4111-8111-111111111111';
 const _device = '22222222-2222-4222-8222-222222222222';
 const _oldConnection = '33333333-3333-4333-8333-333333333333';
+const _otherNode = '55555555-5555-4555-8555-555555555555';
 
 class _MemorySessionStore implements SessionStore {
   @override
@@ -24,6 +26,7 @@ class _MemorySessionStore implements SessionStore {
 class _RecoveryApi extends Api {
   _RecoveryApi({
     required this.availableNode,
+    this.otherNode,
     this.failRestore = false,
     this.existingWindows = const [],
     List<String>? timeline,
@@ -31,6 +34,9 @@ class _RecoveryApi extends Api {
        super(Uri.parse(_origin));
 
   final bool availableNode;
+
+  /// ADR-148: a second TEST ONLY node with this availability; absent when null.
+  final bool? otherNode;
   final bool failRestore;
   final List<Map<String, dynamic>> existingWindows;
   final List<String> timeline;
@@ -66,6 +72,13 @@ class _RecoveryApi extends Api {
             'region': 'test',
             'available': availableNode,
           },
+          if (otherNode != null)
+            {
+              'id': _otherNode,
+              'name': 'TEST ONLY other node',
+              'region': 'test-b',
+              'available': otherNode,
+            },
         ],
       };
     }
@@ -330,6 +343,70 @@ void main() {
       expect(platformCalls, isNot(contains('bootstrapComplete')));
     },
   );
+  group('ADR-148 failover after the probe ladder (owner opt-in)', () {
+    NodeOption option(String id, String reason, {String source = 'vps'}) =>
+        NodeOption(id, 'TEST ONLY', 'test', reason, source: source);
+
+    test('picks the first other available AmneziaWG node, or none', () {
+      final nodes = [
+        option(_node, 'available'),
+        option('66666666-6666-4666-8666-666666666666', 'capacity'),
+        option(_oldConnection, 'available', source: 'panel'),
+        option(_otherNode, 'available'),
+      ];
+      expect(failoverNode(nodes, _node), _otherNode);
+      expect(failoverNode([option(_node, 'available')], _node), isNull);
+      expect(failoverNode(const [], _node), isNull);
+    });
+
+    Future<List<Object?>> restore({
+      required bool failover,
+      required List<String> asked,
+    }) async {
+      final failed = <Object?>[];
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(channel, (call) async {
+            if (call.method == 'bootstrapFailed') failed.add(call.arguments);
+            return null;
+          });
+      // The saved node is gone from the catalog; another one is available.
+      await runAlwaysOnRecoveryWithDependencies(
+        store: _MemorySessionStore(),
+        native: _RecoveryNative(allowed: false),
+        readSelectedNode: () async => _node,
+        takeFailoverRequest: () async {
+          asked.add('failover');
+          return failover;
+        },
+        createApi: (origin, store) =>
+            _RecoveryApi(availableNode: false, otherNode: true),
+      );
+      return failed;
+    }
+
+    test('without a native failover request the saved node is required', () async {
+      final asked = <String>[];
+      final failed = await restore(failover: false, asked: asked);
+      expect(asked, ['failover']);
+      expect(failed, [
+        {'code': 'window_node_unavailable'},
+      ]);
+    });
+
+    test('a native failover request uses another available node', () async {
+      final asked = <String>[];
+      final failed = await restore(failover: true, asked: asked);
+      expect(asked, ['failover'], reason: 'asked once, one-shot');
+      expect(
+        failed,
+        isNot(
+          contains({'code': 'window_node_unavailable'}),
+        ),
+        reason: 'the other node was selected and the connect went on',
+      );
+    });
+  });
+
   test('ADR-121 a native wake call refreshes the restore controller', () async {
     var refreshes = 0;
     registerRecoveryWake(channel, () async => refreshes++);
