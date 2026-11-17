@@ -1,0 +1,171 @@
+# One-shot build for the connection-survivability work (ADR-149, owner steps 1).
+#
+# What it does, in order. It stops at the first failure and prints why:
+#   1. Prepares the new SDK tree .cache\i-011\sdk-go-only-c6-20261117 with
+#      prepare_android_poc.py, unless that tree already exists (it is never overwritten).
+#   2. Copies jniLibs and assets from the c5 tree, and checks that only GoBackend.java
+#      differs between c5 and c6.
+#   3. Verifies PREPARED.json (patch_sha256) and both libwg-go.so files.
+#   4. Asks for the API origin and the keystore path, and asks for the keystore password
+#      as hidden input.
+#   5. Sets the beta keystore environment variables and runs
+#      scripts\build_flutter_client.ps1 -ApiOrigin <origin> -WindowTunnels.
+#      The password is removed from the environment afterwards, win or lose.
+#   6. Prints the path of the generated APK and the adb install command.
+#
+# It does not push, deploy, or install anything. Run it from any folder:
+#   powershell -ExecutionPolicy Bypass -File .\scripts\run_overnight_build.ps1
+
+$ErrorActionPreference = 'Stop'
+
+$expectedPatchHash = 'd84f22bb296bfb7ab287b222e7e1b60c639eab011d6482dde31c214eb1ac326c'
+$oldTreeName = 'sdk-go-only-c5-20261113'
+$newTreeName = 'sdk-go-only-c6-20261117'
+
+function Stop-Overnight([string]$Message) {
+    Write-Host ''
+    Write-Host "STOPPED: $Message" -ForegroundColor Red
+    Write-Host 'Nothing was installed or deployed. Fix the problem above and run the script again.' -ForegroundColor Red
+    exit 1
+}
+
+$root = Split-Path -Parent $PSScriptRoot
+Set-Location -LiteralPath $root
+$cacheDir = Join-Path $root '.cache\i-011'
+$oldTree = Join-Path $cacheDir $oldTreeName
+$newTree = Join-Path $cacheDir $newTreeName
+$newReceiptPath = Join-Path $newTree 'PREPARED.json'
+
+Write-Host "Repository: $root"
+
+if (-not (Get-Command python -ErrorAction SilentlyContinue)) {
+    Stop-Overnight 'python is not on PATH. Add it, or open a shell where "python" works.'
+}
+if (-not (Test-Path -LiteralPath $oldTree -PathType Container)) {
+    Stop-Overnight "The c5 SDK tree is missing: $oldTree"
+}
+
+# ---- Step 1: prepare the new tree -------------------------------------------------
+Write-Host ''
+Write-Host 'Step 1: prepare the c6 SDK tree'
+if (Test-Path -LiteralPath $newReceiptPath -PathType Leaf) {
+    Write-Host "  Already prepared, not overwritten: $newTree"
+} else {
+    & python (Join-Path $root 'scripts\prepare_android_poc.py') --target-dir ".cache/i-011/$newTreeName"
+    if ($LASTEXITCODE -ne 0) { Stop-Overnight 'prepare_android_poc.py failed (see its output above).' }
+}
+
+# ---- Step 2: copy the unchanged native libraries and assets from c5 --------------
+Write-Host ''
+Write-Host 'Step 2: copy jniLibs and assets from c5, and check that only GoBackend.java differs'
+
+foreach ($name in 'jniLibs', 'assets') {
+    $from = Join-Path $oldTree $name
+    $to = Join-Path $newTree $name
+    if (-not (Test-Path -LiteralPath $from -PathType Container)) {
+        Stop-Overnight "The c5 tree has no $name folder: $from"
+    }
+    if (Test-Path -LiteralPath $to) {
+        Write-Host "  $name already present in c6, kept as is."
+        continue
+    }
+    Copy-Item -LiteralPath $from -Destination $to -Recurse
+    Write-Host "  copied $name"
+}
+
+try {
+    $oldReceipt = Get-Content -LiteralPath (Join-Path $oldTree 'PREPARED.json') -Raw | ConvertFrom-Json
+    $newReceipt = Get-Content -LiteralPath $newReceiptPath -Raw | ConvertFrom-Json
+    $oldSrc = @{}
+    foreach ($p in $oldReceipt.source_sha256.PSObject.Properties) { $oldSrc[$p.Name] = $p.Value }
+    $newSrc = @{}
+    foreach ($p in $newReceipt.source_sha256.PSObject.Properties) { $newSrc[$p.Name] = $p.Value }
+} catch {
+    Stop-Overnight "Cannot read the source hashes from PREPARED.json: $($_.Exception.Message)"
+}
+$changed = @()
+foreach ($key in (@($oldSrc.Keys) + @($newSrc.Keys) | Sort-Object -Unique)) {
+    if ($oldSrc[$key] -ne $newSrc[$key]) { $changed += $key }
+}
+Write-Host "  source files that differ from c5: $(if ($changed.Count) { $changed -join ', ' } else { '(none)' })"
+$unexpected = @($changed | Where-Object { $_ -notmatch 'GoBackend\.java$' })
+if ($unexpected.Count -gt 0) {
+    Stop-Overnight "Unexpected source differences from c5 (only GoBackend.java may differ): $($unexpected -join ', ')"
+}
+
+# ---- Step 3: verify the receipt and the native libraries -------------------------
+Write-Host ''
+Write-Host 'Step 3: verify PREPARED.json and the native libraries'
+if ($newReceipt.patch_sha256 -ne $expectedPatchHash) {
+    Stop-Overnight "PREPARED.json patch_sha256 is '$($newReceipt.patch_sha256)', expected '$expectedPatchHash'."
+}
+foreach ($abi in 'arm64-v8a', 'x86_64') {
+    $so = Join-Path $newTree "jniLibs\$abi\libwg-go.so"
+    if (-not (Test-Path -LiteralPath $so -PathType Leaf)) { Stop-Overnight "Missing native library: $so" }
+}
+Write-Host '  patch hash matches, both libwg-go.so files present.'
+
+# ---- Step 4: ask for the API origin, the keystore path and the password -----------
+Write-Host ''
+Write-Host 'Step 4: inputs'
+$apiOrigin = (Read-Host 'API origin, e.g. https://api.example.org (no path)').Trim()
+if ($apiOrigin -notmatch '^https://[A-Za-z0-9.\-]+(:\d+)?$') {
+    Stop-Overnight 'The API origin must look like https://host or https://host:port, with no path.'
+}
+
+$defaultKeystore = $env:DETOURVPN_BETA_KEYSTORE_PATH
+if ($defaultKeystore) {
+    $keystoreInput = (Read-Host "Keystore path [$defaultKeystore]").Trim()
+    if (-not $keystoreInput) { $keystoreInput = $defaultKeystore }
+} else {
+    $keystoreInput = (Read-Host 'Keystore path (absolute, outside this repository)').Trim()
+}
+if (-not $keystoreInput -or -not [IO.Path]::IsPathRooted($keystoreInput)) {
+    Stop-Overnight 'The keystore path must be absolute.'
+}
+$keystorePath = [IO.Path]::GetFullPath($keystoreInput)
+if ($keystorePath.StartsWith($root, [StringComparison]::OrdinalIgnoreCase)) {
+    Stop-Overnight 'The keystore must be outside this repository.'
+}
+if (-not (Test-Path -LiteralPath $keystorePath -PathType Leaf)) {
+    Stop-Overnight "Keystore file not found: $keystorePath"
+}
+
+$securePassword = Read-Host 'Keystore password (hidden)' -AsSecureString
+$bstr = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($securePassword)
+try {
+    $plainPassword = [Runtime.InteropServices.Marshal]::PtrToStringBSTR($bstr)
+} finally {
+    [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($bstr)
+}
+if ([string]::IsNullOrEmpty($plainPassword)) { Stop-Overnight 'The keystore password is empty.' }
+
+# ---- Step 5: build ---------------------------------------------------------------
+Write-Host ''
+Write-Host 'Step 5: build (flutter test, debug build, Gradle unit tests and lint, then the release APK)'
+$env:DETOURVPN_BETA_KEYSTORE_PATH = $keystorePath
+$env:DETOURVPN_BETA_KEYSTORE_PASSWORD = $plainPassword
+$plainPassword = $null
+$buildError = $null
+try {
+    & (Join-Path $root 'scripts\build_flutter_client.ps1') -ApiOrigin $apiOrigin -WindowTunnels
+} catch {
+    $buildError = $_.Exception.Message
+} finally {
+    Remove-Item Env:DETOURVPN_BETA_KEYSTORE_PASSWORD -ErrorAction SilentlyContinue
+}
+if ($buildError) { Stop-Overnight "The build failed: $buildError" }
+
+# ---- Step 6: report the APK ------------------------------------------------------
+Write-Host ''
+Write-Host 'Step 6: result'
+$apk = Join-Path $root 'apps\client\build\app\outputs\flutter-apk\app-release.apk'
+if (-not (Test-Path -LiteralPath $apk -PathType Leaf)) {
+    $found = @(Get-ChildItem -LiteralPath (Join-Path $root 'apps\client\build\app\outputs') -Recurse -Filter '*.apk' -ErrorAction SilentlyContinue | ForEach-Object { $_.FullName })
+    Stop-Overnight "The expected release APK was not found: $apk. APK files present: $(if ($found.Count) { $found -join '; ' } else { '(none)' })"
+}
+Write-Host 'Build finished. The release APK is:' -ForegroundColor Green
+Write-Host $apk
+Write-Host ''
+Write-Host 'Install it on the phone with:'
+Write-Host "adb install -r `"$apk`""

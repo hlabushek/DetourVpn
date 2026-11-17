@@ -10,6 +10,14 @@ JUnit substitute for the Android unit tests. "Code complete" does not mean "work
 The prepared SDK tree in `.cache` (`sdk-go-only-c5-20261113`) is now stale; a build against it
 fails the hash check by design. Prepare a fresh tree first (ADR-149 "Owner steps", step 1).
 
+**One-shot owner build:** `scripts/run_overnight_build.ps1` does ADR-149 step 1 end to end. It
+prepares `.cache\i-011\sdk-go-only-c6-20261117`, copies `jniLibs` and `assets` from c5, checks the
+patch hash and both `libwg-go.so` files, asks for the API origin, keystore path and password
+(hidden), then runs `scripts\build_flutter_client.ps1 -ApiOrigin <origin> -WindowTunnels`. At the
+end it prints the release APK path and the `adb install -r` command. It stops at the first error.
+Not run by the agents; the owner runs it. It has not been executed yet, so its first run is
+unverified.
+
 - Branch: `claude/connection-reliability` (worktree `.claude/worktrees/fixes-before-beta-0eeeba`),
   not pushed.
 - Phases 0 and 1: commit `1fdbbf4`, ADR-144 (`docs/adr/144-native-connection-state-and-single-owner.md`).
