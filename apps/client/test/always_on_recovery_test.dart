@@ -328,10 +328,7 @@ void main() {
         isEmpty,
         reason: 'no connection API call after a refused consent',
       );
-      expect(
-        api.calls,
-        isNot(contains(('POST', '/api/v1/devices'))),
-      );
+      expect(api.calls, isNot(contains(('POST', '/api/v1/devices'))));
       expect(api.calls, isNot(contains(('POST', '/api/v1/window-tunnels'))));
       expect(
         api.calls.where((call) => call.$2.contains('/key-challenge/')),
@@ -384,14 +381,17 @@ void main() {
       return failed;
     }
 
-    test('without a native failover request the saved node is required', () async {
-      final asked = <String>[];
-      final failed = await restore(failover: false, asked: asked);
-      expect(asked, ['failover']);
-      expect(failed, [
-        {'code': 'window_node_unavailable'},
-      ]);
-    });
+    test(
+      'without a native failover request the saved node is required',
+      () async {
+        final asked = <String>[];
+        final failed = await restore(failover: false, asked: asked);
+        expect(asked, ['failover']);
+        expect(failed, [
+          {'code': 'window_node_unavailable'},
+        ]);
+      },
+    );
 
     test('a native failover request uses another available node', () async {
       final asked = <String>[];
@@ -399,9 +399,7 @@ void main() {
       expect(asked, ['failover'], reason: 'asked once, one-shot');
       expect(
         failed,
-        isNot(
-          contains({'code': 'window_node_unavailable'}),
-        ),
+        isNot(contains({'code': 'window_node_unavailable'})),
         reason: 'the other node was selected and the connect went on',
       );
     });

@@ -118,34 +118,40 @@ void main() {
   });
 
   group('2.2 a failed snapshot during reconcile is unknown', () {
-    test('a snapshot that fails once is retried and the connect goes on', () async {
-      native.failSnapshots = 1;
-      final c = controller()..selectedNode = node;
-      await c.connect();
-      expect(c.error, isNull);
-      expect(c.hasLease, isTrue);
-      expect(native.snapshotCalls, greaterThanOrEqualTo(2));
-    });
+    test(
+      'a snapshot that fails once is retried and the connect goes on',
+      () async {
+        native.failSnapshots = 1;
+        final c = controller()..selectedNode = node;
+        await c.connect();
+        expect(c.error, isNull);
+        expect(c.hasLease, isTrue);
+        expect(native.snapshotCalls, greaterThanOrEqualTo(2));
+      },
+    );
 
-    test('a snapshot that keeps failing stops nothing and keeps the intent', () async {
-      native
-        ..up = true
-        ..failSnapshots = 1000;
-      final c = controller()..selectedNode = node;
-      await c.connect();
-      expect(c.error, 'native_state_unknown');
-      expect(native.stops, 0, reason: 'a running tunnel is never stopped');
-      expect(native.up, isTrue);
-      expect(native.intentEnds, 0);
-      expect(api.deletes, 0);
-      expect(api.creates, 0);
-      // Native answers again: the scheduled retry reconciles and connects.
-      native.failSnapshots = 0;
-      await Future<void>.delayed(const Duration(milliseconds: 200));
-      expect(api.creates, greaterThanOrEqualTo(1));
-      expect(c.error, isNull);
-      await c.disconnect();
-    });
+    test(
+      'a snapshot that keeps failing stops nothing and keeps the intent',
+      () async {
+        native
+          ..up = true
+          ..failSnapshots = 1000;
+        final c = controller()..selectedNode = node;
+        await c.connect();
+        expect(c.error, 'native_state_unknown');
+        expect(native.stops, 0, reason: 'a running tunnel is never stopped');
+        expect(native.up, isTrue);
+        expect(native.intentEnds, 0);
+        expect(api.deletes, 0);
+        expect(api.creates, 0);
+        // Native answers again: the scheduled retry reconciles and connects.
+        native.failSnapshots = 0;
+        await Future<void>.delayed(const Duration(milliseconds: 200));
+        expect(api.creates, greaterThanOrEqualTo(1));
+        expect(c.error, isNull);
+        await c.disconnect();
+      },
+    );
 
     test('a refresh with an unreadable native state stops nothing', () async {
       native
@@ -174,7 +180,11 @@ void main() {
         expect(c.selectedNode, isNull, reason: 'not in the (empty) list yet');
         await c.connect();
         expect(c.error, 'window_node_required');
-        expect(native.intentEnds, 0, reason: 'the wish to be connected is kept');
+        expect(
+          native.intentEnds,
+          0,
+          reason: 'the wish to be connected is kept',
+        );
         expect(api.calls.where(_apiWork), isEmpty);
         nodes.failNodes = false;
         await Future<void>.delayed(const Duration(milliseconds: 200));
@@ -186,57 +196,65 @@ void main() {
       },
     );
 
-    test('no node to wait for: a clear error, no retries, intent kept', () async {
-      final nodes = NodeListApi(api);
-      final c = controller(using: nodes);
-      await c.refreshNodes();
-      expect(c.nodes, isNotEmpty);
-      await c.connect();
-      expect(c.error, 'window_node_required');
-      final lists = nodes.nodeLists;
-      await Future<void>.delayed(const Duration(milliseconds: 100));
-      expect(nodes.nodeLists, lists, reason: 'nothing to wait for');
-      expect(native.intentEnds, 0);
-      expect(messageFor('window_node_required'), contains('Выберите сервер'));
-    });
+    test(
+      'no node to wait for: a clear error, no retries, intent kept',
+      () async {
+        final nodes = NodeListApi(api);
+        final c = controller(using: nodes);
+        await c.refreshNodes();
+        expect(c.nodes, isNotEmpty);
+        await c.connect();
+        expect(c.error, 'window_node_required');
+        final lists = nodes.nodeLists;
+        await Future<void>.delayed(const Duration(milliseconds: 100));
+        expect(nodes.nodeLists, lists, reason: 'nothing to wait for');
+        expect(native.intentEnds, 0);
+        expect(messageFor('window_node_required'), contains('Выберите сервер'));
+      },
+    );
   });
 
   group('2.4 handshake_not_established', () {
-    test('no handshake in time: one retry on a fresh lease, then a clear stop', () async {
-      native.age = -1;
-      api.freshCreates = true;
-      final c = controller(
-        handshakeTimeout: const Duration(milliseconds: 30),
-      )..selectedNode = node;
-      await c.connect();
-      expect(c.error, isNull);
-      await Future<void>.delayed(const Duration(milliseconds: 50));
-      await c.refresh();
-      expect(c.error, 'handshake_not_established');
-      expect(c.phase, ConnectionPhase.failed);
-      expect(api.deletes, 1, reason: 'the lease without a handshake is revoked');
-      expect(native.intentEnds, 0, reason: 'one retry follows');
-      await Future<void>.delayed(const Duration(milliseconds: 100));
-      expect(api.creates, 2, reason: 'retried on a fresh lease');
-      expect(c.hasLease, isTrue);
-      await Future<void>.delayed(const Duration(milliseconds: 50));
-      await c.refresh();
-      expect(c.error, 'handshake_not_established');
-      expect(native.intentEnds, 1, reason: 'terminal after the retry');
-      await Future<void>.delayed(const Duration(milliseconds: 100));
-      expect(api.creates, 2, reason: 'no third attempt');
-      expect(messageFor('handshake_not_established'), contains('20 секунд'));
-      expect(
-        diagnosticHintKey('handshake_not_established', 'tunnel_monitor'),
-        'server_busy',
-      );
-    });
+    test(
+      'no handshake in time: one retry on a fresh lease, then a clear stop',
+      () async {
+        native.age = -1;
+        api.freshCreates = true;
+        final c = controller(handshakeTimeout: const Duration(milliseconds: 30))
+          ..selectedNode = node;
+        await c.connect();
+        expect(c.error, isNull);
+        await Future<void>.delayed(const Duration(milliseconds: 50));
+        await c.refresh();
+        expect(c.error, 'handshake_not_established');
+        expect(c.phase, ConnectionPhase.failed);
+        expect(
+          api.deletes,
+          1,
+          reason: 'the lease without a handshake is revoked',
+        );
+        expect(native.intentEnds, 0, reason: 'one retry follows');
+        await Future<void>.delayed(const Duration(milliseconds: 100));
+        expect(api.creates, 2, reason: 'retried on a fresh lease');
+        expect(c.hasLease, isTrue);
+        await Future<void>.delayed(const Duration(milliseconds: 50));
+        await c.refresh();
+        expect(c.error, 'handshake_not_established');
+        expect(native.intentEnds, 1, reason: 'terminal after the retry');
+        await Future<void>.delayed(const Duration(milliseconds: 100));
+        expect(api.creates, 2, reason: 'no third attempt');
+        expect(messageFor('handshake_not_established'), contains('20 секунд'));
+        expect(
+          diagnosticHintKey('handshake_not_established', 'tunnel_monitor'),
+          'server_busy',
+        );
+      },
+    );
 
     test('a handshake in time clears the rule for this window', () async {
       native.age = -1;
-      final c = controller(
-        handshakeTimeout: const Duration(milliseconds: 30),
-      )..selectedNode = node;
+      final c = controller(handshakeTimeout: const Duration(milliseconds: 30))
+        ..selectedNode = node;
       await c.connect();
       native.age = 3;
       await c.refresh();
@@ -247,14 +265,17 @@ void main() {
       expect(c.error, isNot('handshake_not_established'));
     });
 
-    test('before the timeout, a missing handshake is only waited for', () async {
-      native.age = -1;
-      final c = controller()..selectedNode = node;
-      await c.connect();
-      await c.refresh();
-      expect(c.error, isNull);
-      expect(c.hasLease, isTrue);
-    });
+    test(
+      'before the timeout, a missing handshake is only waited for',
+      () async {
+        native.age = -1;
+        final c = controller()..selectedNode = node;
+        await c.connect();
+        await c.refresh();
+        expect(c.error, isNull);
+        expect(c.hasLease, isTrue);
+      },
+    );
   });
 
   group('2.5 a pending revoke', () {
@@ -269,7 +290,11 @@ void main() {
       for (var i = 0; i < 3; i++) {
         await c.refresh();
       }
-      expect(native.stops, stops, reason: 'native.disconnect() is not repeated');
+      expect(
+        native.stops,
+        stops,
+        reason: 'native.disconnect() is not repeated',
+      );
       expect(api.deletes, deletes + 3);
       api.failDeletes = false;
       await c.retryRevoke();
@@ -277,36 +302,39 @@ void main() {
       expect(c.hasLease, isFalse);
     });
 
-    test('force reset frees the UI; the next connect revokes the old row first', () async {
-      final c = controller()..selectedNode = node;
-      await c.connect();
-      api.failDeletes = true;
-      await c.disconnect(user: false);
-      expect(c.remotePending, isTrue);
-      await c.forceReset();
-      expect(c.remotePending, isFalse);
-      expect(c.hasLease, isFalse);
-      expect(c.error, isNull);
-      expect(c.phase, ConnectionPhase.disconnected);
-      expect(native.intentEnds, 1);
-      expect(native.up, isFalse);
-      // The server still holds the old connection and still refuses to close it: no new one.
-      api.oldConnection = true;
-      await c.connect();
-      expect(c.error, 'revoke_unconfirmed');
-      expect(api.creates, 1);
-      // Once the server closes it, the next connect goes through.
-      await c.forceReset();
-      api
-        ..failDeletes = false
-        ..freshCreates = true;
-      final deletes = api.deletes;
-      await c.connect();
-      expect(api.deletes, deletes + 1);
-      expect(api.creates, 2);
-      expect(c.hasLease, isTrue);
-      await c.disconnect();
-    });
+    test(
+      'force reset frees the UI; the next connect revokes the old row first',
+      () async {
+        final c = controller()..selectedNode = node;
+        await c.connect();
+        api.failDeletes = true;
+        await c.disconnect(user: false);
+        expect(c.remotePending, isTrue);
+        await c.forceReset();
+        expect(c.remotePending, isFalse);
+        expect(c.hasLease, isFalse);
+        expect(c.error, isNull);
+        expect(c.phase, ConnectionPhase.disconnected);
+        expect(native.intentEnds, 1);
+        expect(native.up, isFalse);
+        // The server still holds the old connection and still refuses to close it: no new one.
+        api.oldConnection = true;
+        await c.connect();
+        expect(c.error, 'revoke_unconfirmed');
+        expect(api.creates, 1);
+        // Once the server closes it, the next connect goes through.
+        await c.forceReset();
+        api
+          ..failDeletes = false
+          ..freshCreates = true;
+        final deletes = api.deletes;
+        await c.connect();
+        expect(api.deletes, deletes + 1);
+        expect(api.creates, 2);
+        expect(c.hasLease, isTrue);
+        await c.disconnect();
+      },
+    );
 
     testWidgets('the screen offers «Повторить» and «Сбросить»', (tester) async {
       final c = controller()..selectedNode = node;

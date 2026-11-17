@@ -1907,7 +1907,8 @@ void main() {
           pollInterval: const Duration(days: 1),
           renewBeforeMs: 90000,
           nativeOwnsBackgroundRecovery: true,
-          dataPathFlowFor: Duration.zero, // fake time: silence would count at once
+          dataPathFlowFor:
+              Duration.zero, // fake time: silence would count at once
         )..selectedNode = node;
         addTearDown(ui.dispose);
         await ui.connect();

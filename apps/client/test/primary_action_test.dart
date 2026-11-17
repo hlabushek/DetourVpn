@@ -93,21 +93,24 @@ void main() {
       expect(calls, ['connect', 'disconnect', 'cancel']);
     });
 
-    test('retryRevoke runs the retry callback, and nothing without one', () async {
-      expect(fire(PrimaryAction.retryRevoke), isFalse);
-      expect(
-        gate.dispatch(
-          PrimaryAction.retryRevoke,
-          connect: () => record('connect'),
-          disconnect: () => record('disconnect'),
-          cancel: () => record('cancel'),
-          retry: () => record('retry'),
-        ),
-        isTrue,
-      );
-      await Future<void>.delayed(Duration.zero);
-      expect(calls, ['retry']);
-    });
+    test(
+      'retryRevoke runs the retry callback, and nothing without one',
+      () async {
+        expect(fire(PrimaryAction.retryRevoke), isFalse);
+        expect(
+          gate.dispatch(
+            PrimaryAction.retryRevoke,
+            connect: () => record('connect'),
+            disconnect: () => record('disconnect'),
+            cancel: () => record('cancel'),
+            retry: () => record('retry'),
+          ),
+          isTrue,
+        );
+        await Future<void>.delayed(Duration.zero);
+        expect(calls, ['retry']);
+      },
+    );
 
     test('none is never dispatched and does not start the window', () async {
       expect(fire(PrimaryAction.none), isFalse);

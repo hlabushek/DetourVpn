@@ -737,7 +737,8 @@ class WindowConnectionController extends ConnectionController {
     _reconnectAfterCleanup = false;
     if (!_autoReconnecting) {
       _activationRetries = 0;
-      _handshakeRetries = 0; // ADR-145: a user tap gets a fresh handshake retry.
+      _handshakeRetries =
+          0; // ADR-145: a user tap gets a fresh handshake retry.
       // ADR-139: a user tap starts a fresh streak of automatic attempts.
       _recovery.reset();
     }
