@@ -120,7 +120,7 @@ def test_window_rejects_invalid_shape(changes: dict[str, object]) -> None:
     "changes,code",
     [
         ({"public_key": "!" * 44}, "invalid_peer_key"),
-        ({"not_after": NOW + timedelta(seconds=901)}, "window_duration_invalid"),
+        ({"not_after": NOW + timedelta(seconds=3601)}, "window_duration_invalid"),
         ({"not_after": NOW}, "window_duration_invalid"),
         (
             {"issued_at": NOW + timedelta(seconds=2)},

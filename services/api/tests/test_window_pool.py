@@ -94,8 +94,9 @@ def test_gate_program_admits_and_meters_only_its_address(pool: ModuleType) -> No
     ):
         assert line in program
     assert "10.203.72.9" not in program
+    assert "timeout 3600000ms" in gate.program(65536, 3_600_000, replace=False)
     with pytest.raises(pool.GateError):
-        gate.program(65536, 900_001, replace=False)
+        gate.program(65536, 3_600_001, replace=False)
     with pytest.raises(pool.GateError):
         gate.program(1024, 1000, replace=False)
 
