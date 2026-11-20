@@ -130,6 +130,18 @@ final class ConnectionSupervisor {
         return ownerSignalSeen || now - processStart >= STARTUP_SETTLE_MS;
     }
 
+    /** ADR-155: a failed native init (vault, device key, engine) is tried again at most this often. */
+    static final long NATIVE_INIT_RETRY_MS = 2_000;
+
+    /**
+     * ADR-155: whether a failed native init may run again at {@code now}. {@code failedAt} is the
+     * elapsed time of the last failure, or -1 when the init has not failed (or not run yet: the
+     * onCreate task always runs first on the same worker).
+     */
+    static boolean nativeInitRetryDue(long failedAt, long now) {
+        return failedAt >= 0 && now - failedAt >= NATIVE_INIT_RETRY_MS;
+    }
+
     /**
      * ADR-142: the tunnel stopped at {@code now}. A tunnel that had been up for {@link #STABLE_MS}
      * starts a fresh streak, so the first recovery runs at once instead of waiting for an old

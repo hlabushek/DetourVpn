@@ -93,11 +93,17 @@ the javac + JUnit substitute below (against the c6 SDK tree), not a Gradle pass.
   first tick. `stop()` and `prepareWindow()` now reset it; `beginWindow()` starts it. Tests: Java
   251 + 8 passed (new `ConnectionWiringTest`, run from `apps/client/android/app`). Unverified on
   device.
-- **ADR-154** (connect needs retries): commit right after `0c3fdc3`. A tap on «Подключить» while
+- **ADR-154** (connect needs retries): commit `612ac1a`. A tap on «Подключить» while
   a poll ran (on return to the app it reconciles, up to one API timeout) was silently ignored. It
   now waits for the poll (shown as busy) and then connects, unless the poll left a connection or a
   pending revoke. Tests: `flutter test` 320 passed, analyze only `assets/orbit/`. Unverified on
   device.
+- **ADR-155** (cold start: «Повторить» useless until restart): commit right after `612ac1a`. The
+  native init (vault, device key, engine) ran once in `onCreate`; a failure left the engine null for
+  the whole process. `ensureNative()` now retries it (at most every 2 s) before UI calls and before
+  a restore engine starts; the device key is never replaced. Tests: Java 252 + 9 passed. Unverified
+  on device; the tester's actual cause is not proven (look for `native_init_failed` in the event
+  log). Open: a failing `sessionRead` at cold start still erases the session (see ADR-155).
 
 ## Rules for the next agent
 - One phase at a time, with one ADR per phase in `docs/adr/` (next free number: 152).

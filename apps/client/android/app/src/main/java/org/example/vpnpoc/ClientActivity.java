@@ -299,6 +299,8 @@ public final class ClientActivity extends FlutterActivity {
                         || call.method.equals("pendingLoginRead") || call.method.equals("pendingLoginWrite");
                 boolean preference = call.method.equals("nodeRead") || call.method.equals("nodeWrite")
                         || call.method.equals("connectedSinceRead") || call.method.equals("connectedSinceWrite");
+                // ADR-155: a native init that failed at process start is tried again here.
+                if (!storage && !preference) app.ensureNative();
                 if (storage && app.vault == null) throw new IllegalStateException();
                 if (!storage && !preference && app.provider == null) throw new IllegalStateException();
                 Object value = null;

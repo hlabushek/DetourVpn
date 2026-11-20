@@ -42,4 +42,23 @@ public class ConnectionWiringTest {
         String begin = body(app, "void beginWindow()");
         assertTrue(begin.indexOf("watchdog.tunnelUp(now)") > begin.indexOf("windowUpAt = now"));
     }
+
+    /** ADR-155: a failed native init is retried before UI calls and before a restore engine. */
+    @Test public void aFailedNativeInitIsRetriedBeforeItIsNeeded() throws Exception {
+        String app = source("ClientApplication.java");
+        assertTrue(body(app, "public void onCreate()").contains("worker.execute(this::initNative)"));
+        String ensure = body(app, "boolean ensureNative()");
+        assertTrue(ensure.contains("ConnectionSupervisor.nativeInitRetryDue(initFailedAt"));
+        assertTrue(ensure.contains("initNative()"));
+        String init = body(app, "private void initNative()");
+        assertTrue("the device key is never replaced", init.contains("if (key == null) key = vault.device()"));
+        assertTrue(init.contains("initFailedAt = SystemClock.elapsedRealtime()"));
+        String restore = body(app, "void startAlwaysOnRecovery(VpnService service)");
+        assertTrue(restore.indexOf("ensureNative()") >= 0
+                && restore.indexOf("ensureNative()") < restore.indexOf("provider == null"));
+        String activity = source("ClientActivity.java");
+        int retry = activity.indexOf("if (!storage && !preference) app.ensureNative();");
+        int check = activity.indexOf("if (!storage && !preference && app.provider == null)");
+        assertTrue("retried before the provider check", retry >= 0 && check > retry);
+    }
 }

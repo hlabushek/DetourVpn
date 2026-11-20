@@ -196,22 +196,7 @@ public final class ClientApplication extends Application implements Tunnel {
         if (connectionPrefs.contains(AlwaysOnStatus.LEGACY_PREF_KEY))
             connectionPrefs.edit().remove(AlwaysOnStatus.LEGACY_PREF_KEY).apply();
         worker.execute(() -> supervisor.restore(wantsConnected(this)));
-        worker.execute(() -> {
-            String initStage = "vault";
-            try {
-                vault = new SecureVault(this);
-                initStage = "device_key";
-                key = vault.device();
-                initStage = "awg_backend";
-                provider = new AwgProviderV1(this, this);
-                reason = "";
-            } catch (Exception | LinkageError failure) {
-                reason = "native_unavailable";
-                failedAt("native_init");
-                android.util.Log.e("DetourVpnNativeInit", "stage=" + initStage
-                        + " failure=" + failure.getClass().getSimpleName());
-            }
-        });
+        worker.execute(this::initNative);
         watchNetwork();
         watchWake();
         // ADR-135: the 15 s tunnel check is armed by setDeadline and stops when no window is up.
@@ -219,6 +204,51 @@ public final class ClientApplication extends Application implements Tunnel {
         // short bound, so a cold app start and a native restore never race (R5).
         worker.schedule(this::evaluateRecovery, ConnectionSupervisor.STARTUP_SETTLE_MS + 50,
                 TimeUnit.MILLISECONDS);
+    }
+
+    /** ADR-155: elapsed realtime of the last failed native init, or -1. Worker thread only. */
+    private long initFailedAt = -1;
+
+    /**
+     * Worker thread: the vault, the device key and the tunnel engine. ADR-155: it was run once, in
+     * onCreate; a failure there (for example the Android keystore not answering right after a
+     * cold start) left {@code provider} null for the life of the process, so every connect and
+     * «Повторить» failed until the app was restarted. Now {@link #ensureNative} runs it again.
+     * Never regenerates an existing device key: {@link SecureVault#device} creates one only when
+     * no key file exists, and a failed read throws instead.
+     */
+    private void initNative() {
+        String initStage = "vault";
+        try {
+            if (vault == null) vault = new SecureVault(this);
+            initStage = "device_key";
+            if (key == null) key = vault.device();
+            initStage = "awg_backend";
+            provider = new AwgProviderV1(this, this);
+            if ("native_unavailable".equals(reason)) reason = "";
+            initFailedAt = -1;
+            if (failureStage.equals("native_init")) failureStage = "";
+        } catch (Exception | LinkageError failure) {
+            reason = "native_unavailable";
+            failedAt("native_init");
+            initFailedAt = SystemClock.elapsedRealtime();
+            log("native_init_failed", initStage);
+            android.util.Log.e("DetourVpnNativeInit", "stage=" + initStage
+                    + " failure=" + failure.getClass().getSimpleName());
+        }
+    }
+
+    /**
+     * ADR-155, worker thread: true when the tunnel engine is ready; after a failed init it tries
+     * again, at most once per {@link ConnectionSupervisor#NATIVE_INIT_RETRY_MS}. Called before
+     * every UI channel call and before a restore engine starts.
+     */
+    boolean ensureNative() {
+        if (provider != null) return true;
+        if (!ConnectionSupervisor.nativeInitRetryDue(initFailedAt, SystemClock.elapsedRealtime()))
+            return false;
+        initNative();
+        return provider != null;
     }
 
     /**
@@ -1196,6 +1226,7 @@ public final class ClientApplication extends Application implements Tunnel {
             }
             recoveryService = service;
             try {
+                ensureNative(); // ADR-155: a failed init at process start is tried again.
                 if (service == null || VpnService.prepare(this) != null || vault == null
                         || provider == null) {
                     throw new IllegalStateException("recovery_unavailable");

@@ -115,6 +115,16 @@ public class ConnectionSupervisorTest {
                 1_000 + ConnectionSupervisor.STARTUP_SETTLE_MS));
     }
 
+    /** ADR-155: a failed native init is tried again, but not more than once per 2 s. */
+    @Test public void aFailedNativeInitIsRetriedAtABoundedPace() {
+        assertFalse("never failed: nothing to retry",
+                ConnectionSupervisor.nativeInitRetryDue(-1, 1_000_000));
+        assertFalse(ConnectionSupervisor.nativeInitRetryDue(10_000, 11_999));
+        assertTrue(ConnectionSupervisor.nativeInitRetryDue(10_000,
+                10_000 + ConnectionSupervisor.NATIVE_INIT_RETRY_MS));
+        assertTrue(ConnectionSupervisor.nativeInitRetryDue(10_000, 600_000));
+    }
+
     /** ADR-144: a VPN service that died on its own is a transient stop; recovery follows. */
     @Test public void serviceDeathIsATransientTunnelFailure() {
         assertEquals("tun_failure", ConnectionSupervisor.category("service_died"));
