@@ -166,6 +166,14 @@ final class NativeRenewer {
             remaining = live[0];
             traffic = live[1];
         } catch (Exception gone) {
+            // ADR-152: a worker that did not answer within 5 s is busy, not a stopped tunnel.
+            // Before, this ended native renewal for good and the window then expired.
+            if (NativeRenewal.viewBusy(gone)) {
+                app.log("native_renewal_wait", "worker_busy");
+                long retry = NativeRenewal.WORKER_BUSY_RETRY_MS;
+                schedule(s, retry, retry, retry);
+                return -1;
+            }
             finish(s, "tunnel_stopped");
             return -1;
         }

@@ -81,7 +81,12 @@ the javac + JUnit substitute below (against the c6 SDK tree), not a Gradle pass.
   each second for 30 s after window start / restart / network change; Dart renders events during a
   poll and the poll's first snapshot before its API call. Tests: Java 249 + 7 passed, `flutter test`
   318 passed, analyze only the `assets/orbit/` warning. Unverified on device: the time to
-  «Подключено» after a Wi-Fi switch.
+  «Подключено» after a Wi-Fi switch. (SHA filled in by the next commit: `fe99cc9`.)
+- **ADR-152** (rare random drops): commit in the log right after `fe99cc9`. A 5 s timeout of the
+  native renewal view (a busy worker, for example the installed-apps list) was read as "tunnel
+  stopped" and ended native renewal; the window then expired. Now a timeout retries after 5 s, and
+  the `apps` call runs off the tunnel worker. Tests: Java 250 + 7 passed (no Dart change).
+  Unverified on device: renewal while the split-apps screen loads.
 
 ## Rules for the next agent
 - One phase at a time, with one ADR per phase in `docs/adr/` (next free number: 152).

@@ -13,6 +13,18 @@ public class NativeRenewalTest {
     }
 
     /** ADR-142: long windows renew 2 min after the grant; 90 s windows keep 55 s. */
+    /** ADR-152: a slow worker is "try again"; anything else still ends the renewal. */
+    @Test public void aTimedOutRenewalViewIsBusyAndEveryOtherFailureStopsTheRenewal() {
+        assertTrue(NativeRenewal.viewBusy(new java.util.concurrent.TimeoutException()));
+        assertFalse(NativeRenewal.viewBusy(new IllegalStateException()));
+        assertFalse(NativeRenewal.viewBusy(new java.util.concurrent.ExecutionException(
+                new IllegalStateException())));
+        assertFalse(NativeRenewal.viewBusy(new InterruptedException()));
+        assertFalse(NativeRenewal.viewBusy(null));
+        assertTrue(NativeRenewal.WORKER_BUSY_RETRY_MS > 0
+                && NativeRenewal.WORKER_BUSY_RETRY_MS < NativeRenewal.AWAKE_CHECK_MS);
+    }
+
     @Test public void longWindowsRenewTwoMinutesAfterGrantAndShortOnesKeepLegacyThreshold() {
         assertEquals(780000, plan(900).renewBeforeMs());
         assertEquals(55000, plan(90).renewBeforeMs());

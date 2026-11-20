@@ -22,6 +22,21 @@ final class NativeRenewal {
     /** ADR-118: attempts inside one wake-up, and the time from wake-up after which none starts. */
     static final int BURST_ATTEMPTS = 4;
     static final long BURST_BUDGET_MS = 30000;
+    /**
+     * ADR-152: when the app worker did not answer the renewal view in time (it was busy with a
+     * long call, such as listing the installed apps), look again after this. Bounded by the
+     * window itself: once it ends, the view reports no time left.
+     */
+    static final long WORKER_BUSY_RETRY_MS = 5000;
+
+    /**
+     * ADR-152: whether a failed renewal view means "the worker is busy, try again" rather than
+     * "the tunnel this renewal belongs to stopped". Only a timeout is busy; every other failure
+     * (a stopped tunnel, a new generation after a disconnect) still ends the renewal.
+     */
+    static boolean viewBusy(Throwable failure) {
+        return failure instanceof java.util.concurrent.TimeoutException;
+    }
 
     final String connection;
     final String runtime;

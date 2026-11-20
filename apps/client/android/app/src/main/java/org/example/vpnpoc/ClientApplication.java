@@ -1584,7 +1584,7 @@ public final class ClientApplication extends Application implements Tunnel {
      * thread that owns the tunnel state. Throws once the tunnel this renewal belongs to is gone.
      */
     long[] renewalView(long appGeneration) throws Exception {
-        return worker.submit(() -> {
+        java.util.concurrent.Future<long[]> view = worker.submit(() -> {
             enforceDeadline();
             if (generation.get() != appGeneration || provider == null || !provider.isUp()
                     || deadline <= 0)
@@ -1595,7 +1595,14 @@ public final class ClientApplication extends Application implements Tunnel {
                     traffic = provider.transferBytes();
             } catch (RuntimeException | LinkageError ignored) { /* Advisory only. */ }
             return new long[] {Math.max(0, deadline - SystemClock.elapsedRealtime()), traffic};
-        }).get(5, TimeUnit.SECONDS);
+        });
+        try {
+            return view.get(5, TimeUnit.SECONDS);
+        } catch (java.util.concurrent.TimeoutException busy) {
+            // ADR-152: the worker is busy; drop the stale read and let the renewer look again.
+            view.cancel(false);
+            throw busy;
+        }
     }
 
     /** Applies a natively renewed window under the same fencing as advanceWindow. */

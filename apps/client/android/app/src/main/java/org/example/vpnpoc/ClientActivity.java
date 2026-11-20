@@ -35,6 +35,9 @@ public final class ClientActivity extends FlutterActivity {
     private static final long I028_DIAGNOSTICS_LIMIT = 32768;
     private static volatile String i028CurrentStage = "unknown";
     private MethodChannel.Result permissionResult;
+    /** ADR-152: the installed-app list (icons) runs here, never on the tunnel worker. */
+    private static final java.util.concurrent.ExecutorService APPS_IO =
+            java.util.concurrent.Executors.newSingleThreadExecutor();
     private ClientApplication owner() { return (ClientApplication) getApplication(); }
     @Override protected void onCreate(Bundle state) {
         super.onCreate(state);
@@ -252,10 +255,25 @@ public final class ClientActivity extends FlutterActivity {
             });
             return;
         }
+        if (call.method.equals("apps")) {
+            // ADR-152: drawing and encoding an icon for every launcher app can take seconds. It
+            // touches no tunnel state, so it runs off the tunnel worker, which must stay free for
+            // the native renewal view (5 s bound), the watchdog and the state checks.
+            APPS_IO.execute(() -> {
+                try {
+                    final Object apps = installedLauncherApps();
+                    runOnUiThread(() -> result.success(apps));
+                } catch (Exception | LinkageError failure) {
+                    runOnUiThread(() -> result.error("native_operation_failed",
+                            "Операция VPN не выполнена", null));
+                }
+            });
+            return;
+        }
         if (!java.util.Set.of("publicKey", "prove", "connect", "connectWindow", "advanceWindow",
                 "disconnect", "snapshot", "sessionRead", "sessionWrite", "pendingLoginRead",
                 "pendingLoginWrite", "splitRead", "splitModeRead", "splitLastModeRead",
-                "splitWrite", "splitDomainsRead", "apps", "nodeRead", "nodeWrite",
+                "splitWrite", "splitDomainsRead", "nodeRead", "nodeWrite",
                 "connectedSinceRead", "connectedSinceWrite",
                 "startNativeRenewal", "adoptRestore", "dnsRead", "dnsWrite", "setIntent").contains(call.method)) {
             result.notImplemented(); return;
@@ -345,8 +363,6 @@ public final class ClientActivity extends FlutterActivity {
                         if (!since.commit()) throw new IllegalStateException();
                         break;
                     }
-                    case "apps":
-                        value = installedLauncherApps(); break;
                     case "splitRead": value = selectedPackages(); break;
                     case "splitDomainsRead":
                         value = new java.util.ArrayList<>(getSharedPreferences("routing", MODE_PRIVATE)
