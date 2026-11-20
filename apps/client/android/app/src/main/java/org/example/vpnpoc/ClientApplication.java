@@ -284,6 +284,22 @@ public final class ClientApplication extends Application implements Tunnel {
         handshakes.reset();
         deadPeer.windowStarted(); // ADR-148: the probe ladder survives a new lease.
         windowUpAt = -1;
+        forgetWindowWatch(); // ADR-153: no restart budget or trigger from the previous window.
+    }
+
+    /**
+     * ADR-153, worker thread: the watchdog forgets the window that ended (its start time, pending
+     * network trigger, restart budget) and its extra checks are cancelled. Before, only the next
+     * 15 s tick noticed a stop, so a window started within 15 s of a stop inherited the old
+     * window's state and could be restarted, or given up with NEW_LEASE, at its first tick.
+     */
+    private void forgetWindowWatch() {
+        watchdog.tunnelDown();
+        if (pendingCheck != null) pendingCheck.cancel(false);
+        pendingCheck = null;
+        if (stateRecheck != null) stateRecheck.cancel(false);
+        stateRecheck = null;
+        stateRecheckFrom = -1;
     }
 
     /**
@@ -296,6 +312,7 @@ public final class ClientApplication extends Application implements Tunnel {
         failureStage = "";
         windowUpAt = now;
         supervisor.tunnelUp(now);
+        watchdog.tunnelUp(now); // ADR-153: this window's own start, budget and trigger.
         holdCpu();
         scheduleRestoreWake();
         log("window_up");
@@ -1635,6 +1652,7 @@ public final class ClientApplication extends Application implements Tunnel {
         setDeadline(0);
         window.clear();
         windowUpAt = -1;
+        forgetWindowWatch(); // ADR-153
         publishState();
     }
     Map<String, Object> snapshot() {

@@ -76,6 +76,34 @@ public class TunnelWatchdogTest {
         assertFalse(w.awaitingNetworkProof(116_000, -1)); // nothing pending any more
     }
 
+    /**
+     * ADR-153: the state of a window that ended must not reach the next one. Without the reset a
+     * new window, seen first at its 15 s tick, inherits a spent network budget and is given up.
+     */
+    @Test public void aNewWindowDoesNotInheritTheOldWindowsRestartBudget() {
+        var leaked = new TunnelWatchdog();
+        leaked.tunnelUp(0);
+        leaked.networkChanged(100_000, 0);
+        assertTrue(leaked.shouldRestart(100_500, 30_000, true));
+        leaked.restarted(100_500);
+        assertTrue(leaked.shouldRestart(115_500, 30_000, true));
+        leaked.restarted(115_500); // two restarts spent; the user then reconnects at 120 s
+        // Negative (the old wiring): the new window, no handshake yet at its first tick.
+        assertEquals(TunnelWatchdog.Action.NEW_LEASE, leaked.decide(135_000, -1, true));
+
+        var reset = new TunnelWatchdog();
+        reset.tunnelUp(0);
+        reset.networkChanged(100_000, 0);
+        reset.shouldRestart(100_500, 30_000, true);
+        reset.restarted(100_500);
+        reset.shouldRestart(115_500, 30_000, true);
+        reset.restarted(115_500);
+        reset.tunnelDown(); // stop()
+        reset.tunnelUp(120_000); // beginWindow() of the new window
+        assertEquals(TunnelWatchdog.Action.NONE, reset.decide(135_000, -1, true));
+        assertFalse(reset.awaitingNetworkProof(135_000, -1));
+    }
+
     @Test public void networkChangeWhileDownIsIgnored() {
         var w = new TunnelWatchdog();
         w.networkChanged(10_000, -1);
