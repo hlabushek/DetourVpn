@@ -191,9 +191,10 @@ class WindowConnectionController extends ConnectionController {
         event.up &&
         event.connectionId == _id &&
         !busy &&
-        !_polling &&
         !remotePending;
     if (ours) {
+      // ADR-151: render at once, also while a poll is in flight. Before, an event that arrived
+      // during a poll was dropped and the status waited for the poll's API round trip.
       if (_transientApiCodes.contains(error)) error = null;
       _renderNative(event.state, event.reason);
       _emit();
@@ -1380,6 +1381,12 @@ class WindowConnectionController extends ConnectionController {
             handshakeTimeout.inMilliseconds) {
           throw const ClientError('handshake_not_established');
         }
+      }
+      // ADR-151: show native's state now, not only after the API round trip below (which can
+      // take seconds through a fresh tunnel). The end of this poll renders it again.
+      if (snapshot.state != null && error == null) {
+        _renderNative(snapshot.state!, snapshot.stateReason ?? '');
+        _emit();
       }
       final traffic = snapshot.trafficBytes;
       if (traffic != null && traffic >= 0) {

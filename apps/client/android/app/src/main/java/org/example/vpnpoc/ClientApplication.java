@@ -307,6 +307,7 @@ public final class ClientApplication extends Application implements Tunnel {
         observeAlwaysOn(protector, tunnelUpNow());
         updateDozeAids(); // ADR-147: the VPN service is up; the companion stops.
         publishState();
+        recheckStateSoon(); // ADR-151: show the first handshake within about a second.
     }
 
     /** ADR-144, worker thread: a renewed window was applied (UI or restore engine path). */
@@ -336,7 +337,9 @@ public final class ClientApplication extends Application implements Tunnel {
             }
         }
         facts.networkChangeAgeMs = lastNetworkChangeAt < 0 ? -1 : now - lastNetworkChangeAt;
-        facts.restartPending = watchdog.pendingNetworkDelayMs(now) >= 0;
+        // ADR-151: a handshake after the change (or its restart) ends "network_changed" at once.
+        facts.restartPending = watchdog.awaitingNetworkProof(now,
+                facts.handshakeAgeSeconds < 0 ? -1 : facts.handshakeAgeSeconds * 1000);
         facts.inboundFlowing = facts.tunnelUp && deadPeer.flowing(now);
         facts.dataStalled = facts.tunnelUp && deadPeer.stalled(now);
         facts.captivePortal = physical.captivePortalBlocking(); // ADR-148 (5.3)
@@ -368,21 +371,21 @@ public final class ClientApplication extends Application implements Tunnel {
      * ADR-144, worker thread. Pushes the state to the UI engine when it changed (or when
      * {@code force}). Cheap; called after every event that can change it.
      */
-    void publishState(boolean force) {
-        if (provider == null) return;
+    ConnectionState publishState(boolean force) {
+        if (provider == null) return null;
         ConnectionState state;
         Map<String, Object> event;
         try {
             state = connectionState();
             event = stateEvent(state);
         } catch (RuntimeException unavailable) {
-            return; // A state bug must never affect the tunnel.
+            return null; // A state bug must never affect the tunnel.
         }
         String key = state + "|" + event.get("connection") + "|" + event.get("windowGeneration")
                 + "|" + event.get("desired") + "|" + event.get("restoreActive")
                 + "|" + event.get("nativeRenewal");
         boolean changed = !key.equals(lastPublished);
-        if (!changed && !force) return;
+        if (!changed && !force) return state;
         if (!state.toString().equals(lastLoggedState)) {
             lastLoggedState = state.toString();
             log("state", state.kind.wire + "_" + state.reason);
@@ -393,9 +396,46 @@ public final class ClientApplication extends Application implements Tunnel {
             if (sink == null) return;
             try { sink.success(event); } catch (RuntimeException ignored) { /* Engine gone. */ }
         });
+        return state;
     }
 
     void publishState() { publishState(false); }
+
+    /** ADR-151: the fast state re-check and when its trigger happened (-1: none). Worker thread. */
+    private java.util.concurrent.ScheduledFuture<?> stateRecheck;
+    private long stateRecheckFrom = -1;
+
+    /**
+     * ADR-151, worker thread: re-read and publish the state every {@link
+     * ConnectionState#RECHECK_MS} for up to {@link ConnectionState#RECHECK_FOR_MS} after a window
+     * start, a restart in place or a network change, until it is connected. Before, nothing
+     * looked at the handshake between 15 s watch ticks, so «Восстановление связи» or
+     * «Подключение» stayed on screen long after the handshake. Display only: it restarts,
+     * stops or escalates nothing.
+     */
+    private void recheckStateSoon() {
+        stateRecheckFrom = SystemClock.elapsedRealtime();
+        if (stateRecheck == null || stateRecheck.isDone())
+            stateRecheck = worker.schedule(this::stateRecheckTick, ConnectionState.RECHECK_MS,
+                    TimeUnit.MILLISECONDS);
+    }
+
+    private void stateRecheckTick() {
+        stateRecheck = null;
+        try {
+            if (stateRecheckFrom < 0) return;
+            ConnectionState state = publishState(false);
+            long since = SystemClock.elapsedRealtime() - stateRecheckFrom;
+            if (ConnectionState.recheckSoon(state, tunnelUpNow(), since)) {
+                stateRecheck = worker.schedule(this::stateRecheckTick, ConnectionState.RECHECK_MS,
+                        TimeUnit.MILLISECONDS);
+            } else {
+                stateRecheckFrom = -1;
+            }
+        } catch (RuntimeException ignored) {
+            stateRecheckFrom = -1; // A state bug must never affect the tunnel.
+        }
+    }
 
     /** ADR-144, main thread: the UI engine subscribed to (sink) or left (null) the state stream. */
     void stateListener(io.flutter.plugin.common.EventChannel.EventSink sink) {
@@ -942,6 +982,7 @@ public final class ClientApplication extends Application implements Tunnel {
         watchdog.networkChanged(now, tunnelUpNow() ? (windowUpAt >= 0 ? windowUpAt : now) : -1);
         scheduleWatch(TunnelWatchdog.SETTLE_MS + 50);
         publishState();
+        if (tunnelUpNow()) recheckStateSoon(); // ADR-151
     }
 
     /**
@@ -1030,6 +1071,7 @@ public final class ClientApplication extends Application implements Tunnel {
             applyUnderlying();
             schedulePendingWatch(SystemClock.elapsedRealtime());
             publishState();
+            recheckStateSoon(); // ADR-151: the restart's handshake ends "network_changed" at once.
         } catch (Exception | LinkageError failed) {
             giveUpWindow("native_restart_failed");
         }
@@ -1639,7 +1681,8 @@ public final class ClientApplication extends Application implements Tunnel {
         value.put("desiredConnected", supervisor.desired());
         value.put("transport", ConnectionSupervisor.transport(supervisor.desired(), tunnelUp,
                 false, network, afterChange && handshakeAge <= 180,
-                watchdog.pendingNetworkDelayMs(SystemClock.elapsedRealtime()) >= 0, stalled));
+                watchdog.awaitingNetworkProof(SystemClock.elapsedRealtime(),
+                        handshakeAge < 0 ? -1 : handshakeAge * 1000), stalled));
         value.put("evidence", ConnectionSupervisor.evidence(tunnelUp, handshakeAge, afterChange, flowing));
         value.put("failureCategory", ConnectionSupervisor.category(tunnelUp ? "" : reason));
         // ADR-144: the authoritative connection state (the same one the state stream pushes).

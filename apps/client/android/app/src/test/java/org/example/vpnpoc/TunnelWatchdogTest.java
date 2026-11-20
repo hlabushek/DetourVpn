@@ -51,6 +51,31 @@ public class TunnelWatchdogTest {
         assertFalse(w.shouldRestart(214_000, 50_000, true)); // within 15 s of last restart
     }
 
+    /**
+     * ADR-151: after a restart in place the next watchdog check is 15.5 s away, but a handshake
+     * after the restart already proves the path; the displayed state must not wait for that check.
+     */
+    @Test public void aHandshakeAfterTheRestartEndsTheProofWaitBeforeTheNextCheck() {
+        var w = new TunnelWatchdog();
+        w.tunnelUp(0);
+        w.networkChanged(100_000, 0);
+        assertTrue(w.awaitingNetworkProof(100_100, 30_000)); // settling, old handshake
+        assertTrue(w.shouldRestart(100_500, 30_000, true));
+        w.restarted(100_500);
+        assertTrue(w.pendingNetworkDelayMs(102_000) >= 0); // trigger still pending (gap)
+        assertTrue(w.awaitingNetworkProof(101_000, 31_000)); // no handshake since the restart
+        assertTrue(w.awaitingNetworkProof(101_500, -1)); // no handshake at all
+        // Handshake 1 s after the restart, seen 2 s after it: proven, although still pending.
+        assertFalse(w.awaitingNetworkProof(102_500, 1_000));
+        assertTrue(w.pendingNetworkDelayMs(102_500) >= 0);
+        // Negative: a handshake from before the restart proves nothing.
+        assertTrue(w.awaitingNetworkProof(102_500, 3_000));
+        // Read-only: the trigger is still cleared only by decide().
+        assertFalse(w.shouldRestart(116_000, 14_000, true));
+        assertEquals(-1, w.pendingNetworkDelayMs(116_000));
+        assertFalse(w.awaitingNetworkProof(116_000, -1)); // nothing pending any more
+    }
+
     @Test public void networkChangeWhileDownIsIgnored() {
         var w = new TunnelWatchdog();
         w.networkChanged(10_000, -1);

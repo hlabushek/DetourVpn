@@ -81,6 +81,20 @@ final class TunnelWatchdog {
         return Math.max(0, Math.max(settle, gap));
     }
 
+    /**
+     * ADR-151: a network change (or the restart it caused) still waits for its proof: it is
+     * pending and no handshake newer than it is known. {@code handshakeAgeMs} is -1 when no
+     * handshake happened. The same "newer than the change" rule as {@link #decide}, but read-only:
+     * the pending trigger itself is cleared only by {@code decide}. Before, the displayed state used
+     * {@link #pendingNetworkDelayMs} alone, so a tunnel that had already shaken hands after a restart
+     * in place stayed "recovering/network_changed" until the next check, 15.5 s after the restart.
+     */
+    boolean awaitingNetworkProof(long now, long handshakeAgeMs) {
+        if (pendingNetworkDelayMs(now) < 0) return false;
+        boolean handshakeAfterChange = handshakeAgeMs >= 0 && handshakeAgeMs < now - networkChangedAt;
+        return !handshakeAfterChange;
+    }
+
     /** Returns true if the caller should restart now (see {@link #decide}). */
     boolean shouldRestart(long now, long handshakeAgeMs, boolean usableNetwork) {
         return decide(now, handshakeAgeMs, usableNetwork) == Action.RESTART;

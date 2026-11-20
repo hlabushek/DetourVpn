@@ -73,8 +73,18 @@ unverified.
   - Play Store exact-alarm and `systemExempted` policy check (ADR-147, manifest,
     `NativeRenewer.schedule`).
 
+## Tester bug fixes and audit (2026-11-21, autonomous run, committed locally, not pushed)
+Every entry is **build/unit-test verified only**: no APK, no Gradle, no device. Java results are
+the javac + JUnit substitute below (against the c6 SDK tree), not a Gradle pass.
+- **ADR-151** (UI kept «Восстановление связи» ~20 s after the handshake): commit `<pending>`. Native
+  state no longer waits 15.5 s for the watchdog to clear a proven restart; native re-checks the state
+  each second for 30 s after window start / restart / network change; Dart renders events during a
+  poll and the poll's first snapshot before its API call. Tests: Java 249 + 7 passed, `flutter test`
+  318 passed, analyze only the `assets/orbit/` warning. Unverified on device: the time to
+  «Подключено» after a Wi-Fi switch.
+
 ## Rules for the next agent
-- One phase at a time, with one ADR per phase in `docs/adr/` (next free number: 150).
+- One phase at a time, with one ADR per phase in `docs/adr/` (next free number: 152).
 - Commit locally with the owner's OK. No push.
 - No `flutter build`, no `gradlew assemble`, no release or deploy scripts, no adb or device tests,
   and no server changes without explicit approval.

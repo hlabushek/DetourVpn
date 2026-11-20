@@ -34,6 +34,23 @@ final class ConnectionState {
     static final long AWAIT_HANDSHAKE_MS = 30_000;
     /** Inbound bytes from just before a network change prove nothing about the new path. */
     static final long NETWORK_CHANGE_RECENT_MS = 60_000;
+    /**
+     * ADR-151: after a window start, a restart in place or a network change, the state is
+     * re-read this often (instead of only on the 15 s watch tick), so the first handshake shows
+     * «Подключено» within about a second.
+     */
+    static final long RECHECK_MS = 1_000;
+    /** ADR-151: how long after such a trigger the fast re-check runs at most. */
+    static final long RECHECK_FOR_MS = 30_000;
+
+    /**
+     * ADR-151: whether to re-read the state again in {@link #RECHECK_MS}: only while a tunnel is
+     * up, not yet shown as connected, and the trigger is less than {@link #RECHECK_FOR_MS} old.
+     */
+    static boolean recheckSoon(ConnectionState state, boolean tunnelUp, long sinceTriggerMs) {
+        return state != null && tunnelUp && sinceTriggerMs >= 0 && sinceTriggerMs < RECHECK_FOR_MS
+                && state.kind != Kind.CONNECTED;
+    }
 
     /** Facts read on the worker thread. Plain fields; built once per evaluation. */
     static final class Facts {
@@ -49,7 +66,11 @@ final class ConnectionState {
         long handshakeAgeSeconds = -1;
         /** Milliseconds since the default network changed, or -1 if it never changed. */
         long networkChangeAgeMs = -1;
-        /** The watchdog is still verifying the path after a network change. */
+        /**
+         * The watchdog is still verifying the path after a network change, and no handshake newer
+         * than that change (or the restart it caused) is known ({@link
+         * TunnelWatchdog#awaitingNetworkProof}, ADR-151).
+         */
         boolean restartPending;
         /** Inbound bytes progressed recently ({@link DataPathWatch#flowing}). */
         boolean inboundFlowing;

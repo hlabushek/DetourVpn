@@ -28,6 +28,31 @@ public class ConnectionStateTest {
         assertEquals("connected:verified", of(f));
     }
 
+    /** ADR-151: the fast re-check runs only while a tunnel is up, not connected, for 30 s. */
+    @Test public void theFastRecheckStopsWhenConnectedDownOrAfterThirtySeconds() {
+        var connecting = new ConnectionState(ConnectionState.Kind.CONNECTING, "awaiting_handshake");
+        var recovering = new ConnectionState(ConnectionState.Kind.RECOVERING, "network_changed");
+        var connected = new ConnectionState(ConnectionState.Kind.CONNECTED, "verified");
+        org.junit.Assert.assertTrue(ConnectionState.recheckSoon(connecting, true, 0));
+        org.junit.Assert.assertTrue(ConnectionState.recheckSoon(recovering, true, 29_999));
+        org.junit.Assert.assertFalse(ConnectionState.recheckSoon(recovering, true, 30_000));
+        org.junit.Assert.assertFalse(ConnectionState.recheckSoon(connected, true, 1_000));
+        org.junit.Assert.assertFalse(ConnectionState.recheckSoon(recovering, false, 1_000));
+        org.junit.Assert.assertFalse(ConnectionState.recheckSoon(null, true, 1_000));
+        org.junit.Assert.assertFalse(ConnectionState.recheckSoon(connecting, true, -1));
+    }
+
+    /** ADR-151: once the restart's handshake is known, the pending trigger no longer shows. */
+    @Test public void aProvenRestartShowsConnectedWhileTheTriggerIsStillPending() {
+        var f = up();
+        f.networkChangeAgeMs = 3_000; // the change; the restart followed 0.5 s later
+        f.handshakeAgeSeconds = 1; // after the restart
+        f.restartPending = false; // awaitingNetworkProof: proven
+        assertEquals("connected:verified", of(f));
+        f.restartPending = true; // still unproven
+        assertEquals("recovering:network_changed", of(f));
+    }
+
     @Test public void aHandshakeOlderThanTheRejectTimeIsStale() {
         var f = up();
         f.handshakeAgeSeconds = 181;

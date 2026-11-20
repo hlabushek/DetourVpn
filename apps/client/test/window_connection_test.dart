@@ -1967,6 +1967,79 @@ void main() {
     });
 
     test(
+      'ADR-151: a poll shows native\'s state before its API round trip ends',
+      () async {
+        final held = _HeldGets(api);
+        final ui = android(on: held);
+        await ui.connect();
+        state
+          ..stateCode = 'recovering'
+          ..reasonCode = 'network_changed';
+        await ui.refresh();
+        expect(ui.phase, ConnectionPhase.reconnecting);
+        // The handshake arrived; the API is slow through the fresh tunnel.
+        state
+          ..stateCode = 'connected'
+          ..reasonCode = 'verified';
+        held.hold();
+        final poll = ui.refresh();
+        await Future<void>.delayed(Duration.zero);
+        expect(ui.phase, ConnectionPhase.connected);
+        expect(ui.detail, 'Связь через VPN подтверждена');
+        held.release();
+        await poll;
+        expect(ui.phase, ConnectionPhase.connected);
+      },
+    );
+
+    test(
+      'ADR-151: a pushed event is rendered while a poll is in flight',
+      () async {
+        final held = _HeldGets(api);
+        final ui = android(on: held);
+        await ui.connect();
+        state
+          ..stateCode = 'recovering'
+          ..reasonCode = 'network_changed';
+        held.hold();
+        final poll = ui.refresh();
+        await Future<void>.delayed(Duration.zero);
+        expect(ui.phase, ConnectionPhase.reconnecting);
+        state.push(
+          const NativeStateEvent(
+            state: 'connected',
+            reason: 'verified',
+            up: true,
+          ),
+          connectionId: connection,
+        );
+        await Future<void>.delayed(Duration.zero);
+        expect(
+          ui.phase,
+          ConnectionPhase.connected,
+          reason: 'before, the event was dropped until the poll ended',
+        );
+        // Negative: an event for another connection is not rendered as ours.
+        state.push(
+          const NativeStateEvent(
+            state: 'recovering',
+            reason: 'handshake_stale',
+            up: true,
+          ),
+          connectionId: '77777777-7777-4777-8777-777777777777',
+        );
+        await Future<void>.delayed(Duration.zero);
+        expect(ui.phase, ConnectionPhase.connected);
+        state
+          ..stateCode = 'connected'
+          ..reasonCode = 'verified';
+        held.release();
+        await poll;
+        expect(ui.phase, ConnectionPhase.connected);
+      },
+    );
+
+    test(
       'polling pauses in the background while native renews, and resumes',
       () async {
         final ui = android();
@@ -2106,6 +2179,29 @@ class _FlakyGets implements TunnelApi {
         method == 'GET' &&
         path == '${WindowConnectionController.root}/$connection') {
       throw const ClientError('network_unavailable');
+    }
+    return inner.call(method, path, body);
+  }
+}
+
+/// TEST ONLY: holds the poll's connection GET until [release] (ADR-151, slow API).
+class _HeldGets implements TunnelApi {
+  _HeldGets(this.inner);
+  final WindowsApi inner;
+  Completer<void>? held;
+  void hold() => held = Completer<void>();
+  void release() => held?.complete();
+  @override
+  Future<Map<String, dynamic>> call(
+    String method,
+    String path, [
+    Map<String, dynamic>? body,
+  ]) async {
+    final gate = held;
+    if (gate != null &&
+        method == 'GET' &&
+        path == '${WindowConnectionController.root}/$connection') {
+      await gate.future;
     }
     return inner.call(method, path, body);
   }
