@@ -109,13 +109,23 @@ the javac + JUnit substitute below (against the c6 SDK tree), not a Gradle pass.
     client gave up on a black-holed upstream held one of the 8 relay slots until TCP aborted; eight
     blocked every restore-engine API call. The other direction now gets 15 s after the first ends.
     Tests: Java 253 + 9 passed. Unverified on device.
-  - **ADR-157** (companion stop crash): commit right after `e62fd6b`. `stopService()` could reach
+  - **ADR-157** (companion stop crash): commit `c51f5ca`. `stopService()` could reach
     the companion before its `startForeground()`, which Android reports as an app crash (taking the
     VPN service with it). The stop now waits until the companion runs in the foreground. Tests: Java
     254 + 10 passed. Unverified on device.
+- Final checks of this run (after `c51f5ca`): Java substitute 254 + 10 passed; `flutter test` 320
+  passed (last Dart change: ADR-154); `flutter analyze` on an ASCII copy: only the expected
+  `assets/orbit/` warning; `dart format`: clean. The Java substitute now also runs
+  `ConnectionWiringTest` from `apps/client/android/app` (it reads source files, like
+  `SystemIntegrationWiringTest`).
+- Found, not fixed (need an owner decision): a failing `sessionRead` at cold start erases the
+  saved session (`main.dart` `restore()`); the server picker disables every server while the last
+  catalog refresh failed (`region_picker.dart`, `nodesError != null`), so a transient catch-up
+  failure needs a manual pull-to-refresh; handshake ages are wall-clock based (a large clock step can
+  look like a stale handshake to the watchdog).
 
 ## Rules for the next agent
-- One phase at a time, with one ADR per phase in `docs/adr/` (next free number: 152).
+- One phase at a time, with one ADR per phase in `docs/adr/` (next free number: 158).
 - Commit locally with the owner's OK. No push.
 - No `flutter build`, no `gradlew assemble`, no release or deploy scripts, no adb or device tests,
   and no server changes without explicit approval.
