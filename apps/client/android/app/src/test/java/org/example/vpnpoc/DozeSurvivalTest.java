@@ -12,6 +12,12 @@ public class DozeSurvivalTest {
     private static final String R = "22222222-2222-4222-8222-222222222222";
     private static final String W = "33333333-3333-4333-8333-333333333333";
 
+    /** ADR-157: a companion that is not yet in the foreground is never stopped. */
+    @Test public void theCompanionIsStoppedOnlyOnceItRunsInTheForeground() {
+        org.junit.Assert.assertTrue(DozeSurvival.companionMayStop(true));
+        org.junit.Assert.assertFalse(DozeSurvival.companionMayStop(false));
+    }
+
     @Test public void exactAlarmsNeedThePermissionFromAndroid12() {
         assertTrue("no permission exists before API 31", DozeSurvival.exactAlarmAllowed(30, false));
         assertTrue(DozeSurvival.exactAlarmAllowed(31, true));

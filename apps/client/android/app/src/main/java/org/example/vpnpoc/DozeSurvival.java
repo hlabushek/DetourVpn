@@ -46,6 +46,17 @@ final class DozeSurvival {
     }
 
     /**
+     * ADR-157: the companion may be stopped only once it is in the foreground. A service started
+     * with {@code startForegroundService} that is stopped before it called {@code startForeground}
+     * is reported by Android as a crash of the app process ("did not then call
+     * startForeground"), which would also end the VPN service in the same process. A requested
+     * but not yet running companion is stopped by the check that follows its start instead.
+     */
+    static boolean companionMayStop(boolean running) {
+        return running;
+    }
+
+    /**
      * 3.4: a backstop run sends {@code freshSignal("backstop")} only when the VPN is wanted, no
      * tunnel is up and no recovery attempt is in flight. All other cases do nothing.
      */

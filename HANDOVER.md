@@ -105,10 +105,14 @@ the javac + JUnit substitute below (against the c6 SDK tree), not a Gradle pass.
   on device; the tester's actual cause is not proven (look for `native_init_failed` in the event
   log). Open: a failing `sessionRead` at cold start still erases the session (see ADR-155).
 - Stage 2 audit:
-  - **ADR-156** (protected API relay): commit right after `24acf69`. A relayed connection whose
+  - **ADR-156** (protected API relay): commit `e62fd6b`. A relayed connection whose
     client gave up on a black-holed upstream held one of the 8 relay slots until TCP aborted; eight
     blocked every restore-engine API call. The other direction now gets 15 s after the first ends.
     Tests: Java 253 + 9 passed. Unverified on device.
+  - **ADR-157** (companion stop crash): commit right after `e62fd6b`. `stopService()` could reach
+    the companion before its `startForeground()`, which Android reports as an app crash (taking the
+    VPN service with it). The stop now waits until the companion runs in the foreground. Tests: Java
+    254 + 10 passed. Unverified on device.
 
 ## Rules for the next agent
 - One phase at a time, with one ADR per phase in `docs/adr/` (next free number: 152).

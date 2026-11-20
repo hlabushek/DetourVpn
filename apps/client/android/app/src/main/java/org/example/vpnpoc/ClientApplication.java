@@ -741,6 +741,13 @@ public final class ClientApplication extends Application implements Tunnel {
             }
         } else if (!wanted && (companionRequested || companionRunning)) {
             companionRequested = false;
+            // ADR-157: never stop it between startForegroundService() and its startForeground():
+            // Android reports that as a crash of the whole process (and with it the VPN service).
+            // companionStarted() re-runs this check once it is in the foreground and stops it then.
+            if (!DozeSurvival.companionMayStop(companionRunning)) {
+                log("companion_stop_deferred");
+                return;
+            }
             try {
                 stopService(new android.content.Intent(this, RecoveryCompanionService.class));
                 log("companion_stop");

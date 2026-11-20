@@ -43,6 +43,26 @@ public class ConnectionWiringTest {
         assertTrue(begin.indexOf("watchdog.tunnelUp(now)") > begin.indexOf("windowUpAt = now"));
     }
 
+    /**
+     * ADR-157: stopService on the companion happens only after the running check, and a
+     * companion that reaches the foreground re-runs the decision (which then stops it).
+     */
+    @Test public void theCompanionIsNeverStoppedBeforeItIsInTheForeground() throws Exception {
+        String app = source("ClientApplication.java");
+        String aids = body(app, "private void updateDozeAids()");
+        int guard = aids.indexOf("DozeSurvival.companionMayStop(companionRunning)");
+        int stop = aids.indexOf("stopService(");
+        assertTrue("guarded before the stop", guard >= 0 && stop > guard);
+        assertTrue(aids.indexOf("stopService(") == aids.lastIndexOf("stopService("));
+        String started = body(app, "void companionStarted()");
+        assertTrue(started.indexOf("companionRunning = true")
+                < started.indexOf("worker.execute(this::updateDozeAids)"));
+        String service = source("RecoveryCompanionService.java");
+        String start = body(service, "public int onStartCommand(");
+        assertTrue("reported only after startForeground",
+                start.indexOf("startForeground(") < start.indexOf("companionStarted()"));
+    }
+
     /** ADR-155: a failed native init is retried before UI calls and before a restore engine. */
     @Test public void aFailedNativeInitIsRetriedBeforeItIsNeeded() throws Exception {
         String app = source("ClientApplication.java");
