@@ -79,6 +79,62 @@ public final class ProtectedApiRelayTest {
         }
     }
 
+    /**
+     * ADR-156: a client that gives up on an upstream that never answers or closes (a black-holed
+     * path) frees its relay slot after the drain bound. Before, eight such requests held all
+     * slots and the ninth API call was refused.
+     */
+    @Test public void abandonedConnectionsToASilentUpstreamFreeTheirSlots() throws Exception {
+        try (ServerSocket origin = new ServerSocket(0, 16, InetAddress.getByName("127.0.0.1"))) {
+            java.util.List<Socket> held = new java.util.concurrent.CopyOnWriteArrayList<>();
+            java.util.concurrent.Semaphore accepted = new java.util.concurrent.Semaphore(0);
+            AtomicReference<Throwable> originFailure = new AtomicReference<>();
+            Thread originThread = new Thread(() -> {
+                try {
+                    for (int i = 0; i < 9; i++) {
+                        Socket peer = origin.accept();
+                        if (i < 8) { held.add(peer); accepted.release(); continue; } // silent
+                        try (Socket answering = peer) {
+                            assertEquals("ping", new String(answering.getInputStream().readNBytes(4),
+                                    StandardCharsets.US_ASCII));
+                            answering.getOutputStream().write("pong".getBytes(StandardCharsets.US_ASCII));
+                            answering.getOutputStream().flush();
+                        }
+                    }
+                } catch (Exception failure) {
+                    originFailure.set(failure);
+                }
+            });
+            originThread.start();
+            try (ProtectedApiRelay relay = new ProtectedApiRelay(
+                    "127.0.0.1", origin.getLocalPort(), socket -> true, 100)) {
+                byte[] preface = ("DETOUR-RELAY/1 " + relay.token() + "\r\n")
+                        .getBytes(StandardCharsets.US_ASCII);
+                for (int i = 0; i < 8; i++) {
+                    try (Socket client = new Socket("127.0.0.1", relay.port())) {
+                        client.getOutputStream().write(preface);
+                        client.getOutputStream().flush();
+                        assertTrue(accepted.tryAcquire(2, TimeUnit.SECONDS));
+                    } // the client gives up; the upstream stays silent and open
+                }
+                Thread.sleep(600); // past the 100 ms drain bound of every abandoned connection
+                try (Socket client = new Socket("127.0.0.1", relay.port())) {
+                    client.setSoTimeout(3000);
+                    client.getOutputStream().write(preface);
+                    client.getOutputStream().write("ping".getBytes(StandardCharsets.US_ASCII));
+                    client.getOutputStream().flush();
+                    byte[] response = client.getInputStream().readNBytes(4);
+                    assertEquals("a ninth request is still relayed", "pong",
+                            new String(response, StandardCharsets.US_ASCII));
+                }
+            } finally {
+                for (Socket socket : held) socket.close();
+            }
+            originThread.join(2000);
+            if (originFailure.get() != null) throw new AssertionError(originFailure.get());
+        }
+    }
+
     @Test public void invalidTokenNeverOpensTheConfiguredUpstreamSocket() throws Exception {
         try (ServerSocket origin = new ServerSocket(0, 4, InetAddress.getByName("127.0.0.1"));
                 ProtectedApiRelay relay = new ProtectedApiRelay(

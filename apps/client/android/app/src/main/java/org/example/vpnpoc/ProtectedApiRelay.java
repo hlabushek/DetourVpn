@@ -32,8 +32,14 @@ final class ProtectedApiRelay implements AutoCloseable {
     private static final int CONNECT_TIMEOUT_MS = 5000;
     private static final int PREFACE_TIMEOUT_MS = 3000;
     private static final int MAX_PREFACE_BYTES = 96;
+    /**
+     * ADR-156: after one direction of a relayed connection ended, the other one gets this long to
+     * finish (a half-closed request still receives its response); then both sockets are closed.
+     */
+    static final long DRAIN_MS = 15_000;
 
     private final String host;
+    private final long drainMs;
     private final int port;
     private final SocketProtector protector;
     private final byte[] token = new byte[32];
@@ -67,9 +73,17 @@ final class ProtectedApiRelay implements AutoCloseable {
 
     /** Package-private seam for JVM tests; production origins use forApiOrigin. */
     ProtectedApiRelay(String host, int port, SocketProtector protector) throws IOException {
-        if (host == null || host.isBlank() || port < 1 || port > 65535 || protector == null)
+        this(host, port, protector, DRAIN_MS);
+    }
+
+    /** Package-private seam for JVM tests (a short drain bound). */
+    ProtectedApiRelay(String host, int port, SocketProtector protector, long drainMs)
+            throws IOException {
+        if (host == null || host.isBlank() || port < 1 || port > 65535 || protector == null
+                || drainMs < 0)
             throw new IllegalArgumentException();
         this.host = host;
+        this.drainMs = drainMs;
         this.port = port;
         this.protector = protector;
         new SecureRandom().nextBytes(token);
@@ -144,19 +158,29 @@ final class ProtectedApiRelay implements AutoCloseable {
         return MessageDigest.isEqual(expected, java.util.Arrays.copyOf(received, length));
     }
 
+    /**
+     * ADR-156: returns once both directions ended, or {@link #drainMs} after the first one did.
+     * The caller then closes both sockets, which unblocks a copy still waiting on a dead peer.
+     * Before, it waited for both without a bound: the upstream read has no timeout, so a client
+     * that gave up on a black-holed upstream left this slot (of 8) held until TCP itself gave up,
+     * and eight such requests blocked the relay for every later API call.
+     */
     private void pipeBothWays(Socket left, Socket right) throws IOException {
         CountDownLatch completed = new CountDownLatch(2);
-        copies.execute(() -> copy(left, right, completed));
-        copies.execute(() -> copy(right, left, completed));
+        CountDownLatch first = new CountDownLatch(1);
+        copies.execute(() -> copy(left, right, completed, first));
+        copies.execute(() -> copy(right, left, completed, first));
         try {
-            completed.await();
+            first.await();
+            completed.await(drainMs, TimeUnit.MILLISECONDS);
         } catch (InterruptedException interrupted) {
             Thread.currentThread().interrupt();
             throw new IOException("relay_interrupted");
         }
     }
 
-    private static void copy(Socket source, Socket target, CountDownLatch completed) {
+    private static void copy(Socket source, Socket target, CountDownLatch completed,
+            CountDownLatch first) {
         try {
             byte[] buffer = new byte[8192];
             InputStream input = new BufferedInputStream(source.getInputStream());
@@ -171,6 +195,7 @@ final class ProtectedApiRelay implements AutoCloseable {
             // Closing the paired sockets in relay() unblocks the other copy direction.
         } finally {
             completed.countDown();
+            first.countDown();
         }
     }
 
