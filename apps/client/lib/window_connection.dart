@@ -733,7 +733,24 @@ class WindowConnectionController extends ConnectionController {
 
   @override
   Future<void> connect() async {
-    if (busy || _polling || _dead) return;
+    if (busy || _dead) return;
+    if (_polling) {
+      // ADR-154: a tap while a poll runs (on return to the app it reconciles with native and
+      // the server, up to one API timeout) waits for that poll instead of being dropped
+      // silently. Busy meanwhile, so no new poll starts and the screen shows the attempt.
+      _working = true;
+      _emit();
+      try {
+        await _refreshWork;
+      } finally {
+        _working = false;
+      }
+      // The poll may have adopted native's tunnel or left a revoke pending: never replace it.
+      if (busy || _polling || _dead || hasLease || remotePending) {
+        _emit();
+        return;
+      }
+    }
     _working = true;
     final version = ++_version;
     _reconnectAfterCleanup = false;

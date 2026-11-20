@@ -311,6 +311,56 @@ void main() {
   Widget settingsHost() => MaterialApp(
     home: SettingsScreen(onTheme: () {}, controller: c),
   );
+
+  WindowConnectionController heldController(_HeldList held) {
+    final value = WindowConnectionController(
+      held,
+      native,
+      pollInterval: const Duration(days: 1),
+      renewBeforeMs: 90000,
+    )..selectedNode = node;
+    addTearDown(value.dispose);
+    return value;
+  }
+
+  test(
+    'ADR-154: a connect tap during a poll waits for it instead of being dropped',
+    () async {
+      final held = _HeldList(api);
+      final ui = heldController(held);
+      final poll = ui.refresh(); // reconcile, held at the connection list
+      await Future<void>.delayed(Duration.zero);
+      expect(held.holds, 1);
+      final tap = ui.connect();
+      await Future<void>.delayed(Duration.zero);
+      expect(ui.busy, isTrue, reason: 'the tap is shown as an attempt at once');
+      expect(api.creates, 0);
+      held.held.complete();
+      await poll;
+      await tap;
+      expect(api.creates, 1, reason: 'before, the tap was ignored');
+      expect(ui.hasLease, isTrue);
+    },
+  );
+
+  test(
+    'ADR-154 (negative): a poll that leaves a revoke pending is not replaced by the tap',
+    () async {
+      api
+        ..oldConnection = true
+        ..failDeletes = true;
+      final held = _HeldList(api);
+      final ui = heldController(held);
+      final poll = ui.refresh();
+      await Future<void>.delayed(Duration.zero);
+      final tap = ui.connect();
+      held.held.complete();
+      await poll;
+      await tap;
+      expect(ui.remotePending, isTrue);
+      expect(api.creates, 0, reason: 'no second connection while one is held');
+    },
+  );
   testWidgets(
     'apps-outside-VPN row opens the screen directly while VPN is off',
     (tester) async {
@@ -2179,6 +2229,26 @@ class _FlakyGets implements TunnelApi {
         method == 'GET' &&
         path == '${WindowConnectionController.root}/$connection') {
       throw const ClientError('network_unavailable');
+    }
+    return inner.call(method, path, body);
+  }
+}
+
+/// TEST ONLY: holds the reconcile's connection-list GET until [release] (ADR-154, slow poll).
+class _HeldList implements TunnelApi {
+  _HeldList(this.inner);
+  final WindowsApi inner;
+  final held = Completer<void>();
+  int holds = 0;
+  @override
+  Future<Map<String, dynamic>> call(
+    String method,
+    String path, [
+    Map<String, dynamic>? body,
+  ]) async {
+    if (method == 'GET' && path == WindowConnectionController.root) {
+      holds++;
+      await held.future;
     }
     return inner.call(method, path, body);
   }

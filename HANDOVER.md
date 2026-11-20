@@ -87,11 +87,16 @@ the javac + JUnit substitute below (against the c6 SDK tree), not a Gradle pass.
   stopped" and ended native renewal; the window then expired. Now a timeout retries after 5 s, and
   the `apps` call runs off the tunnel worker. Tests: Java 250 + 7 passed (no Dart change).
   Unverified on device: renewal while the split-apps screen loads.
-- **ADR-153** (rare random drops, second cause): commit right after `b8659c3`. The watchdog kept
+- **ADR-153** (rare random drops, second cause): commit `0c3fdc3`. The watchdog kept
   the old window's start, network trigger and spent restart budget when a new window started
   within 15 s of a stop, so the new window could be restarted or given up (`NEW_LEASE`) at its
   first tick. `stop()` and `prepareWindow()` now reset it; `beginWindow()` starts it. Tests: Java
   251 + 8 passed (new `ConnectionWiringTest`, run from `apps/client/android/app`). Unverified on
+  device.
+- **ADR-154** (connect needs retries): commit right after `0c3fdc3`. A tap on «Подключить» while
+  a poll ran (on return to the app it reconciles, up to one API timeout) was silently ignored. It
+  now waits for the poll (shown as busy) and then connects, unless the poll left a connection or a
+  pending revoke. Tests: `flutter test` 320 passed, analyze only `assets/orbit/`. Unverified on
   device.
 
 ## Rules for the next agent
