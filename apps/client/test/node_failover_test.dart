@@ -214,6 +214,39 @@ void main() {
     expect(local.nodes, isEmpty);
   });
 
+  testWidgets(
+    'ADR-159: a failed catalog refresh keeps the last list selectable',
+    (tester) async {
+      tester.view.physicalSize = const Size(400, 1200);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      await c.refreshNodes();
+      api.catalogFails = true;
+      await c.refreshNodes();
+      expect(c.nodesError, 'network_unavailable');
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Builder(
+            builder: (context) => TextButton(
+              onPressed: () => RegionPickerScreen.open(context, c),
+              child: const Text('open'),
+            ),
+          ),
+        ),
+      );
+      await tester.tap(find.text('open'));
+      await tester.pumpAndSettle();
+      // The picker's own refresh failed again; the notice is informational only.
+      expect(c.nodesError, 'network_unavailable');
+      expect(find.byKey(const ValueKey('nodes-stale-notice')), findsOneWidget);
+      await tester.tap(find.text('TEST ONLY B · test-b'));
+      await tester.pumpAndSettle();
+      expect(c.selectedNode, b);
+      expect(find.text('Выберите сервер'), findsNothing);
+    },
+  );
+
   testWidgets('node choices and recovery warning fit narrow large-text UI', (
     tester,
   ) async {

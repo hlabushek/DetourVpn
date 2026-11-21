@@ -128,14 +128,18 @@ the javac + JUnit substitute below (against the c6 SDK tree), not a Gradle pass.
 Autonomous run, committed locally, not pushed. Every entry is **unit-test verified only**: no APK,
 no Gradle, no device, no real network or API failover. A commit's own SHA is filled in by the next
 commit (a commit cannot contain its own hash).
-- **ADR-158** (cold start erased the session on a read error): commit `<filled by next commit>`.
+- **ADR-158** (cold start erased the session on a read error): commit `5eac2dd`.
   A failing `sessionRead` now raises `session_storage_unavailable` and keeps the record; a refresh
   answered with anything but 401 keeps the token; `restore()` erases nothing itself and keeps the
   session after its bounded retry. Tests: `flutter test` 323 passed; `flutter analyze` (ASCII copy)
   only the `assets/orbit/` warning. Code complete, ready for build and device testing.
+- **ADR-159** (server picker blocked after a failed refresh): commit `<filled by next commit>`.
+  The last loaded list stays selectable; the failure is a non-blocking notice. Tests: `flutter test`
+  324 passed; analyze only the `assets/orbit/` warning. Code complete, ready for build and device
+  testing.
 
 ## Rules for the next agent
-- One phase at a time, with one ADR per phase in `docs/adr/` (next free number: 159).
+- One phase at a time, with one ADR per phase in `docs/adr/` (next free number: 160).
 - Commit locally with the owner's OK. No push.
 - No `flutter build`, no `gradlew assemble`, no release or deploy scripts, no adb or device tests,
   and no server changes without explicit approval.

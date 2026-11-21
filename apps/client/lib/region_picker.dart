@@ -126,8 +126,9 @@ class _RegionPickerScreenState extends State<RegionPickerScreen> {
     Widget card(NodeOption node, {bool compact = false}) {
       final state = serverState(node.reason);
       final selected = c.selectedNode == node.id;
-      final enabled =
-          !locked && c.nodesError == null && node.reason == 'available';
+      // ADR-159: a failed refresh keeps the last loaded list selectable; the server still
+      // validates the node when the lease is created.
+      final enabled = !locked && node.reason == 'available';
       return OrbitAppear(
         index: order++,
         child: Padding(
@@ -235,10 +236,13 @@ class _RegionPickerScreenState extends State<RegionPickerScreen> {
               ),
             ),
           if (c.nodesError != null)
-            const Padding(
-              padding: EdgeInsets.only(bottom: 16),
+            Padding(
+              padding: const EdgeInsets.only(bottom: 16),
               child: OrbitNotice(
-                text: 'Каталог не обновлён; прежние статусы устарели.',
+                key: const ValueKey('nodes-stale-notice'),
+                text: c.nodes.isEmpty
+                    ? 'Не удалось загрузить список серверов. Потяните вниз, чтобы повторить.'
+                    : 'Список не обновился: показан последний загруженный, статусы могли устареть.',
               ),
             ),
           if (c is! WindowConnectionController)
