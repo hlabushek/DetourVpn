@@ -149,15 +149,20 @@ commit (a commit cannot contain its own hash).
   never moves. Native renewal and the restore engine still use the primary only. Tests:
   `flutter test` 342 passed; analyze only the `assets/orbit/` warning. Code complete, ready for
   build and device testing.
-- **ADR-162** (offline grace): commit `<filled by next commit>`. A renewal that cannot reach any
+- **ADR-162** (offline grace): commit `3fc90aa`. A renewal that cannot reach any
   API origin starts a grace that ends at the earlier of one hour and the lease's own deadline (never
   extends the lease); the home screen shows «Нет связи с сервером. VPN работает по текущему доступу
   ещё N мин». A tunnel that drops while offline restarts on its still-valid lease (max 3 per streak,
   foreground only). No brand-new connect offline. Tests: `flutter test` 353 passed; analyze only
   the `assets/orbit/` warning. Code complete, ready for build and device testing.
+- **ADR-163** (API high-availability strategy): documentation only, commit `<filled by next
+  commit>`. Client parts are ADR-161/162; the server work (second instance on another provider,
+  shared PostgreSQL with replica and failover, DNS failover/geo-steering, a health endpoint,
+  database-level idempotency for money/reward operations, node-agent and native-path fallbacks) is
+  **not built**, and needs owner decisions and approval. No server was touched.
 
 ## Rules for the next agent
-- One phase at a time, with one ADR per phase in `docs/adr/` (next free number: 163).
+- One phase at a time, with one ADR per phase in `docs/adr/` (next free number: 164).
 - Commit locally with the owner's OK. No push.
 - No `flutter build`, no `gradlew assemble`, no release or deploy scripts, no adb or device tests,
   and no server changes without explicit approval.
