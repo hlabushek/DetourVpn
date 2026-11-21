@@ -6,8 +6,8 @@ The database layer now accepts a remote TLS database (ADR-166), unit-tested only
 ## Decisions in force
 
 - **One database for primary and backup:** a managed Neon PostgreSQL, migrated from the old host.
-- **TLS to the database:** required. Use `sslmode=verify-full` (recommended) or `require`.
-  `require` encrypts but does not verify the certificate (ADR-166, Security notes).
+- **TLS to the database:** `sslmode=verify-full` is the only accepted mode for a remote host.
+  `require`, `verify-ca`, `disable`, `allow` and `prefer` are refused (ADR-166).
 - **Direct endpoint, not the pooler:** use the Neon host without `-pooler` (ADR-166).
 - **No Docker:** the API runs under systemd with uvicorn, like the existing beta unit.
 - **No CORS:** the Flutter app is native and does not send browser CORS requests.
@@ -40,14 +40,62 @@ The database layer now accepts a remote TLS database (ADR-166), unit-tested only
    Two changes from Neon's default string, which are required by the API:
    - use the scheme `postgresql+psycopg://` instead of `postgresql://`;
    - remove `-pooler` from the host;
-   - keep only `sslmode` (and optionally `channel_binding=require`) as query parameters.
+   - keep only `sslmode=verify-full` (required) and optionally `channel_binding=require` as query parameters.
 
    **Do not paste the password into chat.** I do not have your Neon string.
 
 3. Check the server version: `psql "<DIRECT_URL_WITHOUT_+psycopg>" -c 'show server_version'`
    (replace `postgresql+psycopg://` with `postgresql://` for `psql`).
 
-### A2. Dump and restore (on the old host)
+### A2. Running the migration from Windows
+
+The script must run **on the old host**, because the source database listens only on
+loopback there. From Windows you copy the script to that host over SSH and run it there.
+Neon is reachable from the old host over the internet, so no tunnel is needed.
+
+**Option 1 (recommended): copy and run over SSH, from PowerShell**
+
+These are placeholders. Use your own key path, user and old-host address.
+
+```powershell
+scp -i "<PATH_TO_SSH_KEY>" "scripts\migrate_db_to_neon.sh" "<USER>@<OLD_HOST>:/root/migrate_db_to_neon.sh"
+ssh -i "<PATH_TO_SSH_KEY>" "<USER>@<OLD_HOST>"
+```
+
+Then, in the SSH session on the old host (bash):
+
+```bash
+# 1. Make sure the script has Unix line endings (it was edited on Windows).
+sed -i 's/\r$//' /root/migrate_db_to_neon.sh
+
+# 2. Install a PostgreSQL client matching the source and Neon (see A1 step 3).
+sudo apt-get update && sudo apt-get install -y postgresql-client-17
+
+# 3. Stop the old API so the dump is consistent (use its real service name).
+sudo systemctl stop <OLD_API_SERVICE>
+
+# 4. Enter the URLs without them appearing on screen or in shell history.
+read -rsp 'Source URL (local): ' SOURCE_DATABASE_URL; echo; export SOURCE_DATABASE_URL
+read -rsp 'Neon URL (direct, verify-full): ' TARGET_DATABASE_URL; echo; export TARGET_DATABASE_URL
+
+# 5. Run the migration. The dump is written to a 0600 directory.
+export DUMP_DIR=/root/neon-migration
+bash /root/migrate_db_to_neon.sh
+
+# 6. When you have checked the output, delete the dump and the copied script.
+rm -f /root/neon-migration/*.dump /root/migrate_db_to_neon.sh
+unset SOURCE_DATABASE_URL TARGET_DATABASE_URL
+```
+
+Use `sudo -i` first if your SSH user is not root.
+
+**Option 2: WSL with an SSH tunnel (only if you cannot run on the old host)**
+
+Open an SSH tunnel to the old database port from Windows, then run the script inside WSL with
+`SOURCE_DATABASE_URL` pointing at the local end of the tunnel. Install `postgresql-client-17` in WSL first.
+Git Bash is not recommended: it does not ship `pg_dump`.
+
+### A3. Dump and restore (on the old host)
 
 Stop the old API first so the dump is consistent. Use the service name on that host.
 
@@ -154,7 +202,7 @@ in ufw as you asked, but nothing listens on it until a node is installed. Close 
 
 ## Tests
 
-- `services/api/tests/test_database_config.py`: 30 tests, all passed (ADR-166).
+- `services/api/tests/test_database_config.py`: 31 tests, all passed (ADR-166).
 - Full API suite from the repo root with the project virtualenv: 726 passed, 413 skipped. The
   skipped tests need `VPN_TEST_DATABASE_URL` (a real PostgreSQL) and were not run.
 - The deploy and migration scripts: `bash -n` only. shellcheck was not available.

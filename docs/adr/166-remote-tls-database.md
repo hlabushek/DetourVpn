@@ -13,8 +13,10 @@ Neon is a remote host and requires TLS, so the old rule rejects it at startup.
 ## Decision
 1. **Remote hosts are accepted** when they are a DNS hostname with at least one dot. IP literals,
    `localhost`-like names and anything without a dot are refused for remote targets.
-2. **TLS is mandatory for remote hosts.** `sslmode` must be `require`, `verify-ca` or `verify-full`.
-   The default when `sslmode` is absent is `verify-full`. `disable`, `allow` and `prefer` are refused.
+2. **TLS with server verification is mandatory for remote hosts.** `sslmode` must be `verify-full`
+   (also the default when absent). `require`, `verify-ca`, `disable`, `allow` and `prefer` are refused.
+   The owner decided this on 2026-11-22: `require` encrypts without authenticating the server, which
+   a network attacker could exploit.
 3. **Query parameters are an allowlist** for remote targets: only `sslmode` and `channel_binding`
    (value `require`). Everything else is refused (`hostaddr`, `service`, `sslrootcert`,
    `options`, `passfile`, ...), because libpq would honour them and redirect the connection.
@@ -28,9 +30,8 @@ Neon is a remote host and requires TLS, so the old rule rejects it at startup.
    names outside `[A-Za-z_][A-Za-z0-9_]{0,62}`, invalid ports, and error messages that echo the URL.
 
 ## Security notes
-- `sslmode=require` encrypts the link but does **not** verify the server certificate, so a
-  network attacker could impersonate the database. It is accepted because the owner asked for it,
-  but **use `sslmode=verify-full` in production**; the README gives the exact string.
+- `verify-full` checks the server certificate and its hostname. This is why `require` and
+  `verify-ca` are refused: `verify-ca` skips the hostname check, and `require` skips both.
 - The database password lives in the API environment file (mode 0640). It is never logged; the
   settings repr and validation errors are masked (tests cover this).
 - Neon's **pooled** endpoint (host containing `-pooler`) runs PgBouncer in transaction mode and can
@@ -48,8 +49,8 @@ Neon is a remote host and requires TLS, so the old rule rejects it at startup.
   (`parse_local_database_url`). They are not used for Neon and were not changed.
 
 ## Tests
-- `services/api/tests/test_database_config.py`: accepts a Neon-style URL with `sslmode=require` and
-  `channel_binding=require`, accepts `verify-full`/`verify-ca`; rejects `disable`, `prefer`, `allow`,
+- `services/api/tests/test_database_config.py`: accepts a Neon-style URL with `sslmode=verify-full` and
+  `channel_binding=require`; rejects `require`, `verify-ca`, `disable`, `prefer`, `allow`,
   `hostaddr`, `service`, `sslrootcert`, weak `channel_binding`, IP-literal and malformed remote hosts,
   and query parameters on loopback. Builds a lazy remote engine without connecting.
 - Full API suite (repo root, project virtualenv): 726 passed, 413 skipped. The skipped tests need
@@ -63,4 +64,4 @@ Neon is a remote host and requires TLS, so the old rule rejects it at startup.
 
 ## Follow-ups
 - Run the real-PostgreSQL test suite against a Neon **test** branch before any production use.
-- Decide whether to make `verify-full` mandatory for remote hosts (stricter than `require`).
+- Confirm that `sslrootcert=system` verifies Neon's certificate on the first real connection.

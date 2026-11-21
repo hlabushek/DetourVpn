@@ -28,6 +28,9 @@ DUMP_FILE="${DUMP_DIR}/vpn-api-$(date -u +%Y%m%dT%H%M%SZ).dump"
 command -v pg_dump >/dev/null || die "pg_dump not found"
 command -v pg_restore >/dev/null || die "pg_restore not found"
 [[ "${TARGET_DATABASE_URL}" != *"-pooler"* ]] || die "use the direct Neon endpoint, not the pooler"
+[[ "${TARGET_DATABASE_URL}" == *"sslmode=verify-full"* ]] \
+  || die "TARGET_DATABASE_URL must include sslmode=verify-full (ADR-166; require is refused)"
+[[ "${TARGET_DATABASE_URL}" != *"sslmode=require"* ]] || die "sslmode=require is refused"
 
 umask 077
 mkdir -p "${DUMP_DIR}"

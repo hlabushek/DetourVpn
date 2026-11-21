@@ -21,7 +21,7 @@ def test_beta_invites_require_closed_or_test_authenticated_mode() -> None:
 
 NEON_LIKE = (
     "postgresql+psycopg://vpn_api:secret@ep-test-1.eu-central-1.aws.neon.tech/vpn"
-    "?sslmode=require&channel_binding=require"
+    "?sslmode=verify-full&channel_binding=require"
 )
 
 
@@ -31,7 +31,6 @@ NEON_LIKE = (
         NEON_LIKE,
         "postgresql+psycopg://vpn_api:secret@ep-test-1.eu-central-1.aws.neon.tech/vpn",
         "postgresql+psycopg://vpn_api:secret@db.example.test/vpn?sslmode=verify-full",
-        "postgresql+psycopg://vpn_api:secret@db.example.test/vpn?sslmode=verify-ca",
     ],
 )
 def test_database_configuration_accepts_tls_remote_targets(url: str) -> None:
@@ -42,6 +41,8 @@ def test_database_configuration_accepts_tls_remote_targets(url: str) -> None:
 @pytest.mark.parametrize(
     "url",
     [
+        "postgresql+psycopg://vpn_api:secret@db.example.test/vpn?sslmode=require",
+        "postgresql+psycopg://vpn_api:secret@db.example.test/vpn?sslmode=verify-ca",
         "postgresql+psycopg://vpn_api:secret@db.example.test/vpn?sslmode=disable",
         "postgresql+psycopg://vpn_api:secret@db.example.test/vpn?sslmode=prefer",
         "postgresql+psycopg://vpn_api:secret@db.example.test/vpn?sslmode=allow",
@@ -49,11 +50,11 @@ def test_database_configuration_accepts_tls_remote_targets(url: str) -> None:
         "postgresql+psycopg://vpn_api:secret@db.example.test/vpn?service=other",
         "postgresql+psycopg://vpn_api:secret@db.example.test/vpn?sslrootcert=/tmp/x.pem",
         "postgresql+psycopg://vpn_api:secret@db.example.test/vpn?channel_binding=prefer",
-        "postgresql+psycopg://vpn_api:secret@192.0.2.1/vpn?sslmode=require",
-        "postgresql+psycopg://vpn_api:secret@localhost.invalid./vpn?sslmode=require",
+        "postgresql+psycopg://vpn_api:secret@192.0.2.1/vpn?sslmode=verify-full",
+        "postgresql+psycopg://vpn_api:secret@localhost.invalid./vpn?sslmode=verify-full",
         "sqlite:///local.db",
         "postgresql://user@127.0.0.1/db",
-        "postgresql://user:secret@db.example.test/vpn?sslmode=require",
+        "postgresql://user:secret@db.example.test/vpn?sslmode=verify-full",
         "postgresql+psycopg://user@127.0.0.1/db?hostaddr=192.0.2.1",
         "postgresql+psycopg://user@127.0.0.1/db?sslmode=require",
         "postgresql+psycopg://user@127.0.0.1/db?service=other",

@@ -10,14 +10,15 @@ LOOPBACK_ADDRESSES = {"127.0.0.1": "127.0.0.1", "localhost": "127.0.0.1", "::1":
 # ADR-166: remote hosts (managed PostgreSQL such as Neon) are accepted only with TLS.
 # The allowlist is deliberately short: anything else (hostaddr, service, dbname, options,
 # passfile, sslrootcert overrides, ...) is refused, because libpq would honour it.
-REMOTE_SSL_MODES = frozenset({"require", "verify-ca", "verify-full"})
+# Only verify-full: require encrypts without authenticating the server, so it is refused.
+REMOTE_SSL_MODES = frozenset({"verify-full"})
 REMOTE_DEFAULT_SSL_MODE = "verify-full"
 ALLOWED_REMOTE_QUERY_KEYS = frozenset({"sslmode", "channel_binding"})
 _DATABASE_NAME = re.compile(r"[A-Za-z_][A-Za-z0-9_]{0,62}")
 _HOSTNAME_LABEL = re.compile(r"[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?")
 _MESSAGE = (
     "Use a postgresql+psycopg URL with username and database, no hostaddr/service/"
-    "options parameters. Remote hosts require TLS (sslmode=require, verify-ca or verify-full)."
+    "options parameters. Remote hosts require sslmode=verify-full."
 )
 
 
