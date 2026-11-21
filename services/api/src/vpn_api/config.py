@@ -5,7 +5,7 @@ from pydantic import Field, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from vpn_api.app_update import UPDATE_SIGNING_PUBLIC_KEY
-from vpn_api.db.url import parse_local_database_url
+from vpn_api.db.url import parse_database_url
 
 
 class Settings(BaseSettings):
@@ -94,7 +94,7 @@ class Settings(BaseSettings):
             raise ValueError(
                 "Closed operation requires auth or explicit admin setup, DB, HTTPS and no docs"
             )
-        url = parse_local_database_url(self.database_url)
+        url = parse_database_url(self.database_url).url
         if url.username != "vpn_api" or not url.password:
             raise ValueError(
                 "Closed operation requires the dedicated password-protected runtime role"
@@ -172,5 +172,5 @@ class Settings(BaseSettings):
     def validate_database_url(cls, value: SecretStr | None) -> SecretStr | None:
         if value is None or not value.get_secret_value():
             return None
-        parse_local_database_url(value)
+        parse_database_url(value)
         return value
