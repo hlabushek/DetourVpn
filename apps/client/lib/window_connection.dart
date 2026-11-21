@@ -1179,8 +1179,13 @@ class WindowConnectionController extends ConnectionController {
       return false;
     }
     if (_cancelled(version)) {
-      // As in _connect: a disconnect arrived meanwhile; never leave this start running.
-      await native.disconnect();
+      // As in _connect: a disconnect arrived meanwhile; never leave this start running. That
+      // disconnect's own cleanup stops native again, so a failure here must not escape the poll.
+      try {
+        await native.disconnect();
+      } catch (_) {
+        /* The native deadline and the disconnect's cleanup remain the boundary. */
+      }
       return true;
     }
     _trafficBaseline = 0;

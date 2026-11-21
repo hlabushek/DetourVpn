@@ -161,10 +161,13 @@ commit (a commit cannot contain its own hash).
   **not built**, and needs owner decisions and approval. No server was touched.
 - Paranoid audit:
   - **ADR-164** (a failed native stop escaped a poll or a connect as an unhandled error): commit
-    `<filled by next commit>`. `_cleanup` now handles it like the legacy controller
+    `091b1b1`. `_cleanup` now handles it like the legacy controller
     (`native_disconnect_failed`, lease kept, nothing revoked; the next poll retries). Tests:
     `flutter test` 355 passed; analyze only the `assets/orbit/` warning. Code complete, ready for
     build and device testing.
+  - **ADR-162 amendment** (the offline resume's cancelled branch had the same unguarded stop):
+    commit `<filled by next commit>`. Caught now. Tests: `flutter test` 356 passed. Code complete,
+    ready for build and device testing.
 
 ## Rules for the next agent
 - One phase at a time, with one ADR per phase in `docs/adr/` (next free number: 165).

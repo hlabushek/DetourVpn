@@ -76,5 +76,11 @@ connect offline; widget: the home screen shows the degraded text.
 `window_connection_test.dart` "an unreachable API keeps a working tunnel «Подключено»" updated for
 the new text. `flutter test`: full run in HANDOVER.
 
+## Amendment (audit, same night)
+The paranoid audit (ADR-164) found that the offline resume's "cancelled meanwhile" branch called
+`native.disconnect()` unguarded, so a failing stop could escape the poll as an unhandled error. It
+is now caught (the cancelling disconnect's own cleanup stops native again). Test: "a resume
+cancelled mid-start never escapes the poll" in `offline_grace_test.dart`.
+
 ## Not verified
 No device run, no real API outage, no node behaviour for a restarted peer on the same lease.

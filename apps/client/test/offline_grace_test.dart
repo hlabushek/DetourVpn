@@ -29,6 +29,22 @@ class OfflineApi implements TunnelApi {
   }
 }
 
+/// TEST ONLY: runs [onConnectWindow] once, after the fake start succeeded.
+class _HookedNative extends StateNative {
+  void Function()? onConnectWindow;
+  @override
+  Future<void> connectWindow(
+    String config,
+    Map<String, dynamic> grant,
+    int remainingMs,
+  ) async {
+    await super.connectWindow(config, grant, remainingMs);
+    final hook = onConnectWindow;
+    onConnectWindow = null;
+    hook?.call();
+  }
+}
+
 void main() {
   group('OfflineGrace (pure)', () {
     test('ends one hour after the first renewal failure', () {
@@ -245,6 +261,29 @@ void main() {
       expect(find.text('VPN активен на этом устройстве'), findsNothing);
       ui.pausePolling();
       await tester.pumpWidget(const SizedBox());
+    });
+
+    test('a resume cancelled mid-start never escapes the poll', () async {
+      final hooked = _HookedNative()
+        ..age = 0
+        ..restoreActive = false;
+      state = hooked;
+      final ui = android();
+      await ui.connect();
+      await ui.refresh();
+      api.offline = true;
+      await ui.refresh();
+      Future<void>? userStop;
+      hooked
+        ..up = false
+        ..onConnectWindow = () {
+          // A disconnect arrives while the resume starts; the follow-up stop then fails.
+          hooked.failStop = true;
+          userStop = ui.disconnect();
+        };
+      await expectLater(ui.refresh(), completes);
+      await userStop;
+      expect(ui.error, 'native_disconnect_failed');
     });
 
     test('a brand-new connect is not possible offline', () async {
