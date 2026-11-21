@@ -122,8 +122,11 @@ class _VpnAppState extends State<VpnApp> with WidgetsBindingObserver {
       unawaited(_updates?.present(offer, _showUpdate));
 
   /// ADR-100: no network at startup must not sign the user out. Temporary failures are retried
-  /// (about 30 s in total) and the saved session is kept for the next resume or launch; only a
-  /// refusal or invalid storage erases it.
+  /// (about 30 s in total) and the saved session is kept for the next resume or launch.
+  /// ADR-158: only a confirmed "no session" (nothing stored, or a record for another origin,
+  /// both handled inside [Api.restoreSession]) or the server's refusal (`session_expired`, which
+  /// [Api] raises after it already erased the record) ends the session. Every other failure —
+  /// a storage read error at a cold start, a 5xx, an unexpected exception — keeps it.
   bool _sessionKept = false;
   static const _restoreDelays = [1, 2, 4, 8, 15];
   Future<void> restore() async {
@@ -134,8 +137,8 @@ class _VpnAppState extends State<VpnApp> with WidgetsBindingObserver {
           _sessionKept = false;
           if (mounted && widget.api!.authenticated) signedIn();
           return;
-        } on ClientError catch (e) {
-          if (!_transientRestore.contains(e.code)) rethrow;
+        } catch (e) {
+          if (e is ClientError && e.code == 'session_expired') rethrow;
           if (attempt >= _restoreDelays.length || !mounted) {
             _sessionKept = true;
             return;
@@ -146,22 +149,12 @@ class _VpnAppState extends State<VpnApp> with WidgetsBindingObserver {
         }
       }
     } catch (_) {
+      // `session_expired`: the server refused the session and Api erased it already.
       _sessionKept = false;
-      try {
-        await widget.api!.forgetSession();
-      } catch (_) {
-        /* Login remains closed. */
-      }
     } finally {
       if (mounted) setState(() => restoring = false);
     }
   }
-
-  static const _transientRestore = {
-    'network_unavailable',
-    'api_unavailable',
-    'rate_limited',
-  };
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {

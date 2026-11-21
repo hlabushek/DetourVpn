@@ -90,7 +90,14 @@ class Api implements TunnelApi {
 
   Future<void> restoreSession() async {
     final epoch = _sessionEpoch;
-    final saved = await store?.read();
+    Map<String, dynamic>? saved;
+    try {
+      saved = await store?.read();
+    } catch (_) {
+      // ADR-158: a failed read (for example a keystore error at a cold start) is not "no
+      // session". The stored record is kept untouched for the next attempt.
+      throw const ClientError('session_storage_unavailable');
+    }
     if (epoch != _sessionEpoch || saved == null) return;
     if (saved['origin'] != origin.toString() ||
         saved['refresh_token'] is! String) {
@@ -178,7 +185,9 @@ class Api implements TunnelApi {
       });
     } on ClientError catch (e) {
       if (epoch != _sessionEpoch) throw const ClientError('session_expired');
-      if (_transient.contains(e.code)) rethrow;
+      // ADR-158: only the server's authoritative refusal (HTTP 401) ends the session. Any other
+      // answer (a 5xx such as `auth_unavailable`, a malformed body) keeps the durable token.
+      if (e.code != 'unauthorized') rethrow;
       await forgetSession();
       throw const ClientError('session_expired');
     }
@@ -197,12 +206,6 @@ class Api implements TunnelApi {
       throw const ClientError('session_expired');
     }
   }
-
-  static const _transient = {
-    'network_unavailable',
-    'api_unavailable',
-    'rate_limited',
-  };
 
   Future<Map<String, dynamic>> _request(
     String method,

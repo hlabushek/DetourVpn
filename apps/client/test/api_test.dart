@@ -12,8 +12,13 @@ class MemoryStore implements SessionStore, PendingLoginStore {
   Map<String, dynamic>? pendingLogin;
   final writes = <Map<String, dynamic>?>[];
   bool fail = false;
+  bool failRead = false;
   @override
-  Future<Map<String, dynamic>?> read() async => value;
+  Future<Map<String, dynamic>?> read() async {
+    if (failRead) throw StateError('TEST ONLY keystore read error');
+    return value;
+  }
+
   @override
   Future<void> write(Map<String, dynamic>? record) async {
     if (fail) throw StateError('TEST ONLY storage error');
@@ -218,6 +223,66 @@ void main() {
     expect(store.value, null);
     expect(api.authenticated, false);
   });
+
+  test(
+    'ADR-158: a failing session read keeps the stored session and sends nothing',
+    () async {
+      final store = MemoryStore()
+        ..value = {
+          'origin': 'https://example.invalid',
+          'refresh_token': 'TEST ONLY OLD',
+        }
+        ..failRead = true;
+      final api = Api(Uri.parse('https://example.invalid'), store: store);
+      addTearDown(api.close);
+      await expectLater(
+        api.restoreSession(),
+        throwsA(
+          isA<ClientError>().having(
+            (e) => e.code,
+            'code',
+            'session_storage_unavailable',
+          ),
+        ),
+      );
+      expect(store.writes, isEmpty);
+      expect(store.value!['refresh_token'], 'TEST ONLY OLD');
+      expect(api.authenticated, false);
+    },
+  );
+  test(
+    'ADR-158: a refresh answered with a non-401 error keeps the session',
+    () async {
+      final store = MemoryStore()
+        ..value = {
+          'origin': 'http://127.0.0.1:18766',
+          'refresh_token': 'TEST ONLY OLD',
+        };
+      final server = await HttpServer.bind('127.0.0.1', 18766);
+      server.listen((request) async {
+        request.response.statusCode = 503;
+        request.response.write(
+          jsonEncode({
+            'error': {'code': 'auth_unavailable', 'message': 'TEST ONLY'},
+          }),
+        );
+        await request.response.close();
+      });
+      final api = Api(Uri.parse('http://127.0.0.1:18766'), store: store);
+      addTearDown(() async {
+        api.close();
+        await server.close(force: true);
+      });
+      await expectLater(
+        api.restoreSession(),
+        throwsA(
+          isA<ClientError>().having((e) => e.code, 'code', 'auth_unavailable'),
+        ),
+      );
+      expect(store.writes, isEmpty);
+      expect(store.value!['refresh_token'], 'TEST ONLY OLD');
+    },
+  );
 
   test(
     'history cursor query is sent intact; other queries are rejected',

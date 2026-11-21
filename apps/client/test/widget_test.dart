@@ -42,12 +42,22 @@ class ShellApi extends Api {
 class _WidgetSessionStore implements SessionStore, PendingLoginStore {
   Map<String, dynamic>? session;
   Map<String, dynamic>? pendingLogin;
+  bool failRead = false;
+  int reads = 0;
+  int writes = 0;
 
   @override
-  Future<Map<String, dynamic>?> read() async => session;
+  Future<Map<String, dynamic>?> read() async {
+    reads++;
+    if (failRead) throw StateError('TEST ONLY keystore read error');
+    return session;
+  }
 
   @override
-  Future<void> write(Map<String, dynamic>? value) async => session = value;
+  Future<void> write(Map<String, dynamic>? value) async {
+    writes++;
+    session = value;
+  }
 
   @override
   Future<Map<String, dynamic>?> readPendingLogin() async => pendingLogin;
@@ -129,6 +139,32 @@ void main() {
         await tester.scrollUntilVisible(find.text('Подключить'), 200);
         expect(tester.takeException(), isNull);
       }
+    },
+  );
+  testWidgets(
+    'ADR-158: a cold-start session read failure never erases the session',
+    (tester) async {
+      final store = _WidgetSessionStore()
+        ..session = {
+          'origin': 'https://example.invalid',
+          'refresh_token': 'TEST ONLY',
+        }
+        ..failRead = true;
+      await tester.pumpWidget(
+        VpnApp(
+          api: ShellApi(store: store),
+          native: FakeNative(),
+        ),
+      );
+      // The bounded retry schedule (1+2+4+8+15 s) runs out with every read failing.
+      for (var i = 0; i < 40; i++) {
+        await tester.pump(const Duration(seconds: 1));
+      }
+      expect(store.reads, 6);
+      expect(store.writes, 0);
+      expect(store.session!['refresh_token'], 'TEST ONLY');
+      expect(find.byType(LoginScreen), findsOneWidget);
+      await tester.pumpWidget(const SizedBox());
     },
   );
   testWidgets('missing API produces explicit setup screen', (tester) async {

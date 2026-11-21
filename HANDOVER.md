@@ -124,8 +124,18 @@ the javac + JUnit substitute below (against the c6 SDK tree), not a Gradle pass.
   failure needs a manual pull-to-refresh; handshake ages are wall-clock based (a large clock step can
   look like a stale handshake to the watchdog).
 
+## Known-issue fixes, API high availability and paranoid audit (2026-11-21 night run)
+Autonomous run, committed locally, not pushed. Every entry is **unit-test verified only**: no APK,
+no Gradle, no device, no real network or API failover. A commit's own SHA is filled in by the next
+commit (a commit cannot contain its own hash).
+- **ADR-158** (cold start erased the session on a read error): commit `<filled by next commit>`.
+  A failing `sessionRead` now raises `session_storage_unavailable` and keeps the record; a refresh
+  answered with anything but 401 keeps the token; `restore()` erases nothing itself and keeps the
+  session after its bounded retry. Tests: `flutter test` 323 passed; `flutter analyze` (ASCII copy)
+  only the `assets/orbit/` warning. Code complete, ready for build and device testing.
+
 ## Rules for the next agent
-- One phase at a time, with one ADR per phase in `docs/adr/` (next free number: 158).
+- One phase at a time, with one ADR per phase in `docs/adr/` (next free number: 159).
 - Commit locally with the owner's OK. No push.
 - No `flutter build`, no `gradlew assemble`, no release or deploy scripts, no adb or device tests,
   and no server changes without explicit approval.
