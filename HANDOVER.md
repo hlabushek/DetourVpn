@@ -155,14 +155,19 @@ commit (a commit cannot contain its own hash).
   ещё N мин». A tunnel that drops while offline restarts on its still-valid lease (max 3 per streak,
   foreground only). No brand-new connect offline. Tests: `flutter test` 353 passed; analyze only
   the `assets/orbit/` warning. Code complete, ready for build and device testing.
-- **ADR-163** (API high-availability strategy): documentation only, commit `<filled by next
-  commit>`. Client parts are ADR-161/162; the server work (second instance on another provider,
+- **ADR-163** (API high-availability strategy): documentation only, commit `a959293`. Client parts are ADR-161/162; the server work (second instance on another provider,
   shared PostgreSQL with replica and failover, DNS failover/geo-steering, a health endpoint,
   database-level idempotency for money/reward operations, node-agent and native-path fallbacks) is
   **not built**, and needs owner decisions and approval. No server was touched.
+- Paranoid audit:
+  - **ADR-164** (a failed native stop escaped a poll or a connect as an unhandled error): commit
+    `<filled by next commit>`. `_cleanup` now handles it like the legacy controller
+    (`native_disconnect_failed`, lease kept, nothing revoked; the next poll retries). Tests:
+    `flutter test` 355 passed; analyze only the `assets/orbit/` warning. Code complete, ready for
+    build and device testing.
 
 ## Rules for the next agent
-- One phase at a time, with one ADR per phase in `docs/adr/` (next free number: 164).
+- One phase at a time, with one ADR per phase in `docs/adr/` (next free number: 165).
 - Commit locally with the owner's OK. No push.
 - No `flutter build`, no `gradlew assemble`, no release or deploy scripts, no adb or device tests,
   and no server changes without explicit approval.

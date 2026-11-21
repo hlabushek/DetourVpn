@@ -1202,7 +1202,20 @@ class WindowConnectionController extends ConnectionController {
   /// (ADR-145 2.5: a pending revoke no longer stops native on every poll), or where native's
   /// state is unknown (ADR-145 2.2).
   Future<void> _cleanup({bool stopNative = true}) async {
-    if (stopNative) await native.disconnect();
+    if (stopNative) {
+      try {
+        await native.disconnect();
+      } catch (_) {
+        // ADR-164: as in ConnectionController._performCleanup. A failed stop keeps the lease
+        // (nothing is revoked under a tunnel that may still run; the native deadline and Lockdown
+        // stay the fail-closed boundary) and never escapes as an unhandled error from a poll
+        // timer or a connect tap. The next poll stops it again.
+        error = 'native_disconnect_failed';
+        diagnosticStage = 'native_disconnect';
+        phase = ConnectionPhase.failed;
+        return;
+      }
+    }
     _awaitingFirstHandshake = false;
     _panelUp = false;
     _resetGrace();
