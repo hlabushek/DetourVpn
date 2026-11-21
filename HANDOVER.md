@@ -137,14 +137,21 @@ commit (a commit cannot contain its own hash).
   The last loaded list stays selectable; the failure is a non-blocking notice. Tests: `flutter test`
   324 passed; analyze only the `assets/orbit/` warning. Code complete, ready for build and device
   testing.
-- **ADR-160** (wall-clock handshake ages): commit `<filled by next commit>`. The engine's
+- **ADR-160** (wall-clock handshake ages): commit `e8bfd06`. The engine's
   `last_handshake_time_sec` is wall-clock (wireguard-go `time.Now()`); the new `HandshakeClock`
   anchors each new value to `elapsedRealtime()` once, and all three age call sites use it. Tests:
   Java substitute main run 262 passed + 11 from `apps/client/android/app` (no Dart change). Code
   complete, ready for build and device testing.
+- **ADR-161** (fallback API origins): commit `<filled by next commit>`. New build value
+  `VPN_API_FALLBACK_ORIGINS` (up to two https origins; `build_flutter_client.ps1
+  -ApiFallbackOrigins`); empty keeps the single-origin behaviour. A transport failure moves the
+  request to the next origin; after sending, only idempotent or keyed requests move; an HTTP answer
+  never moves. Native renewal and the restore engine still use the primary only. Tests:
+  `flutter test` 342 passed; analyze only the `assets/orbit/` warning. Code complete, ready for
+  build and device testing.
 
 ## Rules for the next agent
-- One phase at a time, with one ADR per phase in `docs/adr/` (next free number: 161).
+- One phase at a time, with one ADR per phase in `docs/adr/` (next free number: 162).
 - Commit locally with the owner's OK. No push.
 - No `flutter build`, no `gradlew assemble`, no release or deploy scripts, no adb or device tests,
   and no server changes without explicit approval.

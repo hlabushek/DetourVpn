@@ -31,25 +31,75 @@ abstract interface class TunnelApi {
   ]);
 }
 
+/// ADR-161: at most this many fallback API origins after the primary.
+const maxFallbackOrigins = 2;
+
+/// ADR-161: parses the build-time `VPN_API_FALLBACK_ORIGINS` value (comma-separated, empty = none).
+/// Any malformed entry fails the whole configuration (the app then shows its setup screen).
+List<Uri> parseFallbackOrigins(String value) {
+  final parts = value
+      .split(',')
+      .map((part) => part.trim())
+      .where((part) => part.isNotEmpty)
+      .toList();
+  if (parts.length > maxFallbackOrigins) {
+    throw const ClientError('invalid_origin');
+  }
+  return [for (final part in parts) Uri.parse(part)];
+}
+
 /// No logging, redirects, disk cache, certificate override or release HTTP mode.
 class Api implements TunnelApi {
-  Api(this.origin, {HttpClient? client, this.store})
-    : _client = client ?? HttpClient() {
+  /// [fallbacks] (ADR-161): up to two more https origins of the same API, tried in order when
+  /// the previous one fails at the connection level. Never a plain-HTTP origin.
+  Api(
+    this.origin, {
+    HttpClient? client,
+    this.store,
+    List<Uri> fallbacks = const [],
+    // Per attempt. Tests shorten it; production keeps 8 s.
+    Duration requestTimeout = const Duration(seconds: 8),
+  }) : _client = client ?? HttpClient(),
+       _requestTimeout = requestTimeout,
+       origins = List.unmodifiable([origin, ...fallbacks]) {
     final loopback =
         kDebugMode &&
         origin.scheme == 'http' &&
         origin.host == '127.0.0.1' &&
         origin.port == 18766;
-    if ((!loopback && origin.scheme != 'https') ||
-        origin.host.isEmpty ||
-        origin.userInfo.isNotEmpty ||
-        origin.hasQuery ||
-        origin.hasFragment ||
-        (origin.path.isNotEmpty && origin.path != '/')) {
+    if ((!loopback && origin.scheme != 'https') || !_wellFormed(origin)) {
       throw const ClientError('invalid_origin');
+    }
+    if (fallbacks.length > maxFallbackOrigins) {
+      throw const ClientError('invalid_origin');
+    }
+    for (var i = 0; i < fallbacks.length; i++) {
+      final fallback = fallbacks[i];
+      // ADR-161: TLS only, and each origin once (no duplicate of the primary or another one).
+      if (fallback.scheme != 'https' ||
+          !_wellFormed(fallback) ||
+          origins.indexWhere((o) => _sameOrigin(o, fallback)) != i + 1) {
+        throw const ClientError('invalid_origin');
+      }
     }
     _client.connectionTimeout = const Duration(seconds: 5);
   }
+
+  static bool _wellFormed(Uri value) =>
+      value.host.isNotEmpty &&
+      value.userInfo.isEmpty &&
+      !value.hasQuery &&
+      !value.hasFragment &&
+      (value.path.isEmpty || value.path == '/');
+
+  static bool _sameOrigin(Uri a, Uri b) =>
+      a.scheme == b.scheme &&
+      a.host.toLowerCase() == b.host.toLowerCase() &&
+      a.port == b.port;
+
+  /// ADR-161: the primary origin first, then the configured fallbacks. Nothing else is contacted.
+  final List<Uri> origins;
+  final Duration _requestTimeout;
 
   Api.protected(
     Uri origin, {
@@ -223,22 +273,55 @@ class Api implements TunnelApi {
                     ).hasMatch(path))))) {
       throw const ClientError('invalid_request');
     }
+    // ADR-161: a request the server may already have received is repeated on the next origin
+    // only when repeating it is safe: an idempotent method or a body with an idempotency key.
+    final key = body?['idempotency_key'];
+    final repeatable =
+        _idempotentMethods.contains(method) ||
+        (key is String && key.isNotEmpty);
+    for (var i = 0; ; i++) {
+      try {
+        return await _requestOnce(origins[i], method, path, body);
+      } on _TransportFailure catch (failure) {
+        final last = i + 1 >= origins.length;
+        if (last || (failure.sent && !repeatable)) {
+          throw const ClientError('network_unavailable');
+        }
+      }
+    }
+  }
+
+  static const _idempotentMethods = {'GET', 'HEAD', 'PUT', 'DELETE', 'OPTIONS'};
+
+  /// One attempt on [base]. An HTTP answer (any status, valid or not) is final and surfaces as
+  /// a result or a [ClientError]; only a failure before any answer is a [_TransportFailure].
+  Future<Map<String, dynamic>> _requestOnce(
+    Uri base,
+    String method,
+    String path,
+    Map<String, dynamic>? body,
+  ) async {
     HttpClientRequest? request;
     var cancelled = false;
+    var sent = false;
+    var answered = false;
     try {
       return await (() async {
-        request = await _client.openUrl(method, origin.resolve(path));
+        request = await _client.openUrl(method, base.resolve(path));
         if (cancelled) {
           request!.abort();
-          throw const ClientError('network_unavailable');
+          throw const _TransportFailure(sent: false);
         }
         request!.followRedirects = false;
         request!.headers.contentType = ContentType.json;
         request!.headers.set('Cache-Control', 'no-store');
         if (_access != null)
           request!.headers.set('Authorization', 'Bearer $_access');
+        // From here bytes may leave the device (headers can be flushed with the body).
+        sent = true;
         if (body != null) request!.write(jsonEncode(body));
         final response = await request!.close();
+        answered = true;
         final bytes = <int>[];
         await for (final chunk in response) {
           bytes.addAll(chunk);
@@ -272,18 +355,30 @@ class Api implements TunnelApi {
           throw const ClientError('invalid_response');
         return parsed;
       })().timeout(
-        const Duration(seconds: 8),
+        _requestTimeout,
         onTimeout: () {
           cancelled = true;
           request?.abort();
-          throw const ClientError('network_unavailable');
+          // A timeout while reading an answer is an answered request: never repeated.
+          if (answered) throw const ClientError('network_unavailable');
+          throw _TransportFailure(sent: sent);
         },
       );
     } on ClientError {
       rethrow;
+    } on _TransportFailure {
+      rethrow;
     } catch (_) {
       request?.abort();
-      throw const ClientError('network_unavailable');
+      if (answered) throw const ClientError('network_unavailable');
+      throw _TransportFailure(sent: sent);
     }
   }
+}
+
+/// ADR-161: a failure before any HTTP answer. [sent] is true once the request may have reached
+/// the server (after `close()` was called), so only a repeatable request is tried elsewhere.
+final class _TransportFailure implements Exception {
+  const _TransportFailure({required this.sent});
+  final bool sent;
 }

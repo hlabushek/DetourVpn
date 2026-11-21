@@ -3,6 +3,8 @@ param(
     [string]$AndroidSdk = "$env:LOCALAPPDATA\Android\Sdk",
     [string]$JavaHome = 'C:\Program Files\Android\Android Studio\jbr',
     [string]$ApiOrigin = '',
+    # ADR-161: up to two https fallback origins of the same API, comma-separated (empty = none).
+    [string]$ApiFallbackOrigins = '',
     [ValidateSet('android-arm64', 'android-arm64,android-x64')]
     [string]$TargetPlatforms = 'android-arm64,android-x64',
     [switch]$PhysicalTestBuild,
@@ -160,6 +162,7 @@ try {
         try {
             $taskArguments = @('build', 'apk', '--debug', '--no-pub', '--target', 'lib/main.dart', '--target-platform', $TargetPlatforms)
             if ($ApiOrigin) { $taskArguments += "--dart-define=VPN_API_ORIGIN=$ApiOrigin" }
+            if ($ApiFallbackOrigins) { $taskArguments += "--dart-define=VPN_API_FALLBACK_ORIGINS=$ApiFallbackOrigins" }
             if ($WindowTunnels) {
                 $taskArguments += "--dart-define=VPN_WINDOW_TUNNELS=true"
                 $taskArguments += "--dart-define=VPN_WINDOW_BUDGET_BYTES=$WindowBudgetBytes"
@@ -190,6 +193,7 @@ try {
         # replace the debug registrant and omit dev-only native plugins.
         $taskReleaseArguments = @('build', 'apk', '--release', '--target', 'lib/main.dart', '--target-platform', $TargetPlatforms)
         if ($ApiOrigin) { $taskReleaseArguments += "--dart-define=VPN_API_ORIGIN=$ApiOrigin" }
+        if ($ApiFallbackOrigins) { $taskReleaseArguments += "--dart-define=VPN_API_FALLBACK_ORIGINS=$ApiFallbackOrigins" }
         $taskPubLockHash = (Get-FileHash -LiteralPath (Join-Path $taskClient 'pubspec.lock') -Algorithm SHA256).Hash
         if ($WindowTunnels) {
             $taskReleaseArguments += "--dart-define=VPN_WINDOW_TUNNELS=true"

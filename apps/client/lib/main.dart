@@ -29,9 +29,15 @@ Future<void> alwaysOnRecoveryMain() => runAlwaysOnRecovery();
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
   const origin = String.fromEnvironment('VPN_API_ORIGIN');
+  // ADR-161: up to two https fallback origins of the same API, comma-separated; empty = none.
+  const fallbacks = String.fromEnvironment('VPN_API_FALLBACK_ORIGINS');
   Api? api;
   try {
-    api = Api(Uri.parse(origin), store: PlatformSessionStore());
+    api = Api(
+      Uri.parse(origin),
+      store: PlatformSessionStore(),
+      fallbacks: parseFallbackOrigins(fallbacks),
+    );
   } catch (_) {
     /* Explicit setup screen. */
   }
