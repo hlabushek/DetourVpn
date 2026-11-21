@@ -63,6 +63,16 @@ public class ConnectionWiringTest {
                 start.indexOf("startForeground(") < start.indexOf("companionStarted()"));
     }
 
+    /** ADR-160: every handshake age comes from the monotonic HandshakeClock. */
+    @Test public void handshakeAgesAreMonotonic() throws Exception {
+        String app = source("ClientApplication.java");
+        assertTrue("no per-read wall-clock age", !app.contains("now - handshake")
+                && !app.contains("wall - handshake") && !app.contains("handshake <= "));
+        assertTrue(body(app, "ConnectionState connectionState()").contains("handshakeClock.ageSeconds("));
+        assertTrue(body(app, "private void watchTunnel()").contains("handshakeClock.ageMs("));
+        assertTrue(body(app, "Map<String, Object> snapshot()").contains("handshakeClock.ageSeconds("));
+    }
+
     /** ADR-155: a failed native init is retried before UI calls and before a restore engine. */
     @Test public void aFailedNativeInitIsRetriedBeforeItIsNeeded() throws Exception {
         String app = source("ClientApplication.java");

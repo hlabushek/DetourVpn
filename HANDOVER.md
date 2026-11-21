@@ -133,13 +133,18 @@ commit (a commit cannot contain its own hash).
   answered with anything but 401 keeps the token; `restore()` erases nothing itself and keeps the
   session after its bounded retry. Tests: `flutter test` 323 passed; `flutter analyze` (ASCII copy)
   only the `assets/orbit/` warning. Code complete, ready for build and device testing.
-- **ADR-159** (server picker blocked after a failed refresh): commit `<filled by next commit>`.
+- **ADR-159** (server picker blocked after a failed refresh): commit `5a62b7c`.
   The last loaded list stays selectable; the failure is a non-blocking notice. Tests: `flutter test`
   324 passed; analyze only the `assets/orbit/` warning. Code complete, ready for build and device
   testing.
+- **ADR-160** (wall-clock handshake ages): commit `<filled by next commit>`. The engine's
+  `last_handshake_time_sec` is wall-clock (wireguard-go `time.Now()`); the new `HandshakeClock`
+  anchors each new value to `elapsedRealtime()` once, and all three age call sites use it. Tests:
+  Java substitute main run 262 passed + 11 from `apps/client/android/app` (no Dart change). Code
+  complete, ready for build and device testing.
 
 ## Rules for the next agent
-- One phase at a time, with one ADR per phase in `docs/adr/` (next free number: 160).
+- One phase at a time, with one ADR per phase in `docs/adr/` (next free number: 161).
 - Commit locally with the owner's OK. No push.
 - No `flutter build`, no `gradlew assemble`, no release or deploy scripts, no adb or device tests,
   and no server changes without explicit approval.

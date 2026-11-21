@@ -110,6 +110,8 @@ public final class ClientApplication extends Application implements Tunnel {
     private volatile String failureStage = "";
     // Task 7: whether a handshake happened since the last connect, seen natively (Dart may sleep).
     final HandshakeMemory handshakes = new HandshakeMemory();
+    /** ADR-160: handshake ages from a monotonic anchor, never from the wall clock per read. */
+    private final HandshakeClock handshakeClock = new HandshakeClock();
     // Window renewals are driven from Dart timers. Without this the CPU may sleep with the screen
     // off and a 90 s window then expires. The lock has a timeout and is refreshed on each renewal,
     // so a dead process can never leak it.
@@ -376,9 +378,8 @@ public final class ClientApplication extends Application implements Tunnel {
         facts.networkLossPending = physical.lossPending(now);
         if (facts.tunnelUp) {
             try {
-                long handshake = provider.lastHandshakeSeconds();
-                long wall = System.currentTimeMillis() / 1000;
-                facts.handshakeAgeSeconds = handshake > 0 && handshake <= wall ? wall - handshake : -1;
+                facts.handshakeAgeSeconds = handshakeClock.ageSeconds(
+                        provider.lastHandshakeSeconds(), System.currentTimeMillis(), now);
             } catch (RuntimeException | LinkageError unavailable) {
                 facts.handshakeAgeSeconds = -1;
             }
@@ -1073,10 +1074,11 @@ public final class ClientApplication extends Application implements Tunnel {
             armWatch(WATCH_MS);
             if (!watchdog.running()) watchdog.tunnelUp(now);
             long handshake = provider.lastHandshakeSeconds();
-            long wall = System.currentTimeMillis() / 1000;
-            handshakes.observe(handshake, wall);
+            long wallMs = System.currentTimeMillis();
+            handshakes.observe(handshake, wallMs / 1000);
             observeAlwaysOn(protector, true); // ADR-141: meaningful only while up.
-            long age = handshake > 0 && handshake <= wall ? (wall - handshake) * 1000 : -1;
+            long age = handshakeClock.ageMs(handshake, wallMs, now); // ADR-160: monotonic
+
             boolean usable = physical.usable();
             // ADR-148: while the probe ladder owns stall recovery, the watchdog keeps only its
             // network-change restarts.
@@ -1700,12 +1702,15 @@ public final class ClientApplication extends Application implements Tunnel {
         long handshake = up ? provider.lastHandshakeSeconds() : 0;
         long now = System.currentTimeMillis() / 1000;
         handshakes.observe(handshake, now);
+        // ADR-160: monotonic age; -1 when none or unknown.
+        long handshakeAge = handshakeClock.ageSeconds(handshake, System.currentTimeMillis(),
+                SystemClock.elapsedRealtime());
         // ADR-127: a usable physical network (INTERNET, no captive portal); validation separate.
         boolean network = physical.usable();
         Map<String, Object> value = new HashMap<>();
         value.put("up", up); value.put("network", network);
         value.put("networkValidated", physical.validated());
-        value.put("handshakeAge", handshake > 0 && handshake <= now ? now - handshake : -1L);
+        value.put("handshakeAge", handshakeAge);
         value.put("remainingMs", Math.max(0, deadline - SystemClock.elapsedRealtime()));
         long transfer = -1;
         long received = -1;
@@ -1738,7 +1743,6 @@ public final class ClientApplication extends Application implements Tunnel {
         value.put("tunnelRestarts", (long) tunnelRestarts);
         // ADR-124/128: additive, authoritative native state. Codes only; no endpoint or key.
         long changeAge = lastNetworkChangeAt < 0 ? -1 : SystemClock.elapsedRealtime() - lastNetworkChangeAt;
-        long handshakeAge = handshake > 0 && handshake <= now ? now - handshake : -1;
         boolean afterChange = handshakeAge >= 0 && (changeAge < 0 || handshakeAge * 1000 < changeAge);
         boolean tunnelUp = up && deadline > 0;
         value.put("desiredConnected", supervisor.desired());
