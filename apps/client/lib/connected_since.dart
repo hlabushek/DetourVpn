@@ -28,6 +28,10 @@ final _uuid = RegExp(
 /// null otherwise. A new id starts the timer (or resumes the stored start of that same id after
 /// a restart); a null after a connection this process saw clears it. A null before any
 /// connection (app start, before a running tunnel is adopted) keeps the stored record.
+// TODO(paranoid-audit): ADR-165 item 3. The «Подключено 02:14:35» timer is wall-clock based
+// (it must survive a process restart, and Dart has no boot-relative clock), so a wall-clock step
+// makes it jump or show 00:00:00. Display only; a fix needs native to report the tunnel's start
+// as elapsedRealtime and the UI to compute the duration from that.
 class ConnectedSinceTracker {
   ConnectedSinceTracker(this.store, {int Function()? nowMs})
     : _nowMs = nowMs ?? (() => DateTime.now().millisecondsSinceEpoch);

@@ -349,6 +349,10 @@ final class NativeRenewer {
         URL url = new URL(base + path);
         HttpURLConnection connection = (HttpURLConnection) url.openConnection();
         try {
+            // TODO(paranoid-audit): ADR-165 item 2. The total time of one call is not bounded:
+            // DNS resolution has no timeout here and the read timeout applies per read, so a
+            // slow-dripping answer can hold the single renewer thread past the window's end.
+            // Needs an overall per-call deadline (for example a watchdog that disconnects).
             connection.setInstanceFollowRedirects(false);
             connection.setUseCaches(false);
             connection.setConnectTimeout(TIMEOUT_MS);

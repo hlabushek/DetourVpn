@@ -1342,6 +1342,11 @@ class WindowConnectionController extends ConnectionController {
     _emit();
   }
 
+  // TODO(paranoid-audit): ADR-165 item 1. Native channel calls (snapshot, connectWindow,
+  // advanceWindow) have no Dart-side timeout. A native worker that never answers would keep
+  // `_polling` true for good: no further poll runs and a connect tap waits for this poll
+  // (ADR-154) without end. A timeout needs native-side cancellation semantics (a late
+  // connectWindow must not start a tunnel nobody tracks), so it is not a local fix.
   @override
   Future<void> refresh() async {
     if (_polling || busy || _dead) return;

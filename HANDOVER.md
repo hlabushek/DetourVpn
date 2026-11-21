@@ -118,11 +118,9 @@ the javac + JUnit substitute below (against the c6 SDK tree), not a Gradle pass.
   `assets/orbit/` warning; `dart format`: clean. The Java substitute now also runs
   `ConnectionWiringTest` from `apps/client/android/app` (it reads source files, like
   `SystemIntegrationWiringTest`).
-- Found, not fixed (need an owner decision): a failing `sessionRead` at cold start erases the
-  saved session (`main.dart` `restore()`); the server picker disables every server while the last
-  catalog refresh failed (`region_picker.dart`, `nodesError != null`), so a transient catch-up
-  failure needs a manual pull-to-refresh; handshake ages are wall-clock based (a large clock step can
-  look like a stale handshake to the watchdog).
+- Found, not fixed at the time (all three fixed in the next run: ADR-158, ADR-159, ADR-160): a
+  failing `sessionRead` at cold start erased the saved session; the server picker disabled every
+  server while the last catalog refresh failed; handshake ages were wall-clock based.
 
 ## Known-issue fixes, API high availability and paranoid audit (2026-11-21 night run)
 Autonomous run, committed locally, not pushed. Every entry is **unit-test verified only**: no APK,
@@ -166,11 +164,22 @@ commit (a commit cannot contain its own hash).
     `flutter test` 355 passed; analyze only the `assets/orbit/` warning. Code complete, ready for
     build and device testing.
   - **ADR-162 amendment** (the offline resume's cancelled branch had the same unguarded stop):
-    commit `<filled by next commit>`. Caught now. Tests: `flutter test` 356 passed. Code complete,
-    ready for build and device testing.
+    commit `b575b98`. Caught now. Tests: `flutter test` 356 passed. Code complete, ready for build
+    and device testing.
+  - **ADR-165** (open items, comments only): the final commit of this run (its SHA is the branch
+    tip). Three `TODO(paranoid-audit)` items: (1) no Dart-side timeout on native channel calls
+    (`window_connection.dart` `refresh()`); (2) no overall deadline on a native renewal HTTP call
+    (`NativeRenewer.call`); (3) the connected timer is wall-clock based (`connected_since.dart`).
+- Final checks of this run: `flutter test` **356 passed**; `flutter analyze` (ASCII copy) only the
+  expected `assets/orbit/` warning; `dart format` clean; Java substitute main run **262 passed** +
+  **11** from `apps/client/android/app`. Not run: Gradle, APK build, device, backend tests (no
+  server change), any real network or API failover.
+- Not verified anywhere: device behaviour of every entry above, real keystore failures, real clock
+  steps, real multi-origin failover and DNS, real API outages, node behaviour for an offline resume
+  on the same lease, libbox.
 
 ## Rules for the next agent
-- One phase at a time, with one ADR per phase in `docs/adr/` (next free number: 165).
+- One phase at a time, with one ADR per phase in `docs/adr/` (next free number: 166).
 - Commit locally with the owner's OK. No push.
 - No `flutter build`, no `gradlew assemble`, no release or deploy scripts, no adb or device tests,
   and no server changes without explicit approval.
