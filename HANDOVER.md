@@ -142,16 +142,22 @@ commit (a commit cannot contain its own hash).
   anchors each new value to `elapsedRealtime()` once, and all three age call sites use it. Tests:
   Java substitute main run 262 passed + 11 from `apps/client/android/app` (no Dart change). Code
   complete, ready for build and device testing.
-- **ADR-161** (fallback API origins): commit `<filled by next commit>`. New build value
+- **ADR-161** (fallback API origins): commit `9381f48`. New build value
   `VPN_API_FALLBACK_ORIGINS` (up to two https origins; `build_flutter_client.ps1
   -ApiFallbackOrigins`); empty keeps the single-origin behaviour. A transport failure moves the
   request to the next origin; after sending, only idempotent or keyed requests move; an HTTP answer
   never moves. Native renewal and the restore engine still use the primary only. Tests:
   `flutter test` 342 passed; analyze only the `assets/orbit/` warning. Code complete, ready for
   build and device testing.
+- **ADR-162** (offline grace): commit `<filled by next commit>`. A renewal that cannot reach any
+  API origin starts a grace that ends at the earlier of one hour and the lease's own deadline (never
+  extends the lease); the home screen shows «Нет связи с сервером. VPN работает по текущему доступу
+  ещё N мин». A tunnel that drops while offline restarts on its still-valid lease (max 3 per streak,
+  foreground only). No brand-new connect offline. Tests: `flutter test` 353 passed; analyze only
+  the `assets/orbit/` warning. Code complete, ready for build and device testing.
 
 ## Rules for the next agent
-- One phase at a time, with one ADR per phase in `docs/adr/` (next free number: 162).
+- One phase at a time, with one ADR per phase in `docs/adr/` (next free number: 163).
 - Commit locally with the owner's OK. No push.
 - No `flutter build`, no `gradlew assemble`, no release or deploy scripts, no adb or device tests,
   and no server changes without explicit approval.

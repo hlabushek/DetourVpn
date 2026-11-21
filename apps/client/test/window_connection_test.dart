@@ -1990,7 +1990,10 @@ void main() {
       expect(ui.phase, ConnectionPhase.connected);
       expect(ui.error, isNull);
       expect(ui.lastApiError, 'network_unavailable');
-      expect(ui.detail, 'VPN работает, сервер временно недоступен');
+      // ADR-162: renewal is due at every poll here (90 s windows), so the failed poll is a failed
+      // renewal and the status names the offline grace.
+      expect(ui.offlineGrace, isTrue);
+      expect(ui.detail, startsWith('Нет связи с сервером'));
       expect(state.stops, stops);
       flaky.fail = false;
       await ui.refresh();

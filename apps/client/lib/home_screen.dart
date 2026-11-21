@@ -90,7 +90,9 @@ class ConnectionScreen extends StatelessWidget {
           : OrbitState.idle;
       final chosen = c.nodes.where((n) => n.id == c.selectedNode).firstOrNull;
       final q = c.quota.snapshot;
-      final subtitle = connected && c.error == null
+      // ADR-162: a lease on offline grace is shown as degraded, with the time left.
+      final degraded = c is WindowConnectionController && c.offlineGrace;
+      final subtitle = connected && c.error == null && !degraded
           ? 'VPN активен на этом устройстве'
           : c.detail;
 

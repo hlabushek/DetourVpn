@@ -10,6 +10,7 @@ import 'connected_since.dart';
 import 'connection.dart';
 import 'diagnostic_report.dart';
 import 'native_tunnel.dart';
+import 'offline_grace.dart';
 import 'panel_servers.dart';
 import 'platform_info.dart';
 import 'recovery_budget.dart';
@@ -33,7 +34,9 @@ class WindowConnectionController extends ConnectionController {
     Uri? renewalOrigin,
     bool? panelVless,
     this.nativeOwnsBackgroundRecovery = false,
+    Duration offlineGrace = OfflineGrace.defaultLength,
   }) : _renewalOrigin = renewalOrigin,
+       _grace = OfflineGrace(length: offlineGrace),
        panelVless = panelVless ?? isWindowsClient {
     // ADR-144: the Android UI listens to native's pushed connection state.
     final source = native;
@@ -101,6 +104,34 @@ class WindowConnectionController extends ConnectionController {
 
   /// ADR-144: the last transient API failure while the tunnel kept working (diagnostics only).
   String? lastApiError;
+
+  /// ADR-162: offline grace. Starts when a renewal first fails to reach any API origin, ends at
+  /// the earlier of its length and the lease's own deadline; never extends the lease.
+  final OfflineGrace _grace;
+
+  /// ADR-162: restarts of a dropped tunnel on its still-valid lease while the API is unreachable.
+  int _offlineResumes = 0;
+  static const maxOfflineResumes = 3;
+
+  /// ADR-162: an offline resume needs at least this much lease (and grace) left.
+  static const minOfflineResumeMs = 30000;
+
+  /// ADR-162: the held lease runs on offline grace (renewal cannot reach the API). Shown to the
+  /// user as a degraded state with the time left.
+  bool get offlineGrace => _grace.active && _grant != null;
+
+  /// ADR-162: grace time left, or null when not on grace.
+  Duration? get offlineGraceRemaining {
+    if (!offlineGrace) return null;
+    return Duration(
+      milliseconds: _grace.remainingMs(_clock.elapsedMilliseconds, _deadline)!,
+    );
+  }
+
+  void _resetGrace() {
+    _grace.clear();
+    _offlineResumes = 0;
+  }
 
   @visibleForTesting
   String? get nativeState => _nativeState;
@@ -176,6 +207,7 @@ class WindowConnectionController extends ConnectionController {
     _awaitingFirstHandshake = false;
     remotePending = false;
     _synced = false;
+    _resetGrace();
   }
 
   /// ADR-144: a state event from native. In the foreground it updates the status at once; when
@@ -858,6 +890,7 @@ class WindowConnectionController extends ConnectionController {
       }
       _grant = grant;
       _deadline = deadline;
+      _resetGrace(); // ADR-162: a fresh lease from a reachable API.
       // A newly connected backend starts a new cumulative statistics lifetime.
       _trafficBaseline = 0;
       _lastTraffic = 0;
@@ -1118,6 +1151,53 @@ class WindowConnectionController extends ConnectionController {
     diagnosticStage = 'revoke_delete';
   }
 
+  /// ADR-162: restart a dropped tunnel on the lease it already holds, only while the API is
+  /// known to be unreachable (a transient failure since the last good answer) and the lease and
+  /// grace leave at least [minOfflineResumeMs]. The native deadline is the end of the grace, which
+  /// is never later than the lease. At most [maxOfflineResumes] per streak. No API call, no new
+  /// key, no new lease. False when it does not apply or the start failed (the normal path runs).
+  Future<bool> _offlineResume(int version) async {
+    final grant = _grant;
+    final config = _config;
+    final apiUnreachable = lastApiError != null || _grace.active;
+    if (!apiUnreachable ||
+        grant == null ||
+        config == null ||
+        _id == null ||
+        remotePending ||
+        _offlineResumes >= maxOfflineResumes) {
+      return false;
+    }
+    final now = _clock.elapsedMilliseconds;
+    final end = _grace.endMs(_deadline) ?? _deadline;
+    if (end - now < minOfflineResumeMs) return false;
+    _offlineResumes++;
+    try {
+      diagnosticStage = 'native_tunnel_start';
+      await _native.connectWindow(config, grant, end - now);
+    } catch (_) {
+      return false;
+    }
+    if (_cancelled(version)) {
+      // As in _connect: a disconnect arrived meanwhile; never leave this start running.
+      await native.disconnect();
+      return true;
+    }
+    _trafficBaseline = 0;
+    _lastTraffic = 0;
+    _renewTrafficAnchor = null;
+    _inboundTraffic.reset();
+    _dataPath.reset();
+    _dataStalled = false;
+    _hasEstablishedHandshake = false;
+    _connectedAtMs = _clock.elapsedMilliseconds;
+    _awaitingFirstHandshake = true;
+    error = null;
+    phase = ConnectionPhase.reconnecting;
+    detail = 'Нет связи с сервером. VPN переподключён по текущему доступу';
+    return true;
+  }
+
   /// [stopNative]: false where native is already stopped and only the server revoke is retried
   /// (ADR-145 2.5: a pending revoke no longer stops native on every poll), or where native's
   /// state is unknown (ADR-145 2.2).
@@ -1125,6 +1205,7 @@ class WindowConnectionController extends ConnectionController {
     if (stopNative) await native.disconnect();
     _awaitingFirstHandshake = false;
     _panelUp = false;
+    _resetGrace();
     _grant = null;
     _config = null;
     _renewIntent = null;
@@ -1382,6 +1463,9 @@ class WindowConnectionController extends ConnectionController {
           !snapshot.up ||
           snapshot.remainingMs <= 0)
         throw ClientError(_stopCode(snapshot));
+      // ADR-162: the offline grace is over (never later than the lease): stop as at expiry.
+      if (_grace.ended(_clock.elapsedMilliseconds, _deadline))
+        throw const ClientError('lease_expired');
       _inboundTraffic.observe(
         snapshot.receivedBytes,
         _clock.elapsedMilliseconds,
@@ -1506,6 +1590,7 @@ class WindowConnectionController extends ConnectionController {
         throw ClientError(_stopCode(snapshot));
       error = null;
       lastApiError = null;
+      _resetGrace(); // ADR-162: the API answered and the window is current again.
       // ADR-144: on Android native's state is the status (180 s handshake rule, inbound data,
       // network change, stall); the Dart rule below remains for Windows and older builds.
       if (_applyNative(snapshot)) return;
@@ -1532,6 +1617,13 @@ class WindowConnectionController extends ConnectionController {
       // reading the app-private device key) and must not be mislabeled as an
       // API response failure.
       final code = e is ClientError ? e.code : 'native_unavailable';
+      // ADR-162: a renewal that could not reach the API starts the offline grace (first failure
+      // of the streak only). The lease itself is never extended.
+      if (_transientApiCodes.contains(code) &&
+          _renewIntent != null &&
+          _grant != null) {
+        _grace.renewalFailed(_clock.elapsedMilliseconds);
+      }
       // ADR-144: in the background never stop, revoke or reconnect from here; native owns the
       // tunnel. The foreground re-syncs with native first (appForegroundChanged).
       if (_recoveryGated) {
@@ -1544,8 +1636,10 @@ class WindowConnectionController extends ConnectionController {
         error = code;
         return;
       }
+      final now = _clock.elapsedMilliseconds;
+      // ADR-162: the end of the offline grace counts as the end of the lease.
       final deadlinePassed =
-          _grant != null && _clock.elapsedMilliseconds >= _deadline;
+          _grant != null && (now >= _deadline || _grace.ended(now, _deadline));
       // ADR-144: an unreachable API does not mean a broken tunnel. While native still runs it,
       // native's state is the status and the API error is a note, not «Восстановление связи».
       if (_transientApiCodes.contains(code) &&
@@ -1556,8 +1650,17 @@ class WindowConnectionController extends ConnectionController {
         error = null;
         _renderNative(_nativeState!, _nativeReason ?? '');
         if (phase == ConnectionPhase.connected) {
-          detail = 'VPN работает, сервер временно недоступен';
+          detail = offlineGrace
+              ? offlineGraceText(_grace.remainingMs(now, _deadline)!)
+              : 'VPN работает, сервер временно недоступен';
         }
+        return;
+      }
+      // ADR-162: the tunnel dropped while the API is unreachable and the lease is still valid:
+      // start it again on the same lease instead of a revoke and a new lease that cannot work.
+      if (code == 'native_down' &&
+          !deadlinePassed &&
+          await _offlineResume(version)) {
         return;
       }
       error = code;
@@ -1571,12 +1674,16 @@ class WindowConnectionController extends ConnectionController {
           ? 'confirmed'
           : 'not_seen';
       phase = ConnectionPhase.reconnecting;
+      if (offlineGrace && _transientApiCodes.contains(code)) {
+        // ADR-162: visible degraded state (Windows and builds without native state).
+        detail = offlineGraceText(_grace.remainingMs(now, _deadline)!);
+      }
       if (!{
             'network_unavailable',
             'api_unavailable',
             'rate_limited',
           }.contains(code) ||
-          (_grant != null && _clock.elapsedMilliseconds >= _deadline)) {
+          deadlinePassed) {
         phase = ConnectionPhase.failed;
         await _cleanup();
         if (code == 'handshake_not_established') {
