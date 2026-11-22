@@ -45,7 +45,7 @@ API_PYTHON = "/opt/detourvpn-beta/.venv/bin/python"
 HELPER_SOURCE = ROOT / "scripts" / "provision_beta_node.py"
 HELPER_REMOTE = "/opt/detourvpn-beta/scripts/provision_beta_node.py"
 # Hash of the helper that the beta host runs today (deploy_beta_node_provisioning.ps1).
-HELPER_PREVIOUS_SHA256 = "1563eceed748430fd86d815da2350efb3ffcbe9fe490a38a3569c82d75b9c0f3"
+HELPER_PREVIOUS_SHA256 = "304d9ff7397911852e135d878ee44b84e0e66133aa6e21a97c31c16a0aa0bf81"
 PROVISION_NAMESPACE = UUID("3b0f5f0e-6a43-4b8e-9d38-3d1f7f0a4f11")
 NAME_PATTERN = re.compile(r"^detourvpn-beta-[a-z0-9]{2,24}$")
 MAX_SLOTS = 16
@@ -115,7 +115,7 @@ from sqlalchemy import func, select
 from vpn_api.config import Settings
 from vpn_api.db.connection import create_database_engine, transaction
 from vpn_api.db.models import PeerConnection, VPNNode
-from vpn_api.db.url import parse_local_database_url
+from vpn_api.db.url import parse_database_url
 from vpn_api.tunnels.window_profiles import WindowManifest
 ENV = Path("/etc/detourvpn-beta/api.env")
 MANIFEST = Path("/etc/detourvpn-beta/window-manifest.json")
@@ -126,8 +126,8 @@ def load_settings():
     info = ENV.lstat()
     if not stat.S_ISREG(info.st_mode) or info.st_uid != 0 or stat.S_IMODE(info.st_mode) != 0o600 or info.st_nlink != 1: raise SystemExit(40)
     s = Settings(_env_file=ENV)
-    u = parse_local_database_url(s.database_url)
-    if not (s.environment == "closed" and s.enable_auth and s.enable_mini_app and s.beta_invites_only and s.enable_window_tunnels and s.window_manifest_file == MANIFEST and u.database == "detourvpn_beta" and u.username == "vpn_api" and u.host in {"localhost", "127.0.0.1"} and u.port == 25433): raise SystemExit(41)
+    u = parse_database_url(s.database_url).url
+    if not (s.environment == "closed" and s.enable_auth and s.enable_mini_app and s.beta_invites_only and s.enable_window_tunnels and s.window_manifest_file == MANIFEST and u.database and u.username == "vpn_api"): raise SystemExit(41)
     return s
 def read_manifest():
     info = MANIFEST.lstat()

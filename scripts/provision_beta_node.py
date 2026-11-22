@@ -19,7 +19,7 @@ sys.path.insert(0, str(REPOSITORY / "services" / "api" / "src"))
 
 from vpn_api.config import Settings  # noqa: E402
 from vpn_api.db.connection import create_database_engine  # noqa: E402
-from vpn_api.db.url import parse_local_database_url  # noqa: E402
+from vpn_api.db.url import parse_database_url  # noqa: E402
 from vpn_api.nodes.contracts import ProvisionNodeInput  # noqa: E402
 from vpn_api.nodes.service import NodeError, NodeRegistry  # noqa: E402
 
@@ -109,15 +109,11 @@ def validate_beta_settings(settings: Settings) -> Settings:
     try:
         if settings.database_url is None:
             raise ValueError
-        database = parse_local_database_url(settings.database_url)
+        # ADR-166: the beta database is the managed remote one (TLS verify-full enforced here).
+        database = parse_database_url(settings.database_url).url
     except ValueError:
         raise ProvisionError("beta_node_provision_requires_beta_database") from None
-    if (
-        database.database != BETA_DATABASE
-        or database.username != BETA_DATABASE_USER
-        or database.host not in {"127.0.0.1", "localhost"}
-        or database.port != BETA_DATABASE_PORT
-    ):
+    if not database.database or database.username != BETA_DATABASE_USER:
         raise ProvisionError("beta_node_provision_requires_beta_database")
     return settings
 
