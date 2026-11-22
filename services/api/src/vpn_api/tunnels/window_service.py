@@ -343,6 +343,9 @@ def create_connection(
 
 
 def owned_connection(session: Session, user_id: UUID, connection_id: UUID) -> PeerConnection:
+    # Lock order matches poll_windows: the user row first, then the connection row. Locking the
+    # connection first deadlocked against the node poll (observed on the managed database).
+    LedgerService._lock_owner(session, user_id, active=False)
     connection = session.scalar(
         select(PeerConnection)
         .where(
@@ -439,6 +442,10 @@ def token_connection(
     session: Session, auth: AuthService, connection_id: UUID, value: str | None
 ) -> PeerConnection:
     """Authenticate a native renewal token. Its only authority is this one connection."""
+    # Same lock order as poll_windows: owner (user row) first, then the connection row.
+    owner = session.scalar(select(PeerConnection.user_id).where(PeerConnection.id == connection_id))
+    if owner is not None:
+        LedgerService._lock_owner(session, owner, active=False)
     connection = session.scalar(
         select(PeerConnection).where(PeerConnection.id == connection_id).with_for_update()
     )
