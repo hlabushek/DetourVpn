@@ -278,6 +278,61 @@ table ip detourvpn_beta_slot_nat {{
 """
 
 
+def _interface_accepts(rule: dict[str, Any]) -> tuple[str, str] | None:
+    """(iifname, oifname) of a plain interface-pair accept rule, else None."""
+    names: dict[str, str] = {}
+    accepted = False
+    for item in rule.get("expr", []):
+        if not isinstance(item, dict):
+            return None
+        if "accept" in item:
+            accepted = True
+            continue
+        match = item.get("match")
+        if isinstance(match, dict) and match.get("op") == "==":
+            left = match.get("left")
+            meta = left.get("meta") if isinstance(left, dict) else None
+            key = meta.get("key") if isinstance(meta, dict) else None
+            if key in {"iifname", "oifname"} and isinstance(match.get("right"), str):
+                names[key] = match["right"]
+    if accepted and set(names) == {"iifname", "oifname"}:
+        return names["iifname"], names["oifname"]
+    return None
+
+
+def _forward_policy_preflight(ruleset: dict[str, Any], slots: list[Slot], uplink: str) -> None:
+    """ADR-172: refuse a host whose other forward chain drops our routed traffic.
+
+    An accept in this project's own table does not stop a later base chain on the same hook
+    (for example ufw's iptables-nft FORWARD chain with policy drop) from dropping. Such a host
+    is accepted only when that table also accepts both directions for every slot veth, which
+    is what the documented `ufw route allow` rules create. Rule order and jumps are not
+    evaluated; iptables-legacy rules are invisible here.
+    """
+    items = [item for item in ruleset.get("nftables", []) if isinstance(item, dict)]
+    ours = {HOST_TABLE, HOST_NAT_TABLE}
+    dropping = {
+        (chain.get("family"), chain.get("table"))
+        for chain in (item.get("chain") for item in items)
+        if isinstance(chain, dict)
+        and chain.get("hook") == "forward"
+        and chain.get("policy") == "drop"
+        and chain.get("table") not in ours
+    }
+    for family, table in sorted(dropping, key=str):
+        pairs = {
+            pair
+            for rule in (item.get("rule") for item in items)
+            if isinstance(rule, dict)
+            and (rule.get("family"), rule.get("table")) == (family, table)
+            and (pair := _interface_accepts(rule)) is not None
+        }
+        for slot in slots:
+            hostdev = _veth(slot.slot_id)[0]
+            if not {(hostdev, uplink), (uplink, hostdev)} <= pairs:
+                raise BootstrapError("host_forward_policy_drops")
+
+
 def _host_network_preflight(slots: list[Slot]) -> str:
     try:
         if Path("/proc/sys/net/ipv4/ip_forward").read_text().strip() != "1":
@@ -329,6 +384,7 @@ def _host_network_preflight(slots: list[Slot]) -> str:
                 for item in present.get("nftables", [])
             ):
                 raise BootstrapError("beta_host_firewall_table_exists")
+        _forward_policy_preflight(json.loads(_run([NFT, "-j", "list", "ruleset"])), slots, uplink)
         if _run([SS, "-H", "-lun", "sport", ">=", "51901", "and", "sport", "<=", "51916"]):
             raise BootstrapError("beta_awg_port_in_use")
         for slot in slots:

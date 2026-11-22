@@ -64,6 +64,22 @@ class InstallError(RuntimeError):
     """Fixed error codes only; never include keys, addresses or raw remote output."""
 
 
+# ADR-172: a host whose firewall drops routed traffic by default (ufw "deny (routed)") also
+# drops the slots' forwarded traffic; the bootstrap refuses it (`host_forward_policy_drops`).
+# The owner adds these rules on the NEW host, once per slot N (pool nodes: N=1), replacing
+# <UPLINK> with the interface of the default route (`ip -4 route get 1.1.1.1`). Placeholders
+# only; this script never changes the host firewall.
+UFW_ROUTE_RULES = (
+    "ufw route allow in on dvbh<N> out on <UPLINK>",
+    "ufw route allow in on <UPLINK> out on dvbh<N>",
+)
+
+
+def forward_policy_hint(error: str) -> list[str] | None:
+    """The manual fix for a refused forward policy; None for every other failure."""
+    return list(UFW_ROUTE_RULES) if "host_forward_policy_drops" in error else None
+
+
 REMOTE_PROGRAM = r"""
 set -Eeuo pipefail
 umask 077
@@ -369,7 +385,11 @@ def main(argv: list[str] | None = None) -> int:
                 "node agent not started; node not registered; not evidence of handshake"
             )
     except (InventoryError, CheckError, InstallError) as error:
-        print(json.dumps({"installed": False, "error": str(error)}), file=sys.stderr)
+        failure: dict[str, object] = {"installed": False, "error": str(error)}
+        hint = forward_policy_hint(str(error))
+        if hint is not None:
+            failure["manual_fix_on_new_host"] = hint  # ADR-172, see docs/runbooks/beta-add-node.md
+        print(json.dumps(failure), file=sys.stderr)
         return 1
     text = json.dumps(report, indent=2) + "\n"
     if arguments.receipt is not None:
