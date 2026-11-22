@@ -179,6 +179,8 @@ def runtime_ready(session: Session, node_id: UUID, runtime_id: UUID) -> bool:
 # renewal simply stays pending until the node acknowledges it.
 ADMISSION_HEARTBEAT_SECONDS = 10
 EXISTING_HEARTBEAT_SECONDS = 120
+# ADR-168: the WindowCommands contract limit; a poll answers at most this many commands.
+MAX_POLL_COMMANDS = 32
 
 
 def available_runtime(
@@ -642,6 +644,11 @@ def poll_windows(
                 # An agent losing a supposedly active peer may not silently reopen it.
                 candidate.state = "revoke_pending"
                 commands.append(WindowCommand(operation="revoke", grant=grant))
+        # ADR-168: the contract carries at most 32 commands. Revokes first (they free slots
+        # and drain the backlog), then windows whose deadline is nearest; the rest stay due
+        # and are sent by the next poll a second later.
+        commands.sort(key=lambda item: (item.operation != "revoke", item.grant.not_after))
+        commands = commands[:MAX_POLL_COMMANDS]
     session.flush()
     return WindowCommands(
         runtime_id=body.runtime_id,
