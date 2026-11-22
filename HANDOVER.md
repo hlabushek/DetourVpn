@@ -178,6 +178,43 @@ commit (a commit cannot contain its own hash).
   steps, real multi-origin failover and DNS, real API outages, node behaviour for an offline resume
   on the same lease, libbox.
 
+## Server and node audit fixes (2026-11-23, NOT committed, not pushed, not deployed)
+From the 2026-11-22 audit. Each entry is verified by local tests only (pytest on a temporary
+local PostgreSQL via `scripts/test_with_postgres.py`); nothing was deployed or run on a node.
+The two backup/restore fixtures in `test_window_service.py` and `test_window_funding.py` error
+here because the portable PostgreSQL has no `pg_dump` (`postgres_tool_missing`), as before.
+- **ADR-168** (C2, node stuck with more than 32 due commands): `poll_windows` answers at most
+  32 commands (revokes first, then nearest deadline); the rest follow on the next poll.
+  Contract unchanged. Tests: `test_audit_stage2_poll_commands.py` + window tests.
+- Commits were refused by the permission system on 2026-11-23, so ADR-168 and every entry
+  below are in the working tree only, uncommitted, for the owner to review and commit.
+- **ADR-169** (H1, node daemon crashed on native errors and closed every gate): per-command
+  containment in `tick()`, parse errors become `RuntimeFault`, the main loop retries every
+  non-fatal error and exits only after 3 consecutive core identity failures. Unit unchanged.
+  Tests: `test_audit_stage2_daemon.py` (H1 tests) + `test_window_daemon.py`,
+  `test_window_runtime.py`, `test_window_pool.py`.
+- **ADR-170** (M1, agent never re-registered after `window_runtime_mismatch`): HTTP error
+  answers are reported as `rejected_<code>` (`[a-z_]{1,64}`, body capped at 4 KiB, else
+  `control_rejected`); a runtime mismatch makes the loop register again. Tests: the M1 tests in
+  `test_audit_stage2_daemon.py` + the same daemon test files.
+- **ADR-171** (C1, critical: one rate bucket for every user behind Caddy): new setting
+  `VPN_TRUSTED_PROXY_ADDRESS`; X-Forwarded-For trusted only from that peer; Caddy overwrites
+  the header (`header_up X-Forwarded-For {remote_host}`); window routes limited per network
+  (120/min), then per session family (30/min) or per connection id for native calls (30/min),
+  each in its own transaction, no global bucket. **Owner step before it helps:** set
+  `VPN_TRUSTED_PROXY_ADDRESS=127.0.0.1` in the API environment and install the new Caddyfile
+  (see ADR-171). Tests: `test_audit_stage2_rate_limit.py` + auth, window, panel and config tests.
+- **ADR-172** (H5, ufw "deny (routed)" silently dropped all slot traffic): the slot bootstrap
+  preflight refuses a host whose other forward chain has `policy drop` unless both
+  `ufw route allow` directions exist for every slot veth (`host_forward_policy_drops`); the
+  runbook (`beta-add-node.md` step 1.4) and `install_beta_node.py` give the two rules as
+  placeholders. No host firewall was touched. Tests: `test_audit_stage2_forward_policy.py` +
+  bootstrap and install tests.
+- **ADR-167 amendment** (L1, docs only): `authenticate()` already locked the user row first, so
+  the `owned_connection` change was a no-op; the real opposite-order path was `token_connection`
+  (native renew) against the node poll, fixed by ADR-167 decision 2. Unproven as the cause of
+  the managed-database deadlocks (no log text). Test: `test_audit_stage2_lock_order.py`.
+
 ## Rules for the next agent
 - One phase at a time, with one ADR per phase in `docs/adr/` (next free number: 166).
 - Commit locally with the owner's OK. No push.
