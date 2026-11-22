@@ -14,6 +14,27 @@ node poll (`poll_windows`), which is authenticated by the node.
 `peer_connections` row first, and only later locked the user row inside window funding
 (`reserve_window` -> `LedgerService._lock_owner`). Two transactions in opposite order deadlock.
 
+### Amendment 2026-11-23 (audit L1): which path was actually wrong
+The first paragraph above is only half right. `AuthService.authenticate()` already locks the
+user row (`SELECT … FROM users … FOR UPDATE`, `auth/service.py`) before any route body runs, so
+`owned_connection` on the renew, revoke, get and renew-token routes already took the user row
+before the connection row. Decision 1 is harmless but changed nothing. A PostgreSQL test
+confirms that `authenticate()` holds the user row lock for the whole transaction
+(`services/api/tests/test_audit_stage2_lock_order.py`).
+
+The real opposite-order path was `token_connection`, used by the native renewer without an
+access token: `POST /{id}/native-renew` locked the connection row, then the node advisory lock,
+then `reserve_window` locked the user row (`LedgerService._lock_owner`). `poll_windows` locks
+the user rows first and then the connection rows, so native-renew against a node poll could
+deadlock. `GET /{id}/native` locked only the connection row and never asked for the user row,
+so it could wait but not deadlock. Decision 2 (owner lock before the connection lock in
+`token_connection`) is the actual fix. Whether this pair produced the deadlocks seen on the
+managed database is still unproven: the PostgreSQL deadlock log text was not captured.
+
+A second, rare opposite-order pair is not fixed here: device link-code redeem (user row, then
+`beta_invites` `FOR SHARE`) against the admin `revoke_beta_invite` (invite `FOR UPDATE`, then
+the user row).
+
 ## Decision
 1. `owned_connection` takes the user row lock (`LedgerService._lock_owner`, `active=False`)
    before the connection row lock. The user id comes from the authenticated principal.
