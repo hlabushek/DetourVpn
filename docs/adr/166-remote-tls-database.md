@@ -22,8 +22,11 @@ Neon is a remote host and requires TLS, so the old rule rejects it at startup.
    `options`, `passfile`, ...), because libpq would honour them and redirect the connection.
 4. **Loopback is unchanged**: loopback host, no query parameters, `sslmode=disable`, `hostaddr` pinned
    to loopback (I-004 development path, the local operations scripts, and the existing beta tooling).
-5. **CA bundle:** remote connections use `sslrootcert=system` (libpq 16+ system trust store), so
-   publicly trusted managed-provider certificates verify without a bundled CA file.
+5. **CA bundle:** remote connections trust the distribution CA bundle file
+   (`/etc/ssl/certs/ca-certificates.crt` or `/etc/pki/tls/certs/ca-bundle.crt`) when it exists,
+   otherwise libpq's `system` store. Amendment 2026-11-22: `sslrootcert=system` alone failed on
+   Ubuntu 24.04 with the psycopg wheel ("certificate verify failed"), because the wheel's bundled
+   OpenSSL does not read the distribution trust store. verify-full is unchanged.
 6. The username/password rules for closed operation are unchanged: the closed validator still
    requires the dedicated `vpn_api` role with a password.
 7. Still refused everywhere: non-`postgresql+psycopg` drivers, missing user or database, database

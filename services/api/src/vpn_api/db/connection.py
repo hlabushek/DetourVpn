@@ -1,3 +1,4 @@
+import os
 from collections.abc import Iterator
 from contextlib import contextmanager
 
@@ -7,12 +8,29 @@ from sqlalchemy.orm import Session
 from vpn_api.config import Settings
 from vpn_api.db.url import LOOPBACK_ADDRESSES, parse_database_url
 
+# Common CA bundle files on Linux distributions. The psycopg wheel bundles its own OpenSSL,
+# which does not read the distribution trust store, so sslrootcert="system" fails with
+# "certificate verify failed" there (seen on Ubuntu 24.04, 2026-11-22). Pointing libpq at
+# the distribution bundle file keeps full verification (verify-full) and works on any libpq.
+_SYSTEM_CA_BUNDLES = (
+    "/etc/ssl/certs/ca-certificates.crt",
+    "/etc/pki/tls/certs/ca-bundle.crt",
+)
+
+
+def remote_ca_file() -> str:
+    """Return the CA bundle file libpq should trust, or "system" when none is found."""
+    for path in _SYSTEM_CA_BUNDLES:
+        if os.path.isfile(path):
+            return path
+    return "system"
+
 
 def create_database_engine(settings: Settings) -> Engine:
     """Construct a lazy engine. Loopback stays unencrypted (local only); remote hosts need TLS.
 
-    ADR-166: remote hosts are accepted with verified TLS. The CA bundle is the system
-    trust store (libpq >= 16 "system"), so managed providers with public certificates work.
+    ADR-166: remote hosts are accepted with verified TLS (verify-full). The CA bundle is the
+    distribution trust store file when present, otherwise libpq's "system" store.
     The caller owns dispose/lifetime.
     """
     if settings.database_url is None:
@@ -35,7 +53,7 @@ def create_database_engine(settings: Settings) -> Engine:
         connect_args = {
             **common,
             "sslmode": target.ssl_mode,
-            "sslrootcert": "system",
+            "sslrootcert": remote_ca_file(),
         }
         if target.channel_binding is not None:
             connect_args["channel_binding"] = target.channel_binding

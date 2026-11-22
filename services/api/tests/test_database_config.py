@@ -93,6 +93,17 @@ def test_engine_has_safe_defaults_without_connecting() -> None:
         engine.dispose()
 
 
+def test_remote_ca_file_prefers_distribution_bundle(tmp_path, monkeypatch) -> None:
+    from vpn_api.db import connection
+
+    bundle = tmp_path / "ca-certificates.crt"
+    bundle.write_text("placeholder")
+    monkeypatch.setattr(connection, "_SYSTEM_CA_BUNDLES", (str(bundle),))
+    assert connection.remote_ca_file() == str(bundle)
+    monkeypatch.setattr(connection, "_SYSTEM_CA_BUNDLES", (str(tmp_path / "absent.crt"),))
+    assert connection.remote_ca_file() == "system"
+
+
 def test_remote_engine_is_lazy_and_keeps_tls_defaults() -> None:
     from vpn_api.db.url import parse_database_url
 
