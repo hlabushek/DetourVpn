@@ -93,6 +93,8 @@ def create_app(
     )
     app.state.auth = None
     app.state.admin = None
+    # ADR-171: read by auth.routes.network() for rate-limit subjects.
+    app.state.trusted_proxy = config.trusted_proxy_address
     app.add_middleware(BodyLimitMiddleware)
     app.include_router(router)
     app.include_router(mini_app_router)

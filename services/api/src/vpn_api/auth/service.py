@@ -129,34 +129,70 @@ class AuthService:
             is not None
         )
 
-    def rate(self, operation: str, network: str) -> None:
-        limits = {
-            "start": (10, 100),
-            "verify": (60, 1000),
-            "refresh": (120, 1000),
-            "webhook": (120, 1000),
-            "device": (30, 300),
-            "reward": (120, 3000),
-            "mini_app": (30, 300),
-            "link_create": (10, 100),
-            "link_redeem": (10, 100),
-        }
-        per_network, global_limit = limits[operation]
+    # Per minute: (per subject, global or None). ADR-171: the window-tunnel operations have no
+    # global bucket, so no group of callers can lock every user out of connect and renewal.
+    RATE_LIMITS: dict[str, tuple[int, int | None]] = {
+        "start": (10, 100),
+        "verify": (60, 1000),
+        "refresh": (120, 1000),
+        "webhook": (120, 1000),
+        "device": (30, 300),
+        "reward": (120, 3000),
+        "mini_app": (30, 300),
+        "link_create": (10, 100),
+        "link_redeem": (10, 100),
+        # Before authentication, per client network (several users may share a carrier NAT).
+        "window_ip": (120, None),
+        # After authentication: per user and device, or per connection for the native token.
+        "window_device": (30, None),
+        "window_native": (30, None),
+    }
+
+    def _count(self, session: Session, operation: str, network: str) -> bool:
+        per_network, global_limit = self.RATE_LIMITS[operation]
+        now = database_now(session)
+        window = int(now.timestamp()) // 60
         exceeded = False
+        buckets = [(network, per_network)]
+        if global_limit is not None:
+            buckets.insert(0, ("global", global_limit))
+        for subject, limit in buckets:
+            key = keyed_digest(self.pepper, "rate", operation, subject, window)
+            statement = insert(RateBucket).values(
+                key=key, count=1, expires_at=now + timedelta(minutes=2)
+            )
+            count = session.scalar(
+                statement.on_conflict_do_update(
+                    index_elements=[RateBucket.key], set_={"count": RateBucket.count + 1}
+                ).returning(RateBucket.count)
+            )
+            exceeded = exceeded or (count is not None and count > limit)
+        return exceeded
+
+    def rate(self, operation: str, network: str) -> None:
+        """Own transaction: the count survives a later failure of the request."""
         with transaction(self.engine) as session:
-            now = database_now(session)
-            window = int(now.timestamp()) // 60
-            for subject, limit in (("global", global_limit), (network, per_network)):
-                key = keyed_digest(self.pepper, "rate", operation, subject, window)
-                statement = insert(RateBucket).values(
-                    key=key, count=1, expires_at=now + timedelta(minutes=2)
+            exceeded = self._count(session, operation, network)
+        if exceeded:
+            raise AuthError("rate_limited", 429)
+
+    def rate_session(self, operation: str, access: str) -> None:
+        """ADR-171: count per session family (one signed-in device), in its own transaction.
+
+        Only a read of the credential row, without locks: the request authenticates fully
+        afterwards. An unknown or malformed token has no family and is not counted here; the
+        per-network `rate()` before it bounds such callers. The count survives a later failure
+        of the request.
+        """
+        if not re.fullmatch(r"[A-Za-z0-9_-]{43}", access):
+            return
+        with transaction(self.engine) as session:
+            family = session.scalar(
+                select(SessionCredential.family_id).where(
+                    SessionCredential.access_digest == digest(access)
                 )
-                count = session.scalar(
-                    statement.on_conflict_do_update(
-                        index_elements=[RateBucket.key], set_={"count": RateBucket.count + 1}
-                    ).returning(RateBucket.count)
-                )
-                exceeded = exceeded or (count is not None and count > limit)
+            )
+            exceeded = family is not None and self._count(session, operation, str(family))
         if exceeded:
             raise AuthError("rate_limited", 429)
 

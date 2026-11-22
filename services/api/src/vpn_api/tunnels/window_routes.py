@@ -195,7 +195,8 @@ def panel_profile(
     server_id: UUID, request: Request, auth: Service, access: Access
 ) -> panel_delivery.PanelProfileView:
     """VLESS + Reality profile of one panel server, for a bound Windows device only (ADR-115)."""
-    auth.rate("device", network(request))
+    auth.rate("window_ip", network(request))
+    auth.rate_session("window_device", access)
     with transaction(auth.engine) as session:
         principal = auth.authenticate(session, access, "tunnels:manage")
         return panel_delivery.profile(session, auth.settings, principal, server_id)
@@ -205,7 +206,8 @@ def panel_profile(
 def create(
     body: ConnectionInput, request: Request, auth: Service, access: Access
 ) -> ConnectionView:
-    auth.rate("device", network(request))
+    auth.rate("window_ip", network(request))
+    auth.rate_session("window_device", access)
     selected = selected_node(auth, body.node_id)
     with transaction(auth.engine) as session:
         connection = create_connection(session, auth, access, selected, body)
@@ -249,7 +251,8 @@ def get(connection_id: UUID, auth: Service, access: Access) -> ConnectionView:
 def renew(
     connection_id: UUID, body: RenewalInput, request: Request, auth: Service, access: Access
 ) -> ConnectionView:
-    auth.rate("device", network(request))
+    auth.rate("window_ip", network(request))
+    auth.rate_session("window_device", access)
     with transaction(auth.engine) as session:
         principal = auth.authenticate(session, access, "tunnels:manage")
         connection = owned_connection(session, principal.user_id, connection_id)
@@ -292,7 +295,8 @@ def renew_token(
     connection_id: UUID, request: Request, auth: Service, access: Access
 ) -> RenewTokenView:
     """ADR-097: rotate the token the OS-level VPN service uses to renew this connection only."""
-    auth.rate("device", network(request))
+    auth.rate("window_ip", network(request))
+    auth.rate_session("window_device", access)
     with transaction(auth.engine) as session:
         return RenewTokenView(renew_token=issue_renew_token(session, auth, access, connection_id))
 
@@ -301,7 +305,8 @@ def renew_token(
 def native_status(
     connection_id: UUID, request: Request, auth: Service, token: RenewToken = None
 ) -> NativeWindowView:
-    auth.rate("device", network(request))
+    auth.rate("window_ip", network(request))
+    auth.rate("window_native", str(connection_id))
     with transaction(auth.engine) as session:
         connection = token_connection(session, auth, connection_id, token)
         return native_view(session, selected_node(auth, connection.node_id), connection)
@@ -315,7 +320,8 @@ def native_renew(
     auth: Service,
     token: RenewToken = None,
 ) -> NativeWindowView:
-    auth.rate("device", network(request))
+    auth.rate("window_ip", network(request))
+    auth.rate("window_native", str(connection_id))
     with transaction(auth.engine) as session:
         connection = token_connection(session, auth, connection_id, token)
         selected = selected_node(auth, connection.node_id)
@@ -327,7 +333,8 @@ def native_renew(
 
 @router.delete("/{connection_id}", response_model=ConnectionView, status_code=202)
 def revoke(connection_id: UUID, request: Request, auth: Service, access: Access) -> ConnectionView:
-    auth.rate("device", network(request))
+    auth.rate("window_ip", network(request))
+    auth.rate_session("window_device", access)
     with transaction(auth.engine) as session:
         principal = auth.authenticate(session, access, "tunnels:manage")
         connection = owned_connection(session, principal.user_id, connection_id)

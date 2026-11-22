@@ -146,6 +146,8 @@ install_api_env() {
       printf 'VPN_ENVIRONMENT=%s\n' "${VPN_ENVIRONMENT}"
       printf 'VPN_PUBLIC_ORIGIN=https://%s\n' "${SITE_HOST}"
       printf 'VPN_DATABASE_URL="%s"\n' "${VPN_DATABASE_URL}"
+      # ADR-171: trust X-Forwarded-For only from the local Caddy (rate-limit subjects).
+      printf 'VPN_TRUSTED_PROXY_ADDRESS=127.0.0.1\n'
     } > "${ENV_FILE}"
   )
   chown root:"${APP_USER}" "${ENV_FILE}"
@@ -218,7 +220,9 @@ ${SITE_HOST} {
 		path /api/v1/plans /api/v1/subscriptions /api/v1/rewards/* /api/v1/referrals /api/v1/referrals/*
 	}
 	handle @beta_api {
-		reverse_proxy 127.0.0.1:${API_PORT}
+		reverse_proxy 127.0.0.1:${API_PORT} {
+			header_up X-Forwarded-For {remote_host}
+		}
 	}
 	handle {
 		respond 404

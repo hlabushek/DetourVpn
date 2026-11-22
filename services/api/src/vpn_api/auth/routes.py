@@ -1,3 +1,4 @@
+from ipaddress import ip_address, ip_network
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Request, Response
@@ -47,9 +48,36 @@ def access_token(
 Access = Annotated[str, Depends(access_token)]
 
 
+FORWARDED_INVALID = "forwarded-invalid"
+
+
 def network(request: Request) -> str:
-    # Never trust X-Forwarded-For; reverse-proxy trust is a separate deployment gate.
-    return request.client.host if request.client is not None else "unknown"
+    """Rate-limit subject for the caller's network (ADR-171).
+
+    X-Forwarded-For is trusted only when the direct peer is the configured local proxy
+    (`VPN_TRUSTED_PROXY_ADDRESS`), which overwrites the header with its own peer address.
+    Otherwise the direct peer is the subject. IPv6 clients are grouped by /64.
+    """
+    peer = request.client.host if request.client is not None else "unknown"
+    app = request.scope.get("app")
+    trusted = getattr(getattr(app, "state", None), "trusted_proxy", None)
+    try:
+        from_proxy = trusted is not None and ip_address(peer) == trusted
+    except ValueError:
+        from_proxy = False
+    if not from_proxy:
+        return peer
+    values = request.headers.getlist("x-forwarded-for")
+    if len(values) != 1 or "," in values[0]:
+        # The proxy always sends exactly one address; anything else is a misconfiguration.
+        return FORWARDED_INVALID
+    try:
+        client = ip_address(values[0].strip())
+    except ValueError:
+        return FORWARDED_INVALID
+    if client.version == 6:
+        return str(ip_network(f"{client}/64", strict=False))
+    return str(client)
 
 
 @router.post("/auth/start", response_model=StartResponse)

@@ -1,7 +1,7 @@
 from pathlib import Path
 from typing import Literal
 
-from pydantic import Field, SecretStr, field_validator, model_validator
+from pydantic import Field, IPvAnyAddress, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from vpn_api.app_update import UPDATE_SIGNING_PUBLIC_KEY
@@ -51,6 +51,9 @@ class Settings(BaseSettings):
     # ADR-115: list imported panel servers to devices and give Windows devices their VLESS
     # profile. Off by default: a panel link is one shared panel client and is not metered.
     deliver_panel_servers: bool = False
+    # ADR-171: the local reverse proxy (Caddy) whose X-Forwarded-For is trusted for rate
+    # limiting. Unset = never trust the header (direct peer only, the previous behaviour).
+    trusted_proxy_address: IPvAnyAddress | None = None
 
     @model_validator(mode="after")
     def validate_window_tunnels(self) -> "Settings":
