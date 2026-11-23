@@ -261,7 +261,8 @@ std::vector<std::string> TunnelController::WriteSplit(const std::string& mode,
                                                       const std::vector<std::string>& apps,
                                                       const std::vector<std::string>& domains) {
   std::lock_guard<std::mutex> lock(mutex_);
-  if (engine_started_ || deadline_ != 0) throw Generic();  // never change rules while connected
+  // ADR-187: allowed while connected. Only the stored rules change; the running engine keeps the
+  // config built at its connect, and the next connect reads these prefs.
   if ((mode != "all" && mode != "exclude" && mode != "include") || apps.size() > 63 || domains.size() > 128)
     throw Generic();
   std::set<std::string> seen_apps;

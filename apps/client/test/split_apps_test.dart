@@ -200,7 +200,7 @@ void main() {
 
     expect(mode, 'exclude');
     expect(
-      find.text('Не удалось сохранить. Отключи VPN и попробуй снова.'),
+      find.text('Не удалось сохранить. Попробуй снова.'),
       findsOneWidget,
     );
   });

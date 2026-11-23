@@ -376,31 +376,20 @@ void main() {
     },
   );
   testWidgets(
-    'apps-outside-VPN row stays tappable while connected and offers to disconnect',
+    'apps-outside-VPN row opens directly while connected and keeps the tunnel up (ADR-187)',
     (tester) async {
       await tester.runAsync(() => c.connect());
       await tester.pumpWidget(settingsHost());
       expect(c.hasLease, isTrue);
       expect(
-        find.text('VPN включён: для изменения его нужно отключить'),
+        find.text('VPN включён: изменения применятся при следующем подключении'),
         findsOneWidget,
       );
       await tester.tap(find.text('Приложения вне VPN'));
       await settle(tester);
-      expect(find.text('Отключить VPN?'), findsOneWidget);
-      // Cancel keeps the tunnel up and does not open the screen.
-      await tester.tap(find.text('Отмена'));
-      await settle(tester);
-      expect(native.up, isTrue);
-      expect(find.byType(SplitAppsScreen), findsNothing);
-      // Confirm disconnects first, then opens the screen.
-      await tester.tap(find.text('Приложения вне VPN'));
-      await settle(tester);
-      await tester.tap(find.text('Отключить и открыть'));
-      await settle(tester);
-      expect(native.up, isFalse);
-      expect(c.hasLease, isFalse);
+      expect(find.text('Отключить VPN?'), findsNothing);
       expect(find.byType(SplitAppsScreen), findsOneWidget);
+      expect(native.up, isTrue);
     },
   );
   group('ADR-097 native renewal', () {

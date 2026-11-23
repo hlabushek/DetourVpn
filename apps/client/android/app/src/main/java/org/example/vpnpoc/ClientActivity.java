@@ -399,7 +399,8 @@ public final class ClientActivity extends FlutterActivity {
                         value = lastMode;
                         break;
                     case "splitWrite":
-                        if (app.provider.isUp() || app.deadline != 0) throw new IllegalStateException();
+                        // ADR-187: a write while the tunnel is up only changes the stored rules. The
+                        // running tunnel keeps the config it was built with; the next connect reads these.
                         java.util.List<String> selected = call.argument("packages");
                         java.util.List<String> requestedDomains = call.argument("domains");
                         if (requestedDomains == null) requestedDomains = java.util.Collections.emptyList();

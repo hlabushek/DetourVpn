@@ -5,7 +5,10 @@ import 'native_tunnel.dart';
 import 'platform_info.dart';
 
 class SplitAppsScreen extends StatefulWidget {
-  const SplitAppsScreen({super.key});
+  const SplitAppsScreen({super.key, this.onSaved});
+
+  /// ADR-187: called after a change is stored. The running tunnel is not changed by it.
+  final VoidCallback? onSaved;
 
   @override
   State<SplitAppsScreen> createState() => _SplitAppsState();
@@ -180,6 +183,7 @@ class _SplitAppsState extends State<SplitAppsScreen>
           saving = false;
         });
       }
+      widget.onSaved?.call();
     } on PlatformException catch (failure) {
       if (!mounted) return;
       setState(() {
@@ -192,7 +196,7 @@ class _SplitAppsState extends State<SplitAppsScreen>
             ? 'Добавь домен без https:// и пути, например example.org или *.ru.'
             : failure.code == 'domain_duplicate'
             ? 'Этот домен уже есть в списке.'
-            : 'Не удалось сохранить. Отключи VPN и попробуй снова.';
+            : 'Не удалось сохранить. Попробуй снова.';
       });
     } catch (_) {
       if (!mounted) return;

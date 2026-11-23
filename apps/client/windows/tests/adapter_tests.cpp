@@ -376,7 +376,9 @@ void ControllerTests() {
     CHECK(s.handshake_seen);  // Task 7: native memory of this connection's handshake
     CHECK(s.received_bytes == 1000 && s.traffic_bytes == 1500);
     CHECK(ThrowsCode("native_service_state_invalid", [&] { r.c->Connect(kProfile, 30000, grant); }));  // already up
-    CHECK(ThrowsCode("native_operation_failed", [&] { r.c->WriteSplit("all", {}, {}); }));             // locked while up
+    // ADR-187: split rules are stored while up; the running tunnel is not touched.
+    r.c->WriteSplit("all", {}, {});
+    CHECK(r.c->SplitMode() == "all" && r.c->Snapshot().up);
     CHECK(ThrowsCode("native_operation_failed", [&] { r.c->WriteDns("1.1.1.1"); }));                   // locked while up
     r.c->AdvanceWindow(WindowGrant{"conn-1", "run-1", 2}, 80000);
     CHECK(r.c->Snapshot().remaining_ms > 60000);

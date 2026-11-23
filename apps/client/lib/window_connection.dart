@@ -2042,6 +2042,22 @@ class WindowConnectionController extends ConnectionController {
     }
   }
 
+  /// ADR-187: restart the running tunnel on the same server so saved split rules take effect.
+  /// Keeps the user's "stay connected" wish, unlike a manual disconnect.
+  Future<void> restartTunnel() async {
+    if (_dead || _switching || !hasLease) return;
+    _switching = true;
+    try {
+      await disconnect(user: false);
+      if (_dead) return;
+      await _refreshWork;
+      if (_dead) return;
+      await connect();
+    } finally {
+      _switching = false;
+    }
+  }
+
   bool _establishedStatusConfirmed(NativeSnapshot snapshot) {
     if (snapshot.confirmed) _hasEstablishedHandshake = true;
     // ADR-133: a fresh handshake does not prove the return path while data goes out unanswered.

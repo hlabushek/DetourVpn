@@ -45,50 +45,44 @@ class SettingsScreen extends StatelessWidget {
 
   static const _vpnSettings = MethodChannel('project.vpn/tunnel.v1');
 
-  /// Split settings are applied when the tunnel is built, so they can only change while it is
-  /// off. With the VPN on, offer to turn it off first instead of leaving a dead button.
+  /// ADR-187: split rules can be edited at any time. A change made while the VPN is up is
+  /// stored now and applied at the next connect; the user may restart the tunnel right away.
   Future<void> _openSplitApps(
     BuildContext context,
     WindowConnectionController c,
   ) async {
     final navigator = Navigator.of(context);
-    final messenger = ScaffoldMessenger.of(context);
-    if (c.hasLease) {
-      final disconnect = await showDialog<bool>(
-        context: context,
-        builder: (dialogContext) => AlertDialog(
-          title: const Text('Отключить VPN?'),
-          content: const Text(
-            'Список приложений применяется при подключении. Чтобы его изменить, VPN нужно отключить. После изменения подключитесь снова.',
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(dialogContext).pop(false),
-              child: const Text('Отмена'),
-            ),
-            FilledButton(
-              onPressed: () => Navigator.of(dialogContext).pop(true),
-              child: const Text('Отключить и открыть'),
-            ),
-          ],
-        ),
-      );
-      if (disconnect != true) return;
-      await c.disconnect();
-      if (c.hasLease || c.busy) {
-        messenger.showSnackBar(
-          const SnackBar(
-            content: Text(
-              'Не удалось отключить VPN. Отключите его на главном экране.',
-            ),
-          ),
-        );
-        return;
-      }
-    }
+    var changedWhileOn = false;
     await navigator.push(
-      MaterialPageRoute<void>(builder: (_) => const SplitAppsScreen()),
+      MaterialPageRoute<void>(
+        builder: (_) => SplitAppsScreen(
+          onSaved: () {
+            if (c.hasLease || c.busy) changedWhileOn = true;
+          },
+        ),
+      ),
     );
+    if (!changedWhileOn || !c.hasLease || !context.mounted) return;
+    final restart = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Применить новые правила?'),
+        content: const Text(
+          'Сохранено. Текущее подключение работает со старыми правилами. Перезапустить VPN сейчас или применить при следующем подключении?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('Позже'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text('Перезапустить'),
+          ),
+        ],
+      ),
+    );
+    if (restart == true) await c.restartTunnel();
   }
 
   /// Picks the tunnel DNS. The choice is stored natively and read at the next connect,
@@ -198,7 +192,7 @@ class SettingsScreen extends StatelessWidget {
             subtitle: c.busy
                 ? 'Подождите: идёт подключение или отключение'
                 : c.hasLease
-                ? 'VPN включён: для изменения его нужно отключить'
+                ? 'VPN включён: изменения применятся при следующем подключении'
                 : 'Исключённые приложения используют обычную сеть',
             enabled: !c.busy,
             onTap: () => _openSplitApps(context, c),
