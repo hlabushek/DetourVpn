@@ -123,7 +123,9 @@ class ClosedWindow(FrozenInput):
     slot_id: StrictInt = Field(ge=1, le=MAX_PEER_SLOT)
     generation: StrictInt = Field(ge=1, le=2**63 - 1)
     gate_closed: StrictBool
-    observation: Literal["measured", "unknown"]
+    # ADR-179: "not_opened" = the gate for this grant was never opened, so nothing passed and
+    # nothing is charged; "unknown" = it may have opened but no trustworthy counter exists.
+    observation: Literal["measured", "unknown", "not_opened"]
     meter: Meter
     observed_bytes: StrictInt | None = Field(default=None, ge=0, le=2**63 - 1)
 

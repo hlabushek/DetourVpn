@@ -58,6 +58,9 @@ class WindowJournal:
                 CHECK(acknowledged IN (0,1))
             );
             CREATE TABLE IF NOT EXISTS fences (connection_id TEXT PRIMARY KEY);
+            -- ADR-179: written durably right before a gate is opened for a window. Without
+            -- it the gate was never opened for that window, so nothing can have passed.
+            CREATE TABLE IF NOT EXISTS opening (window_id TEXT PRIMARY KEY);
             CREATE TRIGGER IF NOT EXISTS immutable_receipt
                 BEFORE UPDATE OF window_id, slot, payload ON receipts
                 BEGIN SELECT RAISE(ABORT,'receipt_immutable'); END;
@@ -98,6 +101,8 @@ class WindowJournal:
                 (str(grant.window_id), grant.slot_id, receipt.model_dump_json()),
             )
             self.db.execute("UPDATE slots SET state='closed' WHERE slot=?", (grant.slot_id,))
+            # The receipt now carries the truth; keep the marker table bounded.
+            self.db.execute("DELETE FROM opening WHERE window_id=?", (str(grant.window_id),))
 
     def pending(self, slot: int | None = None) -> list[ClosedWindow]:
         rows = self.db.execute(
@@ -123,6 +128,19 @@ class WindowJournal:
             self.db.execute(
                 "UPDATE receipts SET acknowledged=1 WHERE window_id=?", (str(receipt.window_id),)
             )
+
+    def mark_opening(self, window_id: UUID) -> None:
+        """ADR-179: durable BEFORE the gate is opened."""
+        with self.db:
+            self.db.execute(
+                "INSERT OR IGNORE INTO opening(window_id) VALUES (?)", (str(window_id),)
+            )
+
+    def opening(self, window_id: UUID) -> bool:
+        return (
+            self.db.execute("SELECT 1 FROM opening WHERE window_id=?", (str(window_id),)).fetchone()
+            is not None
+        )
 
     def fence(self, connection_id: UUID) -> None:
         with self.db:
@@ -168,7 +186,9 @@ class WindowRuntime:
         self.started = False
         self.admitted = False
 
-    def _receipt(self, grant: WindowGrant, measured: int | None) -> ClosedWindow:
+    def _receipt(
+        self, grant: WindowGrant, measured: int | None, *, opened: bool = True
+    ) -> ClosedWindow:
         return ClosedWindow(
             connection_id=grant.connection_id,
             window_id=grant.window_id,
@@ -177,7 +197,10 @@ class WindowRuntime:
             slot_id=grant.slot_id,
             generation=grant.generation,
             gate_closed=True,
-            observation="unknown" if measured is None else "measured",
+            # ADR-179: a gate that was never opened passed nothing: "not_opened", no charge.
+            observation=(
+                "measured" if measured is not None else "unknown" if opened else "not_opened"
+            ),
             meter=self.meter,
             observed_bytes=measured,
         )
@@ -189,8 +212,11 @@ class WindowRuntime:
         if current is None or current[1] == "closed":
             return
         grant, state = current
+        # ADR-179: "intent" with the opening marker means open() was called (the counter was
+        # reset for this grant before the marker); without it the gate never opened.
+        opened = state == "active" or self.journal.opening(grant.window_id)
         measured = None
-        if counter_exists and state == "active":
+        if counter_exists and opened:
             try:
                 measured = gate.closed_bytes()
             except Exception:
@@ -199,7 +225,7 @@ class WindowRuntime:
             if measured is not None and not 0 <= measured <= grant.budget_bytes:
                 # Preserve uncertainty instead of clipping a faulty kernel counter.
                 measured = None
-        self.journal.finish(grant, self._receipt(grant, measured))
+        self.journal.finish(grant, self._receipt(grant, measured, opened=opened))
 
     def startup(self) -> None:
         if self.started:
@@ -267,6 +293,7 @@ class WindowRuntime:
             remaining = math.floor((grant.not_after - self.now()).total_seconds() * 1000) - 6000
             if not 1 <= remaining <= MAX_WINDOW_SECONDS * 1000:
                 raise RuntimeFault("dispatch_deadline_exhausted")
+            self.journal.mark_opening(grant.window_id)
             gate.open(remaining)
             self.journal.save(grant, "active")
         except Exception:
@@ -332,9 +359,10 @@ class WindowRuntime:
             raise RuntimeFault("close_grant_slot_conflict")
         self.revoke(grant.connection_id)
         if self.journal.receipt(grant.window_id) is None:
+            # Never saved by apply() in this runtime, so its gate was never opened (ADR-179).
             self.gates[grant.slot_id].close()
             self.peers[grant.slot_id].remove()
-            self.journal.finish(grant, self._receipt(grant, None))
+            self.journal.finish(grant, self._receipt(grant, None, opened=False))
 
     def expire(self) -> None:
         for slot in self.gates:

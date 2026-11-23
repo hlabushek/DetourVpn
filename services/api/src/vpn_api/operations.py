@@ -16,13 +16,15 @@ from uuid import uuid4
 from alembic.config import Config
 from alembic.script import ScriptDirectory
 from cryptography.fernet import Fernet, InvalidToken
-from pydantic import BaseModel, ConfigDict, ValidationError
+from pydantic import BaseModel, ConfigDict, SecretStr, ValidationError
 from sqlalchemy import Connection, Engine, create_engine, inspect, select, text
 from sqlalchemy.engine import URL, make_url
-from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.exc import ArgumentError, SQLAlchemyError
 from sqlalchemy.orm import Session
 
+from vpn_api.db.connection import remote_ca_file
 from vpn_api.db.models import User
+from vpn_api.db.url import parse_database_url
 from vpn_api.quota.service import LedgerService
 
 MAX_DUMP = 32 * 1024 * 1024
@@ -50,25 +52,68 @@ class Backup(BaseModel):
     dump: str
 
 
+LOOPBACK_HOSTS = {"127.0.0.1", "::1"}
+
+
 def local_url(raw: str) -> URL:
-    url = make_url(raw)
+    """The operations database: loopback (unchanged rules) or a remote host with verified TLS.
+
+    ADR-180: a non-loopback host is accepted only with an explicit `sslmode=verify-full` and
+    the API parser's other rules (DNS name, no IP literal, only `sslmode`/`channel_binding`).
+    Every refusal keeps the historic code `local_database_required`.
+    """
+    try:
+        url = make_url(raw)
+    except ArgumentError:
+        raise OperationsError("local_database_required") from None
     if (
         url.drivername not in {"postgresql", "postgresql+psycopg"}
-        or url.host not in {"127.0.0.1", "::1"}
-        or url.query
         # libpq expands dbname values containing '=' or a postgres URI. Restrict
         # names so PGDATABASE can never smuggle connection options past loopback.
         or not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]{0,62}", url.database or "")
         or not url.username
     ):
         raise OperationsError("local_database_required")
-    return url.set(drivername="postgresql+psycopg")
+    url = url.set(drivername="postgresql+psycopg")
+    if url.host in LOOPBACK_HOSTS:
+        if url.query:
+            raise OperationsError("local_database_required")
+        return url
+    if url.query.get("sslmode") != "verify-full":
+        raise OperationsError("local_database_required")
+    try:
+        target = parse_database_url(SecretStr(url.render_as_string(hide_password=False)))
+    except ValueError:
+        raise OperationsError("local_database_required") from None
+    if target.is_loopback:
+        raise OperationsError("local_database_required")
+    query = {"sslmode": target.ssl_mode}
+    if target.channel_binding is not None:
+        query["channel_binding"] = target.channel_binding
+    return target.url.set(query=query)
+
+
+def engine_source(engine: Engine) -> str:
+    """The URL of an API engine for the checks above.
+
+    `create_database_engine` strips the query of a remote URL and enforces verify-full through
+    its connection arguments (ADR-166), so that guarantee is written back explicitly here.
+    """
+    url = engine.url
+    if url.host not in LOOPBACK_HOSTS and not url.query.get("sslmode"):
+        url = url.update_query_dict({"sslmode": "verify-full"})
+    return url.render_as_string(hide_password=False)
 
 
 def local_engine(raw: str) -> Engine:
-    return create_engine(
-        local_url(raw), connect_args={"connect_timeout": 5, "options": "-c statement_timeout=60000"}
-    )
+    url = local_url(raw)
+    connect_args: dict[str, object] = {
+        "connect_timeout": 5,
+        "options": "-c statement_timeout=60000",
+    }
+    if url.host not in LOOPBACK_HOSTS:
+        connect_args["sslrootcert"] = remote_ca_file()  # sslmode=verify-full is in the URL
+    return create_engine(url, connect_args=connect_args)
 
 
 def source_id(url: URL) -> str:
@@ -91,6 +136,12 @@ def pg_environment(url: URL) -> dict[str, str]:
         PGOPTIONS="-c statement_timeout=60000",
         PGSSLMODE="disable",
     )
+    if url.host not in LOOPBACK_HOSTS:
+        # ADR-180: local_url only lets a remote URL through with sslmode=verify-full.
+        env["PGSSLMODE"] = str(url.query["sslmode"])
+        env["PGSSLROOTCERT"] = remote_ca_file()
+        if url.query.get("channel_binding"):
+            env["PGCHANNELBINDING"] = str(url.query["channel_binding"])
     return env
 
 
@@ -169,7 +220,7 @@ def manifest(conn: Connection) -> dict[str, TableDigest]:
 
 
 def make_backup(engine: Engine, binary_dir: Path, output: Path, key: Path) -> Backup:
-    url = local_url(engine.url.render_as_string(hide_password=False))
+    url = local_url(engine_source(engine))
     encryption = cipher(key)
     with engine.connect().execution_options(isolation_level="REPEATABLE READ") as conn:
         with conn.begin():
@@ -227,7 +278,7 @@ def restore_drill(engine: Engine, binary_dir: Path, archive: Path, key: Path) ->
         raise OperationsError("backup_invalid") from exc
     if not dump.startswith(b"PGDMP") or len(dump) > MAX_DUMP:
         raise OperationsError("backup_invalid")
-    url = local_url(engine.url.render_as_string(hide_password=False))
+    url = local_url(engine_source(engine))
     executable = tool(binary_dir, "pg_restore")
     name = "vpn_i016_drill_" + uuid4().hex
     target: Engine | None = None
@@ -279,7 +330,7 @@ def restore_drill(engine: Engine, binary_dir: Path, archive: Path, key: Path) ->
 
 
 def monitor_database(engine: Engine, now: datetime) -> dict[str, int]:
-    local_url(engine.url.render_as_string(hide_password=False))
+    local_url(engine_source(engine))
     counts: dict[str, int] = {}
     with engine.connect() as conn, conn.begin():
         conn.execute(text("SET TRANSACTION READ ONLY"))

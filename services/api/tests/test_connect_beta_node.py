@@ -107,14 +107,17 @@ def test_database_programs_verify_the_beta_target() -> None:
     ):
         assert "load_settings()" in connect.PROGRAMS[name], name
     prologue = connect.API_PROLOGUE
+    # ADR-166 (1a4d252): the API's own parser (verify-full for a remote host), the dedicated
+    # role and a database name; no fixed loopback name or port any more.
     for requirement in (
-        'u.database == "detourvpn_beta"',
+        "u = parse_database_url(s.database_url).url",
+        "u.database",
         'u.username == "vpn_api"',
-        "u.port == 25433",
         "s.enable_window_tunnels",
         "s.beta_invites_only",
     ):
         assert requirement in prologue
+    assert "parse_local_database_url" not in prologue
 
 
 def test_remote_programs_never_print_secrets() -> None:

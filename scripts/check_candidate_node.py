@@ -15,6 +15,7 @@ import argparse
 import json
 import subprocess
 import sys
+import time
 from pathlib import Path
 
 from scripts.beta_nodes import BetaNode, InventoryError, load_inventory
@@ -46,6 +47,8 @@ echo "host_ip_assigned=$(ip -4 -o addr show 2>/dev/null | awk '{print $4}' | cut
 if [ -d /run/systemd/system ]; then echo "systemd=1"; else echo "systemd=0"; fi
 if [ -x /usr/lib/systemd/systemd-executor ]; then echo "systemd_executor=1"; else echo "systemd_executor=0"; fi
 echo "udp_ports_busy=$(ss -H -lun 2>/dev/null | awk '{print $5}' | grep -cE ":($ports)$")"
+echo "ntp_synchronized=$(timedatectl show -p NTPSynchronized --value 2>/dev/null || echo unknown)"
+echo "clock_epoch_ms=$(date +%s%3N)"
 """
 
 
@@ -65,6 +68,11 @@ def parse_output(text: str) -> dict[str, str]:
 def _int(values: dict[str, str], key: str) -> int | None:
     value = values.get(key, "")
     return int(value) if value.isdecimal() else None
+
+
+def _offset_ok(values: dict[str, str]) -> bool:
+    raw = values.get("clock_offset_ms", "")
+    return raw.lstrip("-").isdecimal() and abs(int(raw)) <= 1000
 
 
 def evaluate(values: dict[str, str]) -> list[dict[str, object]]:
@@ -87,6 +95,10 @@ def evaluate(values: dict[str, str]) -> list[dict[str, object]]:
         ("public_ipv4_assigned_directly", values.get("host_ip_assigned") == "1", True),
         ("ip_forward_enabled", values.get("ip_forward") == "1", True),
         ("udp_ports_free", values.get("udp_ports_busy") == "0", True),
+        # ADR-178: a node whose clock is off by more than 1 s refuses every grant (the grant
+        # allows 1 s of server-ahead skew), so it is not installed.
+        ("ntp_synchronized", values.get("ntp_synchronized") == "yes", True),
+        ("clock_within_1s", _offset_ok(values), True),
         ("memory_advisory", mem is not None and mem > MIN_MEM_AVAILABLE_KB, False),
         ("disk_advisory", disk is not None and disk > MIN_ROOT_FREE_KB, False),
         ("cpu_advisory", cpus is not None and cpus >= 1, False),
@@ -101,6 +113,7 @@ def run_remote(node: BetaNode) -> dict[str, str]:
         "-o", "IdentitiesOnly=yes", "-i", str(node.ssh_key), "-p", str(node.ssh_port),
         f"{node.ssh_user}@{node.host}", "bash", "-s", "--", node.host, ports,
     ]  # fmt: skip
+    before = time.time()
     try:
         result = subprocess.run(  # noqa: S603, S607 - fixed argv, no shell, fixed program on stdin.
             command, input=REMOTE_PROGRAM.encode("ascii"), capture_output=True, timeout=60,
@@ -108,9 +121,16 @@ def run_remote(node: BetaNode) -> dict[str, str]:
         )  # fmt: skip
     except (OSError, subprocess.TimeoutExpired):
         raise CheckError("candidate_ssh_unavailable") from None
+    after = time.time()
     if result.returncode != 0:
         raise CheckError("candidate_ssh_failed")
-    return parse_output(result.stdout.decode("utf-8", "replace"))
+    values = parse_output(result.stdout.decode("utf-8", "replace"))
+    # ADR-178: the node's clock minus the workstation's, measured around the SSH call (the
+    # midpoint of the round trip; the error is at most half the round trip).
+    remote_ms = values.get("clock_epoch_ms", "")
+    if remote_ms.isdecimal():
+        values["clock_offset_ms"] = str(int(remote_ms) - round((before + after) * 500))
+    return values
 
 
 def main(argv: list[str] | None = None) -> int:

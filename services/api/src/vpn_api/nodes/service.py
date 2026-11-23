@@ -152,5 +152,7 @@ class NodeRegistry:
             session.flush()
         except IntegrityError:
             raise NodeError("agent_replay", 409) from None
-        node.last_seen_at = current
+        # ADR-178: last_seen_at uses the database clock, the same clock admission compares
+        # against. `current` (the API host's clock) only checks the agent's request timestamp.
+        node.last_seen_at = session.scalar(select(func.clock_timestamp()))
         return AgentPrincipal(node.id, node.secret_digest)

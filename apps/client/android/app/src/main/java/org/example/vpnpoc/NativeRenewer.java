@@ -37,6 +37,15 @@ final class NativeRenewer {
     /** No new pending poll this long after a wake-up began, so attempts fit the 60 s lock. */
     private static final long PENDING_BUDGET_MS = 40000;
     private static final long LOCK_MS = 60000;
+    /** Overall bound for one HTTP call: connect, write and read each have TIMEOUT_MS. */
+    private static final long CALL_DEADLINE_MS = 25000;
+    /** Daemon thread that disconnects a call which outlives CALL_DEADLINE_MS. */
+    private static final ScheduledExecutorService WATCHDOG =
+            Executors.newSingleThreadScheduledExecutor(r -> {
+                Thread t = new Thread(r, "detourvpn-renew-watchdog");
+                t.setDaemon(true);
+                return t;
+            });
 
     private final ClientApplication app;
     private final ScheduledExecutorService io = Executors.newSingleThreadScheduledExecutor();
@@ -348,11 +357,12 @@ final class NativeRenewer {
         String base = s.origin.toString().replaceAll("/+$", "");
         URL url = new URL(base + path);
         HttpURLConnection connection = (HttpURLConnection) url.openConnection();
+        // ADR-165 item 2: the per-read timeouts alone let a slow-dripping answer hold the renewer
+        // thread past the window's end. The watchdog disconnects after an overall deadline. It
+        // cannot interrupt a DNS lookup already in progress; that step stays unbounded here.
+        ScheduledFuture<?> deadline = WATCHDOG.schedule(connection::disconnect,
+                CALL_DEADLINE_MS, TimeUnit.MILLISECONDS);
         try {
-            // TODO(paranoid-audit): ADR-165 item 2. The total time of one call is not bounded:
-            // DNS resolution has no timeout here and the read timeout applies per read, so a
-            // slow-dripping answer can hold the single renewer thread past the window's end.
-            // Needs an overall per-call deadline (for example a watchdog that disconnects).
             connection.setInstanceFollowRedirects(false);
             connection.setUseCaches(false);
             connection.setConnectTimeout(TIMEOUT_MS);
@@ -373,6 +383,7 @@ final class NativeRenewer {
             String text = stream == null ? "" : read(stream);
             return new Response(status, text.isEmpty() ? new JSONObject() : new JSONObject(text));
         } finally {
+            deadline.cancel(false);
             connection.disconnect();
         }
     }

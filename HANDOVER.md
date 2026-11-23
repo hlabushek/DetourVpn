@@ -214,9 +214,71 @@ here because the portable PostgreSQL has no `pg_dump` (`postgres_tool_missing`),
   the `owned_connection` change was a no-op; the real opposite-order path was `token_connection`
   (native renew) against the node poll, fixed by ADR-167 decision 2. Unproven as the cause of
   the managed-database deadlocks (no log text). Test: `test_audit_stage2_lock_order.py`.
+- The six entries above were committed by the owner (`2d13129` … `13edbee`).
+
+## Remaining audit items (2026-11-23, stage 4, NOT committed, not deployed)
+Working tree only; the owner commits item by item. Local tests only (temporary PostgreSQL);
+nothing ran on a node or on the managed database.
+- **Stale node-tooling tests** (no ADR): `test_beta_node_provisioning_cli.py` and
+  `test_connect_beta_node.py` still expected the loopback-only checks that `1a4d252` (ADR-166)
+  removed on purpose. The tests were wrong, not the scripts; they now check the ADR-166 rules
+  (API parser, verify-full for remote, `vpn_api` role).
+- **ADR-173** (M2): `poll_windows` isolates one bad receipt (savepoint) or one inconsistent
+  connection (skipped) and logs `window_poll_item_failed code=<code>`; the node's other windows
+  keep moving. Test: `test_window_poll_isolation.py`.
+- **ADR-178** (M7 and M8): `last_seen_at` uses the database clock; the candidate check (run before
+  every install) requires NTP synchronisation and a node clock within 1 s of the workstation
+  (measured around the SSH call). Tests: `test_audit_stage4_clock.py`; `test_beta_nodes.py`
+  fixture updated. Not run on a node.
+- **ADR-177** (M4): `detourvpn-beta-api.service` uses `Wants=` (not `Requires=`) for the local
+  database unit; `After=` kept. Test: `infra/ansible/tests/test_beta_api_unit_dependencies.py`.
+  Not installed on any host; the owner confirms the database choice first.
+- **ADR-176** (M3): `deploy_beta_api_latest.py` refuses before any change when the primary's
+  `api.env` does not point at the local Docker database (`refused=database_not_local_docker`).
+  Tests: `test_deploy_beta_guard.py`. A managed-database deploy needs its own runbook (owner).
+- **ADR-175** (M9 and M5): `restore_primary_api.sh` and `activate_beta_caddy_allowlist.ps1` read
+  host values from an operator file outside the repository; the allowlist script merges the
+  node IP into the live Caddy `remote_ip` line (`scripts/caddy_allowlist.py`) instead of
+  overwriting it. M9 is partial: about 47 other committed files still carry the identifiers.
+  Tests: `test_caddy_allowlist.py`, `test_operator_scripts_config.py`.
+- **ADR-174** (M10): `migrate_db_to_neon.sh` passes password-free conninfo strings
+  (`scripts/pg_conninfo.py`) and a temporary 0600 `PGPASSFILE`; no URL on any command line.
+  Test: `test_pg_conninfo.py`. Not run on a host.
+- **ADR-179** (H4): new receipt observation `not_opened` (gate never opened: no charge, hold
+  released, receipt kept). Node journal writes an `opening` marker before `gate.open()`;
+  intent without it, late/skewed/declined grants and revokes of never-applied grants are
+  `not_opened`; recovery stays `unknown`. Migration `0028_window_not_opened_receipts` (guarded
+  rollback). **Rollout: migration + API first, then node agents.** Tests:
+  `test_window_not_opened.py` + runtime/daemon/window/migration tests.
+- **ADR-180** (H6): `operations.local_url` accepts a remote database only with explicit
+  `sslmode=verify-full` and the API parser's rules; `pg_dump`/`pg_restore` get verify-full TLS
+  settings; backup and maintenance units `Wants=` the local database. **Owner:** point
+  `operations.env` at the managed database. Tests: `test_operations_remote_database.py` +
+  operations/backup/maintenance tests.
+- **ADR-181** (H3): migration `0029_window_hot_path_indexes` adds
+  `peer_window_allocations(user_id)` and a partial `peer_connections(node_id, runtime_id)
+  WHERE state <> 'closed'`; models declare both. The hold half of `runtime_ready` is still a
+  history scan (owner decision). **Owner:** apply 0028 then 0029 on the managed database.
+  Tests: `test_window_hot_path_indexes.py`, `test_migrations.py`.
+- **ADR-182** (L2): link-code redeem checks the beta invite (FOR SHARE) before locking the user
+  row and the code, the same order as `authenticate()` and the admin invite revoke. Test:
+  `test_link_redeem_lock_order.py` (call order; invites not enforced in the harness).
+- **ADR-183** (L3, L4, L5): first use of an access credential is marked before any row lock;
+  a native renew token is checked on an unlocked read before the owner lock (re-checked under
+  the locks); a `receipt_ack_required` grant is deferred on the node, not closed. Test:
+  `test_lock_and_backlog_small_fixes.py`.
+- **Deferred (client, need a phone and Gradle/Flutter builds):** L6 — native renewal treats a
+  401 after token rotation as final (`apps/client/android/app/src/main/java/org/example/vpnpoc/NativeRenewer.java`
+  `refused()`, lines 240-242, and the `finish()` call at 196/201); L7 — ADR-165 TODOs:
+  no timeout on native channel calls (`apps/client/lib/window_connection.dart:1345`), no overall
+  deadline on a native renewal call (`NativeRenewer.java:352`), wall-clock connected timer
+  (`apps/client/lib/connected_since.dart:31`).
+- Test environment note: the "known pg_dump errors" in this worktree only meant that its own
+  `.cache` has no portable PostgreSQL. With `VPN_TEST_POSTGRES_BIN` set to the main checkout's
+  `.cache/i-004/portable/pgsql/bin`, the backup/restore fixtures run and pass.
 
 ## Rules for the next agent
-- One phase at a time, with one ADR per phase in `docs/adr/` (next free number: 166).
+- One phase at a time, with one ADR per phase in `docs/adr/` (next free number: 184).
 - Commit locally with the owner's OK. No push.
 - No `flutter build`, no `gradlew assemble`, no release or deploy scripts, no adb or device tests,
   and no server changes without explicit approval.
@@ -337,3 +399,23 @@ What was **not** run or verified:
 - no Lockdown, protector, reboot or app-update scenario on a phone;
 - no Play policy check;
 - the shared `.cache` prepared SDK tree was not regenerated (owner step, ADR-149).
+
+## ADR-184 — native renewal HTTP call deadline (ADR-165 item 2, partly)
+
+- `NativeRenewer.call` now disconnects a call after 25 s through a daemon watchdog thread. DNS is still unbounded (see ADR-184).
+- Compiled `NativeRenewer.java` alone with the Android Studio JBR and android-36 jar: no errors. Not built into an APK, not run on a phone.
+
+## ADR-185 — Dart-side timeouts on native channel calls (ADR-165 item 1)
+
+- `WindowConnectionController` bounds every native call that poll, connect and disconnect await (20 s; tunnel starts 60 s). A timeout shows `native_timeout`; `_polling` and the ADR-154 connect wait always end.
+- Late answers are dropped. While a call is unanswered, connect is refused and nothing new is sent to native except stops. A timed-out start is stopped at once and again after it answers; the next connect reconciles from a fresh snapshot. Dart only, no Java/C++ change.
+- Verified: `flutter analyze` (no issues) and `flutter test` (362 passed, 6 new in `paranoid_audit_test.dart`) on an ASCII copy.
+- Not verified: no APK, no Android/Windows build, no device run, no real hung native worker. `native_timeout` is not yet in the diagnostic report allowlists (Dart + `DiagnosticReportText.java`); reports show it as `unknown`. ADR-165 item 3 (wall-clock timer) not addressed: needs native.
+
+## Release entry point (scripts/release.ps1)
+
+- `-Stage Build`: preflight (clean tree, version read), signed APK via build_beta_apk.ps1, optional adb install, then stops for the phone test.
+- `-Stage Publish`: enable_app_update.ps1 -Publish (manifest, dry run, typed YES).
+- ApiOrigin is passed as a parameter for Build; no local settings file.
+- Not automated on purpose: git commit/push, backend deploy and migrations 0028/0029, node rollout.
+- Parsed only. Not run.

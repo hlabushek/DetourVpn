@@ -508,6 +508,11 @@ class AuthService:
         )
         if credential is None:
             raise AuthError("unauthorized")
+        if credential.first_used_at is None:
+            # ADR-183 (L3): before this transaction takes any lock, so the second pooled
+            # connection never waits while the request holds the user or family row. "Used"
+            # means presented: the holder had the token, even if the request is then refused.
+            self._mark_used(credential.id)
         family = session.get(SessionFamily, credential.family_id)
         if family is None:
             raise AuthError("unauthorized")
@@ -540,8 +545,6 @@ class AuthService:
         principal = Principal(
             user.id, family.id, user.role, identity.provider_subject, guest, family.device_id
         )
-        if credential.first_used_at is None:
-            self._mark_used(credential.id)
         if guest and permission not in GUEST_PERMISSIONS:
             raise AuthError("forbidden", 403)
         if family.client_kind == "mini_app" and permission not in {

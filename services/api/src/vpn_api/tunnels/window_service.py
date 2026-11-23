@@ -5,11 +5,14 @@ node transport remain mandatory at the adapter boundary.
 """
 
 import hmac
+import logging
+import re
 from datetime import datetime, timedelta
 from uuid import UUID, uuid4
 
 from pydantic import Field, SecretStr, StrictBool
 from sqlalchemy import or_, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from vpn_api.auth.security import AuthError, keyed_digest, token
@@ -36,6 +39,7 @@ from vpn_api.tunnels.v3_contracts import (
     MAX_WINDOW_SECONDS,
     MIN_WINDOW_SECONDS,
     RENEWAL_MARGIN_SECONDS,
+    ContractError,
     FrozenInput,
     WindowCommand,
     WindowGrant,
@@ -444,23 +448,44 @@ def token_connection(
     session: Session, auth: AuthService, connection_id: UUID, value: str | None
 ) -> PeerConnection:
     """Authenticate a native renewal token. Its only authority is this one connection."""
-    # Same lock order as poll_windows: owner (user row) first, then the connection row.
-    owner = session.scalar(select(PeerConnection.user_id).where(PeerConnection.id == connection_id))
-    if owner is not None:
-        LedgerService._lock_owner(session, owner, active=False)
-    connection = session.scalar(
-        select(PeerConnection).where(PeerConnection.id == connection_id).with_for_update()
-    )
     presented = renew_token_digest(auth, connection_id, value or "")
-    stored = connection.renew_token_digest if connection is not None else None
-    # Compare before branching on state so timing does not reveal which check failed.
-    matches = hmac.compare_digest(presented, stored or "0" * 64)
-    if (
-        connection is None
-        or stored is None
-        or value is None
-        or not matches
-        or connection.state in {"revoke_pending", "closed"}
+
+    def valid(row: tuple[UUID, str | None, str] | None) -> bool:
+        stored = row[1] if row is not None else None
+        # Compare before branching on state so timing does not reveal which check failed.
+        matches = hmac.compare_digest(presented, stored or "0" * 64)
+        return not (
+            row is None
+            or stored is None
+            or value is None
+            or not matches
+            or row[2] in {"revoke_pending", "closed"}
+        )
+
+    # ADR-183 (L4): check the token on an unlocked read first, so an invalid token never takes
+    # the owner's row lock. Then the ADR-167 order (owner, then connection) and a re-check
+    # under the locks, because the token may have been rotated or revoked meanwhile.
+    unlocked = session.execute(
+        select(
+            PeerConnection.user_id, PeerConnection.renew_token_digest, PeerConnection.state
+        ).where(PeerConnection.id == connection_id)
+    ).one_or_none()
+    seen = (
+        (unlocked.user_id, unlocked.renew_token_digest, unlocked.state)
+        if unlocked is not None
+        else None
+    )
+    if not valid(seen) or unlocked is None:
+        raise AuthError("renew_token_invalid", 401)
+    LedgerService._lock_owner(session, unlocked.user_id, active=False)
+    connection = session.scalar(
+        select(PeerConnection)
+        .where(PeerConnection.id == connection_id)
+        .with_for_update()
+        .execution_options(populate_existing=True)
+    )
+    if connection is None or not valid(
+        (connection.user_id, connection.renew_token_digest, connection.state)
     ):
         raise AuthError("renew_token_invalid", 401)
     return connection
@@ -553,6 +578,25 @@ def revoke_connections(session: Session, user_id: UUID, device_id: UUID | None =
     session.flush()
 
 
+# ADR-173: errors that concern one receipt or one connection, never the node or the database.
+POLL_ITEM_ERRORS: tuple[type[Exception], ...] = (QuotaError, NodeError, ValueError, IntegrityError)
+logger = logging.getLogger("vpn_api.windows")
+
+
+def error_code(error: Exception) -> str:
+    code = getattr(error, "code", None)
+    if isinstance(code, str) and re.fullmatch(r"[a-z_]{1,64}", code):
+        return code
+    if isinstance(error, ContractError) and re.fullmatch(r"[a-z_]{1,64}", str(error)):
+        return str(error)
+    return "window_item_invalid"
+
+
+def poll_item_failed(code: str) -> None:
+    """Fixed code only: no user, connection or window identifiers in the log."""
+    logger.warning("window_poll_item_failed code=%s", code)
+
+
 def poll_windows(
     session: Session,
     selected: WindowNode,
@@ -571,12 +615,15 @@ def poll_windows(
     if epoch is None or epoch.manifest_digest != selected.digest():
         raise NodeError("window_operator_manifest_changed")
     # Every user lock in deterministic UUID order, before any connection/lot lock.
-    holds = {
-        receipt.window_id: session.get(PeerWindowHold, receipt.window_id)
-        for receipt in body.receipts
-    }
-    if any(hold is None or hold.node_id != node.id for hold in holds.values()):
-        raise NodeError("window_receipt_not_found", 404)
+    holds: dict[UUID, PeerWindowHold] = {}
+    for receipt in body.receipts:
+        hold = session.get(PeerWindowHold, receipt.window_id)
+        if hold is None or hold.node_id != node.id:
+            # ADR-173: one unknown or foreign receipt is refused alone (never acknowledged);
+            # the node's other receipts and windows keep moving.
+            poll_item_failed("window_receipt_not_found")
+            continue
+        holds[receipt.window_id] = hold
     candidates = list(
         session.scalars(
             select(PeerConnection)
@@ -587,20 +634,25 @@ def poll_windows(
             .order_by(PeerConnection.user_id, PeerConnection.id)
         )
     )
-    owners = {hold.user_id for hold in holds.values() if hold is not None} | {
-        c.user_id for c in candidates
-    }
+    owners = {hold.user_id for hold in holds.values()} | {c.user_id for c in candidates}
     for owner in sorted(owners):
         LedgerService._lock_owner(session, owner, active=False)
     acknowledged = []
     for receipt in body.receipts:
-        hold = holds[receipt.window_id]
+        hold = holds.get(receipt.window_id)
         if hold is None:
-            raise NodeError("window_receipt_not_found", 404)
-        settle_window(session, hold.user_id, receipt)
-        connection = session.get(PeerConnection, hold.connection_id, populate_existing=True)
-        if connection is not None and connection.window_id == hold.id:
-            connection.state = "closed"
+            continue
+        # ADR-173: a savepoint per receipt. Settlement writes the ledger; a failure part way
+        # must leave nothing behind, and must not abort the node's other receipts.
+        try:
+            with session.begin_nested():
+                settle_window(session, hold.user_id, receipt)
+                connection = session.get(PeerConnection, hold.connection_id, populate_existing=True)
+                if connection is not None and connection.window_id == hold.id:
+                    connection.state = "closed"
+        except POLL_ITEM_ERRORS as error:
+            poll_item_failed(error_code(error))
+            continue
         acknowledged.append(receipt)
     session.flush()
     ready = runtime_ready(session, node.id, body.runtime_id)
@@ -620,19 +672,29 @@ def poll_windows(
             .order_by(PeerWindowHold.created_at)
             .limit(16)
         ):
-            commands.append(
-                WindowCommand(operation="recover", grant=WindowGrant.model_validate(hold.grant))
-            )
+            try:
+                grant = WindowGrant.model_validate(hold.grant)
+            except ValueError:
+                poll_item_failed("window_grant_invalid")
+                continue
+            commands.append(WindowCommand(operation="recover", grant=grant))
     else:
         reported = set(body.active_windows)
         for candidate in candidates:
             session.refresh(candidate, with_for_update=True)
             if candidate.state == "closed":
                 continue
-            grant = current_grant(session, candidate)
-            if candidate.runtime_id != body.runtime_id or not grant_authorized(
-                session, candidate, grant
-            ):
+            # ADR-173: these checks only read. One connection's inconsistent data is skipped
+            # (no command, state unchanged) instead of failing the whole node's poll.
+            try:
+                grant = current_grant(session, candidate)
+                authorized = candidate.runtime_id == body.runtime_id and grant_authorized(
+                    session, candidate, grant
+                )
+            except POLL_ITEM_ERRORS as error:
+                poll_item_failed(error_code(error))
+                continue
+            if not authorized:
                 candidate.state = "revoke_pending"
             if candidate.state == "revoke_pending":
                 commands.append(WindowCommand(operation="revoke", grant=grant))

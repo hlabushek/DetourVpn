@@ -1,7 +1,8 @@
 [Unit]
 Description=DetourVpn closed beta retention cleanup and ledger reconciliation
 After=detourvpn-beta-database.service
-Requires=detourvpn-beta-database.service
+# ADR-180: the database may be the managed one; the local unit is optional.
+Wants=detourvpn-beta-database.service
 
 [Service]
 Type=oneshot

@@ -31,6 +31,8 @@ class WindowConnectionController extends ConnectionController {
     this.handshakeTimeout = const Duration(seconds: 20),
     this.snapshotRetryDelay = const Duration(milliseconds: 500),
     this.snapshotAttempts = 3,
+    this.nativeCallTimeout = const Duration(seconds: 20),
+    this.nativeStartTimeout = const Duration(seconds: 60),
     Uri? renewalOrigin,
     bool? panelVless,
     this.nativeOwnsBackgroundRecovery = false,
@@ -59,6 +61,82 @@ class WindowConnectionController extends ConnectionController {
   final Duration snapshotRetryDelay;
   final int snapshotAttempts;
 
+  /// ADR-185: the longest this controller waits for one native channel call (snapshot, stop,
+  /// window advance, key read) and for a tunnel start. A call that does not answer in time fails
+  /// with `native_timeout`; its late answer is never applied (see [_bounded]).
+  final Duration nativeCallTimeout;
+  final Duration nativeStartTimeout;
+
+  /// ADR-185: native calls that timed out and have not answered yet. While any is outstanding no
+  /// new non-stop native call is sent (they would queue behind it on native's serial worker),
+  /// connect is refused and the poll does only server-side revoke retries.
+  int _lateNative = 0;
+
+  /// ADR-185: a tunnel start timed out; it may still bring a tunnel up that nobody tracks. Cleared
+  /// only by a stop that answered after every late call had settled.
+  bool _lateStart = false;
+  Future<void>? _lateStop;
+
+  bool get _nativeStuck => _lateNative > 0 || _lateStart;
+
+  @visibleForTesting
+  bool get nativeStuck => _nativeStuck;
+
+  /// ADR-185: one bounded native call. [kind] stop calls (disconnect, end of intent) are always
+  /// sent, also while late calls are outstanding: stopping is the fail-closed direction, and on
+  /// Android a disconnect bumps native's generation at once, which makes a late start stop itself.
+  Future<T> _bounded<T>(
+    Future<T> Function() call, {
+    _NativeCall kind = _NativeCall.read,
+  }) async {
+    if (kind != _NativeCall.stop && _lateNative > 0)
+      throw const ClientError('native_timeout');
+    final pending = call();
+    try {
+      return await pending.timeout(
+        kind == _NativeCall.start ? nativeStartTimeout : nativeCallTimeout,
+      );
+    } on TimeoutException {
+      _lateNative++;
+      if (kind == _NativeCall.start) _lateStart = true;
+      unawaited(
+        pending
+            .then<void>((_) {}, onError: (Object _) {})
+            .whenComplete(_lateSettled),
+      );
+      throw const ClientError('native_timeout');
+    }
+  }
+
+  /// ADR-185: a timed-out call answered. Its result is dropped. Once nothing is outstanding, a
+  /// timed-out start is followed by one more stop, so whatever it started is not left running.
+  void _lateSettled() {
+    _lateNative--;
+    if (_dead) return;
+    if (_lateNative == 0 && _lateStart) {
+      unawaited(_stopLateStart());
+    } else {
+      _emit();
+    }
+  }
+
+  Future<void> _stopLateStart() => _lateStop ??= () async {
+    try {
+      await _bounded(native.disconnect, kind: _NativeCall.stop);
+      if (_lateNative == 0) {
+        _lateStart = false;
+        // Native's state is not what this controller last saw: the next poll or connect
+        // reconciles with a fresh snapshot (and revokes a lease left from the failed start).
+        _synced = false;
+      }
+    } catch (_) {
+      // Still unconfirmed; the next poll stops it again.
+    } finally {
+      _lateStop = null;
+      _emit();
+    }
+  }();
+
   /// ADR-145 (2.3): the node saved on this phone. Applied once the node list has it, so a node
   /// list that failed to load at startup does not lose the user's choice.
   String? _preferredNode;
@@ -77,6 +155,9 @@ class WindowConnectionController extends ConnectionController {
   static const _keepIntentCodes = {
     'window_node_required',
     'native_state_unknown',
+    // ADR-185: native did not answer; its state is unknown, and ending the intent is one more
+    // native call. Not retried automatically: the user taps again once native answers.
+    'native_timeout',
   };
 
   /// ADR-142 (Android UI controller only): while the app is in the background, native owns
@@ -543,7 +624,7 @@ class WindowConnectionController extends ConnectionController {
   Future<void> _ensureDevice() async {
     if (_deviceId != null) return;
     diagnosticStage = 'device_key_read';
-    _key ??= await native.publicKey();
+    _key ??= await _bounded(native.publicKey);
     diagnosticStage = 'device_registration';
     final device = await api.call('POST', '/api/v1/devices', {
       'platform': devicePlatform,
@@ -586,7 +667,7 @@ class WindowConnectionController extends ConnectionController {
     if (!adoptable) {
       _resumeWanted = live.desiredConnected;
       diagnosticStage = 'native_disconnect';
-      await native.disconnect();
+      await _bounded(native.disconnect, kind: _NativeCall.stop);
     }
     diagnosticStage = 'connection_reconcile';
     final result = await api.call('GET', root);
@@ -613,7 +694,7 @@ class WindowConnectionController extends ConnectionController {
       }
       _resumeWanted = live.desiredConnected;
       diagnosticStage = 'native_disconnect';
-      await native.disconnect();
+      await _bounded(native.disconnect, kind: _NativeCall.stop);
       diagnosticStage = 'connection_reconcile';
     }
     for (final row in rows) {
@@ -633,7 +714,7 @@ class WindowConnectionController extends ConnectionController {
   Future<NativeSnapshot> _reconcileSnapshot() async {
     for (var attempt = 1; ; attempt++) {
       try {
-        return await native.snapshot();
+        return await _bounded(native.snapshot);
       } catch (_) {
         if (attempt >= snapshotAttempts || _dead) {
           diagnosticStage = 'connection_reconcile';
@@ -699,7 +780,10 @@ class WindowConnectionController extends ConnectionController {
     final dartRenewal = handover && !live.nativeRenewal;
     if (handover) {
       if (dartRenewal && generation > nativeGeneration + 1) return false;
-      if (!await (native as RestoreHandover).adoptRestore()) return false;
+      // ADR-185: bounded. On a timeout nothing is adopted; the connect path then stops native,
+      // the poll stays unsynced and reconciles once native answers.
+      if (!await _bounded((native as RestoreHandover).adoptRestore))
+        return false;
     }
     final now = _clock.elapsedMilliseconds;
     _intentAt = now;
@@ -708,7 +792,9 @@ class WindowConnectionController extends ConnectionController {
       try {
         final end = _bound(raw, requested: false);
         if (end <= deadline) return false;
-        await _native.advanceWindow(raw, end - _clock.elapsedMilliseconds);
+        await _bounded(
+          () => _native.advanceWindow(raw, end - _clock.elapsedMilliseconds),
+        );
         deadline = end;
       } catch (_) {
         return false;
@@ -783,6 +869,15 @@ class WindowConnectionController extends ConnectionController {
         return;
       }
     }
+    if (_nativeStuck) {
+      // ADR-185: an earlier native call has not answered (or a timed-out start is not yet
+      // confirmed stopped). Nothing new is started until native answers and a fresh snapshot
+      // reconciles; no API call, no quota. The stage of the call that timed out is kept.
+      error = 'native_timeout';
+      if (!hasLease) phase = ConnectionPhase.failed;
+      _emit();
+      return;
+    }
     _working = true;
     final version = ++_version;
     _reconnectAfterCleanup = false;
@@ -848,9 +943,11 @@ class WindowConnectionController extends ConnectionController {
         '/api/v1/tunnels/key-challenge/$_deviceId',
       );
       diagnosticStage = 'key_proof';
-      final answer = await native.prove(
-        proof['ephemeral_public_key'] as String,
-        proof['transcript'] as String,
+      final answer = await _bounded(
+        () => native.prove(
+          proof['ephemeral_public_key'] as String,
+          proof['transcript'] as String,
+        ),
       );
       if (_cancelled(version)) return;
       _createIntent = {
@@ -879,13 +976,18 @@ class WindowConnectionController extends ConnectionController {
       final deadline = _bound(grant);
       _config = value['client_config'] as String;
       diagnosticStage = 'native_tunnel_start';
-      await _native.connectWindow(
-        _config!,
-        grant,
-        deadline - _clock.elapsedMilliseconds,
+      // ADR-185: bounded. On a timeout the catch below stops native at once (fail closed) and
+      // the late answer is followed by one more stop; it is never taken as a running window.
+      await _bounded(
+        () => _native.connectWindow(
+          _config!,
+          grant,
+          deadline - _clock.elapsedMilliseconds,
+        ),
+        kind: _NativeCall.start,
       );
       if (_cancelled(version)) {
-        await native.disconnect();
+        await _bounded(native.disconnect, kind: _NativeCall.stop);
         return;
       }
       _grant = grant;
@@ -975,9 +1077,12 @@ class WindowConnectionController extends ConnectionController {
     if (_cancelled(version)) return;
     diagnosticStage = 'native_tunnel_start';
     // VlessNative is a separate interface, so the check above cannot promote `engine`.
-    await (engine as VlessNative).connectVless(args, panelSessionMaxMs);
+    await _bounded(
+      () => (engine as VlessNative).connectVless(args, panelSessionMaxMs),
+      kind: _NativeCall.start,
+    );
     if (_cancelled(version)) {
-      await native.disconnect();
+      await _bounded(native.disconnect, kind: _NativeCall.stop);
       return;
     }
     _panelUp = true;
@@ -1091,16 +1196,20 @@ class WindowConnectionController extends ConnectionController {
       final issued = await api.call('POST', '$root/$_id/renew-token');
       final token = issued['renew_token'];
       if (token is! String) return;
-      await host.startNativeRenewal({
-        'origin': origin.toString(),
-        'token': token,
-        'connection': grant['connection_id'],
-        'runtime': grant['runtime_id'],
-        'windowId': grant['window_id'],
-        'generation': grant['generation'],
-        'budgetBytes': budgetBytes,
-        'windowSeconds': windowSeconds,
-      });
+      // ADR-185: bounded. A late acceptance is the normal hand-off seen late: the poll follows
+      // the snapshot's nativeRenewal flag and stops renewing from Dart.
+      await _bounded(
+        () => host.startNativeRenewal({
+          'origin': origin.toString(),
+          'token': token,
+          'connection': grant['connection_id'],
+          'runtime': grant['runtime_id'],
+          'windowId': grant['window_id'],
+          'generation': grant['generation'],
+          'budgetBytes': budgetBytes,
+          'windowSeconds': windowSeconds,
+        }),
+      );
     } catch (_) {
       // ADR-117: any failure keeps Dart renewal, including MissingPluginException from an
       // engine that does not offer native renewal. It must never fail a connect.
@@ -1174,7 +1283,21 @@ class WindowConnectionController extends ConnectionController {
     _offlineResumes++;
     try {
       diagnosticStage = 'native_tunnel_start';
-      await _native.connectWindow(config, grant, end - now);
+      await _bounded(
+        () => _native.connectWindow(config, grant, end - now),
+        kind: _NativeCall.start,
+      );
+    } on ClientError catch (e) {
+      // ADR-185: a start that did not answer may still come up; stop it now (fail closed). The
+      // poll's normal failure path then stops native again and revokes as usual.
+      if (e.code == 'native_timeout') {
+        try {
+          await _bounded(native.disconnect, kind: _NativeCall.stop);
+        } catch (_) {
+          /* The late-start stop and the next poll retry it. */
+        }
+      }
+      return false;
     } catch (_) {
       return false;
     }
@@ -1182,7 +1305,7 @@ class WindowConnectionController extends ConnectionController {
       // As in _connect: a disconnect arrived meanwhile; never leave this start running. That
       // disconnect's own cleanup stops native again, so a failure here must not escape the poll.
       try {
-        await native.disconnect();
+        await _bounded(native.disconnect, kind: _NativeCall.stop);
       } catch (_) {
         /* The native deadline and the disconnect's cleanup remain the boundary. */
       }
@@ -1209,7 +1332,7 @@ class WindowConnectionController extends ConnectionController {
   Future<void> _cleanup({bool stopNative = true}) async {
     if (stopNative) {
       try {
-        await native.disconnect();
+        await _bounded(native.disconnect, kind: _NativeCall.stop);
       } catch (_) {
         // ADR-164: as in ConnectionController._performCleanup. A failed stop keeps the lease
         // (nothing is revoked under a tunnel that may still run; the native deadline and Lockdown
@@ -1273,7 +1396,11 @@ class WindowConnectionController extends ConnectionController {
     final host = native;
     if (host is! UserIntentHost) return;
     try {
-      await (host as UserIntentHost).endUserIntent();
+      // ADR-185: bounded, so a native worker that never answers cannot hold a disconnect tap.
+      await _bounded(
+        (host as UserIntentHost).endUserIntent,
+        kind: _NativeCall.stop,
+      );
     } catch (_) {
       /* The engine stop that follows still happens. */
     }
@@ -1291,7 +1418,7 @@ class WindowConnectionController extends ConnectionController {
     _emit();
     try {
       if (user) await _endUserIntent();
-      await native.disconnect();
+      await _bounded(native.disconnect, kind: _NativeCall.stop);
       await _connectWork;
       await _refreshWork;
       await _cleanup();
@@ -1329,7 +1456,7 @@ class WindowConnectionController extends ConnectionController {
     _pollWanted = false;
     await _endUserIntent();
     try {
-      await native.disconnect();
+      await _bounded(native.disconnect, kind: _NativeCall.stop);
     } catch (_) {
       // The native deadline and Lockdown stay the fail-closed boundary.
     }
@@ -1342,11 +1469,8 @@ class WindowConnectionController extends ConnectionController {
     _emit();
   }
 
-  // TODO(paranoid-audit): ADR-165 item 1. Native channel calls (snapshot, connectWindow,
-  // advanceWindow) have no Dart-side timeout. A native worker that never answers would keep
-  // `_polling` true for good: no further poll runs and a connect tap waits for this poll
-  // (ADR-154) without end. A timeout needs native-side cancellation semantics (a late
-  // connectWindow must not start a tunnel nobody tracks), so it is not a local fix.
+  // ADR-185 (ADR-165 item 1): every native call this poll awaits is bounded by [_bounded], so
+  // `_polling` is always released and a connect tap that waits for the poll (ADR-154) ends.
   @override
   Future<void> refresh() async {
     if (_polling || busy || _dead) return;
@@ -1413,9 +1537,20 @@ class WindowConnectionController extends ConnectionController {
         }
         return;
       }
+      // ADR-185: an earlier native call has not answered. Send nothing more (it would queue
+      // behind it); once every late call settled, a timed-out start is stopped first, and then
+      // this poll reconciles with a fresh snapshot (the stop left the controller unsynced).
+      if (_nativeStuck) {
+        if (_lateNative == 0) await _stopLateStart();
+        if (_cancelled(version)) return;
+        if (_nativeStuck) {
+          error = 'native_timeout';
+          return;
+        }
+      }
       // ADR-115: a panel session has no lease to reconcile; only the engine's liveness.
       if (_panelUp) {
-        final snapshot = await native.snapshot();
+        final snapshot = await _bounded(native.snapshot);
         if (_cancelled(version)) return;
         if (!snapshot.up) throw ClientError(_stopCode(snapshot));
         return;
@@ -1453,7 +1588,7 @@ class WindowConnectionController extends ConnectionController {
       }
       if (_id == null) return;
       diagnosticStage = 'tunnel_monitor';
-      var snapshot = await native.snapshot();
+      var snapshot = await _bounded(native.snapshot);
       if (_cancelled(version)) return;
       _recordContext(snapshot);
       _nativeRenewing = snapshot.nativeRenewal;
@@ -1590,7 +1725,11 @@ class WindowConnectionController extends ConnectionController {
         diagnosticStage = 'window_advance';
         if (end <= _deadline)
           throw const ClientError('window_generation_conflict');
-        await _native.advanceWindow(grant, end - _clock.elapsedMilliseconds);
+        // ADR-185: bounded. A late advance is harmless: the next poll sends the same generation
+        // again, which native accepts as a no-op (WindowDeadline.advance).
+        await _bounded(
+          () => _native.advanceWindow(grant, end - _clock.elapsedMilliseconds),
+        );
         if (_cancelled(version)) return;
         _grant = grant;
         _deadline = end;
@@ -1604,7 +1743,7 @@ class WindowConnectionController extends ConnectionController {
         _renewIntent = null;
       }
       diagnosticStage = 'tunnel_monitor';
-      snapshot = await native.snapshot();
+      snapshot = await _bounded(native.snapshot);
       if (_cancelled(version)) return;
       _recordContext(snapshot);
       if (!snapshot.up ||
@@ -1655,7 +1794,9 @@ class WindowConnectionController extends ConnectionController {
       }
       // ADR-145 (2.2): native's state is unknown. Stop nothing, revoke nothing; the next poll
       // reconciles again (still unsynced).
-      if (code == 'native_state_unknown') {
+      // ADR-185: the same for a native call that did not answer in time: the tunnel this
+      // controller holds may still run, so nothing is stopped or revoked from here.
+      if (code == 'native_state_unknown' || code == 'native_timeout') {
         error = code;
         return;
       }
@@ -1935,6 +2076,10 @@ class WindowConnectionController extends ConnectionController {
     super.dispose();
   }
 }
+
+/// ADR-185: what a bounded native call does, which sets its timeout and whether it may be sent
+/// while an earlier call is still unanswered.
+enum _NativeCall { read, start, stop }
 
 const _nativeStartErrorCodes = <String>{
   'native_config_invalid',

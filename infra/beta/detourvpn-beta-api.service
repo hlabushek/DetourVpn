@@ -2,7 +2,7 @@
 Description=DetourVpn isolated beta control plane
 After=network-online.target detourvpn-beta-database.service
 Wants=network-online.target
-Requires=detourvpn-beta-database.service
+Wants=detourvpn-beta-database.service
 StartLimitIntervalSec=300
 StartLimitBurst=10
 

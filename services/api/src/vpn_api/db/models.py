@@ -540,6 +540,8 @@ class PeerWindowAllocation(Base):
         UniqueConstraint("window_id", "position", name="uq_peer_window_allocation_position"),
         CheckConstraint("amount_bytes > 0 AND position >= 0", name="ck_peer_window_allocation"),
         Index("ix_peer_window_allocation_lot", "lot_id"),
+        # ADR-181: held_lots filters by user on every create, renew and settle.
+        Index("ix_peer_window_allocation_user", "user_id"),
     )
     window_id: Mapped[UUID] = mapped_column(primary_key=True)
     lot_id: Mapped[UUID] = mapped_column(primary_key=True)
@@ -565,7 +567,8 @@ class PeerWindowReceipt(Base):
         ),
         UniqueConstraint("operation_id", name="uq_peer_window_receipt_operation"),
         CheckConstraint(
-            "(observation = 'unknown' AND observed_bytes IS NULL AND operation_id IS NULL) OR "
+            "(observation IN ('unknown', 'not_opened') AND observed_bytes IS NULL "
+            "AND operation_id IS NULL) OR "
             "(observation = 'measured' AND observed_bytes IS NOT NULL "
             "AND observed_bytes BETWEEN 0 AND 67108864 AND "
             "((observed_bytes = 0 AND operation_id IS NULL) OR "
@@ -685,6 +688,13 @@ class PeerConnection(Base):
             postgresql_where=text("state <> 'closed'"),
         ),
         Index("ix_peer_connection_owner", "user_id", "created_at"),
+        # ADR-181: runtime_ready looks for live connections of another runtime on a node.
+        Index(
+            "ix_peer_connection_live_runtime",
+            "node_id",
+            "runtime_id",
+            postgresql_where=text("state <> 'closed'"),
+        ),
     )
     id: Mapped[UUID] = mapped_column(primary_key=True)
     user_id: Mapped[UUID] = mapped_column(ForeignKey("users.id", ondelete="RESTRICT"))

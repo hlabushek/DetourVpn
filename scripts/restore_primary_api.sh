@@ -18,13 +18,29 @@ readonly APP=/opt/detourvpn-beta
 readonly ENV_FILE=/etc/detourvpn-beta/api.env
 readonly UNIT=detourvpn-beta-api
 readonly PORT=28000
-readonly PUBLIC_IP=193.68.88.239
-readonly FRANKFURT_HOST=ep-hidden-paper-b9dg3cy5.c-7.eu-central-1.aws.neon.tech
+# Host-specific values are NOT in this file (audit M9). They come from RESTORE_ENV, a root-only
+# file outside the repository (mode 600), with exactly these lines:
+#   PUBLIC_IP=<public IPv4 of this host>
+#   DATABASE_HOST=<managed database host name, without port or database>
+readonly RESTORE_ENV="${RESTORE_ENV:-/root/detourvpn-restore.env}"
 readonly SHA_CONNECTION=dfab57f397ccc10b4af16abed852ac143b426004313e3334445931876bcb834b
 readonly SHA_WINDOW_SERVICE=fd4414a92ea32ed969884d0664e0283b92cac265f4e17f24a0a54fab33cb4b80
 
 log() { printf '[restore] %s\n' "$*"; }
 die() { printf '[restore] FAIL: %s\n' "$*" >&2; exit 1; }
+
+[[ -f "$RESTORE_ENV" ]] || die "$RESTORE_ENV missing (see the header of this script)"
+[[ "$(stat -c '%a %u' "$RESTORE_ENV")" == "600 0" ]] || die "$RESTORE_ENV must be mode 600, owned by root"
+while IFS='=' read -r key value; do
+  case "$key" in
+    PUBLIC_IP) PUBLIC_IP="$value" ;;
+    DATABASE_HOST) DATABASE_HOST="$value" ;;
+    ''|'#'*) ;;
+    *) die "unexpected line in $RESTORE_ENV" ;;
+  esac
+done < "$RESTORE_ENV"
+[[ "${PUBLIC_IP:-}" =~ ^[0-9]{1,3}(\.[0-9]{1,3}){3}$ ]] || die "PUBLIC_IP missing or invalid in $RESTORE_ENV"
+[[ "${DATABASE_HOST:-}" =~ ^[a-z0-9.-]+\.[a-z]{2,}$ ]] || die "DATABASE_HOST missing or invalid in $RESTORE_ENV"
 
 [[ "${EUID}" -eq 0 ]] || die "run as root"
 [[ -f "$ENV_FILE" ]] || die "$ENV_FILE missing"
@@ -45,8 +61,8 @@ check_code services/api/src/vpn_api/tunnels/window_service.py "$SHA_WINDOW_SERVI
 # 2. Database URL: right host, verify-full, parsed by the API's own code. Nothing is printed.
 grep -q "^VPN_DATABASE_URL=\"postgresql+psycopg://vpn_api:" "$ENV_FILE" \
   || die "VPN_DATABASE_URL has the wrong shape (expected postgresql+psycopg://vpn_api:...)"
-grep -Fq "@${FRANKFURT_HOST}/neondb?sslmode=verify-full\"" "$ENV_FILE" \
-  || die "VPN_DATABASE_URL does not point to the Frankfurt database with sslmode=verify-full"
+grep -Fq "@${DATABASE_HOST}/neondb?sslmode=verify-full\"" "$ENV_FILE" \
+  || die "VPN_DATABASE_URL does not point to the configured database host with sslmode=verify-full"
 (
   set -a; . "$ENV_FILE"; set +a
   cd "$APP"

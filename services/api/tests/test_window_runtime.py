@@ -186,7 +186,8 @@ def test_restart_closes_and_captures_original_binding(
     restarted.journal.db.close()
 
 
-def test_crash_after_open_before_commit_retains_unknown(tmp_path: Path) -> None:
+def test_crash_after_open_before_commit_measures_the_reset_counter(tmp_path: Path) -> None:
+    """ADR-179: the opening marker proves the counter was reset for this grant before open."""
     path = tmp_path / "journal.db"
     runtime, gate, peer, clock = setup(path)
     first = value(runtime, clock)
@@ -194,6 +195,7 @@ def test_crash_after_open_before_commit_retains_unknown(tmp_path: Path) -> None:
     with pytest.raises(SystemExit, match="TEST ONLY"):
         runtime.apply(first)
     assert gate.live
+    gate.amount = 4321  # TEST ONLY traffic that passed before the crash
     runtime.journal.db.close()
     restarted = WindowRuntime(
         runtime.node_id,
@@ -203,8 +205,8 @@ def test_crash_after_open_before_commit_retains_unknown(tmp_path: Path) -> None:
         now=lambda: clock.now,
     )
     restarted.startup()
-    assert not gate.live and restarted.journal.pending()[0].observation == "unknown"
-    assert restarted.journal.pending()[0].observed_bytes is None
+    assert not gate.live and restarted.journal.pending()[0].observation == "measured"
+    assert restarted.journal.pending()[0].observed_bytes == 4321
     restarted.journal.db.close()
 
 
@@ -270,7 +272,9 @@ def test_kernel_expiry_blocks_new_generation_before_absolute_deadline(tmp_path: 
     receipts = runtime.journal.pending()
     assert {r.window_id for r in receipts} == {first.window_id, second.window_id}
     final = runtime.journal.receipt(second.window_id)
-    assert final is not None and final.observation == "unknown"
+    # ADR-179: the second grant's gate never opened: nothing passed, nothing is held.
+    assert final is not None and final.observation == "not_opened"
+    assert final.observed_bytes is None
     runtime.journal.db.close()
 
 

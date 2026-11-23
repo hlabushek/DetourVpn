@@ -580,8 +580,9 @@ def test_cross_owner_and_cross_node_receipts_fail_closed(harness: Harness) -> No
         )
     foreign_node, foreign_manifest = inventory(h)
     foreign_runtime = boot(h, foreign_node, foreign_manifest)
-    with pytest.raises(NodeError, match="window_receipt_not_found"):
-        poll(h, foreign_node, foreign_manifest, foreign_runtime, receipts=[close(grant, 123)])
+    # ADR-173: a foreign receipt is refused alone (never acknowledged or settled), not the poll.
+    refused = poll(h, foreign_node, foreign_manifest, foreign_runtime, receipts=[close(grant, 123)])
+    assert refused.acknowledged_receipts == []
     assert poll(h, node, selected, runtime).commands[0].grant == grant
     with transaction(h.engine) as session:
         assert session.scalar(select(func.count()).select_from(PeerWindowHold)) == 1

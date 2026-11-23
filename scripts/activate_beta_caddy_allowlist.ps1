@@ -3,9 +3,22 @@ param([switch]$RunHere)
 
 $ErrorActionPreference = 'Stop'
 $PSNativeCommandUseErrorActionPreference = $false
-$betaHost = '193.68.88.239'
-$betaNode = '95.81.73.183'
-$keyPath = Join-Path $env:USERPROFILE '.ssh\detourvpn-beta-20261026'
+# Audit M9: hosts and key name come from an operator file outside the repository, with lines
+#   BETA_HOST=<public IPv4 of the primary API host>
+#   BETA_NODE_IP=<public IPv4 of the node to allow>
+#   BETA_SSH_KEY=<key file name under %USERPROFILE%\.ssh>
+$operatorEnv = Join-Path $env:USERPROFILE '.detourvpn\beta-operator.env'
+if (-not (Test-Path -LiteralPath $operatorEnv -PathType Leaf)) { throw 'Operator env file missing.' }
+$config = @{}
+foreach ($line in Get-Content -LiteralPath $operatorEnv) {
+    if ($line -match '^(BETA_HOST|BETA_NODE_IP|BETA_SSH_KEY)=(.+)$') { $config[$matches[1]] = $matches[2].Trim() }
+}
+foreach ($name in 'BETA_HOST', 'BETA_NODE_IP', 'BETA_SSH_KEY') {
+    if (-not $config.ContainsKey($name)) { throw "Operator env file lacks $name." }
+}
+$betaHost = $config['BETA_HOST']
+$betaNode = $config['BETA_NODE_IP']
+$keyPath = Join-Path $env:USERPROFILE (Join-Path '.ssh' $config['BETA_SSH_KEY'])
 $runId = [guid]::NewGuid().ToString('N')
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 $templatePath = Join-Path $repoRoot 'infra\beta\Caddyfile.ip'
@@ -26,10 +39,16 @@ if (-not (Test-Path -LiteralPath $keyPath -PathType Leaf)) { throw 'Beta SSH ide
 $sshPath = (Get-Command ssh.exe -ErrorAction Stop).Source
 $scpPath = (Get-Command scp.exe -ErrorAction Stop).Source
 $sshOptions = @('-o', 'BatchMode=yes', '-o', 'ConnectTimeout=10', '-o', 'StrictHostKeyChecking=yes', '-i', $keyPath)
-$rendered = (Get-Content -Raw -LiteralPath $templatePath).
-    Replace('{$DETOURVPN_BETA_IP}', $betaHost).
-    Replace('{$DETOURVPN_BETA_NODE_IP}', $betaNode)
-if ($rendered -match '\{\$DETOURVPN_') { throw 'Unresolved beta Caddy placeholder.' }
+$mergeScript = Join-Path $repoRoot 'scripts\caddy_allowlist.py'
+$pythonPath = (Get-Command python.exe -ErrorAction Stop).Source
+# ADR-175: the live allowlist is merged, never replaced: the node IPs that connect_beta_node.py
+# added earlier stay in the matcher, and this node's IP is added once.
+$liveRaw = & $sshPath @sshOptions $remote 'cat /etc/caddy/Caddyfile'
+if ($LASTEXITCODE -ne 0) { throw 'Could not read the live Caddy configuration.' }
+$live = ($liveRaw -join "`n")
+$rendered = ($live | & $pythonPath $mergeScript merge $betaNode) -join "`n"
+if ($LASTEXITCODE -ne 0) { throw 'Caddy allowlist merge refused (see caddy_allowlist.py codes).' }
+if ($rendered -notmatch 'remote_ip') { throw 'Merged Caddy configuration has no node matcher.' }
 
 $remoteScript = @'
 set -Eeuo pipefail

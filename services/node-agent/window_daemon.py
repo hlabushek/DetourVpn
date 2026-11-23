@@ -258,6 +258,12 @@ def run_command(runtime: WindowRuntime, operation: str, grant: Any) -> None:
             except COMMAND_ERRORS as declined:
                 if identity_failure(declined):
                     raise
+                if isinstance(declined, RuntimeFault) and str(declined) == "receipt_ack_required":
+                    # ADR-183 (L5): an unacknowledged receipt on this slot is a backlog, not a
+                    # refusal. Nothing was changed; the grant stays pending on the server and
+                    # is applied once the receipt is acknowledged (a later poll).
+                    report("window_command_deferred", declined, operation)
+                    return
                 # Late/declined/failed grants close; no blind reopening or guessed debit.
                 runtime.close_grant(grant)
     except COMMAND_ERRORS as error:

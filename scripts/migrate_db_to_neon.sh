@@ -10,8 +10,12 @@
 # directory you choose (DUMP_DIR) and must be deleted after a verified restore.
 # Nothing here is committed or printed. URLs are read from the environment only.
 #
-# Requirements: pg_dump and pg_restore whose major version is >= the source server and
-# matches the Neon server (check: psql "$TARGET_DATABASE_URL" -c 'show server_version').
+# Requirements: python3, and pg_dump/pg_restore/psql whose major version is >= the source
+# server and matches the Neon server.
+#
+# ADR-174: no password ever appears on a command line. scripts/pg_conninfo.py turns each URL
+# into a password-free libpq conninfo and writes the passwords to a mode-0600 pgpass file in
+# a private temporary directory, which PGPASSFILE points to and which is removed on exit.
 #
 # Use the DIRECT (non-pooled) Neon endpoint, not the "-pooler" host (ADR-166).
 
@@ -34,23 +38,35 @@ command -v pg_restore >/dev/null || die "pg_restore not found"
 
 umask 077
 mkdir -p "${DUMP_DIR}"
+command -v python3 >/dev/null || die "python3 not found"
+command -v psql >/dev/null || die "psql not found"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SECRETS_DIR="$(mktemp -d)"
+trap 'rm -rf -- "${SECRETS_DIR}"' EXIT
+export PGPASSFILE="${SECRETS_DIR}/pgpass"
+SOURCE_CONNINFO="$(python3 "${SCRIPT_DIR}/pg_conninfo.py" SOURCE_DATABASE_URL "${PGPASSFILE}")" \
+  || die "SOURCE_DATABASE_URL is not a usable database URL"
+TARGET_CONNINFO="$(python3 "${SCRIPT_DIR}/pg_conninfo.py" TARGET_DATABASE_URL "${PGPASSFILE}")" \
+  || die "TARGET_DATABASE_URL is not a usable database URL"
+# The URLs are no longer needed; child processes do not inherit them.
+unset SOURCE_DATABASE_URL TARGET_DATABASE_URL
 
 log "dumping source (custom format, no owners or privileges)"
-pg_dump --format=custom --no-owner --no-privileges --file "${DUMP_FILE}" "${SOURCE_DATABASE_URL}"
+pg_dump --format=custom --no-owner --no-privileges --file "${DUMP_FILE}" --dbname "${SOURCE_CONNINFO}"
 [[ -s "${DUMP_FILE}" ]] || die "dump is empty"
 log "dump written (path not printed; mode 0600)"
 
 log "restoring into Neon (single transaction, stops on first error)"
 pg_restore --no-owner --no-privileges --single-transaction --exit-on-error \
-  --dbname "${TARGET_DATABASE_URL}" "${DUMP_FILE}"
+  --dbname "${TARGET_CONNINFO}" "${DUMP_FILE}"
 
 log "verifying row counts for the public schema on both sides"
 count_tables() {
-  psql --no-psqlrc -At "$1" -c \
+  psql --no-psqlrc -At --dbname "$1" -c \
     "select table_name || ' ' || (xpath('/row/c/text()', query_to_xml(format('select count(*) as c from %I', table_name), false, true, '')))[1]::text from information_schema.tables where table_schema = 'public' and table_type = 'BASE TABLE' order by 1;"
 }
-count_tables "${SOURCE_DATABASE_URL}" > "${DUMP_DIR}/source-counts.txt"
-count_tables "${TARGET_DATABASE_URL}" > "${DUMP_DIR}/target-counts.txt"
+count_tables "${SOURCE_CONNINFO}" > "${DUMP_DIR}/source-counts.txt"
+count_tables "${TARGET_CONNINFO}" > "${DUMP_DIR}/target-counts.txt"
 if diff -q "${DUMP_DIR}/source-counts.txt" "${DUMP_DIR}/target-counts.txt" >/dev/null; then
   log "row counts match for every table"
 else

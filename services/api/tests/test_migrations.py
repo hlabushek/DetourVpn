@@ -10,6 +10,7 @@ from uuid import uuid4
 import pytest
 from alembic import command
 from alembic.config import Config
+from alembic.script import ScriptDirectory
 from sqlalchemy import Engine, delete, func, inspect, select, text
 from sqlalchemy.exc import DataError, DBAPIError, IntegrityError
 
@@ -24,6 +25,11 @@ def migration_config(engine: Engine) -> Config:
     config = Config(str(ROOT / "alembic.ini"))
     config.attributes["database_engine"] = engine
     return config
+
+
+# The newest revision; a refused rollback must leave the schema here (computed, not pinned,
+# so a new migration does not have to edit every assertion).
+HEAD = ScriptDirectory.from_config(Config(str(ROOT / "alembic.ini"))).get_current_head()
 
 
 def upgrade(engine: Engine) -> Config:
@@ -175,10 +181,7 @@ def test_account_deletion_migration_constraints_and_rollback(engine: Engine) -> 
     with pytest.raises(RuntimeError, match="deleted accounts exist"):
         command.downgrade(config, "0018_peer_window_resolution")
     with transaction(engine) as session:
-        assert (
-            session.scalar(text("SELECT version_num FROM alembic_version"))
-            == "0027_panel_server_sources"
-        )
+        assert session.scalar(text("SELECT version_num FROM alembic_version")) == HEAD
         assert session.scalar(text("SELECT count(*) FROM users WHERE status = 'deleted'")) == 1
 
 
@@ -207,10 +210,7 @@ def test_device_platform_migration_constraint_and_guarded_rollback(engine: Engin
     with pytest.raises(DBAPIError, match="Refusing downgrade: windows devices exist"):
         command.downgrade(config, "0021_device_link_codes")
     with transaction(engine) as session:
-        assert (
-            session.scalar(text("SELECT version_num FROM alembic_version"))
-            == "0027_panel_server_sources"
-        )
+        assert session.scalar(text("SELECT version_num FROM alembic_version")) == HEAD
         assert session.scalar(select(func.count()).select_from(Device)) == 1
         session.execute(delete(Device))
     # With only Android data (here: none) the rollback works and restores the old constraint.
@@ -230,10 +230,7 @@ def test_downgrade_with_data_fails_without_losing_rows_or_revision(engine: Engin
         command.downgrade(config, "base")
     with transaction(engine) as session:
         assert session.scalar(select(func.count()).select_from(User)) == 1
-        assert (
-            session.scalar(text("SELECT version_num FROM alembic_version"))
-            == "0027_panel_server_sources"
-        )
+        assert session.scalar(text("SELECT version_num FROM alembic_version")) == HEAD
 
 
 def test_downgrade_cannot_delete_a_concurrently_committing_account(engine: Engine) -> None:
@@ -267,10 +264,7 @@ def test_downgrade_cannot_delete_a_concurrently_committing_account(engine: Engin
                 result.result(timeout=10)
     with transaction(engine) as session:
         assert session.scalar(select(func.count()).select_from(User)) == 1
-        assert (
-            session.scalar(text("SELECT version_num FROM alembic_version"))
-            == "0027_panel_server_sources"
-        )
+        assert session.scalar(text("SELECT version_num FROM alembic_version")) == HEAD
 
 
 @pytest.mark.parametrize("subject", [0, -1])
@@ -413,10 +407,7 @@ def test_panel_server_rollback_refuses_while_rows_exist(engine: Engine) -> None:
     with pytest.raises(DBAPIError, match="Refusing downgrade: panel servers exist"):
         command.downgrade(config, "0026_telegram_username")
     with transaction(engine) as session:
-        assert (
-            session.scalar(text("SELECT version_num FROM alembic_version"))
-            == "0027_panel_server_sources"
-        )
+        assert session.scalar(text("SELECT version_num FROM alembic_version")) == HEAD
         session.execute(text("DELETE FROM panel_server_sources"))
     command.downgrade(config, "0026_telegram_username")
     assert "panel_server_sources" not in inspect(engine).get_table_names()

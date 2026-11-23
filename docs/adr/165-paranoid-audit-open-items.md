@@ -21,6 +21,7 @@ ladder, Doze aids, backstop, wake receivers), `ClientActivity` channel dispatch,
    wait without end (ADR-154). Not proven to happen: the worker's operations are each bounded
    today. A fix needs native-side cancellation (a `connectWindow` answered late must not leave a
    tunnel nobody tracks), so it is a design change, not a local fix.
+   *Addressed Dart-side by ADR-185 (uncommitted, not on a device); no native change was needed.*
 2. **Native renewal HTTP calls have no overall deadline** — `NativeRenewer.call` (platform HTTPS
    path). Connect and read timeouts are 10 s each, but DNS has no timeout and the read timeout is
    per read, so a slow-dripping answer could hold the single renewer thread past the window's end.

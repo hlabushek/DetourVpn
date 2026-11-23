@@ -38,9 +38,12 @@ def test_credential_file_is_private_and_exclusive(tmp_path: Path) -> None:
         ("enable_auth", False),
         ("enable_mini_app", False),
         ("beta_invites_only", False),
+        # ADR-166: a remote database needs sslmode=verify-full; weaker TLS is refused.
         (
             "database_url",
-            SecretStr("postgresql+psycopg://vpn_api:TEST_ONLY@127.0.0.1:25433/other"),
+            SecretStr(
+                "postgresql+psycopg://vpn_api:TEST_ONLY@db.example.invalid/beta?sslmode=require"
+            ),
         ),
         (
             "database_url",
@@ -48,7 +51,7 @@ def test_credential_file_is_private_and_exclusive(tmp_path: Path) -> None:
         ),
         (
             "database_url",
-            SecretStr("postgresql+psycopg://vpn_api:TEST_ONLY@127.0.0.1:25434/detourvpn_beta"),
+            SecretStr("postgresql+psycopg://other:TEST_ONLY@db.example.invalid/beta"),
         ),
         (
             "database_url",
@@ -76,6 +79,21 @@ def test_cli_accepts_exact_local_beta_database() -> None:
         environment="closed",
         database_url=SecretStr(
             "postgresql+psycopg://vpn_api:TEST_ONLY@127.0.0.1:25433/detourvpn_beta"
+        ),
+        enable_auth=True,
+        enable_mini_app=True,
+        beta_invites_only=True,
+    )
+
+    assert cli.validate_beta_settings(settings) is settings  # type: ignore[arg-type]
+
+
+def test_cli_accepts_managed_remote_database_with_verified_tls() -> None:
+    """ADR-166 (1a4d252): the beta database may be the managed one; any database name."""
+    settings = FakeSettings(
+        environment="closed",
+        database_url=SecretStr(
+            "postgresql+psycopg://vpn_api:TEST_ONLY@db.example.invalid/neondb?sslmode=verify-full"
         ),
         enable_auth=True,
         enable_mini_app=True,

@@ -38,6 +38,9 @@ String messageFor(String code) => switch (code) {
   // ADR-145 (2.2): the VPN state could not be read; nothing was stopped.
   'native_state_unknown' =>
     'Не удалось прочитать состояние VPN на телефоне. Ничего не отключено; приложение повторит проверку автоматически.',
+  // ADR-185: a native call did not answer in time. A start that answers late is stopped.
+  'native_timeout' =>
+    'VPN на устройстве не ответил вовремя. Пока он не ответит, приложение ничего не запускает; незавершённый запуск останавливается. Подождите несколько секунд; если VPN не работает, нажмите «Подключить».',
   'window_tunnels_unavailable' || 'window_node_unavailable' =>
     'Сервис продлеваемых подключений пока недоступен. Повторите после подготовки узла.',
   // ADR-119: one text per cause, and only promises what the app really does.

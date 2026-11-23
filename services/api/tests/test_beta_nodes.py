@@ -120,7 +120,7 @@ GOOD = {
     "os_id": "ubuntu", "os_version": "24.04", "arch": "x86_64", "uid": "0", "cpus": "2",
     "mem_available_kb": "1500000", "root_free_kb": "20000000", "ip_forward": "1",
     "default_routes": "1", "host_ip_assigned": "1", "systemd": "1", "systemd_executor": "1",
-    "udp_ports_busy": "0",
+    "udp_ports_busy": "0", "ntp_synchronized": "yes", "clock_offset_ms": "12",
 }  # fmt: skip
 
 

@@ -358,7 +358,12 @@ def redeem_link_code(body: LinkRedeemInput, request: Request, auth: Service) -> 
         probe = session.scalar(select(DeviceLinkCode).where(DeviceLinkCode.code_digest == digest))
         if probe is None:
             raise invalid
-        # Lock order is user then code, as in every owner-side path; no deadlock with cancel.
+        # ADR-182: lock order is the beta invite (FOR SHARE), then the user, then the code, as in
+        # authenticate() and the admin revoke_beta_invite (invite FOR UPDATE, then the user).
+        # Taking the user first deadlocked against a concurrent invite revoke.
+        identity = session.scalar(select(AuthIdentity).where(AuthIdentity.user_id == probe.user_id))
+        if identity is None or not auth.beta_subject_allowed(session, identity.provider_subject):
+            raise invalid
         user = session.scalar(select(User).where(User.id == probe.user_id).with_for_update())
         # populate_existing: the unlocked probe cached this row; without a refresh a concurrent
         # redeem would see the pre-lock consumed_at and succeed a second time.
@@ -369,7 +374,6 @@ def redeem_link_code(body: LinkRedeemInput, request: Request, auth: Service) -> 
             .execution_options(populate_existing=True)
         )
         now = database_now(session)
-        identity = session.scalar(select(AuthIdentity).where(AuthIdentity.user_id == probe.user_id))
         if (
             row is None
             or user is None
@@ -377,8 +381,6 @@ def redeem_link_code(body: LinkRedeemInput, request: Request, auth: Service) -> 
             or row.consumed_at is not None
             or row.revoked_at is not None
             or row.expires_at <= now
-            or identity is None
-            or not auth.beta_subject_allowed(session, identity.provider_subject)
         ):
             raise invalid
         if active_device_count(session, user.id) >= auth.settings.device_limit:

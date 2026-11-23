@@ -119,6 +119,10 @@ rollback() {
 }
 trap rollback ERR
 test "$(hostname -s)" = __EXPECTED_HOST__
+# ADR-176: this script's schema backup, rollback and migration act on the LOCAL Docker database
+# only. A primary whose API reads the managed database would be migrated and dumped in the wrong
+# place, so the run refuses before anything changes.
+grep -Eq '^VPN_DATABASE_URL="?postgresql\+psycopg://[^:@/]+:[^@]*@127\.0\.0\.1:25433/detourvpn_beta"?$' /etc/detourvpn-beta/api.env || { echo refused=database_not_local_docker; exit 1; }
 systemctl is-active --quiet detourvpn-beta-api.service
 systemctl is-active --quiet detourvpn-beta-database.service
 test "$(ready)" = 200
