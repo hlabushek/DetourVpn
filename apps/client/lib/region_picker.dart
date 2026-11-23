@@ -113,7 +113,9 @@ class _RegionPickerScreenState extends State<RegionPickerScreen> {
   Widget _body(BuildContext context) {
     final c = widget.controller;
     final t = OrbitTokens.of(context);
-    final locked = c.busy || c.hasLease;
+    // ADR-119: while connected, another server is selectable and switches the tunnel.
+    // Only an operation in progress locks the list.
+    final locked = c.busy;
     final byCountry = <String?, List<NodeOption>>{};
     for (final node in c.nodes) {
       byCountry.putIfAbsent(node.countryCode, () => []).add(node);
@@ -227,12 +229,18 @@ class _RegionPickerScreenState extends State<RegionPickerScreen> {
                 style: Theme.of(context).textTheme.bodySmall,
               ),
             ),
-          if (c.hasLease)
+          if (c.busy)
             const Padding(
               padding: EdgeInsets.only(bottom: 16),
               child: OrbitNotice(
-                text:
-                    'Сначала отключите VPN и дождитесь завершения подключения.',
+                text: 'Дождитесь завершения подключения или отключения.',
+              ),
+            )
+          else if (c.hasLease)
+            const Padding(
+              padding: EdgeInsets.only(bottom: 16),
+              child: OrbitNotice(
+                text: 'Выбор другого сервера переподключит VPN к нему.',
               ),
             ),
           if (c.nodesError != null)
