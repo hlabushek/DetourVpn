@@ -199,9 +199,6 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(mode, 'exclude');
-    expect(
-      find.text('Не удалось сохранить. Попробуй снова.'),
-      findsOneWidget,
-    );
+    expect(find.text('Не удалось сохранить. Попробуй снова.'), findsOneWidget);
   });
 }

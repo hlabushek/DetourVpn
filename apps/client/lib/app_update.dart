@@ -313,9 +313,14 @@ class UpdateDownload {
 
   /// Starts a download (or, for a verified file, opens the installer again). A call while one is
   /// running does nothing: the dialog already shows that download.
-  Future<void> start(SignedManifest signed, {required int expectedTotal}) async {
+  Future<void> start(
+    SignedManifest signed, {
+    required int expectedTotal,
+  }) async {
     if (state.value.active || _disposed) return;
-    _set(UpdateDownloadState(flow: UpdateFlow.downloading, total: expectedTotal));
+    _set(
+      UpdateDownloadState(flow: UpdateFlow.downloading, total: expectedTotal),
+    );
     _poll = Timer.periodic(pollEvery, (_) => unawaited(_pollOnce()));
     var outcome = 'download_failed';
     try {
@@ -684,7 +689,8 @@ class _UpdateDialog extends StatelessWidget {
                   ),
                 TextButton(
                   key: const ValueKey('update-cancel'),
-                  onPressed: state.cancelling || state.flow != UpdateFlow.downloading
+                  onPressed:
+                      state.cancelling || state.flow != UpdateFlow.downloading
                       ? null
                       : () => unawaited(download.cancel()),
                   child: const Text('Отменить загрузку'),
