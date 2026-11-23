@@ -1,13 +1,15 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart' show MissingPluginException;
+import 'package:flutter/services.dart'
+    show MethodChannel, MissingPluginException;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:vpn_client/api.dart';
 import 'package:vpn_client/connection.dart';
 import 'package:vpn_client/native_tunnel.dart';
 import 'package:vpn_client/platform_info.dart';
 import 'package:vpn_client/recovery_budget.dart';
+import 'package:vpn_client/region_picker.dart';
 import 'package:vpn_client/settings_screen.dart';
 import 'package:vpn_client/split_apps.dart';
 import 'package:vpn_client/window_connection.dart';
@@ -394,6 +396,120 @@ void main() {
       expect(native.up, isTrue);
     },
   );
+  group('ADR-187 apply dialog after a split change while connected', () {
+    // TEST ONLY platform channel for the split screen; no Android or Windows routing proof.
+    const splitChannel = MethodChannel('project.vpn/tunnel.v1');
+    var splitWrites = 0;
+    setUp(() {
+      splitWrites = 0;
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(splitChannel, (call) async {
+            switch (call.method) {
+              case 'apps':
+                return [
+                  {
+                    'packageName': 'org.example.browser',
+                    'label': 'Browser',
+                    'icon': null,
+                  },
+                ];
+              case 'splitRead':
+                return <String>[];
+              case 'splitModeRead':
+              case 'splitLastModeRead':
+                return 'exclude';
+              case 'splitWrite':
+                splitWrites++;
+                return null;
+            }
+            return null;
+          });
+    });
+    tearDown(
+      () => TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(splitChannel, null),
+    );
+
+    Future<void> saveChangeWhileConnected(WidgetTester tester) async {
+      tester.view.physicalSize = const Size(800, 1600);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      api.freshCreates = true;
+      await tester.runAsync(() => c.connect());
+      expect(c.hasLease, isTrue);
+      await tester.pumpWidget(settingsHost());
+      await tester.tap(find.text('Приложения вне VPN'));
+      await settle(tester);
+      await tester.ensureVisible(find.text('org.example.browser'));
+      await tester.tap(find.text('org.example.browser'));
+      await settle(tester);
+      expect(splitWrites, 1);
+      // Saving alone never touches the running tunnel.
+      expect(find.text('Применить новые правила?'), findsNothing);
+      await tester.pageBack();
+      await settle(tester);
+      expect(find.text('Применить новые правила?'), findsOneWidget);
+      expect(find.text('Позже'), findsOneWidget);
+      expect(find.text('Перезапустить'), findsOneWidget);
+    }
+
+    testWidgets('«Позже» keeps the running tunnel as it is', (tester) async {
+      await saveChangeWhileConnected(tester);
+      final stops = native.stops;
+      await tester.tap(find.text('Позже'));
+      await settle(tester);
+      expect(find.text('Применить новые правила?'), findsNothing);
+      expect(native.stops, stops);
+      expect(native.up, isTrue);
+      expect(c.hasLease, isTrue);
+      expect(api.creates, 1);
+      expect(api.deletes, 0);
+    });
+
+    testWidgets('«Перезапустить» restarts the tunnel on the same server', (
+      tester,
+    ) async {
+      await saveChangeWhileConnected(tester);
+      final stops = native.stops;
+      final starts = native.starts;
+      await tester.tap(find.text('Перезапустить'));
+      for (var i = 0; i < 10; i++) {
+        await tester.pump(const Duration(milliseconds: 100));
+      }
+      expect(find.text('Применить новые правила?'), findsNothing);
+      expect(native.stops, greaterThan(stops));
+      expect(native.starts, starts + 1);
+      expect(native.up, isTrue);
+      expect(api.deletes, 1);
+      expect(api.creates, 2);
+      expect(api.deletedNodes, [node]);
+      expect(api.nodeId, node);
+      expect(c.selectedNode, node);
+      expect(c.hasLease, isTrue);
+      expect(c.error, isNull);
+    });
+
+    testWidgets('no dialog when the change was made while VPN was off', (
+      tester,
+    ) async {
+      tester.view.physicalSize = const Size(800, 1600);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      await tester.pumpWidget(settingsHost());
+      await tester.tap(find.text('Приложения вне VPN'));
+      await settle(tester);
+      await tester.ensureVisible(find.text('org.example.browser'));
+      await tester.tap(find.text('org.example.browser'));
+      await settle(tester);
+      expect(splitWrites, 1);
+      await tester.pageBack();
+      await settle(tester);
+      expect(find.text('Применить новые правила?'), findsNothing);
+      expect(api.creates, 0);
+    });
+  });
   group('ADR-097 native renewal', () {
     late RenewingNative renewing;
     WindowConnectionController controller({int seconds = 900}) {
@@ -975,6 +1091,153 @@ void main() {
         messageFor('window_generation_conflict'),
         isNot(contains('подключается заново')),
       );
+    });
+  });
+  group('ADR-190 restartTunnel on the same server', () {
+    const other = '77777777-7777-4777-8777-777777777777';
+
+    test('restarts on the same node and keeps the stay-connected wish', () async {
+      final intent = IntentNative()..age = 0;
+      final w = WindowConnectionController(
+        api,
+        intent,
+        pollInterval: const Duration(days: 1),
+        renewBeforeMs: 90000,
+        revokeWaitInterval: const Duration(milliseconds: 5),
+      )..selectedNode = node;
+      addTearDown(w.dispose);
+      api.freshCreates = true;
+      await w.connect();
+      expect(w.hasLease, isTrue);
+      final starts = intent.starts;
+      intent.order.clear();
+      await w.restartTunnel();
+      // disconnect(user: false): the engine is stopped, the native intent is not ended.
+      expect(intent.intentEnds, 0);
+      expect(intent.order, isNot(contains('endIntent')));
+      expect(intent.order.first, 'disconnect');
+      expect(intent.starts, starts + 1);
+      expect(intent.up, isTrue);
+      expect(api.deletedNodes, [node]);
+      expect(api.creates, 2);
+      expect(api.nodeId, node);
+      expect(w.selectedNode, node);
+      expect(w.hasLease, isTrue);
+      expect(w.error, isNull);
+      // Contrast: a user disconnect does end the wish.
+      await w.disconnect();
+      expect(intent.intentEnds, 1);
+    });
+
+    test('is a no-op without a lease', () async {
+      await c.restartTunnel();
+      expect(api.calls, isEmpty);
+      expect(native.starts, 0);
+      expect(native.stops, 0);
+      expect(c.hasLease, isFalse);
+    });
+
+    test('is a no-op while a server switch is running', () async {
+      final w = WindowConnectionController(
+        api,
+        native,
+        pollInterval: const Duration(days: 1),
+        renewBeforeMs: 90000,
+        revokeWaitInterval: const Duration(milliseconds: 5),
+      );
+      addTearDown(w.dispose);
+      w.nodes = [
+        NodeOption(node, 'A', 'r', 'available'),
+        NodeOption(other, 'B', 'r', 'available'),
+      ];
+      api.freshCreates = true;
+      w.selectedNode = node;
+      await w.connect();
+      final switching = w.switchNode(other);
+      await w.restartTunnel(); // returns at once: the switch holds the guard
+      await switching;
+      expect(w.selectedNode, other);
+      expect(api.creates, 2, reason: 'only the switch created a connection');
+      expect(api.deletedNodes, [node]);
+      expect(w.hasLease, isTrue);
+    });
+  });
+  group('ADR-189 server picker while connected', () {
+    const other = '77777777-7777-4777-8777-777777777777';
+
+    Widget pickerHost(WindowConnectionController controller) => MaterialApp(
+      home: Builder(
+        builder: (context) => TextButton(
+          onPressed: () => Navigator.push(
+            context,
+            MaterialPageRoute<void>(
+              builder: (_) => RegionPickerScreen(controller: controller),
+            ),
+          ),
+          child: const Text('open TEST ONLY'),
+        ),
+      ),
+    );
+
+    testWidgets('another available server is tappable and switches to it', (
+      tester,
+    ) async {
+      c.nodes = [
+        NodeOption(node, 'A', 'r', 'available'),
+        NodeOption(other, 'B', 'r', 'available'),
+      ];
+      api.freshCreates = true;
+      await tester.runAsync(() => c.connect());
+      expect(c.hasLease, isTrue);
+      await tester.pumpWidget(pickerHost(c));
+      await tester.tap(find.text('open TEST ONLY'));
+      await settle(tester);
+      expect(
+        find.text('Выбор другого сервера переподключит VPN к нему.'),
+        findsOneWidget,
+      );
+      await tester.tap(find.text('B · r'));
+      for (var i = 0; i < 10; i++) {
+        await tester.pump(const Duration(milliseconds: 100));
+      }
+      expect(find.text('Выберите сервер'), findsNothing);
+      expect(c.selectedNode, other);
+      expect(api.deletedNodes, [node]);
+      expect(api.creates, 2);
+      expect(api.nodeId, other);
+      expect(c.hasLease, isTrue);
+      expect(c.error, isNull);
+    });
+
+    testWidgets('a busy controller locks the list', (tester) async {
+      final held = _HeldList(api);
+      final ui = heldController(held);
+      ui.nodes = [
+        NodeOption(node, 'A', 'r', 'available'),
+        NodeOption(other, 'B', 'r', 'available'),
+      ];
+      final tap = ui.connect(); // held at the reconcile: busy
+      await tester.pump();
+      expect(ui.busy, isTrue);
+      await tester.pumpWidget(pickerHost(ui));
+      await tester.tap(find.text('open TEST ONLY'));
+      await settle(tester);
+      expect(
+        find.text('Дождитесь завершения подключения или отключения.'),
+        findsOneWidget,
+      );
+      await tester.tap(find.text('B · r'), warnIfMissed: false);
+      await settle(tester);
+      expect(find.text('Выберите сервер'), findsOneWidget);
+      expect(ui.selectedNode, node);
+      held.held.complete();
+      for (var i = 0; i < 10; i++) {
+        await tester.pump(const Duration(milliseconds: 100));
+      }
+      await tap;
+      ui.pausePolling(); // the poll timer was created in the fake zone
+      expect(ui.selectedNode, node);
+      expect(api.deletedNodes, isEmpty);
     });
   });
   test('production window budget remains 1 MiB by default', () {
