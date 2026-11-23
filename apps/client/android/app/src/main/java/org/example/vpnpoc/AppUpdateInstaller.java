@@ -12,9 +12,12 @@ import java.io.FileOutputStream;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.URL;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicLong;
 import javax.net.ssl.HttpsURLConnection;
 
 /**
@@ -29,6 +32,20 @@ final class AppUpdateInstaller {
     static final String MIME = "application/vnd.android.package-archive";
     private static final ExecutorService DOWNLOADS = Executors.newSingleThreadExecutor();
     private static final AtomicBoolean RUNNING = new AtomicBoolean(false);
+
+    // ADR-188: progress and cancel for the one running download. In-memory only: a new process
+    // starts idle, and its activity drops any file left behind (discardStaleAtStart).
+    private static final AtomicBoolean CANCEL = new AtomicBoolean(false);
+    private static final AtomicLong RECEIVED = new AtomicLong(0);
+    private static volatile long expectedTotal = 0;
+    /** "idle", "downloading", "verifying" or "ready" (a verified file is in the cache). */
+    private static volatile String phase = "idle";
+    /** Outcome code of the last finished run, "" before the first one. */
+    private static volatile String lastOutcome = "";
+    private static volatile HttpsURLConnection current;
+    /** SHA-256 and version of the file that passed every check; null when there is none. */
+    private static volatile String readySha256;
+    private static volatile long readyVersionCode;
 
     interface Callback { void done(String outcome); }
 
@@ -53,10 +70,47 @@ final class AppUpdateInstaller {
         return new File(new File(context.getCacheDir(), DIRECTORY), FILE_NAME);
     }
 
-    /** Removes a file left by an earlier attempt. Called on start and before each download. */
+    /** Removes a file left by an earlier attempt. Called before each download and after a failure. */
     static void discardStale(Context context) {
         File file = apkFile(context);
         if (file.exists() && !file.delete()) file.deleteOnExit();
+    }
+
+    /**
+     * ADR-188: a fresh activity drops a stale file, but not one this process is still writing or
+     * has just verified (the activity can be recreated while the process and download live on).
+     */
+    static void discardStaleAtStart(Context context) {
+        if (RUNNING.get() || readySha256 != null) return;
+        discardStale(context);
+    }
+
+    /** ADR-188: a snapshot for the UI. Numbers only; never the URL, hash or file path. */
+    static Map<String, Object> progress() {
+        Map<String, Object> value = new HashMap<>();
+        value.put("phase", phase);
+        value.put("received", RECEIVED.get());
+        value.put("total", expectedTotal);
+        value.put("outcome", lastOutcome);
+        return value;
+    }
+
+    /**
+     * ADR-188: asks the running download to stop. The read loop checks the flag; the connection
+     * is also closed off the calling thread so a stalled read ends at once. The download's own
+     * callback then answers "cancelled" and the partial file is deleted.
+     */
+    static void cancel() {
+        if (!RUNNING.get()) return;
+        CANCEL.set(true);
+        HttpsURLConnection connection = current;
+        if (connection != null) {
+            Thread closer = new Thread(() -> {
+                try { connection.disconnect(); } catch (RuntimeException ignored) { /* Closing. */ }
+            }, "update-cancel");
+            closer.setDaemon(true);
+            closer.start();
+        }
     }
 
     /** False on Android 8+ when the user has not allowed "install unknown apps" for DetourVPN. */
@@ -73,12 +127,18 @@ final class AppUpdateInstaller {
     /**
      * Downloads and verifies on a background thread; {@code callback} receives a stable outcome
      * code: "verified" (file ready, caller starts the installer), "busy", "invalid_manifest",
-     * "not_newer", "download_failed", "size_mismatch", "hash_mismatch", "package_mismatch".
+     * "not_newer", "download_failed", "size_mismatch", "hash_mismatch", "package_mismatch",
+     * "cancelled" (ADR-188). A file this process already verified for the same SHA-256 and
+     * version is re-checked and reused instead of downloaded again.
      */
     static void download(Context context, String url, String sha256, long sizeBytes,
             long manifestVersionCode, long minSupportedVersionCode, Callback callback) {
         Context app = context.getApplicationContext();
         if (!RUNNING.compareAndSet(false, true)) { callback.done("busy"); return; }
+        CANCEL.set(false);
+        RECEIVED.set(0);
+        expectedTotal = sizeBytes > 0 && sizeBytes <= 512L * 1024 * 1024 ? sizeBytes : 0;
+        phase = "downloading";
         DOWNLOADS.execute(() -> {
             String outcome;
             try {
@@ -86,10 +146,27 @@ final class AppUpdateInstaller {
                         minSupportedVersionCode);
             } catch (Exception | LinkageError failure) {
                 outcome = "download_failed";
+            }
+            // A cancel wins over any other result, including a file that just verified.
+            if (CANCEL.get()) outcome = "cancelled";
+            boolean verified = "verified".equals(outcome);
+            try {
+                if (verified) {
+                    readyVersionCode = manifestVersionCode;
+                    readySha256 = sha256;
+                } else {
+                    readySha256 = null;
+                    discardStale(app);
+                }
+            } catch (RuntimeException deleteFailed) {
+                // The next download deletes it first anyway.
             } finally {
+                current = null;
+                lastOutcome = outcome;
+                phase = verified ? "ready" : "idle";
+                // Released last, so a new download cannot start while this one deletes its file.
                 RUNNING.set(false);
             }
-            if (!"verified".equals(outcome)) discardStale(app);
             callback.done(outcome);
         });
     }
@@ -106,11 +183,23 @@ final class AppUpdateInstaller {
         // Downgrade and same-version manifests never download anything.
         if (UpdatePolicy.decide((int) installed, (int) manifestVersionCode,
                 (int) minSupportedVersionCode) == UpdatePolicy.Decision.NONE) return "not_newer";
-        discardStale(app);
         File file = apkFile(app);
+        // ADR-188: the same verified build again (the user closed the system installer): every
+        // check below runs again on the cached file, so nothing unverified is ever handed over.
+        if (sha256.equals(readySha256) && readyVersionCode == manifestVersionCode && file.isFile()) {
+            RECEIVED.set(sizeBytes);
+            phase = "verifying";
+            if (file.length() == sizeBytes
+                    && "verified".equals(verifyFile(app, file, sha256, manifestVersionCode, installed)))
+                return "verified";
+        }
+        readySha256 = null;
+        discardStale(app);
         File dir = file.getParentFile();
         if (dir == null || (!dir.isDirectory() && !dir.mkdirs())) return "download_failed";
+        if (CANCEL.get()) return "cancelled";
         HttpsURLConnection connection = (HttpsURLConnection) new URL(url).openConnection();
+        current = connection;
         try {
             connection.setInstanceFollowRedirects(false); // No redirect to another host or scheme.
             connection.setConnectTimeout(10_000);
@@ -126,15 +215,25 @@ final class AppUpdateInstaller {
                 byte[] buffer = new byte[64 * 1024];
                 int read;
                 while ((read = in.read(buffer)) != -1) {
+                    if (CANCEL.get()) return "cancelled";
                     total += read;
                     if (total > sizeBytes) return "size_mismatch";
                     out.write(buffer, 0, read);
+                    RECEIVED.set(total);
                 }
             }
             if (total != sizeBytes) return "size_mismatch";
         } finally {
+            current = null;
             connection.disconnect();
         }
+        if (CANCEL.get()) return "cancelled";
+        phase = "verifying";
+        return verifyFile(app, file, sha256, manifestVersionCode, installed);
+    }
+
+    private static String verifyFile(Context app, File file, String sha256, long manifestVersionCode,
+            long installed) throws Exception {
         if (!UpdatePolicy.sha256Matches(file, sha256)) return "hash_mismatch";
         // Second downgrade guard on the verified file itself: same package, exact manifest version.
         PackageInfo archive = app.getPackageManager().getPackageArchiveInfo(file.getPath(), 0);

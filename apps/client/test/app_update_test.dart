@@ -82,6 +82,47 @@ class FakeUpdateNative implements UpdateNative {
     installs++;
     return outcome;
   }
+
+  @override
+  Future<UpdateProgress?> progress() async =>
+      const UpdateProgress(UpdateNativePhase.idle, 0, 0, '');
+
+  @override
+  Future<void> cancel() async {}
+}
+
+/// MOCK (ADR-188): a download the test drives by hand. Nothing is downloaded; [snapshot] is what
+/// "native" reports, and [finish] answers the pending install call.
+class SteppedUpdateNative extends FakeUpdateNative {
+  SteppedUpdateNative({this.answerBusy = false}) : super(27);
+  final bool answerBusy;
+  Completer<String>? _pending;
+  UpdateProgress snapshot = const UpdateProgress(
+    UpdateNativePhase.downloading,
+    0,
+    0,
+    '',
+  );
+  int cancels = 0;
+
+  void finish(String outcome) => _pending?.complete(outcome);
+
+  @override
+  Future<String> install(SignedManifest signed) {
+    installs++;
+    if (answerBusy) return Future.value('busy');
+    _pending = Completer<String>();
+    return _pending!.future;
+  }
+
+  @override
+  Future<UpdateProgress?> progress() async => snapshot;
+
+  @override
+  Future<void> cancel() async {
+    cancels++;
+    finish('cancelled');
+  }
 }
 
 void main() {
@@ -479,4 +520,192 @@ void main() {
       }
     },
   );
+
+  group('ADR-188 download progress', () {
+    const mib = 1024 * 1024;
+
+    test('progress snapshot parse is strict', () {
+      final ok = UpdateProgress.parse({
+        'phase': 'downloading',
+        'received': 10,
+        'total': 20,
+        'outcome': '',
+      })!;
+      expect(ok.phase, UpdateNativePhase.downloading);
+      expect(ok.received, 10);
+      for (final bad in <Object?>[
+        null,
+        'downloading',
+        {'phase': 'other', 'received': 1, 'total': 1, 'outcome': ''},
+        {'phase': 'idle', 'received': -1, 'total': 1, 'outcome': ''},
+        {'phase': 'idle', 'received': 1, 'total': '1', 'outcome': ''},
+        {'phase': 'idle', 'received': 1, 'total': 1},
+      ]) {
+        expect(UpdateProgress.parse(bad), isNull, reason: '$bad');
+      }
+    });
+
+    test('progress text shows sizes and a whole percent', () {
+      expect(
+        updateProgressText(12 * mib + mib ~/ 4, 46 * mib),
+        '12,3 МБ из 46,0 МБ · 26 %',
+      );
+      expect(updateProgressText(0, 46 * mib), '0,0 МБ из 46,0 МБ · 0 %');
+      expect(updateProgressText(99 * mib, 46 * mib), contains('100 %'));
+      expect(updateProgressText(3 * mib, 0), 'Загружено 3,0 МБ');
+    });
+
+    Future<void> openWith(
+      WidgetTester tester,
+      UpdateOffer offer,
+      UpdateDownload download,
+    ) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Builder(
+            builder: (context) => TextButton(
+              onPressed: () => showUpdateDialog(
+                context,
+                offer,
+                download.native,
+                download: download,
+              ),
+              child: const Text('open'),
+            ),
+          ),
+        ),
+      );
+      await tester.tap(find.text('open'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
+    }
+
+    final optional = UpdateOffer(
+      UpdateManifest.parse(manifest(size: 40 * mib))!,
+      UpdateDecision.optional,
+      signedOf(manifest(size: 40 * mib)),
+    );
+
+    testWidgets(
+      'a running download shows bytes and percent, survives reopening, and can be cancelled',
+      (tester) async {
+        final native = SteppedUpdateNative();
+        final download = UpdateDownload(
+          native,
+          pollEvery: const Duration(milliseconds: 50),
+        );
+        await openWith(tester, optional, download);
+        await tester.tap(find.text('Скачать'));
+        await tester.pump();
+        native.snapshot = UpdateProgress(
+          UpdateNativePhase.downloading,
+          10 * mib,
+          40 * mib,
+          '',
+        );
+        await tester.pump(const Duration(milliseconds: 60));
+        await tester.pump();
+        expect(find.text('10,0 МБ из 40,0 МБ · 25 %'), findsOneWidget);
+        final bar = tester.widget<LinearProgressIndicator>(
+          find.byKey(const ValueKey('update-progress')),
+        );
+        expect(bar.value, closeTo(0.25, 1e-9));
+
+        // Hide, then open again (the owner's repeated tap): same download, live progress.
+        await tester.tap(find.text('Скрыть'));
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 300));
+        await tester.pump();
+        expect(find.byKey(const ValueKey('update-progress')), findsNothing);
+        native.snapshot = UpdateProgress(
+          UpdateNativePhase.downloading,
+          30 * mib,
+          40 * mib,
+          '',
+        );
+        await openWith(tester, optional, download);
+        expect(find.text('30,0 МБ из 40,0 МБ · 75 %'), findsOneWidget);
+        expect(find.text('Загрузка уже идёт.'), findsNothing);
+        expect(native.installs, 1);
+
+        await tester.tap(find.byKey(const ValueKey('update-cancel')));
+        await tester.pump();
+        await tester.pump();
+        expect(native.cancels, 1);
+        expect(find.text('Загрузка отменена.'), findsOneWidget);
+        expect(find.text('Скачать'), findsOneWidget);
+        download.dispose();
+      },
+    );
+
+    testWidgets('verifying shows an indeterminate bar, then «Установить»', (
+      tester,
+    ) async {
+      final native = SteppedUpdateNative();
+      final download = UpdateDownload(
+        native,
+        pollEvery: const Duration(milliseconds: 50),
+      );
+      await openWith(tester, optional, download);
+      await tester.tap(find.text('Скачать'));
+      await tester.pump();
+      native.snapshot = UpdateProgress(
+        UpdateNativePhase.verifying,
+        40 * mib,
+        40 * mib,
+        '',
+      );
+      await tester.pump(const Duration(milliseconds: 60));
+      await tester.pump();
+      expect(find.text('Проверка файла…'), findsOneWidget);
+      expect(
+        tester
+            .widget<LinearProgressIndicator>(
+              find.byKey(const ValueKey('update-progress')),
+            )
+            .value,
+        isNull,
+      );
+      native.finish('installer_opened');
+      await tester.pump();
+      await tester.pump();
+      expect(
+        find.text('Подтвердите установку в системном окне Android.'),
+        findsOneWidget,
+      );
+      await tester.tap(find.text('Установить'));
+      await tester.pump();
+      expect(native.installs, 2, reason: 'reopens the installer via native');
+      native.finish('installer_opened');
+      await tester.pump();
+      download.dispose();
+    });
+
+    test('"busy" follows the download already running natively', () async {
+      final native = SteppedUpdateNative(answerBusy: true);
+      final download = UpdateDownload(
+        native,
+        pollEvery: const Duration(milliseconds: 1),
+      );
+      native.snapshot = const UpdateProgress(
+        UpdateNativePhase.downloading,
+        5,
+        10,
+        '',
+      );
+      final run = download.start(optional.signed, expectedTotal: 10);
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+      expect(download.state.value.active, isTrue);
+      native.snapshot = const UpdateProgress(
+        UpdateNativePhase.ready,
+        10,
+        10,
+        'verified',
+      );
+      await run;
+      expect(download.state.value.outcome, 'verified');
+      expect(download.state.value.installable, isTrue);
+      download.dispose();
+    });
+  });
 }

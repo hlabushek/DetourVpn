@@ -120,7 +120,13 @@ class _VpnAppState extends State<VpnApp> with WidgetsBindingObserver {
     if (scheduler == null || !mounted || context == null || !context.mounted) {
       return;
     }
-    await showUpdateDialog(context, offer, scheduler.native);
+    // ADR-188: every dialog shows the one app-wide download, so reopening shows its progress.
+    await showUpdateDialog(
+      context,
+      offer,
+      scheduler.native,
+      download: scheduler.download,
+    );
   }
 
   /// The home-screen banner opens the same dialog and download flow as Settings.
@@ -337,6 +343,7 @@ class _VpnAppState extends State<VpnApp> with WidgetsBindingObserver {
     WidgetsBinding.instance.removeObserver(this);
     connection?.dispose();
     _updates?.bannerOffer.dispose();
+    _updates?.download.dispose();
     widget.api?.close();
     super.dispose();
   }

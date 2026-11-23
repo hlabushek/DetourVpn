@@ -43,7 +43,8 @@ public final class ClientActivity extends FlutterActivity {
         super.onCreate(state);
         // FLAG_SECURE intentionally not set: screenshots and recents previews are allowed (ADR-103).
         // ADR-107: a cold start drops an update APK left by an earlier attempt.
-        if (state == null) AppUpdateInstaller.discardStale(this);
+        // ADR-188: not while this process is still downloading or holds a verified file.
+        if (state == null) AppUpdateInstaller.discardStaleAtStart(this);
         recordI028Lifecycle("activity_created");
     }
     @Override protected void onStart() {
@@ -218,6 +219,16 @@ public final class ClientActivity extends FlutterActivity {
         }
         if (call.method.equals("appUpdateInstall")) {
             handleUpdateInstall(call, result);
+            return;
+        }
+        if (call.method.equals("appUpdateProgress")) {
+            // ADR-188: phase and byte counts of the update download; no URL, hash or path.
+            result.success(AppUpdateInstaller.progress());
+            return;
+        }
+        if (call.method.equals("appUpdateCancel")) {
+            AppUpdateInstaller.cancel();
+            result.success(null);
             return;
         }
         if (call.method.equals("shareDiagnosticReport")) {
