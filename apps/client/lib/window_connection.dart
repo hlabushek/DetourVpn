@@ -1379,7 +1379,9 @@ class WindowConnectionController extends ConnectionController {
     }
     remotePending = hasLease;
     if (remotePending) {
-      error ??= 'revoke_unconfirmed';
+      // The server accepts a close with 202 (state revoke_pending) and the node confirms it on a
+      // later poll. That is normal, not an error: only a failed DELETE is shown as a warning.
+      if (revokeErrorCode != null) error ??= 'revoke_unconfirmed';
       startPolling();
     } else {
       revokeErrorCode = null;

@@ -382,7 +382,9 @@ void main() {
       await tester.pumpWidget(settingsHost());
       expect(c.hasLease, isTrue);
       expect(
-        find.text('VPN включён: изменения применятся при следующем подключении'),
+        find.text(
+          'VPN включён: изменения применятся при следующем подключении',
+        ),
         findsOneWidget,
       );
       await tester.tap(find.text('Приложения вне VPN'));
@@ -1387,6 +1389,24 @@ void main() {
       await c.refresh();
       expect(c.hasLease, false);
       expect(c.revokeErrorCode, isNull);
+      expect(c.error, isNull);
+    },
+  );
+  test(
+    'accepted close answering revoke_pending shows no warning and polls to closed (ADR-186)',
+    () async {
+      await c.connect();
+      api.pendingDeletes = 1;
+      await c.disconnect();
+      // The server accepted the close (202 revoke_pending): not an error.
+      expect(c.remotePending, true);
+      expect(c.revokeErrorCode, isNull);
+      expect(c.error, isNot('revoke_unconfirmed'));
+      expect(c.error, isNull);
+      // A later poll reaches closed and clears the pending close.
+      await c.refresh();
+      expect(c.hasLease, false);
+      expect(c.remotePending, false);
       expect(c.error, isNull);
     },
   );
