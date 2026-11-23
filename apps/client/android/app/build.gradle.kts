@@ -56,7 +56,7 @@ android {
         minSdk = 24
         targetSdk = 36
         versionCode = 35
-        versionName = "0.1.0-beta.34"
+        versionName = "0.1.0-beta.35"
         testInstrumentationRunner = if (providers.gradleProperty("i028FlutterInstrumentation").orNull == "true")
             "androidx.test.runner.AndroidJUnitRunner" else "org.example.vpnpoc.I025DeviceTests"
         ndk { abiFilters += targetAbiFilters }
