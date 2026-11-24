@@ -33,6 +33,16 @@ Build from a clean folder on a committed, pushed commit. The report must show no
 2. Push the branch if the work must survive: `git push -u origin <branch>`.
 3. Run `python scripts/git_state.py` and confirm there is no `UNSAVED` or `NOT PUSHED` line for the branch you used.
 
+## Current state (snapshot, 2026-11-24; the owner updates it when the line changes)
+
+- **Current line of work:** `claude/connection-reliability` (commit `aedf5fd`, pushed to origin). Start new work from here.
+- **`main`:** still the initial import (`c001d3d`). It does not contain the current work. Merging into it is an owner decision.
+- **`codex/i025-android-windows`:** the main folder. It holds unsaved Android reliability changes and 10 commits not on origin. Do not commit, push, or reset it without the owner's go-ahead.
+- **Rescue branch:** `backup/android-reliability-snapshot-2026-11-12` (commit `4538bb0`). It keeps the 12 November Android snapshot that was not on any branch. Not pushed.
+- **Removed on 2026-11-24:** duplicate and empty worktrees and branches, and build caches. Copies are in `C:\Users\JetGame\DetourVpn-cleanup-backup-2026-11-24\`.
+
+If `scripts/git_state.py` disagrees with this section, trust the script and update this section.
+
 ## Rules this repository follows
 
 - Never `git reset`, `git clean`, `git stash` (without a unique tag) or delete a branch or folder without the owner's explicit instruction.
