@@ -1,9 +1,11 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import 'api.dart';
 import 'app_update.dart';
+import 'update_ui.dart';
 import 'connection.dart';
 import 'home_screen.dart';
 import 'login_screen.dart';
@@ -120,16 +122,11 @@ class _VpnAppState extends State<VpnApp> with WidgetsBindingObserver {
     if (scheduler == null || !mounted || context == null || !context.mounted) {
       return;
     }
-    // ADR-188: every dialog shows the one app-wide download, so reopening shows its progress.
-    await showUpdateDialog(
-      context,
-      offer,
-      scheduler.native,
-      download: scheduler.download,
-    );
+    // ADR-188/193: every sheet shows the one app-wide download, so reopening shows its progress.
+    await showUpdateSheet(context, offer, scheduler.download);
   }
 
-  /// The home-screen banner opens the same dialog and download flow as Settings.
+  /// ADR-193: the banner opens the same sheet and download flow as Settings.
   void _openUpdateBanner(UpdateOffer offer) =>
       unawaited(_updates?.present(offer, _showUpdate));
 
@@ -428,8 +425,6 @@ class _VpnAppState extends State<VpnApp> with WidgetsBindingObserver {
           controller: connection!,
           onSignOut: signOut,
           onOpenTraffic: () => _selectTab(1),
-          updateOffer: _updates?.bannerOffer,
-          onOpenUpdate: _openUpdateBanner,
         ),
       },
     );
@@ -445,6 +440,25 @@ class _VpnAppState extends State<VpnApp> with WidgetsBindingObserver {
     themeAnimationCurve: Curves.easeInOut,
     theme: orbitTheme(Brightness.light),
     darkTheme: orbitTheme(Brightness.dark),
+    // Tint the Android system navigation bar to the Orbit background and follow
+    // the in-app theme toggle (no-op on platforms without such a bar).
+    builder: (context, child) {
+      final dark = Theme.of(context).brightness == Brightness.dark;
+      final bg = (dark ? OrbitTokens.dark : OrbitTokens.light).bg;
+      final icons = dark ? Brightness.light : Brightness.dark;
+      return AnnotatedRegion<SystemUiOverlayStyle>(
+        value: SystemUiOverlayStyle(
+          systemNavigationBarColor: bg,
+          systemNavigationBarDividerColor: bg,
+          systemNavigationBarIconBrightness: icons,
+          systemNavigationBarContrastEnforced: false,
+          statusBarColor: Colors.transparent,
+          statusBarIconBrightness: icons,
+          statusBarBrightness: dark ? Brightness.dark : Brightness.light,
+        ),
+        child: child ?? const SizedBox.shrink(),
+      );
+    },
     home: Builder(
       builder: (context) {
         final nav = !showLogin && !restoring && widget.api != null;
@@ -476,7 +490,20 @@ class _VpnAppState extends State<VpnApp> with WidgetsBindingObserver {
                 child: Center(
                   child: ConstrainedBox(
                     constraints: const BoxConstraints(maxWidth: 520),
-                    child: OrbitSwitcher(child: _page()),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        // ADR-193: the update banner slides in under the app bar, on every tab.
+                        if (_updates case final updates?)
+                          UpdateBannerSlot(
+                            offer: updates.bannerOffer,
+                            download: updates.download.state,
+                            onOpen: _openUpdateBanner,
+                            onDismiss: updates.dismissBanner,
+                          ),
+                        Expanded(child: OrbitSwitcher(child: _page())),
+                      ],
+                    ),
                   ),
                 ),
               ),

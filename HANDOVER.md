@@ -278,7 +278,7 @@ nothing ran on a node or on the managed database.
   `.cache/i-004/portable/pgsql/bin`, the backup/restore fixtures run and pass.
 
 ## Rules for the next agent
-- One phase at a time, with one ADR per phase in `docs/adr/` (next free number: 191).
+- One phase at a time, with one ADR per phase in `docs/adr/` (next free number: 194).
 - Commit locally with the owner's OK. No push.
 - No `flutter build`, no `gradlew assemble`, no release or deploy scripts, no adb or device tests,
   and no server changes without explicit approval.
@@ -423,3 +423,12 @@ What was **not** run or verified:
 ## ADR-186 — no warning for an accepted disconnect
 
 - Disconnect showed `revoke_unconfirmed` every time, because the server answers the DELETE with `revoke_pending` (202). The warning now appears only when the DELETE call fails. See docs/adr/186-disconnect-is-not_an_error.md. Tests: 362 passed, analyze clean (ASCII copy). Not on a phone.
+
+## ADR-191 — a held connection is not ended by recoverable answers (uncommitted)
+
+- Reconcile no longer throws `revoke_unconfirmed` on an accepted close (202); Android adopts a running tunnel without native renewal instead of stopping it; 503 codes keep the tunnel; `window_not_renewable` / `window_generation_conflict` reconnect instead of ending the wish; a failed native renewal hand-off is retried (60 s). See docs/adr/191-connection-not-ended-by-recoverable-answers.md.
+- Tests: `flutter test` 384 passed (6 new); analyze (ASCII copy) only the `assets/orbit/` warning. No Java change. Not on a phone.
+
+## ADR-193 — in-app update banner and progress sheet (uncommitted)
+
+- App-wide slide-in update banner, bottom sheet with real-byte progress, cancel, explicit «Установить» (native `openInstaller` flag), partial APK never at the served path. See docs/adr/193-in-app-update-banner-and-sheet.md. Tests: `flutter test` 416 passed; analyze (ASCII copy) clean; Java update tests 17 passed (reduced javac set). Not built, not on a phone.

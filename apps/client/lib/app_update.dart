@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 
-import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 
 import 'api.dart';
@@ -135,8 +135,10 @@ abstract interface class UpdateNative {
   /// Android below 13, which has no platform Ed25519, and while no key is configured).
   Future<String?> verifyManifest(SignedManifest signed);
 
-  /// The native side re-verifies [signed] and takes every install value from it.
-  Future<String> install(SignedManifest signed);
+  /// The native side re-verifies [signed] and takes every install value from it. With
+  /// [openInstaller] false it only downloads and verifies (answer `verified`); with true it
+  /// re-verifies a file it already verified (or downloads anew) and opens the system installer.
+  Future<String> install(SignedManifest signed, {required bool openInstaller});
 
   /// ADR-188: where the native download is now; null when the platform did not answer.
   Future<UpdateProgress?> progress();
@@ -221,12 +223,15 @@ class PlatformUpdateNative implements UpdateNative {
   }
 
   @override
-  Future<String> install(SignedManifest signed) async {
+  Future<String> install(
+    SignedManifest signed, {
+    required bool openInstaller,
+  }) async {
     try {
-      final value = await _channel.invokeMethod<Object>(
-        'appUpdateInstall',
-        signed.channelArgs,
-      );
+      final value = await _channel.invokeMethod<Object>('appUpdateInstall', {
+        ...signed.channelArgs,
+        'openInstaller': openInstaller,
+      });
       return value is String ? value : 'download_failed';
     } catch (_) {
       return 'download_failed';
@@ -254,49 +259,95 @@ class PlatformUpdateNative implements UpdateNative {
   }
 }
 
-/// ADR-188: what the update dialog shows about the download.
-enum UpdateFlow { idle, downloading, verifying, finished }
+/// ADR-193: where the one update download is. `offered` is not a stage of the download: it is
+/// [UpdateScheduler.bannerOffer] holding an offer while the download is still [idle].
+enum UpdateStage {
+  /// Nothing started (or a finished check offered nothing to download yet).
+  idle,
+
+  /// Bytes are arriving; [UpdateDownloadState.received] counts them.
+  downloading,
+
+  /// The whole file arrived; native checks size, SHA-256, package name and version.
+  verifying,
+
+  /// The file passed every check. Only «Установить» is left.
+  ready,
+
+  /// «Установить» was tapped; native re-verifies the file and opens the system installer.
+  installing,
+
+  /// The user stopped the download; native deleted the partial file.
+  cancelled,
+
+  /// The download or a check failed; native deleted the file. [UpdateDownloadState.outcome]
+  /// says why.
+  failed,
+}
 
 class UpdateDownloadState {
   const UpdateDownloadState({
-    this.flow = UpdateFlow.idle,
+    this.stage = UpdateStage.idle,
     this.received = 0,
     this.total = 0,
     this.outcome,
     this.cancelling = false,
   });
-  final UpdateFlow flow;
+  final UpdateStage stage;
   final int received;
   final int total;
 
-  /// Native outcome code once [flow] is `finished`.
+  /// Native outcome code of the last finished step (download or installer hand-off).
   final String? outcome;
   final bool cancelling;
 
+  /// A native call is running; a second one must not start.
   bool get active =>
-      flow == UpdateFlow.downloading || flow == UpdateFlow.verifying;
+      stage == UpdateStage.downloading ||
+      stage == UpdateStage.verifying ||
+      stage == UpdateStage.installing;
 
   /// 0..1 while bytes are counted against a known size; null when not determinate.
   double? get fraction {
-    if (flow != UpdateFlow.downloading || total <= 0) return null;
+    if (stage != UpdateStage.downloading || total <= 0) return null;
     return (received / total).clamp(0.0, 1.0);
   }
 
-  /// The file passed every check and only the system installer is left.
-  bool get installable =>
-      flow == UpdateFlow.finished && fileReadyOutcomes.contains(outcome);
+  /// A verified file is waiting for «Установить».
+  bool get installable => stage == UpdateStage.ready;
 
-  static const fileReadyOutcomes = {
+  /// Downloading again can help (network, a corrupted transfer). A refused signature, invalid
+  /// data or a build that is not newer will fail the same way, so no «Повторить» is offered.
+  bool get retryable =>
+      stage == UpdateStage.cancelled ||
+      (stage == UpdateStage.failed && !_finalFailures.contains(outcome));
+
+  static const _finalFailures = {
+    'manifest_unverified',
+    'invalid_manifest',
+    'not_newer',
+  };
+
+  /// Native answers after which a verified file is still in place ([UpdateStage.ready]).
+  static const readyOutcomes = {
+    'verified',
     'installer_opened',
     'installer_unavailable',
-    'verified',
+    'install_permission_required',
+  };
+
+  /// The stage a finished native call leads to.
+  static UpdateStage stageAfter(String outcome) => switch (outcome) {
+    _ when readyOutcomes.contains(outcome) => UpdateStage.ready,
+    'cancelled' => UpdateStage.cancelled,
+    _ => UpdateStage.failed,
   };
 }
 
-/// ADR-188: the one update download of this app. It outlives the dialog, so closing and reopening
-/// the dialog (or tapping the banner again) shows the running download instead of starting a
-/// second one. Progress comes from polling the native side; the install call's own answer is the
-/// final outcome.
+/// ADR-188/193: the one update download of this app. It outlives the sheet, so closing and
+/// reopening it (or tapping the banner again) shows the running download instead of starting a
+/// second one. Progress comes from polling native byte counts (never a timer that invents
+/// numbers); the native call's own answer is the final outcome.
 class UpdateDownload {
   UpdateDownload(
     this.native, {
@@ -311,20 +362,45 @@ class UpdateDownload {
   bool _polling = false;
   bool _disposed = false;
 
-  /// Starts a download (or, for a verified file, opens the installer again). A call while one is
-  /// running does nothing: the dialog already shows that download.
-  Future<void> start(
+  /// Downloads and verifies only; the installer is not opened. Ends in [UpdateStage.ready],
+  /// [UpdateStage.cancelled] or [UpdateStage.failed]. Ignored while a call is running.
+  Future<void> start(SignedManifest signed, {required int expectedTotal}) =>
+      _run(
+        signed,
+        openInstaller: false,
+        first: UpdateDownloadState(
+          stage: UpdateStage.downloading,
+          total: expectedTotal,
+        ),
+      );
+
+  /// Hands the verified file to the system installer (native re-verifies it first). Only from
+  /// [UpdateStage.ready]; anything else is ignored.
+  Future<void> install(SignedManifest signed) {
+    final now = state.value;
+    if (now.stage != UpdateStage.ready) return Future.value();
+    return _run(
+      signed,
+      openInstaller: true,
+      first: UpdateDownloadState(
+        stage: UpdateStage.installing,
+        received: now.received,
+        total: now.total,
+      ),
+    );
+  }
+
+  Future<void> _run(
     SignedManifest signed, {
-    required int expectedTotal,
+    required bool openInstaller,
+    required UpdateDownloadState first,
   }) async {
     if (state.value.active || _disposed) return;
-    _set(
-      UpdateDownloadState(flow: UpdateFlow.downloading, total: expectedTotal),
-    );
+    _set(first);
     _poll = Timer.periodic(pollEvery, (_) => unawaited(_pollOnce()));
     var outcome = 'download_failed';
     try {
-      outcome = await native.install(signed);
+      outcome = await native.install(signed, openInstaller: openInstaller);
       // An earlier screen of this app (a recreated activity) still owns the native download:
       // follow it to its end instead of reporting a dead "already downloading".
       if (outcome == 'busy') outcome = await _follow();
@@ -335,22 +411,28 @@ class UpdateDownload {
       _poll = null;
     }
     final last = state.value;
+    final stage = UpdateDownloadState.stageAfter(outcome);
     _set(
       UpdateDownloadState(
-        flow: UpdateFlow.finished,
-        received: last.received,
+        stage: stage,
+        // A verified file is whole; a cancelled or failed one is gone.
+        received: stage == UpdateStage.ready ? last.total : last.received,
         total: last.total,
         outcome: outcome,
       ),
     );
   }
 
+  /// Stops a running download. The native call then answers `cancelled` and the partial file is
+  /// deleted there. Not offered while the file is checked or the installer opens.
   Future<void> cancel() async {
     final now = state.value;
-    if (!now.active || now.cancelling || _disposed) return;
+    if (now.stage != UpdateStage.downloading || now.cancelling || _disposed) {
+      return;
+    }
     _set(
       UpdateDownloadState(
-        flow: now.flow,
+        stage: now.stage,
         received: now.received,
         total: now.total,
         cancelling: true,
@@ -366,15 +448,16 @@ class UpdateDownload {
       final snapshot = await native.progress();
       final now = state.value;
       if (snapshot == null || !now.active || _disposed) return;
-      final flow = switch (snapshot.phase) {
-        UpdateNativePhase.verifying => UpdateFlow.verifying,
-        UpdateNativePhase.downloading => UpdateFlow.downloading,
-        // Finished natively; the install call answers in a moment.
-        _ => now.flow,
+      final stage = switch (snapshot.phase) {
+        UpdateNativePhase.verifying => UpdateStage.verifying,
+        // During «Установить» native downloads again only if the cached file was lost.
+        UpdateNativePhase.downloading => UpdateStage.downloading,
+        // Finished natively; the native call answers in a moment.
+        _ => now.stage,
       };
       _set(
         UpdateDownloadState(
-          flow: flow,
+          stage: stage,
           received: snapshot.received,
           total: snapshot.total > 0 ? snapshot.total : now.total,
           cancelling: now.cancelling,
@@ -436,7 +519,7 @@ class UpdateOffer {
   final SignedManifest signed;
 }
 
-/// Any failure (no manifest, network, invalid data) means no dialog.
+/// Any failure (no manifest, network, invalid data) means no offer.
 Future<UpdateOffer?> checkForUpdate(TunnelApi api, UpdateNative native) async =>
     (await checkForUpdateDetailed(api, native)).offer;
 
@@ -512,14 +595,23 @@ String updateCheckText(UpdateCheckStatus status) => switch (status) {
   UpdateCheckStatus.available => 'Доступно обновление.',
 };
 
-/// The offer the home-screen banner shows after [result]. A newer build replaces it, "up to date"
+/// The offer the update banner shows after [result]. A newer build replaces it, "up to date"
 /// clears it, and a failed check keeps the previous one (a failed check proves nothing).
-UpdateOffer? nextBannerOffer(UpdateOffer? previous, UpdateCheck result) =>
-    switch (result.status) {
-      UpdateCheckStatus.available => result.offer,
-      UpdateCheckStatus.upToDate => null,
-      UpdateCheckStatus.failed => previous,
-    };
+/// ADR-193: an optional build the user hid this session ([dismissedCode]) stays hidden; a
+/// blocking one is always shown.
+UpdateOffer? nextBannerOffer(
+  UpdateOffer? previous,
+  UpdateCheck result, {
+  int? dismissedCode,
+}) => switch (result.status) {
+  UpdateCheckStatus.available
+      when result.offer?.decision == UpdateDecision.optional &&
+          result.offer?.manifest.versionCode == dismissedCode =>
+    null,
+  UpdateCheckStatus.available => result.offer,
+  UpdateCheckStatus.upToDate => null,
+  UpdateCheckStatus.failed => previous,
+};
 
 /// Banner text: the version and whether the installed one is still supported.
 String updateBannerText(UpdateOffer offer) =>
@@ -528,7 +620,9 @@ String updateBannerText(UpdateOffer offer) =>
     : 'Доступна новая версия ${offer.manifest.versionName}';
 
 /// When to check: at start, when the app returns to the screen (at most every [autoEvery]),
-/// and whenever the user asks. One check at a time; no second dialog while one is open.
+/// and whenever the user asks. One check at a time; no second sheet while one is open.
+/// ADR-193: an automatic check announces an optional build only through the banner; the sheet
+/// opens by itself only for a blocking build or a manual check.
 class UpdateScheduler {
   UpdateScheduler(
     this.api,
@@ -544,18 +638,30 @@ class UpdateScheduler {
   bool _running = false;
   bool _showing = false;
 
-  /// The offer from the last check that worked; null until a check found a newer build.
-  /// Drives the home-screen banner.
+  /// The offer from the last check that worked; null until a check found a newer build, and
+  /// after the user hid an optional one. Drives the in-app update banner.
   final ValueNotifier<UpdateOffer?> bannerOffer = ValueNotifier(null);
 
-  /// ADR-188: the app-wide download every update dialog shows.
+  /// ADR-188: the app-wide download every update sheet shows.
   late final UpdateDownload download = UpdateDownload(native);
+
+  /// Version code of the optional build whose banner the user hid this session.
+  int? _dismissedCode;
+
+  /// ADR-193: hides the banner of an optional build until the app process ends. A blocking
+  /// build cannot be hidden. A running download continues; Settings still reaches it.
+  void dismissBanner() {
+    final offer = bannerOffer.value;
+    if (offer == null || offer.decision == UpdateDecision.blocking) return;
+    _dismissedCode = offer.manifest.versionCode;
+    bannerOffer.value = null;
+  }
 
   bool get dueForAuto =>
       _lastCheck == null || _now().difference(_lastCheck!) >= autoEvery;
 
-  /// Null when skipped (another check or dialog is in progress, or an automatic check is not
-  /// due yet). [show] opens the dialog for an available update.
+  /// Null when skipped (another check or sheet is in progress, or an automatic check is not
+  /// due yet). [show] opens the sheet for an available update when [manual] or blocking.
   Future<UpdateCheck?> run({
     required bool manual,
     required Future<void> Function(UpdateOffer offer) show,
@@ -569,9 +675,14 @@ class UpdateScheduler {
     } finally {
       _running = false;
     }
-    bannerOffer.value = nextBannerOffer(bannerOffer.value, result);
+    bannerOffer.value = nextBannerOffer(
+      bannerOffer.value,
+      result,
+      dismissedCode: _dismissedCode,
+    );
     final offer = result.offer;
-    if (offer != null) {
+    if (offer != null &&
+        (manual || offer.decision == UpdateDecision.blocking)) {
       _showing = true;
       try {
         await show(offer);
@@ -582,8 +693,8 @@ class UpdateScheduler {
     return result;
   }
 
-  /// Opens [show] for an offer already found (the home-screen banner). Skipped while a check or
-  /// another update dialog is in progress, like [run].
+  /// Opens [show] for an offer already found (the update banner). Skipped while a check or
+  /// another update sheet is in progress, like [run].
   Future<void> present(
     UpdateOffer offer,
     Future<void> Function(UpdateOffer offer) show,
@@ -598,177 +709,28 @@ class UpdateScheduler {
   }
 }
 
+/// ADR-193: Russian text for a native outcome, accurate about what happened to the file.
 String updateOutcomeText(String outcome) => switch (outcome) {
-  'installer_opened' => 'Подтвердите установку в системном окне Android.',
+  'verified' => 'Файл скачан и проверен. Можно устанавливать.',
+  'installer_opened' =>
+    'Подтвердите установку в окне Android. Если окно не появилось или было закрыто, нажмите «Установить» ещё раз.',
   'install_permission_required' =>
-    'Разрешите DetourVPN устанавливать приложения в открывшихся настройках, затем вернитесь и нажмите «Скачать» ещё раз.',
-  'hash_mismatch' || 'size_mismatch' || 'package_mismatch' =>
-    'Загруженный файл не прошёл проверку и удалён. Попробуйте позже.',
-  'not_newer' => 'У вас уже установлена актуальная версия.',
-  'manifest_unverified' =>
-    'Не удалось проверить подпись обновления. Обновление не установлено.',
-  'busy' => 'Загрузка уже идёт.',
-  'cancelled' => 'Загрузка отменена.',
-  'verified' => 'Обновление загружено и проверено. Нажмите «Установить».',
+    'Разрешите DetourVPN устанавливать приложения в открывшихся настройках, затем вернитесь и нажмите «Установить».',
   'installer_unavailable' =>
     'Не удалось открыть установщик Android. Нажмите «Установить» ещё раз.',
+  'size_mismatch' =>
+    'Размер скачанного файла не совпал с ожидаемым. Файл удалён, ничего не установлено.',
+  'hash_mismatch' =>
+    'Контрольная сумма скачанного файла не совпала. Файл удалён, ничего не установлено.',
+  'package_mismatch' =>
+    'Скачанный файл не является нужной версией DetourVPN. Файл удалён, ничего не установлено.',
+  'manifest_unverified' =>
+    'Не удалось проверить подпись обновления. Обновление не установлено.',
+  'invalid_manifest' =>
+    'Данные обновления на сервере некорректны. Обновление не установлено.',
+  'not_newer' => 'У вас уже установлена актуальная версия.',
+  'busy' => 'Загрузка уже идёт.',
+  'cancelled' => 'Загрузка отменена. Скачанная часть удалена.',
   _ =>
-    'Не удалось загрузить обновление. Проверьте интернет и попробуйте ещё раз.',
+    'Не удалось скачать обновление: нет связи с сервером или загрузка прервалась. Проверьте интернет и повторите загрузку.',
 };
-
-/// Blocking dialogs cannot be dismissed (no back, no tap outside, no "later"). [download] is the
-/// app-wide download (ADR-188); without it the dialog gets its own, which lives only as long as
-/// the dialog's caller keeps it.
-Future<void> showUpdateDialog(
-  BuildContext context,
-  UpdateOffer offer,
-  UpdateNative native, {
-  UpdateDownload? download,
-}) {
-  final blocking = offer.decision == UpdateDecision.blocking;
-  final owned = download == null ? UpdateDownload(native) : null;
-  return showDialog<void>(
-    context: context,
-    barrierDismissible: !blocking,
-    builder: (_) => PopScope(
-      canPop: !blocking,
-      child: _UpdateDialog(offer: offer, download: download ?? owned!),
-    ),
-  ).whenComplete(() {
-    // An owned download is only dropped once it has ended; a running one keeps its native call.
-    if (owned != null && !owned.state.value.active) owned.dispose();
-  });
-}
-
-class _UpdateDialog extends StatelessWidget {
-  const _UpdateDialog({required this.offer, required this.download});
-  final UpdateOffer offer;
-  final UpdateDownload download;
-
-  void _start() => unawaited(
-    download.start(offer.signed, expectedTotal: offer.manifest.apkSizeBytes),
-  );
-
-  @override
-  Widget build(BuildContext context) {
-    final blocking = offer.decision == UpdateDecision.blocking;
-    final notes = offer.manifest.releaseNotesRu.trim();
-    return ValueListenableBuilder<UpdateDownloadState>(
-      valueListenable: download.state,
-      builder: (context, state, _) => AlertDialog(
-        title: Text(
-          blocking ? 'Нужно обновить приложение' : 'Доступно обновление',
-        ),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                blocking
-                    ? 'Эта версия DetourVPN больше не поддерживается. Установите версию ${offer.manifest.versionName}, чтобы продолжить.'
-                    : 'Доступна версия ${offer.manifest.versionName}.',
-              ),
-              if (notes.isNotEmpty) ...[
-                const SizedBox(height: 12),
-                Text(notes),
-              ],
-              if (state.flow != UpdateFlow.idle) ...[
-                const SizedBox(height: 16),
-                _UpdateProgressView(state: state, blocking: blocking),
-              ],
-            ],
-          ),
-        ),
-        actions: state.active
-            ? [
-                if (!blocking)
-                  TextButton(
-                    onPressed: () => Navigator.of(context).pop(),
-                    child: const Text('Скрыть'),
-                  ),
-                TextButton(
-                  key: const ValueKey('update-cancel'),
-                  onPressed:
-                      state.cancelling || state.flow != UpdateFlow.downloading
-                      ? null
-                      : () => unawaited(download.cancel()),
-                  child: const Text('Отменить загрузку'),
-                ),
-              ]
-            : [
-                if (!blocking)
-                  TextButton(
-                    onPressed: () => Navigator.of(context).pop(),
-                    child: const Text('Позже'),
-                  ),
-                FilledButton(
-                  onPressed: _start,
-                  child: Text(state.installable ? 'Установить' : 'Скачать'),
-                ),
-              ],
-      ),
-    );
-  }
-}
-
-/// ADR-188: a determinate bar with "12,3 МБ из 45,6 МБ · 27 %" while bytes arrive, an
-/// indeterminate one while the file is checked, and the outcome text once it ended.
-class _UpdateProgressView extends StatelessWidget {
-  const _UpdateProgressView({required this.state, required this.blocking});
-  final UpdateDownloadState state;
-  final bool blocking;
-
-  @override
-  Widget build(BuildContext context) {
-    final muted = Theme.of(context).textTheme.bodySmall;
-    if (state.flow == UpdateFlow.finished) {
-      final outcome = state.outcome ?? 'download_failed';
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            updateOutcomeText(outcome),
-            key: const ValueKey('update-status'),
-          ),
-          if (outcome == 'installer_opened') ...[
-            const SizedBox(height: 4),
-            Text(
-              'Если окно установки не появилось или было закрыто, нажмите «Установить».',
-              style: muted,
-            ),
-          ],
-        ],
-      );
-    }
-    final verifying = state.flow == UpdateFlow.verifying;
-    final fraction = state.fraction;
-    final label = state.cancelling
-        ? 'Отмена загрузки…'
-        : verifying
-        ? 'Проверка файла…'
-        : updateProgressText(state.received, state.total);
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        LinearProgressIndicator(
-          key: const ValueKey('update-progress'),
-          value: verifying ? null : (fraction ?? 0),
-          semanticsLabel: 'Загрузка обновления',
-          semanticsValue: fraction == null
-              ? null
-              : '${(fraction * 100).floor()} %',
-        ),
-        const SizedBox(height: 8),
-        Text(label, key: const ValueKey('update-status')),
-        if (!blocking && !state.cancelling) ...[
-          const SizedBox(height: 4),
-          Text(
-            'Окно можно скрыть: загрузка продолжится, установщик откроется сам.',
-            style: muted,
-          ),
-        ],
-      ],
-    );
-  }
-}

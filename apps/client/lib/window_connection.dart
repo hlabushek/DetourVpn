@@ -37,6 +37,7 @@ class WindowConnectionController extends ConnectionController {
     bool? panelVless,
     this.nativeOwnsBackgroundRecovery = false,
     Duration offlineGrace = OfflineGrace.defaultLength,
+    this.nativeRenewalRetry = const Duration(seconds: 60),
   }) : _renewalOrigin = renewalOrigin,
        _grace = OfflineGrace(length: offlineGrace),
        panelVless = panelVless ?? isWindowsClient {
@@ -52,6 +53,12 @@ class WindowConnectionController extends ConnectionController {
   /// ADR-145 (2.4): a window this controller started with `connectWindow` must show a handshake
   /// within this time, or it fails with `handshake_not_established` (retried once on a new lease).
   final Duration handshakeTimeout;
+
+  /// ADR-191 (Android UI only): while a held window has no native renewal (its hand-off failed,
+  /// or native renewal stopped), a successful poll hands it to native again at most this often.
+  /// Native renewal is what renews the window while Dart timers sleep in Doze.
+  final Duration nativeRenewalRetry;
+  int? _nativeRenewalTriedAt;
   bool _awaitingFirstHandshake = false;
   int _handshakeRetries = 0;
   static const maxHandshakeRetries = 1;
@@ -349,7 +356,7 @@ class WindowConnectionController extends ConnectionController {
       'Нет входящего трафика через VPN, соединение может быть нарушено',
     'handshake_stale' => 'Сервер давно не отвечал, связь проверяется',
     'no_handshake' =>
-      'Handshake не получен. Нажмите «Отключить» и подключитесь заново.',
+      'Handshake не получен. Нажмите «Отключить VPN» и подключитесь заново.',
     // ADR-148 (5.3): nothing reaches the server until the user signs in to the network.
     'captive_portal' =>
       'Сеть требует входа (страница авторизации Wi-Fi). Войдите в сеть — VPN подключится сам',
@@ -372,6 +379,18 @@ class WindowConnectionController extends ConnectionController {
     'network_unavailable',
     'api_unavailable',
     'rate_limited',
+    // ADR-191: HTTP 503 codes of the window routes and the storage layer. The API answered but
+    // could not decide now (database, node agent or clock briefly unavailable); nothing about
+    // this lease changed. Before, a poll stopped the tunnel and ended the user's wish on them.
+    // The lease deadline (and the offline grace, ADR-162) stays the boundary.
+    'storage_unavailable',
+    'dependencies_unavailable',
+    'database_clock_unavailable',
+    'window_tunnels_unavailable',
+    'window_node_unavailable',
+    'agent_unavailable',
+    'quota_inconsistent',
+    'window_inconsistent',
   };
 
   /// ADR-115: this engine can run panel servers (VLESS + Reality). Windows only today.
@@ -486,6 +505,8 @@ class WindowConnectionController extends ConnectionController {
   bool get hasLease => _id != null || _createIntent != null;
   @override
   bool get busy => _working || _closed;
+  @override
+  bool get disconnecting => _closed;
   @override
   bool get canRecover => false; // Unknown holds require operator reconciliation.
   void _emit() {
@@ -657,9 +678,13 @@ class WindowConnectionController extends ConnectionController {
         !live.desiredConnected &&
         live.stopCategory == 'recovery_exhausted';
     _nativeFailureStage = live.up ? null : live.failureStage;
+    // ADR-191: on Android a running tunnel without native renewal (its hand-off failed, or
+    // native renewal stopped) is adopted and renewed from here, not stopped. Its own native
+    // deadline still bounds it. Windows keeps the ADR-117 fail-closed rule.
     final adoptable =
         live.up &&
         (live.nativeRenewal ||
+            nativeOwnsBackgroundRecovery ||
             (live.restoreActive && native is RestoreHandover)) &&
         live.remainingMs > 0 &&
         live.connectionId != null &&
@@ -697,14 +722,23 @@ class WindowConnectionController extends ConnectionController {
       await _bounded(native.disconnect, kind: _NativeCall.stop);
       diagnosticStage = 'connection_reconcile';
     }
+    // ADR-191: a close the server accepted (202 revoke_pending, ADR-186) is normal. Before, it
+    // was thrown as `revoke_unconfirmed` here, which a poll treated as terminal (the user's
+    // wish to stay connected was ended) and a restore attempt as a failure. Now the first row
+    // still closing stays held: connect waits for it ([_closeOldLease]), a poll retries it.
+    String? closing;
     for (final row in rows) {
       if (row['state'] != 'closed') {
         _id = _uuid(row['id']);
         remotePending = true;
         // Native was stopped above; only the server row is left to revoke.
         await _cleanup(stopNative: false);
-        if (hasLease) throw const ClientError('revoke_unconfirmed');
+        if (hasLease) closing ??= _id;
       }
+    }
+    if (closing != null) {
+      _id = closing;
+      remotePending = true;
     }
     _synced = true;
     return false;
@@ -777,7 +811,9 @@ class WindowConnectionController extends ConnectionController {
     // blocked native recovery for good.
     final handover = live.restoreActive && native is RestoreHandover;
     // Dart renews only when native does not; a native renewal applies its own generations.
-    final dartRenewal = handover && !live.nativeRenewal;
+    // ADR-191: also for a plain running tunnel without native renewal (Android only, see
+    // [_reconcile]); a renewal the server granted but native never applied is advanced below.
+    final dartRenewal = !live.nativeRenewal;
     if (handover) {
       if (dartRenewal && generation > nativeGeneration + 1) return false;
       // ADR-185: bounded. On a timeout nothing is adopted; the connect path then stops native,
@@ -1192,6 +1228,7 @@ class WindowConnectionController extends ConnectionController {
     if (windowSeconds == 90 || host == null || origin == null) {
       return;
     }
+    _nativeRenewalTriedAt = _clock.elapsedMilliseconds;
     try {
       final issued = await api.call('POST', '$root/$_id/renew-token');
       final token = issued['renew_token'];
@@ -1437,7 +1474,7 @@ class WindowConnectionController extends ConnectionController {
     }
   }
 
-  /// ADR-145 (2.5): «Повторить» while a revoke is pending: one more server revoke now.
+  /// ADR-145 (2.5): «Повторить закрытие» while a revoke is pending: one more server revoke now.
   Future<void> retryRevoke() async {
     if (!remotePending || _dead) return;
     await refresh();
@@ -1536,6 +1573,10 @@ class WindowConnectionController extends ConnectionController {
         if (!hasLease && _reconnectAfterCleanup && !_cancelled(version)) {
           _reconnectAfterCleanup = false;
           _scheduleAutoReconnect(version);
+        } else if (!hasLease && _resumeWanted && !_cancelled(version)) {
+          // ADR-191: reconcile left an old row closing while the user still wants the VPN.
+          _resumeWanted = false;
+          _scheduleResume(version);
         }
         return;
       }
@@ -1564,6 +1605,20 @@ class WindowConnectionController extends ConnectionController {
       if (_cancelled(version)) return;
       if (_restorePending) {
         _waitForRestore();
+        return;
+      }
+      if (remotePending) {
+        // ADR-191: an old row is still closing (accepted, not yet confirmed by the node). The
+        // next poll retries its revoke and then resumes; never monitor a closing connection.
+        _awaitingRestore = false;
+        if (_resumeWanted) {
+          if (error == null) diagnosticStage = 'session_resume';
+          phase = ConnectionPhase.reconnecting;
+          detail = 'Восстанавливается подключение';
+        } else if (phase != ConnectionPhase.failed) {
+          phase = ConnectionPhase.disconnected;
+          detail = 'VPN на телефоне выключен';
+        }
         return;
       }
       if (_awaitingRestore) {
@@ -1755,6 +1810,20 @@ class WindowConnectionController extends ConnectionController {
       error = null;
       lastApiError = null;
       _resetGrace(); // ADR-162: the API answered and the window is current again.
+      // ADR-191: a held window without native renewal expires in Doze (Dart timers sleep), so
+      // the hand-off is retried here, bounded by [nativeRenewalRetry]. Before, one failed
+      // renew-token call at connect left the window to Dart for its whole life.
+      final triedAt = _nativeRenewalTriedAt;
+      if (nativeOwnsBackgroundRecovery &&
+          !snapshot.nativeRenewal &&
+          _renewIntent == null &&
+          _grant != null &&
+          (triedAt == null ||
+              _clock.elapsedMilliseconds - triedAt >=
+                  nativeRenewalRetry.inMilliseconds)) {
+        await _startNativeRenewal(_grant!);
+        if (_cancelled(version)) return;
+      }
       // ADR-144: on Android native's state is the status (180 s handshake rule, inbound data,
       // network change, stall); the Dart rule below remains for Windows and older builds.
       if (_applyNative(snapshot)) return;
@@ -1772,7 +1841,7 @@ class WindowConnectionController extends ConnectionController {
           ? 'Сеть сменилась, восстанавливается связь'
           : _handshakeOverdue
           ? 'Handshake не получен более ${handshakeHintAfter.inSeconds} с. '
-                'Нажмите «Отключить» и подключитесь заново.'
+                'Нажмите «Отключить VPN» и подключитесь заново.'
           : 'Ожидается сеть и handshake';
     } catch (e) {
       if (_cancelled(version)) return;
@@ -1844,12 +1913,7 @@ class WindowConnectionController extends ConnectionController {
         // ADR-162: visible degraded state (Windows and builds without native state).
         detail = offlineGraceText(_grace.remainingMs(now, _deadline)!);
       }
-      if (!{
-            'network_unavailable',
-            'api_unavailable',
-            'rate_limited',
-          }.contains(code) ||
-          deadlinePassed) {
+      if (!_transientApiCodes.contains(code) || deadlinePassed) {
         phase = ConnectionPhase.failed;
         await _cleanup();
         if (code == 'handshake_not_established') {
@@ -1884,6 +1948,11 @@ class WindowConnectionController extends ConnectionController {
     'lease_expired',
     'window_not_active',
     'native_down',
+    // ADR-191: this lease cannot be renewed (for example the node agent restarted with a new
+    // runtime) or its generation no longer matches. A new lease can work; before, both ended
+    // the user's wish to stay connected.
+    'window_not_renewable',
+    'window_generation_conflict',
   };
 
   /// Temporary failures of an automatic reconnect attempt itself; it is retried with backoff.

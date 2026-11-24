@@ -1419,7 +1419,7 @@ void main() {
       await slow.connect();
       await slow.refresh();
       expect(slow.phase, ConnectionPhase.reconnecting);
-      expect(slow.detail, contains('Нажмите «Отключить»'));
+      expect(slow.detail, contains('Нажмите «Отключить VPN»'));
       expect(native.starts, 1); // No automatic reconnect.
       slow.dispose();
     },
@@ -2449,6 +2449,205 @@ void main() {
       },
     );
   });
+
+  group('ADR-191 the connection is not ended by recoverable answers', () {
+    late _IntentStateNative state;
+    late _CodeApi coded;
+    WindowConnectionController android({
+      Duration nativeRenewalRetry = const Duration(hours: 1),
+    }) {
+      final value = WindowConnectionController(
+        coded,
+        state,
+        pollInterval: const Duration(days: 1),
+        renewBeforeMs: 90000,
+        autoReconnectDelay: const Duration(milliseconds: 20),
+        nativeOwnsBackgroundRecovery: true,
+        windowSeconds: 900,
+        renewalOrigin: Uri.parse('https://api.example.invalid'),
+        nativeRenewalRetry: nativeRenewalRetry,
+      )..selectedNode = node;
+      addTearDown(value.dispose);
+      return value;
+    }
+
+    setUp(() {
+      coded = _CodeApi(api);
+      state = _IntentStateNative()
+        ..age = 150
+        ..restoreActive = false;
+    });
+
+    test(
+      'reconcile: an accepted close (revoke_pending) is not an error and the VPN resumes',
+      () async {
+        state
+          ..up = false
+          ..wanted = true;
+        api
+          ..oldConnection = true
+          ..pendingDeletes = 1;
+        final ui = android();
+        await ui.refresh();
+        expect(
+          ui.error,
+          isNull,
+          reason: 'before: revoke_unconfirmed at connection_reconcile',
+        );
+        expect(state.intentEnds, 0, reason: 'before, the wish was ended');
+        expect(ui.remotePending, isTrue);
+        expect(ui.phase, ConnectionPhase.reconnecting);
+        expect(api.creates, 0, reason: 'no new lease while the old one closes');
+        api.freshCreates = true;
+        await ui.refresh(); // the node confirmed the close
+        expect(ui.remotePending, isFalse);
+        await Future<void>.delayed(const Duration(milliseconds: 150));
+        expect(api.creates, 1, reason: 'the wanted VPN resumes on its own');
+        expect(ui.hasLease, isTrue);
+        expect(state.intentEnds, 0);
+      },
+    );
+
+    test(
+      'reconcile: a running tunnel without native renewal is adopted, not stopped',
+      () async {
+        state
+          ..up = true
+          ..renewing = false
+          ..heldConnection = connection
+          ..heldGeneration = 1
+          ..remaining = 500000;
+        api.oldConnection = true;
+        final ui = android();
+        await ui.refresh();
+        expect(
+          state.stops,
+          0,
+          reason: 'before, the healthy tunnel was stopped',
+        );
+        expect(api.deletes, 0);
+        expect(ui.hasLease, isTrue);
+        expect(ui.error, isNull);
+        expect(state.handoffs, hasLength(1), reason: 'renewal goes to native');
+      },
+    );
+
+    test(
+      'a 503 answer during a poll keeps the tunnel, the lease and the wish',
+      () async {
+        final ui = android();
+        await ui.connect();
+        final stops = state.stops;
+        coded.getCode = 'storage_unavailable';
+        await ui.refresh();
+        expect(state.stops, stops, reason: 'before, the tunnel was stopped');
+        expect(api.deletes, 0);
+        expect(ui.hasLease, isTrue);
+        expect(state.intentEnds, 0);
+        expect(ui.lastApiError, 'storage_unavailable');
+        coded.getCode = null;
+        await ui.refresh();
+        expect(ui.lastApiError, isNull);
+        expect(ui.hasLease, isTrue);
+      },
+    );
+
+    test(
+      'window_not_renewable reconnects on a new lease instead of ending the wish',
+      () async {
+        final ui = android();
+        api.failRenewToken =
+            true; // Dart renews this window (no native renewal)
+        await ui.connect();
+        expect(api.creates, 1);
+        coded.renewCode = 'window_not_renewable';
+        api.freshCreates = true;
+        await ui.refresh();
+        expect(state.intentEnds, 0, reason: 'before, the wish was ended');
+        coded.renewCode = null;
+        await Future<void>.delayed(const Duration(milliseconds: 150));
+        expect(api.creates, 2, reason: 'a new lease replaces the old one');
+        expect(ui.hasLease, isTrue);
+      },
+    );
+
+    test(
+      'a failed native renewal hand-off is retried by a later poll',
+      () async {
+        final ui = android(nativeRenewalRetry: Duration.zero);
+        api.failRenewToken = true;
+        await ui.connect();
+        expect(state.handoffs, isEmpty);
+        api.failRenewToken = false;
+        await ui.refresh();
+        expect(state.handoffs, hasLength(1), reason: 'before, never retried');
+        await ui.refresh();
+        expect(state.handoffs, hasLength(1), reason: 'native renews now');
+      },
+    );
+
+    test('the hand-off retry is rate-limited', () async {
+      final ui = android();
+      api.failRenewToken = true;
+      await ui.connect();
+      api.failRenewToken = false;
+      await ui.refresh();
+      expect(state.handoffs, isEmpty);
+    });
+  });
+}
+
+/// TEST ONLY: ADR-144 native that also records ended user intents and reports the wish.
+class _IntentStateNative extends StateNative implements UserIntentHost {
+  int intentEnds = 0;
+  bool wanted = false;
+  @override
+  Future<void> endUserIntent() async => intentEnds++;
+
+  @override
+  Future<NativeSnapshot> snapshot() async {
+    final s = await super.snapshot();
+    return NativeSnapshot(
+      up: s.up,
+      network: s.network,
+      handshakeAge: s.handshakeAge,
+      remainingMs: s.remainingMs,
+      reason: s.reason,
+      nativeRenewal: s.nativeRenewal,
+      connectionId: s.connectionId,
+      windowGeneration: s.windowGeneration,
+      restoreActive: s.restoreActive,
+      trafficBytes: s.trafficBytes,
+      receivedBytes: s.receivedBytes,
+      state: s.state,
+      stateReason: s.stateReason,
+      desiredConnected: wanted,
+    );
+  }
+}
+
+/// TEST ONLY: answers the connection GET or the renewal with a fixed API error code.
+class _CodeApi implements TunnelApi {
+  _CodeApi(this.inner);
+  final WindowsApi inner;
+  String? getCode;
+  String? renewCode;
+  @override
+  Future<Map<String, dynamic>> call(
+    String method,
+    String path, [
+    Map<String, dynamic>? body,
+  ]) {
+    if (getCode != null &&
+        method == 'GET' &&
+        path == '${WindowConnectionController.root}/$connection') {
+      throw ClientError(getCode!);
+    }
+    if (renewCode != null && path.endsWith('/renew')) {
+      throw ClientError(renewCode!);
+    }
+    return inner.call(method, path, body);
+  }
 }
 
 /// TEST ONLY: native that reports the ADR-144 connection state and can push events.

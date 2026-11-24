@@ -336,7 +336,9 @@ void main() {
       },
     );
 
-    testWidgets('the screen offers «Повторить» and «Сбросить»', (tester) async {
+    testWidgets('the screen offers «Повторить закрытие» and «Сбросить»', (
+      tester,
+    ) async {
       final c = controller()..selectedNode = node;
       await tester.runAsync(() async {
         await c.connect();
@@ -353,7 +355,9 @@ void main() {
         ),
       );
       await tester.pump(const Duration(milliseconds: 300));
-      final retry = find.widgetWithText(FilledButton, 'Повторить');
+      // ADR-192: VPN off and the server still closing: the status says so, not «Отключено».
+      expect(find.text('Закрытие подключения'), findsOneWidget);
+      final retry = find.widgetWithText(FilledButton, 'Повторить закрытие');
       expect(retry, findsOneWidget);
       expect(tester.widget<FilledButton>(retry).onPressed, isNotNull);
       await tester.scrollUntilVisible(

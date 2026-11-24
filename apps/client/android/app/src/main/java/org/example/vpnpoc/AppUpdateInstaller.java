@@ -70,10 +70,18 @@ final class AppUpdateInstaller {
         return new File(new File(context.getCacheDir(), DIRECTORY), FILE_NAME);
     }
 
-    /** Removes a file left by an earlier attempt. Called before each download and after a failure. */
+    /** ADR-193: where the bytes arrive. Never served by {@link UpdateApkProvider}. */
+    static File partialFile(Context context) {
+        return new File(new File(context.getCacheDir(), DIRECTORY), UpdateDownloadFile.PARTIAL_NAME);
+    }
+
+    /**
+     * Removes the files left by an earlier attempt (the served file and a partial download).
+     * Called before each download and after a failure or cancel.
+     */
     static void discardStale(Context context) {
-        File file = apkFile(context);
-        if (file.exists() && !file.delete()) file.deleteOnExit();
+        UpdateDownloadFile.deleteQuietly(partialFile(context));
+        UpdateDownloadFile.deleteQuietly(apkFile(context));
     }
 
     /**
@@ -195,6 +203,9 @@ final class AppUpdateInstaller {
         }
         readySha256 = null;
         discardStale(app);
+        // ADR-193: bytes go to a partial file the provider never serves; only a file that passed
+        // every check below is renamed to the served name.
+        File partial = partialFile(app);
         File dir = file.getParentFile();
         if (dir == null || (!dir.isDirectory() && !dir.mkdirs())) return "download_failed";
         if (CANCEL.get()) return "cancelled";
@@ -209,27 +220,22 @@ final class AppUpdateInstaller {
             if (connection.getResponseCode() != 200) return "download_failed";
             long declared = connection.getContentLengthLong();
             if (declared >= 0 && declared != sizeBytes) return "size_mismatch";
-            long total = 0;
+            String copied;
             try (InputStream in = connection.getInputStream();
-                    OutputStream out = new FileOutputStream(file)) {
-                byte[] buffer = new byte[64 * 1024];
-                int read;
-                while ((read = in.read(buffer)) != -1) {
-                    if (CANCEL.get()) return "cancelled";
-                    total += read;
-                    if (total > sizeBytes) return "size_mismatch";
-                    out.write(buffer, 0, read);
-                    RECEIVED.set(total);
-                }
+                    OutputStream out = new FileOutputStream(partial)) {
+                copied = UpdateDownloadFile.copyBounded(in, out, sizeBytes, CANCEL::get, RECEIVED::set);
             }
-            if (total != sizeBytes) return "size_mismatch";
+            if (!UpdateDownloadFile.OK.equals(copied)) return copied;
         } finally {
             current = null;
             connection.disconnect();
         }
         if (CANCEL.get()) return "cancelled";
         phase = "verifying";
-        return verifyFile(app, file, sha256, manifestVersionCode, installed);
+        String verdict = verifyFile(app, partial, sha256, manifestVersionCode, installed);
+        if (!"verified".equals(verdict)) return verdict;
+        if (CANCEL.get()) return "cancelled";
+        return UpdateDownloadFile.promote(partial, file) ? "verified" : "download_failed";
     }
 
     private static String verifyFile(Context app, File file, String sha256, long manifestVersionCode,

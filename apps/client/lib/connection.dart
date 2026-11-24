@@ -50,7 +50,7 @@ String messageFor(String code) => switch (code) {
     'Сервер не включил новое подключение. Приложение повторяет попытку (до трёх раз); если не получилось, нажмите «Подключить» или выберите другой сервер.',
   // ADR-123: the device clock is minutes off the server's.
   'device_clock_skew' =>
-    'Время на устройстве отличается от времени сервера. Включите автоматическую установку даты и времени (на компьютере: Параметры → Время и язык → «Синхронизировать»), затем нажмите «Повторить».',
+    'Время на устройстве отличается от времени сервера. Включите автоматическую установку даты и времени (на компьютере: Параметры → Время и язык → «Синхронизировать»), затем нажмите «Подключить».',
   'window_generation_conflict' =>
     'Сервер и приложение разошлись в данных подключения. VPN остановлен; нажмите «Подключить».',
   'session_storage_failed' =>
@@ -416,6 +416,10 @@ class ConnectionController extends ChangeNotifier {
   Future<void>? _connecting;
   Timer? _timer;
   bool get busy => _connecting != null || _closing;
+
+  /// A disconnect (or close) is running. Part of [busy]; the home screen shows it as
+  /// «Отключение» instead of a connect that could be cancelled. Display only.
+  bool get disconnecting => _closing;
   bool get hasLease => _tunnel != null || _pendingBody != null;
   void _emit() {
     if (!_disposed) notifyListeners();

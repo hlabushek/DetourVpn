@@ -578,14 +578,20 @@ public final class ClientActivity extends FlutterActivity {
         } catch (org.json.JSONException invalid) {
             result.success("invalid_manifest"); return;
         }
-        if (!AppUpdateInstaller.canInstall(this)) {
+        // ADR-193: false = download and verify only; the app shows «Установить» and calls again
+        // with true, which re-verifies the cached file in full before the installer opens.
+        // Absent means true (the ADR-107/188 behavior).
+        final boolean openInstaller = !Boolean.FALSE.equals(call.argument("openInstaller"));
+        if (openInstaller && !AppUpdateInstaller.canInstall(this)) {
             try { startActivity(AppUpdateInstaller.unknownSourcesSettings(this)); }
-            catch (RuntimeException unavailable) { /* The dialog explains the setting. */ }
+            catch (RuntimeException unavailable) { /* The sheet explains the setting. */ }
             result.success("install_permission_required"); return;
         }
         AppUpdateInstaller.download(this, url, sha256, size, version,
                 minimum, outcome -> runOnUiThread(() -> {
-                    if (!"verified".equals(outcome)) { result.success(outcome); return; }
+                    if (!"verified".equals(outcome) || !openInstaller) {
+                        result.success(outcome); return;
+                    }
                     try {
                         startActivity(AppUpdateInstaller.installIntent(this));
                         result.success("installer_opened");

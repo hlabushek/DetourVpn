@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Orbit dark background (OrbitTokens.dark.bg = #191624) for the window and system bars until
+         Flutter draws; Dart (main.dart) then follows the in-app light/dark toggle. -->
+    <style name="DetourTheme" parent="@android:style/Theme.Material.NoActionBar">
+        <item name="android:windowBackground">@color/orbit_bg</item>
+        <item name="android:navigationBarColor">@color/orbit_bg</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+    </style>
+    <color name="orbit_bg">#FF191624</color>
+</resources>

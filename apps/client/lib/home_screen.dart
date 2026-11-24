@@ -3,7 +3,6 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
-import 'app_update.dart';
 import 'connection.dart';
 import 'connection_status.dart';
 import 'country_flag.dart';
@@ -27,17 +26,11 @@ class ConnectionScreen extends StatelessWidget {
     required this.controller,
     required this.onSignOut,
     this.onOpenTraffic,
-    this.updateOffer,
-    this.onOpenUpdate,
   });
   final ConnectionController controller;
 
-  /// The newer build found by the last update check (ADR-107); null hides the banner. Null as a
-  /// whole where there is no updater (Windows, tests).
-  final ValueListenable<UpdateOffer?>? updateOffer;
-
-  /// Opens the same update dialog and download flow as Settings.
-  final void Function(UpdateOffer offer)? onOpenUpdate;
+  // ADR-193: the update banner moved out of this screen to the app-wide slot under the app
+  // bar (update_ui.dart), so it is visible on every tab.
   final Future<void> Function() onSignOut;
 
   /// Switches to the Traffic tab. Without it (standalone use) the traffic
@@ -64,95 +57,89 @@ class ConnectionScreen extends StatelessWidget {
       final c = controller;
       final t = OrbitTokens.of(context);
       final text = Theme.of(context).textTheme;
-      final connected = c.phase == ConnectionPhase.connected;
-      final waitingForServerClose =
-          c is WindowConnectionController && c.remotePending;
-      final failedAttemptWaitingForServerClose =
-          waitingForServerClose && c.phase == ConnectionPhase.failed;
-      final mustDisconnect =
-          c.hasLease || c.busy || c.error == 'native_disconnect_failed';
-      final title = switch (c.phase) {
-        ConnectionPhase.disconnected => 'Отключено',
-        ConnectionPhase.connecting => 'Подключение',
-        ConnectionPhase.connected => 'Подключено',
-        ConnectionPhase.reconnecting => 'Восстановление связи',
-        ConnectionPhase.failed => 'Требуется действие',
-      };
-      final orbit =
-          c.busy ||
-              c.phase == ConnectionPhase.connecting ||
-              c.phase == ConnectionPhase.reconnecting
-          ? OrbitState.connecting
-          : c.phase == ConnectionPhase.failed || c.error != null
-          ? OrbitState.error
-          : connected
-          ? OrbitState.connected
-          : OrbitState.idle;
+      // ADR-192: one decision for the status, the orbit and both controls (the bottom
+      // button and the orbit share `primary`, `runPrimary` and the same gate), so the
+      // picture, the text and the action cannot disagree or double-fire.
+      final view = resolveHomeView(
+        phase: c.phase,
+        busy: c.busy,
+        disconnecting: c.disconnecting,
+        hasLease: c.hasLease,
+        remotePending: c.remotePending,
+        canRetryClose: c is WindowConnectionController,
+        error: c.error,
+      );
+      final title = view.title;
+      final orbit = view.orbit(hasError: c.error != null);
       final chosen = c.nodes.where((n) => n.id == c.selectedNode).firstOrNull;
       final q = c.quota.snapshot;
       // ADR-162: a lease on offline grace is shown as degraded, with the time left.
       final degraded = c is WindowConnectionController && c.offlineGrace;
-      final subtitle = connected && c.error == null && !degraded
-          ? 'VPN активен на этом устройстве'
-          : c.detail;
-
-      // One decision for both controls: the bottom button and the orbit share
-      // `primary`, `runPrimary` and the same gate, so they cannot disagree or double-fire.
-      final primary = resolvePrimaryAction(
-        waitingForServerClose: waitingForServerClose,
-        busy: c.busy,
-        mustDisconnect: mustDisconnect,
-      );
+      final subtitle = switch (view.state) {
+        HomeState.connected when c.error == null && !degraded =>
+          'VPN активен на этом устройстве',
+        HomeState.disconnecting =>
+          'VPN выключается, подключение закрывается на сервере',
+        // ADR-154: a tap that waits for a running check keeps the old phase and text.
+        HomeState.connecting when c.phase != ConnectionPhase.connecting =>
+          'Проверяется текущее состояние VPN',
+        HomeState.closing => 'VPN на телефоне выключен',
+        // ADR-192 decision B: the subtitle names the step the button offers.
+        HomeState.failed || HomeState.disconnected
+            when view.action == PrimaryAction.signIn =>
+          'VPN не подключён. Нужно войти снова',
+        HomeState.failed || HomeState.disconnected
+            when view.action == PrimaryAction.openTraffic =>
+          'VPN не подключён: недостаточно трафика',
+        // The controller's text may still describe the step that failed; the cause is below.
+        HomeState.failed when c.error != null =>
+          'VPN не подключён. Причина указана ниже',
+        HomeState.stopNeeded =>
+          'VPN мог остаться включённым. Нажмите «Отключить VPN»',
+        _ => c.detail,
+      };
+      final primary = view.action;
       void runPrimary() => PrimaryActionGate.shared.dispatch(
         primary,
         connect: c.connect,
         disconnect: c.disconnect,
         cancel: c.disconnect,
         retry: c is WindowConnectionController ? c.retryRevoke : null,
+        // Decision B: the existing sign-out path (to the login screen) and Traffic tab.
+        signIn: onSignOut,
+        openTraffic: () async => _openTraffic(context),
       );
 
       final Widget action;
       final String actionKey;
+      final label = Text(view.label, textAlign: TextAlign.center);
       switch (primary) {
         case PrimaryAction.none:
           actionKey = 'wait';
-          action = FilledButton(
-            onPressed: null,
-            child: Text(
-              failedAttemptWaitingForServerClose
-                  ? 'Ожидание закрытия попытки'
-                  : 'Ожидание подтверждения сервера',
-              textAlign: TextAlign.center,
-            ),
-          );
+          action = FilledButton(onPressed: null, child: label);
         case PrimaryAction.retryRevoke:
           // ADR-145 (2.5): retry the server close now instead of a disabled button.
           actionKey = 'retry-revoke';
-          action = FilledButton(
-            onPressed: runPrimary,
-            child: const Text('Повторить'),
-          );
+          action = FilledButton(onPressed: runPrimary, child: label);
         case PrimaryAction.cancel:
           actionKey = 'cancel';
           action = OutlinedButton(
             style: dangerOutlined(context),
             onPressed: runPrimary,
-            child: const Text('Отменить подключение'),
+            child: label,
           );
         case PrimaryAction.disconnect:
           actionKey = 'disconnect';
-          action = FilledButton(
-            onPressed: runPrimary,
-            child: const Text('Отключить VPN'),
-          );
+          action = FilledButton(onPressed: runPrimary, child: label);
         case PrimaryAction.connect:
           actionKey = 'connect';
-          action = FilledButton(
-            onPressed: runPrimary,
-            child: Text(
-              c.phase == ConnectionPhase.failed ? 'Повторить' : 'Подключить',
-            ),
-          );
+          action = FilledButton(onPressed: runPrimary, child: label);
+        case PrimaryAction.signIn:
+          actionKey = 'sign-in';
+          action = FilledButton(onPressed: runPrimary, child: label);
+        case PrimaryAction.openTraffic:
+          actionKey = 'open-traffic';
+          action = FilledButton(onPressed: runPrimary, child: label);
       }
 
       return RefreshIndicator(
@@ -170,19 +157,6 @@ class ConnectionScreen extends StatelessWidget {
             32 + GlassNavInset.of(context),
           ),
           children: [
-            if (updateOffer != null && onOpenUpdate != null)
-              ValueListenableBuilder<UpdateOffer?>(
-                valueListenable: updateOffer!,
-                builder: (context, offer, _) => offer == null
-                    ? const SizedBox.shrink()
-                    : Padding(
-                        padding: const EdgeInsets.only(bottom: 12),
-                        child: UpdateBanner(
-                          offer: offer,
-                          onOpen: () => onOpenUpdate!(offer),
-                        ),
-                      ),
-              ),
             Semantics(
               liveRegion: true,
               child: OrbitSwitcher(
@@ -367,7 +341,7 @@ class ConnectionScreen extends StatelessWidget {
             if (c.remotePending) ...[
               const SizedBox(height: 16),
               OrbitNotice(
-                text: 'Ожидается подтверждение удаления peer на сервере.',
+                text: 'Сервер ещё не подтвердил закрытие прошлого подключения.',
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -407,37 +381,4 @@ class ConnectionScreen extends StatelessWidget {
       );
     },
   );
-}
-
-/// Compact home-screen notice that a newer build is published; the button opens the update dialog.
-class UpdateBanner extends StatelessWidget {
-  const UpdateBanner({super.key, required this.offer, required this.onOpen});
-  final UpdateOffer offer;
-  final VoidCallback onOpen;
-
-  @override
-  Widget build(BuildContext context) {
-    final t = OrbitTokens.of(context);
-    return Semantics(
-      liveRegion: true,
-      child: OrbitPanel(
-        key: const ValueKey('update-banner'),
-        tone: t.accent,
-        padding: const EdgeInsets.fromLTRB(16, 8, 8, 8),
-        child: Row(
-          children: [
-            Icon(Icons.system_update_outlined, color: t.accent, size: 22),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Text(
-                updateBannerText(offer),
-                style: Theme.of(context).textTheme.bodyMedium,
-              ),
-            ),
-            TextButton(onPressed: onOpen, child: const Text('Обновить')),
-          ],
-        ),
-      ),
-    );
-  }
 }
