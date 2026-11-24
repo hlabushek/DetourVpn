@@ -284,8 +284,11 @@ def main() -> int:
         check=False,
     )
     print("\n".join(x for x in result.stdout.splitlines() if x.split("=")[0] in WANTED))
-    if result.returncode != 0 and result.stderr.strip():
-        # The remote shell's own error text was previously discarded; show it so a failure is diagnosable.
+    if result.returncode != 0:
+        # Failures must be diagnosable: show the remote shell's unfiltered output and error text.
+        print("remote_stdout_begin", file=sys.stderr)
+        print(result.stdout.strip(), file=sys.stderr)
+        print("remote_stdout_end", file=sys.stderr)
         print("remote_stderr_begin", file=sys.stderr)
         print(result.stderr.strip(), file=sys.stderr)
         print("remote_stderr_end", file=sys.stderr)
