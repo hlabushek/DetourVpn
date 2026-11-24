@@ -79,11 +79,34 @@ def sha(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
 
 
+HELPER = "scripts/managed_db_step.py"
+HELPER_NAME = "managed_db_step.py"
+SNAPSHOT_REF = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]{2,99}")
+CONFIRM_WORD = "MIGRATE"
+
+
+def mode_error(database: str, snapshot_ref: str | None) -> str | None:
+    """ADR-197: managed mode needs an owner snapshot id; local mode must not get one."""
+    if database == "local":
+        return "refused=snapshot_ref_only_for_managed" if snapshot_ref else None
+    if not snapshot_ref:
+        return (
+            "refused=snapshot_ref_required (create a branch/snapshot in the provider console first)"
+        )
+    if not SNAPSHOT_REF.fullmatch(snapshot_ref):
+        return "refused=snapshot_ref_bad_shape (letters, digits, . _ - only; 3-100 characters)"
+    return None
+
+
 SCRIPT = r"""set -Eeuo pipefail
 set +x
 rid="$1"; stage="/run/detourvpn-dev0022-$rid"; backup="/root/detourvpn-pre-0025-$rid"
-root=/opt/detourvpn-beta; changed=0; phase=preflight
+root=/opt/detourvpn-beta; changed=0; phase=preflight; mode=__DB_MODE__
 q() { docker exec detourvpn-beta-postgres-1 sh -c 'PGPASSWORD="$(cat /run/secrets/pg_runtime)" psql -h 127.0.0.1 -U vpn_api -d detourvpn_beta -Atqc "SELECT version_num FROM alembic_version"'; }
+# ADR-197 managed mode: database steps run in the API's own environment (EnvironmentFile), through the
+# helper uploaded to this run's private stage directory; it prints fixed tokens only, never the URL.
+mdb() { systemd-run --quiet --wait --pipe --collect --property=WorkingDirectory="$root" --property=EnvironmentFile=/etc/detourvpn-beta/api.env "$root/.venv/bin/python" "$stage/__HELPER_NAME__" "$@"; }
+if [ "$mode" = managed ]; then q() { mdb revision; }; fi
 ready() { curl -sS -o /dev/null -w '%{http_code}' http://127.0.0.1:28000/api/v1/ready || true; }
 cleanup_stage() {
   rm -f -- /run/detourvpn-dev0022-migrate-"$rid".env
@@ -119,15 +142,33 @@ rollback() {
 }
 trap rollback ERR
 test "$(hostname -s)" = __EXPECTED_HOST__
+if [ "$mode" = local ]; then
 # ADR-176: this script's schema backup, rollback and migration act on the LOCAL Docker database
 # only. A primary whose API reads the managed database would be migrated and dumped in the wrong
 # place, so the run refuses before anything changes.
 grep -Eq '^VPN_DATABASE_URL="?postgresql\+psycopg://[^:@/]+:[^@]*@127\.0\.0\.1:25433/detourvpn_beta"?$' /etc/detourvpn-beta/api.env || { echo refused=database_not_local_docker; exit 1; }
+elif [ "$mode" = managed ]; then
+# ADR-197: exactly one URL line, a DNS host (not an IP, not loopback) with sslmode=verify-full.
+test "$(grep -c '^VPN_DATABASE_URL=' /etc/detourvpn-beta/api.env)" = 1 || { echo refused=database_url_ambiguous; exit 1; }
+grep -Eq '^VPN_DATABASE_URL="?postgresql\+psycopg://[^:@/]+:[^@]*@([A-Za-z0-9-]+\.)+[A-Za-z][A-Za-z0-9-]*[A-Za-z0-9](:[0-9]{1,5})?/[A-Za-z_][A-Za-z0-9_]{0,62}\?sslmode=verify-full(&channel_binding=require)?"?$' /etc/detourvpn-beta/api.env || { echo refused=database_not_managed; exit 1; }
+# The helper runs as root with the API's secrets in its environment: it must be the exact uploaded file.
+test "$(sha256sum "$stage/__HELPER_NAME__" | cut -d ' ' -f1)" = __HELPER_SHA__
+else
+echo refused=unknown_database_mode; exit 1
+fi
 systemctl is-active --quiet detourvpn-beta-api.service
+if [ "$mode" = local ]; then
 systemctl is-active --quiet detourvpn-beta-database.service
+fi
 test "$(ready)" = 200
+if [ "$mode" = local ]; then
 test "$(docker inspect --format '{{.State.Health.Status}}' detourvpn-beta-postgres-1)" = healthy
+fi
 test "$(q)" = __BEFORE__
+# ADR-197: a pending managed migration needs a role that can act as table owner; never another credential.
+if [ "$mode" = managed ] && [ __BEFORE__ != __AFTER__ ]; then
+test "$(mdb can-migrate)" = yes || { echo refused=managed_role_cannot_migrate; exit 1; }
+fi
 test "$(df -Pk / | awk 'NR==2{print $4}')" -gt 1000000
 test "$(awk '/^MemAvailable:/{print $2}' /proc/meminfo)" -gt 350000
 phase=verify_baselines
@@ -151,6 +192,10 @@ install -d -o root -g root -m 0700 "$backup" "$backup/source"
 while IFS= read -r rel; do [ -z "$rel" ] && continue; cp -a "$root/$rel" "$backup/source/$(echo "$rel" | tr / _)"; done <<'LIST'
 __CHANGED__
 LIST
+if [ "$mode" = managed ]; then
+# ADR-197: the schema backup is the owner's provider snapshot (named locally, never sent here).
+echo database_backup=owner_provider_snapshot
+else
 docker exec detourvpn-beta-postgres-1 sh -c 'set -eu; export PGPASSWORD="$(cat /run/secrets/pg_migrator)"; exec pg_dump -Fc -h 127.0.0.1 -U vpn_migrator -d detourvpn_beta' > "$backup/database.dump"
 test -s "$backup/database.dump"
 docker exec -i detourvpn-beta-postgres-1 pg_restore --list >/dev/null < "$backup/database.dump"
@@ -169,6 +214,7 @@ fd = os.open(sys.argv[1], os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
 with os.fdopen(fd, 'w', encoding='utf-8') as stream:
     stream.write('VPN_DATABASE_URL=' + url + '\n')
 PY
+fi
 changed=1
 phase=replace_and_migrate
 systemctl stop detourvpn-beta-api.service
@@ -190,7 +236,12 @@ LIST
 while read -r want rel; do [ -z "$rel" ] && continue; test "$(sha256sum "$root/$rel" | cut -d ' ' -f1)" = "$want"; done <<'LIST'
 __INSTALLED__
 LIST
+if [ "$mode" = managed ]; then
+# ADR-197: upgrade to the exact target, then alembic check; any failure stops and rolls the code back.
+mdb upgrade __AFTER__ >"$backup/migrate.out" 2>&1 || { echo migrate_unit_failed=1; echo migrate_out="$(tr '\n' ' ' < "$backup/migrate.out" | cut -c1-400)"; false; }
+else
 systemd-run --quiet --wait --pipe --collect --unit="detourvpn-dev0022-migrate-$rid" --property=WorkingDirectory="$root" --property="EnvironmentFile=/run/detourvpn-dev0022-migrate-$rid.env" "$root/.venv/bin/python" scripts/closed_migrate.py >"$backup/migrate.out" 2>&1 || echo migrate_unit_failed=1
+fi
 echo migrate_out="$(tr '\n' ' ' < "$backup/migrate.out" | cut -c1-400)"
 echo revision_after_migrate="$(q || echo query_failed)"
 test "$(q)" = __AFTER__
@@ -214,6 +265,33 @@ WANTED = {
 }  # fmt: skip
 
 
+def print_managed_plan(
+    args: argparse.Namespace, after: str, migrations: list[str], files: int, baselines: int
+) -> None:
+    """ADR-197: the exact plan, printed before any connection; no host or URL appears in it."""
+    names = ", ".join(Path(p).stem for p in migrations) or "none"
+    print("plan database=managed (the API's own database, read from its environment on the host)")
+    print(
+        f"plan snapshot_ref={args.snapshot_ref} (owner-made; restore it in the provider console to undo the schema)"
+    )
+    print(
+        f"plan source_rev={args.source_rev} baseline_rev={args.baseline_rev} files={files} baselines={baselines}"
+    )
+    print(f"plan schema {args.before_revision} -> {after}; migrations: {names}")
+    print(
+        "plan 1 preflight: host name, URL shape is managed verify-full, API ready, revision matches,"
+    )
+    print(
+        "       API role can act as table owner (only when a migration is pending), baselines match"
+    )
+    print("plan 2 copy the old source files to a root-only backup directory on the host")
+    print(
+        f"plan 3 stop the API, install the files, alembic upgrade {after} (lock_timeout 5s), alembic check"
+    )
+    print("plan 4 start the API, readiness 200, /nodes answers 401")
+    print("plan on failure: restore the old code and restart the API; the schema is NOT downgraded")
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--execute", action="store_true")
@@ -224,7 +302,21 @@ def main() -> int:
     )
     parser.add_argument("--source-rev", default="HEAD", help="committed revision to deploy")
     parser.add_argument("--baseline-rev", default="ddf1320", help="revision the host runs now")
+    parser.add_argument(
+        "--database",
+        choices=("local", "managed"),
+        default="local",
+        help="local Docker database (default, unchanged) or the managed database (ADR-197)",
+    )
+    parser.add_argument(
+        "--snapshot-ref",
+        help="managed only: id of the branch/snapshot the owner created in the provider console",
+    )
     args = parser.parse_args()
+    refusal = mode_error(args.database, args.snapshot_ref)
+    if refusal:
+        print(refusal)
+        return 2
     run_id = uuid.uuid4().hex
     CHANGED, NEW = changed_files(args.baseline_rev, args.source_rev)
     AFTER = target_revision(args.source_rev, NEW, args.before_revision)
@@ -243,11 +335,27 @@ def main() -> int:
         .replace("__INSTALLED__", "\n".join(f"{sha(files[p])} {p}" for p in files))
         .replace("__CHANGED__", "\n".join(CHANGED))
     )
+    helper = git_blob(args.source_rev, HELPER) if args.database == "managed" else b""
+    script = (
+        script.replace("__DB_MODE__", args.database)
+        .replace("__HELPER_NAME__", HELPER_NAME)
+        .replace("__HELPER_SHA__", sha(helper))
+    )
+    if args.database == "managed":
+        print_managed_plan(args, AFTER, MIGS, len(files), len(CHANGED))
     if not args.execute:
         print(
             f"mode=preflight_only; files={len(files)}; baselines={len(CHANGED)}; target={AFTER}; run with --execute"
         )
         return 0
+    if args.database == "managed":
+        if not sys.stdin.isatty():
+            print("refused=confirmation_needs_console; nothing was changed")
+            return 2
+        answer = input(f"Type {CONFIRM_WORD} to deploy and migrate the managed database: ")
+        if answer.strip() != CONFIRM_WORD:
+            print("cancelled; nothing was changed")
+            return 1
     ssh = [
         "ssh", "-o", "BatchMode=yes", "-o", "ServerAliveInterval=10", "-o", "ServerAliveCountMax=3", "-o", "ConnectTimeout=10", "-o", "StrictHostKeyChecking=yes",
         "-o", "IdentitiesOnly=yes", "-i", str(IDENTITY), f"root@{HOST}",
@@ -264,6 +372,8 @@ def main() -> int:
         # Bytes, not write_text: Windows text mode would add carriage returns to the host's paths.
         (t / "map").write_bytes(("\n".join(f"{names[p]} {p}" for p in files) + "\n").encode())
         (t / "deploy.sh").write_bytes(script.replace("\r", "").encode("utf-8"))
+        if helper:
+            (t / HELPER_NAME).write_bytes(helper)
         subprocess.run(  # noqa: S603
             [*ssh, f"set -eu; test ! -e '{stage}'; install -d -o root -g root -m 0700 '{stage}'"],
             check=True,
