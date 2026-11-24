@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import 'api.dart';
+import 'client_lifetime.dart';
 import 'auth_replay_probe.dart';
 import 'connection.dart';
 import 'native_tunnel.dart';
@@ -16,7 +17,25 @@ import 'always_on_recovery.dart';
 export 'connection_screen.dart' show ConnectionScreen;
 
 @pragma('vm:entry-point')
-Future<void> alwaysOnRecoveryMain() => runAlwaysOnRecovery();
+Future<void> alwaysOnRecoveryMain() {
+  WidgetsFlutterBinding.ensureInitialized();
+  return runAlwaysOnRecovery(
+    onReady: (api, controller) {
+      runApp(
+        VpnApp(
+          api: api,
+          native: controller.native,
+          initialConnection: controller,
+          lifetime: ClientLifetime(
+            api,
+            controller.native as PlatformTunnel,
+            connection: controller,
+          ),
+        ),
+      );
+    },
+  );
+}
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -27,11 +46,22 @@ void main() {
   } catch (_) {
     /* Explicit setup screen. */
   }
-  runApp(VpnApp(api: api, native: PlatformTunnel()));
+  final native = PlatformTunnel();
+  runApp(
+    VpnApp(api: api, native: native, lifetime: ClientLifetime(api, native)),
+  );
 }
 
 class VpnApp extends StatefulWidget {
-  const VpnApp({super.key, required this.api, required this.native});
+  const VpnApp({
+    super.key,
+    required this.api,
+    required this.native,
+    this.initialConnection,
+    this.lifetime,
+  });
+  final ClientLifetime? lifetime;
+  final WindowConnectionController? initialConnection;
   final Api? api;
   final NativeTunnel native;
   @override
@@ -49,7 +79,11 @@ class _VpnAppState extends State<VpnApp> with WidgetsBindingObserver {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    if (widget.api?.store != null) {
+    if (widget.initialConnection != null ||
+        widget.lifetime?.connection != null) {
+      connection = widget.initialConnection ?? widget.lifetime!.connection;
+      showLogin = false;
+    } else if (widget.api?.store != null) {
       restoring = true;
       unawaited(restore());
     }
@@ -90,6 +124,7 @@ class _VpnAppState extends State<VpnApp> with WidgetsBindingObserver {
     if (value is WindowConnectionController) {
       value.onAuthenticatedSessionChanged();
     }
+    widget.lifetime?.connection = value;
     setState(() {
       connection = value;
       showLogin = false;
@@ -184,8 +219,10 @@ class _VpnAppState extends State<VpnApp> with WidgetsBindingObserver {
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
-    connection?.dispose();
-    widget.api?.close();
+    if (widget.lifetime == null) {
+      connection?.dispose();
+      widget.api?.close();
+    }
     super.dispose();
   }
 

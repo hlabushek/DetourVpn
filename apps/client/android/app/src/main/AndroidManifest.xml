@@ -10,7 +10,7 @@
         android:dataExtractionRules="@xml/data_extraction_rules"
         android:usesCleartextTraffic="false" android:theme="@android:style/Theme.Material.Light.NoActionBar">
         <service android:name="org.amnezia.awg.backend.GoBackend$VpnService"
-            android:exported="false" android:permission="android.permission.BIND_VPN_SERVICE">
+            android:exported="false" android:stopWithTask="false" android:permission="android.permission.BIND_VPN_SERVICE">
             <meta-data android:name="android.net.VpnService.SUPPORTS_ALWAYS_ON"
                 android:value="${supportsAlwaysOn}" tools:replace="android:value" />
         </service>

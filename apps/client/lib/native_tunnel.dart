@@ -9,6 +9,9 @@ class NativeSnapshot {
     this.trafficBytes,
     this.receivedBytes,
     this.reason = '',
+    this.healthConfirmed,
+    this.connectionState,
+    this.desiredConnected,
   });
   final bool up;
   final bool network;
@@ -21,11 +24,13 @@ class NativeSnapshot {
   /// Approximate inbound tunnel bytes; used only as recent data-path evidence.
   final int? receivedBytes;
   final String reason;
+  final bool? healthConfirmed;
+  final String? connectionState;
+  final bool? desiredConnected;
   bool get confirmed =>
       up &&
       network &&
-      handshakeAge >= 0 &&
-      handshakeAge <= 60 &&
+      (healthConfirmed ?? (handshakeAge >= 0 && handshakeAge <= 60)) &&
       remainingMs > 0;
 }
 
@@ -91,7 +96,29 @@ abstract interface class NodePreferenceStore {
   Future<void> writeSelectedNode(String? id);
 }
 
-class PlatformTunnel implements WindowNative, NodePreferenceStore {
+abstract interface class ServicePulseNative {
+  set onSessionPulse(Future<void> Function()? callback);
+  Future<void> requestSessionPulse(int delayMs);
+}
+
+abstract interface class SessionIntentNative {
+  Future<void> setDesiredConnected(bool desired);
+}
+
+class PlatformTunnel
+    implements
+        WindowNative,
+        NodePreferenceStore,
+        SessionIntentNative,
+        ServicePulseNative {
+  @override
+  Future<void> Function()? onSessionPulse;
+  @override
+  Future<void> requestSessionPulse(int delayMs) =>
+      channel.invokeMethod<void>('sessionPulseAfter', {'delayMs': delayMs});
+  @override
+  Future<void> setDesiredConnected(bool desired) =>
+      channel.invokeMethod<void>('sessionIntent', {'desired': desired});
   static const channel = MethodChannel('project.vpn/tunnel.v1');
   Map<String, dynamic> _windowArgs(
     Map<String, dynamic> grant,
@@ -154,6 +181,9 @@ class PlatformTunnel implements WindowNative, NodePreferenceStore {
           ? value['receivedBytes'] as int
           : null,
       reason: value['reason'] as String,
+      healthConfirmed: value['healthConfirmed'] as bool?,
+      connectionState: value['connectionState'] as String?,
+      desiredConnected: value['desiredConnected'] as bool?,
     );
   }
 

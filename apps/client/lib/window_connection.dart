@@ -23,9 +23,14 @@ class WindowConnectionController extends ConnectionController {
   );
   final int renewBeforeMs;
 
-  /// After this long without any confirmed handshake, the status asks the user to reconnect.
-  /// Advisory text only: no automatic reconnect, because every new window reserves quota.
+  /// Delay before showing the recovery explanation. Health and retry ownership
+  /// remain native; a fresh admission requires confirmed prior closure.
   final Duration handshakeHintAfter;
+  bool _desiredConnected = false;
+  int _recoveryAttempts = 0;
+  int _recoverAt = 0;
+  int? _healthySince;
+  final Random _retryRandom = Random();
   int _connectedAtMs = 0;
   final _clock = Stopwatch()..start();
   Map<String, dynamic>? _createIntent;
@@ -83,11 +88,17 @@ class WindowConnectionController extends ConnectionController {
 
   @override
   void startPolling() {
+    if (native is ServicePulseNative) {
+      (native as ServicePulseNative).onSessionPulse = refresh;
+      return;
+    }
     _poll ??= Timer.periodic(pollInterval, (_) => unawaited(refresh()));
   }
 
   @override
   void pausePolling() {
+    if (native is ServicePulseNative)
+      (native as ServicePulseNative).onSessionPulse = null;
     _poll?.cancel();
     _poll = null;
   }
@@ -178,6 +189,7 @@ class WindowConnectionController extends ConnectionController {
   @override
   Future<void> connect() async {
     if (busy || _polling || _dead) return;
+    _desiredConnected = true;
     _working = true;
     final version = ++_version;
     error = null;
@@ -197,6 +209,10 @@ class WindowConnectionController extends ConnectionController {
 
   Future<void> _connect(int version) async {
     try {
+      if (native is SessionIntentNative) {
+        await (native as SessionIntentNative).setDesiredConnected(true);
+        if (_cancelled(version)) return;
+      }
       diagnosticStage = 'selected_node';
       if (selectedNode == null) throw const ClientError('window_node_required');
       // A fresh OTP session has no device binding yet. Register this phone's
@@ -214,6 +230,10 @@ class WindowConnectionController extends ConnectionController {
       if (!await native.permission())
         throw const ClientError('permission_denied');
       if (_cancelled(version)) return;
+      if (native is SessionIntentNative) {
+        await (native as SessionIntentNative).setDesiredConnected(true);
+        if (_cancelled(version)) return;
+      }
       diagnosticStage = 'key_challenge';
       final proof = await api.call(
         'POST',
@@ -280,7 +300,65 @@ class WindowConnectionController extends ConnectionController {
             : 'native_unavailable';
         phase = ConnectionPhase.failed;
         await _cleanup();
+        await _scheduleRecovery(error);
       }
+    }
+  }
+
+  Future<void> _scheduleRecovery(String? code) async {
+    _healthySince = null;
+    if (!_desiredConnected) return;
+    if (!{
+      'network_unavailable',
+      'api_unavailable',
+      'rate_limited',
+      'lease_expired',
+      'native_io_error',
+      'native_start_failed',
+    }.contains(code)) {
+      _desiredConnected = false;
+      if (native is SessionIntentNative) {
+        await (native as SessionIntentNative).setDesiredConnected(false);
+      }
+      return;
+    }
+    final base = min(60000, 1000 * (1 << min(6, _recoveryAttempts++)));
+    _recoverAt =
+        _clock.elapsedMilliseconds +
+        min(60000, (base * (0.75 + _retryRandom.nextDouble() * 0.5)).round());
+    phase = ConnectionPhase.reconnecting;
+    startPolling();
+  }
+
+  Future<void> _recoverIfDue() async {
+    if (!_desiredConnected ||
+        hasLease ||
+        _clock.elapsedMilliseconds < _recoverAt)
+      return;
+    final status = await native.snapshot();
+    if (!_desiredConnected || _closed || _dead) return;
+    if ({
+      'vpn_permission_revoked',
+      'system_stopped',
+      'user_disconnected',
+      'native_down',
+      'native_config_invalid',
+    }.contains(status.reason)) {
+      _desiredConnected = false;
+      phase = ConnectionPhase.disconnected;
+      return;
+    }
+    if (!status.network) {
+      phase = ConnectionPhase.reconnecting;
+      detail = 'Ожидается сеть';
+      return;
+    }
+    // _refresh owns serialization here; reuse admission/idempotency, never replay a grant.
+    _working = true;
+    try {
+      await _connect(_version);
+    } finally {
+      _working = false;
     }
   }
 
@@ -411,11 +489,17 @@ class WindowConnectionController extends ConnectionController {
 
   @override
   Future<void> disconnect() async {
+    _desiredConnected = false;
+    _recoveryAttempts = 0;
+    _healthySince = null;
     if (_closed) return;
     _closed = true;
     ++_version;
     _emit();
     try {
+      if (native is SessionIntentNative) {
+        await (native as SessionIntentNative).setDesiredConnected(false);
+      }
       await native.disconnect();
       await _connectWork;
       await _refreshWork;
@@ -443,6 +527,14 @@ class WindowConnectionController extends ConnectionController {
     } finally {
       _refreshWork = null;
       _polling = false;
+      if (!_dead &&
+          native is ServicePulseNative &&
+          (_renewIntent != null ||
+              remotePending ||
+              (_desiredConnected && !hasLease))) {
+        // Bounded protocol retry. Android owns the wakeup; no widget timer.
+        await (native as ServicePulseNative).requestSessionPulse(3000);
+      }
       _emit();
     }
   }
@@ -457,6 +549,11 @@ class WindowConnectionController extends ConnectionController {
       await _ensureDevice();
       if (_cancelled(version)) return;
       if (remotePending) {
+        if (_desiredConnected && !(await native.snapshot()).network) {
+          phase = ConnectionPhase.reconnecting;
+          detail = 'Ожидается сеть';
+          return;
+        }
         await _cleanup();
         return;
       }
@@ -464,13 +561,34 @@ class WindowConnectionController extends ConnectionController {
       // its local public key. Bind first so the per-device reconciliation query
       // can safely return this phone's prior connections (if any).
       await _reconcile();
-      if (_cancelled(version) || _id == null) return;
+      if (_cancelled(version)) return;
+      if (_id == null) {
+        await _recoverIfDue();
+        return;
+      }
       var snapshot = await native.snapshot();
+      if ({
+        'vpn_permission_revoked',
+        'system_stopped',
+        'user_disconnected',
+        'native_down',
+        'native_config_invalid',
+      }.contains(snapshot.reason)) {
+        _desiredConnected = false;
+        await _cleanup();
+        phase = ConnectionPhase.disconnected;
+        return;
+      }
       if (_cancelled(version)) return;
       if (_clock.elapsedMilliseconds >= _deadline ||
           !snapshot.up ||
           snapshot.remainingMs <= 0)
         throw const ClientError('lease_expired');
+      if (!snapshot.network) {
+        phase = ConnectionPhase.reconnecting;
+        detail = 'Ожидается сеть';
+        return;
+      }
       _inboundTraffic.observe(
         snapshot.receivedBytes,
         _clock.elapsedMilliseconds,
@@ -527,7 +645,9 @@ class WindowConnectionController extends ConnectionController {
             : ConnectionPhase.reconnecting;
         detail = confirmed
             ? (snapshot.confirmed
-                  ? 'Свежий handshake подтверждён'
+                  ? (snapshot.healthConfirmed == true
+                        ? 'Соединение проверено'
+                        : 'Свежий handshake подтверждён')
                   : 'Входящий трафик через VPN подтверждён')
             : 'Ожидается подтверждение продления';
         return;
@@ -561,13 +681,21 @@ class WindowConnectionController extends ConnectionController {
       phase = confirmed
           ? ConnectionPhase.connected
           : ConnectionPhase.reconnecting;
+      if (confirmed) {
+        _healthySince ??= _clock.elapsedMilliseconds;
+        if (_clock.elapsedMilliseconds - _healthySince! >= 120000)
+          _recoveryAttempts = 0;
+      } else {
+        _healthySince = null;
+      }
       detail = snapshot.confirmed
-          ? 'Свежий handshake подтверждён'
+          ? (snapshot.healthConfirmed == true
+                ? 'Соединение проверено'
+                : 'Свежий handshake подтверждён')
           : confirmed
           ? 'Входящий трафик через VPN подтверждён'
           : _handshakeOverdue
-          ? 'Handshake не получен более ${handshakeHintAfter.inSeconds} с. '
-                'Нажмите «Отключить» и подключитесь заново.'
+          ? 'Соединение проверяется; восстановление выполняется автоматически'
           : 'Ожидается сеть и handshake';
     } catch (e) {
       if (_cancelled(version)) return;
@@ -586,11 +714,13 @@ class WindowConnectionController extends ConnectionController {
           (_grant != null && _clock.elapsedMilliseconds >= _deadline)) {
         phase = ConnectionPhase.failed;
         await _cleanup();
+        await _scheduleRecovery(code);
       }
     }
   }
 
   bool _establishedStatusConfirmed(NativeSnapshot snapshot) {
+    if (snapshot.healthConfirmed != null) return snapshot.confirmed;
     if (snapshot.confirmed) _hasEstablishedHandshake = true;
     return snapshot.confirmed ||
         (_hasEstablishedHandshake &&

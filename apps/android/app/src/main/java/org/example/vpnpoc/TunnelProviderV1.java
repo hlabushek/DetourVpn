@@ -10,6 +10,13 @@ interface TunnelProviderV1 {
     void connect(Config config) throws Exception;
     void disconnect() throws Exception;
     boolean isUp();
+    default void setAuthorizationDeadline(long end) { throw new UnsupportedOperationException(); }
+    default void cancelImmediately() { }
+    default void suspendTransport() { }
+    default long deliveredDataAge() { return -1; }
+    default void bindNetwork(android.net.Network network, long revision) throws Exception {
+        throw new UnsupportedOperationException("network_binding_unavailable");
+    }
     long lastHandshakeSeconds();
     // Optional advisory only; -1 means unavailable. Never use for settlement.
     default long transferBytes() { return -1; }

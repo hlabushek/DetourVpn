@@ -17,7 +17,7 @@ final class AwgProviderV1 implements TunnelProviderV1 {
     }
     @Override public Set<String> capabilities() {
         return Set.of("awg3", "userspace", "ipv4-full-route", "ephemeral-device-key",
-                "traffic-stats-advisory.v1");
+                "traffic-stats-advisory.v1", "underlying-network-binding.v1");
     }
     @Override public void connect(Config config) throws Exception {
         if (!capabilities().contains("awg3")) throw new IllegalStateException();
@@ -30,6 +30,11 @@ final class AwgProviderV1 implements TunnelProviderV1 {
         // fast reconnect and can leave the next UP request using a dying service.
         backend.setState(tunnel, Tunnel.State.DOWN, null);
     }
+    @Override public void bindNetwork(android.net.Network network, long revision) throws Exception { backend.bindNetwork(network, revision); }
+    @Override public void setAuthorizationDeadline(long end) { backend.setAuthorizationDeadline(end); }
+    @Override public void cancelImmediately() { backend.cancelImmediately(); }
+    @Override public void suspendTransport() { backend.suspendTransport(); }
+    @Override public long deliveredDataAge() { return backend.deliveredDataAge(); }
     @Override public boolean isUp() { return backend.getState(tunnel) == Tunnel.State.UP; }
     @Override public long lastHandshakeSeconds() { return backend.getLastHandshake(tunnel); }
     @Override public long transferBytes() {

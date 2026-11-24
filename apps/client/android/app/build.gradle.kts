@@ -50,6 +50,7 @@ if (betaKeystore != null) {
 android {
     namespace = "org.example.vpnclient"
     compileSdk = 36
+    ndkVersion = "28.2.13676358"
     buildToolsVersion = "36.0.0"
     defaultConfig {
         applicationId = clientApplicationId
@@ -57,7 +58,8 @@ android {
         targetSdk = 36
         versionCode = 23
         versionName = "0.1.0-beta.22"
-        testInstrumentationRunner = if (providers.gradleProperty("i028FlutterInstrumentation").orNull == "true")
+        testInstrumentationRunner = if (providers.gradleProperty("reliabilityInstrumentation").orNull == "true")
+            "org.example.vpnpoc.ReliabilityDeviceTests" else if (providers.gradleProperty("i028FlutterInstrumentation").orNull == "true")
             "androidx.test.runner.AndroidJUnitRunner" else "org.example.vpnpoc.I025DeviceTests"
         ndk { abiFilters += targetAbiFilters }
     }

@@ -14,6 +14,14 @@ ROOT = Path(__file__).resolve().parents[1]
 REVISION = "ff15093bf3856fea0947923474870b86efb682f0"
 
 
+def reliability_fingerprint() -> str:
+    digest = hashlib.sha256((ROOT / "apps/android/patches/reliability.patch").read_bytes())
+    for source in sorted((ROOT / "apps/android/reliability").glob("*.go")):
+        digest.update(source.name.encode())
+        digest.update(source.read_bytes())
+    return digest.hexdigest()
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
@@ -29,6 +37,7 @@ def main() -> None:
     except ValueError as failure:
         raise SystemExit("Prepared SDK target must stay inside the repository cache") from failure
     patch = ROOT / "apps/android/patches/go-only.patch"
+    reliability_patch = ROOT / "apps/android/patches/reliability.patch"
     git_executable = shutil.which("git")
     if git_executable is None:
         raise SystemExit("git is required to apply the reviewed SDK patch")
@@ -44,6 +53,8 @@ def main() -> None:
         receipt = json.loads(prepared_manifest.read_text())
         if receipt["patch_sha256"] != hashlib.sha256(patch.read_bytes()).hexdigest():
             raise SystemExit("Prepared patch differs; use a fresh sdk-go-only directory")
+        if receipt.get("reliability_sha256") != reliability_fingerprint():
+            raise SystemExit("Prepared reliability patch differs; use a fresh SDK directory")
         for name, digest in receipt["source_sha256"].items():
             if hashlib.sha256((target / name).read_bytes()).hexdigest() != digest:
                 raise SystemExit("Prepared source drift")
@@ -61,6 +72,18 @@ def main() -> None:
         cwd=ROOT,
         check=True,
     )
+    subprocess.run(  # noqa: S603 - explicit local tool and argument list; no shell
+        [
+            git_executable,
+            "apply",
+            f"--directory={target.relative_to(ROOT).as_posix()}",
+            str(reliability_patch),
+        ],
+        cwd=ROOT,
+        check=True,
+    )
+    for source in sorted((ROOT / "apps/android/reliability").glob("*.go")):
+        shutil.copyfile(source, target / "tunnel/tools/libwg-go" / source.name)
     manifest = target / "tunnel/src/main/AndroidManifest.xml"
     text = (
         manifest.read_text()
@@ -83,6 +106,7 @@ def main() -> None:
     receipt = {
         "sdk_revision": REVISION,
         "patch_sha256": hashlib.sha256(patch.read_bytes()).hexdigest(),
+        "reliability_sha256": reliability_fingerprint(),
         "source_sha256": hashes,
     }
     (target / "PREPARED.json").write_text(json.dumps(receipt, indent=2) + "\n")

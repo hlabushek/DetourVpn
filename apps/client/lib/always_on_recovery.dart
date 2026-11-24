@@ -14,13 +14,16 @@ const _recoveryChannel = MethodChannel('project.vpn/tunnel.v1');
 
 /// Runs only after Android starts the VPN service in Always-on mode.
 /// A stored node ID is a preference; a fresh API session and lease are required.
-Future<void> runAlwaysOnRecovery() async {
+Future<void> runAlwaysOnRecovery({
+  void Function(Api, WindowConnectionController)? onReady,
+}) async {
   final store = PlatformSessionStore();
   final native = PlatformTunnel();
   await _runAlwaysOnRecovery(
     store: store,
     native: native,
     readSelectedNode: native.readSelectedNode,
+    onReady: onReady,
     createApi: (origin, sessionStore) => Api.protected(
       origin,
       relayProvider: PlatformProtectedRelayProvider(),
@@ -45,6 +48,7 @@ Future<void> runAlwaysOnRecoveryWithDependencies({
 );
 
 Future<void> _runAlwaysOnRecovery({
+  void Function(Api, WindowConnectionController)? onReady,
   required SessionStore store,
   required WindowNative native,
   required Future<String?> Function() readSelectedNode,
@@ -85,6 +89,7 @@ Future<void> _runAlwaysOnRecovery({
       throw const ClientError('recovery_failed');
     }
     await _recoveryChannel.invokeMethod<void>('bootstrapComplete');
+    onReady?.call(api, controller);
 
     // Keep the controller alive to renew the lease and enforce its monotonic deadline.
     await Completer<void>().future;

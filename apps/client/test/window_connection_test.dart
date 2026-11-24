@@ -18,6 +18,7 @@ class Native extends FakeNative implements WindowNative {
   int? traffic;
   int? received;
   bool failPublicKey = false;
+  bool? health;
   @override
   Future<String> publicKey() async {
     if (failPublicKey) throw StateError('TEST ONLY native key failure');
@@ -33,6 +34,7 @@ class Native extends FakeNative implements WindowNative {
     trafficBytes: traffic,
     receivedBytes: received,
     reason: reason,
+    healthConfirmed: health,
   );
   @override
   Future<void> connectWindow(
@@ -307,7 +309,7 @@ void main() {
     },
   );
   test(
-    'overdue first handshake asks the user to reconnect, advisory only',
+    'overdue health reports automatic recovery without claiming success',
     () async {
       final slow = WindowConnectionController(
         api,
@@ -320,7 +322,7 @@ void main() {
       await slow.connect();
       await slow.refresh();
       expect(slow.phase, ConnectionPhase.reconnecting);
-      expect(slow.detail, contains('Нажмите «Отключить»'));
+      expect(slow.detail, contains('восстановление выполняется автоматически'));
       expect(native.starts, 1); // No automatic reconnect.
       slow.dispose();
     },
@@ -521,5 +523,89 @@ void main() {
     expect(native.advances, 0);
     expect(api.renewKeys, isEmpty);
     expect(api.deletes, 1);
+  });
+  test(
+    'native negative health overrides handshake and incoming counters',
+    () async {
+      await c.connect();
+      native.age = 0;
+      native.health = false;
+      native.received = 1024;
+      await c.refresh();
+      native.received = 2048;
+      await c.refresh();
+      expect(c.phase, ConnectionPhase.reconnecting);
+      native.health = true;
+      await c.refresh();
+      expect(c.phase, ConnectionPhase.connected);
+    },
+  );
+  test('offline waiting does not issue renewal requests', () async {
+    await c.connect();
+    native.network = false;
+    final before = api.calls.length;
+    await c.refresh();
+    await c.refresh();
+    expect(api.calls.length, before);
+    expect(c.phase, ConnectionPhase.reconnecting);
+    expect(c.hasLease, true);
+  });
+  test(
+    'notification disconnect is authoritative and closes remote authorization',
+    () async {
+      await c.connect();
+      native.reason = 'user_disconnected';
+      native.up = false;
+      await c.refresh();
+      expect(c.phase, ConnectionPhase.disconnected);
+      expect(c.hasLease, false);
+      expect(api.deletes, 1);
+      await c.refresh();
+      expect(native.starts, 1);
+    },
+  );
+  test('permission revocation cannot be recovered by network return', () async {
+    await c.connect();
+    native.reason = 'vpn_permission_revoked';
+    native.network = false;
+    await c.refresh();
+    native.network = true;
+    await c.refresh();
+    expect(c.phase, ConnectionPhase.disconnected);
+    expect(native.starts, 1);
+  });
+  test(
+    'expired authorization is closed before a delayed fresh admission',
+    () async {
+      await c.connect();
+      native.remaining = 0;
+      await c.refresh();
+      expect(api.deletes, 1);
+      expect(native.up, false);
+      expect(api.creates, 1);
+      native.network = false;
+      await Future<void>.delayed(const Duration(milliseconds: 1300));
+      await c.refresh();
+      expect(api.creates, 1);
+      native.network = true;
+      native.remaining = 59000;
+      api.state = 'active';
+      api.issued = DateTime.now().toUtc();
+      await c.refresh();
+      expect(api.creates, 2);
+      expect(api.createKeys.toSet().length, 2);
+      expect(native.starts, 2);
+    },
+  );
+  test('user disconnect cancels delayed automatic admission', () async {
+    await c.connect();
+    native.remaining = 0;
+    await c.refresh();
+    await c.disconnect();
+    await Future<void>.delayed(const Duration(milliseconds: 1300));
+    await c.refresh();
+    expect(api.creates, 1);
+    expect(native.starts, 1);
+    expect(c.phase, ConnectionPhase.disconnected);
   });
 }

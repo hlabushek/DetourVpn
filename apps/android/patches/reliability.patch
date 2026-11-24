@@ -1,0 +1,341 @@
+--- a/tunnel/tools/libwg-go/api-android.go
++++ b/tunnel/tools/libwg-go/api-android.go
+@@ -11,6 +11,7 @@
+ 
+ import (
+ 	"math"
++ "sync"
+ 	"runtime/debug"
+ 	"strings"
+ 
+@@ -20,8 +21,14 @@
+ 	"golang.org/x/sys/unix"
+ )
+ 
+-type TunnelHandle struct { device *device.Device }
++type TunnelHandle struct { device *device.Device; gate *authorizationGate }
+ var tunnelHandles = make(map[int32]TunnelHandle)
++var handlesMu sync.RWMutex
++var nextHandle int32
++func lookupHandle(id int32) (TunnelHandle, bool) {
++ handlesMu.RLock(); defer handlesMu.RUnlock()
++ h, ok := tunnelHandles[id]; return h, ok
++}
+ 
+ //export awgTurnOn
+ func awgTurnOn(interfaceName string, tunFd int32, settings string) int32 {
+@@ -34,7 +41,8 @@
+ 		return -1
+ 	}
+ 
+-	device := device.NewDevice(tun, conn.NewStdNetBind(), logger)
++	gate := newGate()
++ device := device.NewDevice(&observedTun{tun, gate}, &authorizedBind{conn.NewStdNetBind(), gate}, logger)
+ 
+ 	err = device.IpcSet(settings)
+ 	if err != nil {
+@@ -52,34 +60,32 @@
+ 	}
+ 	logger.Verbosef("Device started")
+ 
+-	var i int32
+-	for i = 0; i < math.MaxInt32; i++ {
+-		if _, exists := tunnelHandles[i]; !exists {
+-			break
+-		}
+-	}
+-	if i == math.MaxInt32 {
+-		logger.Errorf("Unable to find empty handle")
+-		device.Close()
+-		return -1
+-	}
+-	tunnelHandles[i] = TunnelHandle{device: device}
++ handlesMu.Lock()
++ if nextHandle == math.MaxInt32 {
++  handlesMu.Unlock(); device.Close(); return -1
++ }
++ i := nextHandle; nextHandle++
++ tunnelHandles[i] = TunnelHandle{device: device, gate: gate}
++ handlesMu.Unlock()
+ 	return i
+ }
+ 
+ //export awgTurnOff
+ func awgTurnOff(tunnelHandle int32) {
+-	handle, ok := tunnelHandles[tunnelHandle]
++	handle, ok := lookupHandle(tunnelHandle)
+ 	if !ok {
+ 		return
+ 	}
+-	delete(tunnelHandles, tunnelHandle)
++	handlesMu.Lock()
++ delete(tunnelHandles, tunnelHandle)
++ handlesMu.Unlock()
++ handle.gate.cancel()
+ 	handle.device.Close()
+ }
+ 
+ //export awgGetSocketV4
+ func awgGetSocketV4(tunnelHandle int32) int32 {
+-	handle, ok := tunnelHandles[tunnelHandle]
++	handle, ok := lookupHandle(tunnelHandle)
+ 	if !ok {
+ 		return -1
+ 	}
+@@ -96,7 +102,7 @@
+ 
+ //export awgGetSocketV6
+ func awgGetSocketV6(tunnelHandle int32) int32 {
+-	handle, ok := tunnelHandles[tunnelHandle]
++	handle, ok := lookupHandle(tunnelHandle)
+ 	if !ok {
+ 		return -1
+ 	}
+@@ -113,7 +119,7 @@
+ 
+ //export awgGetConfig
+ func awgGetConfig(tunnelHandle int32) *C.char {
+-	handle, ok := tunnelHandles[tunnelHandle]
++	handle, ok := lookupHandle(tunnelHandle)
+ 	if !ok {
+ 		return nil
+ 	}
+@@ -142,4 +148,19 @@
+ 	return C.CString("unknown")
+ }
+ 
++//export awgSetDeadline
++func awgSetDeadline(id int32, end int64) int32 {
++ h, ok := lookupHandle(id); if !ok || !h.gate.setDeadline(end) { return 0 }; return 1
++}
++//export awgCancel
++func awgCancel(id int32) { if h, ok := lookupHandle(id); ok { h.gate.cancel() } }
++//export awgRouteReady
++func awgRouteReady(id int32, ready int32) int32 {
++ h, ok := lookupHandle(id); if !ok || !h.gate.route(ready != 0) { return 0 }; return 1
++}
++//export awgDataAge
++func awgDataAge(id int32) int64 {
++ h, ok := lookupHandle(id); if !ok { return -1 }; return h.gate.dataAge()
++}
++
+ func main() {}
+--- a/tunnel/tools/libwg-go/jni.c
++++ b/tunnel/tools/libwg-go/jni.c
+@@ -69,3 +69,12 @@
+ 	free(version);
+ 	return ret;
+ }
++
++extern int awgSetDeadline(int handle, long long end);
++extern void awgCancel(int handle);
++extern int awgRouteReady(int handle, int ready);
++extern long long awgDataAge(int handle);
++JNIEXPORT jboolean JNICALL Java_org_amnezia_awg_GoBackend_awgSetDeadline(JNIEnv *env, jclass c, jint handle, jlong end) { return awgSetDeadline(handle, end) != 0; }
++JNIEXPORT void JNICALL Java_org_amnezia_awg_GoBackend_awgCancel(JNIEnv *env, jclass c, jint handle) { awgCancel(handle); }
++JNIEXPORT jboolean JNICALL Java_org_amnezia_awg_GoBackend_awgRouteReady(JNIEnv *env, jclass c, jint handle, jboolean ready) { return awgRouteReady(handle, ready) != 0; }
++JNIEXPORT jlong JNICALL Java_org_amnezia_awg_GoBackend_awgDataAge(JNIEnv *env, jclass c, jint handle) { return awgDataAge(handle); }
+--- a/tunnel/src/main/java/org/amnezia/awg/GoBackend.java
++++ b/tunnel/src/main/java/org/amnezia/awg/GoBackend.java
+@@ -15,4 +15,8 @@
+     public static native int awgTurnOn(String ifName, int tunFd, String settings);
+ 
+     public static native String awgVersion();
++    public static native boolean awgSetDeadline(int handle, long end);
++    public static native void awgCancel(int handle);
++    public static native boolean awgRouteReady(int handle, boolean ready);
++    public static native long awgDataAge(int handle);
+ }
+--- a/tunnel/src/main/java/org/amnezia/awg/backend/GoBackend.java
++++ b/tunnel/src/main/java/org/amnezia/awg/backend/GoBackend.java
+@@ -50,7 +50,28 @@
+     private final Context context;
+     @Nullable private Config currentConfig;
+     @Nullable private Tunnel currentTunnel;
+-    private int currentTunnelHandle = -1;
++    private volatile int currentTunnelHandle = -1;
++    private final java.util.concurrent.atomic.AtomicLong operationEpoch = new java.util.concurrent.atomic.AtomicLong();
++    private android.net.Network boundNetwork;
++    private long boundRevision = -1;
++
++    /** Nonblocking packet cancellation; safe while startup holds the backend monitor. */
++    public void cancelImmediately() {
++        operationEpoch.incrementAndGet();
++        int handle = currentTunnelHandle;
++        if (handle >= 0) awgCancel(handle);
++    }
++    public synchronized void setAuthorizationDeadline(long end) {
++        if (currentTunnelHandle < 0 || !awgSetDeadline(currentTunnelHandle, end))
++            throw new IllegalStateException("authorization_expired");
++    }
++    public synchronized long deliveredDataAge() {
++        return currentTunnelHandle < 0 ? -1 : awgDataAge(currentTunnelHandle);
++    }
++    public synchronized void suspendTransport() {
++        if (currentTunnelHandle >= 0) awgRouteReady(currentTunnelHandle, false);
++        boundNetwork = null; boundRevision = -1;
++    }
+     @Nullable private Thread statusThread;
+     @Nullable private StatusCallback statusCallback;
+ 
+@@ -318,11 +339,34 @@
+         return getState(tunnel);
+     }
+ 
++    /** Protect first, bind duplicated descriptors, then publish the actual underlying network.
++     * Existing core/TUN ownership is retained. No process-wide network binding. */
++    public synchronized void bindNetwork(android.net.Network network, long revision) throws Exception {
++        if (currentTunnelHandle < 0) throw new IllegalStateException("tunnel_not_up");
++        if (network.equals(boundNetwork) && revision == boundRevision) return;
++        awgRouteReady(currentTunnelHandle, false);
++        VpnService service = vpnService.get(0, TimeUnit.NANOSECONDS);
++        int[] sockets = {awgGetSocketV4(currentTunnelHandle), awgGetSocketV6(currentTunnelHandle)};
++        for (int fd : sockets) {
++            if (fd < 0) continue;
++            if (!service.protect(fd)) throw new IllegalStateException("socket_protection_failed");
++            try (ParcelFileDescriptor copy = ParcelFileDescriptor.fromFd(fd)) {
++                network.bindSocket(copy.getFileDescriptor());
++            }
++        }
++        if (!service.setUnderlyingNetworks(new android.net.Network[] {network}))
++            throw new IllegalStateException("underlying_network_unavailable");
++        if (!awgRouteReady(currentTunnelHandle, true))
++            throw new IllegalStateException("authorization_expired");
++        boundNetwork = network; boundRevision = revision;
++    }
++
+     private void setStateInternal(final Tunnel tunnel, @Nullable final Config config, final State state)
+             throws Exception {
+ 
+ 
+         if (state == State.UP) {
++            final long operation = operationEpoch.incrementAndGet();
+             if (config == null)
+                 throw new BackendException(Reason.TUNNEL_MISSING_CONFIG);
+ 
+@@ -332,7 +376,8 @@
+             final VpnService service;
+             if (!vpnService.isDone()) {
+ 
+-                context.startService(new Intent(context, VpnService.class));
++                if (Build.VERSION.SDK_INT >= 26) context.startForegroundService(new Intent(context, VpnService.class));
++                else context.startService(new Intent(context, VpnService.class));
+             }
+ 
+             try {
+@@ -422,6 +467,12 @@
+             if (currentTunnelHandle < 0)
+                 throw new BackendException(Reason.GO_ACTIVATION_ERROR_CODE, currentTunnelHandle);
+ 
++            if (operation != operationEpoch.get()) {
++                awgTurnOff(currentTunnelHandle);
++                currentTunnelHandle = -1;
++                throw new IllegalStateException("startup_cancelled");
++            }
++            boundNetwork = null; boundRevision = -1;
+             currentTunnel = tunnel;
+             currentConfig = config;
+ 
+@@ -445,7 +496,8 @@
+             currentConfig = null;
+             awgTurnOff(handleToClose);
+             try {
+-                vpnService.get(0, TimeUnit.NANOSECONDS).stopSelf();
++                if (alwaysOnCallback == null || !alwaysOnCallback.keepAliveRequested())
++                    vpnService.get(0, TimeUnit.NANOSECONDS).stopSelf();
+             } catch (final TimeoutException ignored) { }
+         }
+ 
+@@ -459,6 +511,10 @@
+     public interface AlwaysOnCallback {
+         void alwaysOnTriggered(VpnService service);
+         void alwaysOnStopped(VpnService service);
++        default boolean keepAliveRequested() { return false; }
++        default void serviceCreated(VpnService service) { }
++        default void disconnectRequested(VpnService service) { service.stopSelf(); }
++        default void permissionRevoked(VpnService service) { service.stopSelf(); }
+     }
+ 
+     // TODO: When we finally drop API 21 and move to API 24, delete this and replace with the ordinary CompletableFuture.
+@@ -509,28 +565,39 @@
+                     "i011", "VPN I-011 test", android.app.NotificationManager.IMPORTANCE_LOW));
+             android.app.Notification.Builder notification = Build.VERSION.SDK_INT >= 26
+                 ? new android.app.Notification.Builder(this, "i011") : new android.app.Notification.Builder(this);
+-            notification.setContentTitle("VPN I-011 · test service")
+-                .setContentText("Native tunnel; handshake and egress checked separately")
++            notification.setContentTitle("DetourVpn")
++                .setContentText("Подключение проверяется")
+                 .setSmallIcon(android.R.drawable.stat_sys_warning).setOngoing(true);
+-            startForeground(11, notification.build());
++            android.content.Intent stop = new android.content.Intent(this, VpnService.class)
++                .setAction("org.example.vpnpoc.DISCONNECT");
++            notification.addAction(android.R.drawable.ic_menu_close_clear_cancel, "Отключить",
++                android.app.PendingIntent.getService(this, 11, stop,
++                    android.app.PendingIntent.FLAG_IMMUTABLE | android.app.PendingIntent.FLAG_UPDATE_CURRENT));
++            if (Build.VERSION.SDK_INT >= 34) startForeground(11, notification.build(),
++                android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_SYSTEM_EXEMPTED);
++            else startForeground(11, notification.build());
+             vpnService.complete(this);
++            if (alwaysOnCallback != null) alwaysOnCallback.serviceCreated(this);
+         }
+ 
+         @Override
+         public void onDestroy() {
+-            if (owner != null) {
+-              synchronized (owner) {
+-                final Tunnel tunnel = owner.currentTunnel;
+-                if (tunnel != null) {
+-                    if (owner.currentTunnelHandle != -1)
+-                        awgTurnOff(owner.currentTunnelHandle);
+-                    owner.currentTunnel = null;
+-                    owner.currentTunnelHandle = -1;
+-                    owner.currentConfig = null;
+-                    tunnel.onStateChange(State.DOWN);
+-                }
+-            }
+-              }
++            final GoBackend stoppedOwner = owner;
++            if (stoppedOwner != null) {
++                stoppedOwner.cancelImmediately();
++                final long stoppedEpoch = stoppedOwner.operationEpoch.get();
++                new Thread(() -> {
++                    synchronized (stoppedOwner) {
++                        if (stoppedOwner.operationEpoch.get() != stoppedEpoch) return;
++                        final Tunnel tunnel = stoppedOwner.currentTunnel;
++                        if (stoppedOwner.currentTunnelHandle >= 0) awgTurnOff(stoppedOwner.currentTunnelHandle);
++                        stoppedOwner.currentTunnelHandle = -1;
++                        stoppedOwner.currentTunnel = null;
++                        stoppedOwner.currentConfig = null;
++                        if (tunnel != null) tunnel.onStateChange(State.DOWN);
++                    }
++                }, "awg-service-cleanup").start();
++            }
+             if (alwaysOnCallback != null)
+                 alwaysOnCallback.alwaysOnStopped(this);
+             vpnService = vpnService.newIncompleteFuture();
+@@ -540,12 +607,24 @@
+         @Override
+         public int onStartCommand(@Nullable final Intent intent, final int flags, final int startId) {
+             vpnService.complete(this);
++            if (intent != null && "org.example.vpnpoc.DISCONNECT".equals(intent.getAction())) {
++                if (alwaysOnCallback != null) alwaysOnCallback.disconnectRequested(this);
++                else stopSelf();
++                return START_NOT_STICKY;
++            }
+             if (intent == null || intent.getComponent() == null || !intent.getComponent().getPackageName().equals(getPackageName())) {
+ 
+                 if (alwaysOnCallback != null)
+                     alwaysOnCallback.alwaysOnTriggered(this);
+             }
+-            return START_NOT_STICKY;
++            return alwaysOnCallback != null && alwaysOnCallback.keepAliveRequested()
++                ? START_STICKY : START_NOT_STICKY;
++        }
++
++        @Override public void onRevoke() {
++            if (owner != null) owner.cancelImmediately();
++            if (alwaysOnCallback != null) alwaysOnCallback.permissionRevoked(this);
++            super.onRevoke();
+         }
+ 
+         public void setOwner(final GoBackend owner) {

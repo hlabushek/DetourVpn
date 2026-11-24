@@ -12,7 +12,6 @@ import io.flutter.embedding.engine.FlutterEngine;
 import io.flutter.embedding.engine.dart.DartExecutor;
 import io.flutter.plugin.common.MethodCall;
 import io.flutter.plugin.common.MethodChannel;
-import io.flutter.plugins.GeneratedPluginRegistrant;
 import java.net.URI;
 import java.util.HashMap;
 import java.util.Map;
@@ -31,21 +30,185 @@ public final class ClientApplication extends Application implements Tunnel {
     KeyPair key;
     SecureVault vault;
     final WindowDeadline window = new WindowDeadline();
-    TunnelProviderV1 provider;
+    volatile TunnelProviderV1 provider;
     private final Handler mainThread = new Handler(Looper.getMainLooper());
     private volatile VpnService recoveryService;
     private ProtectedApiRelay protectedRelay;
-    private FlutterEngine recoveryEngine;
+    private volatile FlutterEngine recoveryEngine;
+    final ClientBridge bridge = new ClientBridge(this);
+    private volatile FlutterEngine uiEngine;
+    private AndroidConnectionRuntime runtime;
+    private volatile GoBackend.VpnService activeService;
+    volatile boolean desiredConnected;
+    private java.util.concurrent.ScheduledFuture<?> deadlineTask;
     long deadline;
+    private java.util.concurrent.ScheduledFuture<?> pulseTask;
+    volatile boolean nativeTimedOut;
+
+    void scheduleSessionPulse(long delayMs) {
+        if (pulseTask != null) pulseTask.cancel(false);
+        pulseTask = worker.schedule(this::requestSessionPulse, Math.max(1000, Math.min(30_000, delayMs)), TimeUnit.MILLISECONDS);
+    }
+    void requestSessionPulse() {
+        mainThread.post(() -> {
+            FlutterEngine engine = uiEngine != null ? uiEngine : recoveryEngine;
+            if (engine != null) new MethodChannel(engine.getDartExecutor().getBinaryMessenger(),
+                    "project.vpn/tunnel.v1").invokeMethod("sessionPulse", null);
+        });
+    }
+    MethodChannel.Result boundedResult(MethodChannel.Result result) {
+        return new BoundedMethodResult(result, mainThread, () -> {
+            nativeTimedOut = true;
+            cancelDesiredConnection();
+        });
+    }
+
+    // Main-thread only. One engine and one token/renewal owner across Activity recreation.
+    FlutterEngine uiEngine() {
+        if (recoveryEngine != null) { uiEngine = recoveryEngine; return uiEngine; }
+        if (uiEngine == null) {
+            uiEngine = new FlutterEngine(this);
+            new MethodChannel(uiEngine.getDartExecutor().getBinaryMessenger(), "project.vpn/tunnel.v1")
+                .setMethodCallHandler(bridge::handle);
+            uiEngine.getDartExecutor().executeDartEntrypoint(DartExecutor.DartEntrypoint.createDefault());
+        }
+        return uiEngine;
+    }
+
+    void startAuthorized(org.amnezia.awg.config.Config config) throws Exception {
+        provider.connect(config);
+        provider.setAuthorizationDeadline(deadline);
+        if (runtime == null) runtime = new AndroidConnectionRuntime(this);
+        runtime.start(config);
+        armDeadline();
+    }
+
+    void armDeadline() {
+        if (deadline > 0 && provider != null && provider.isUp())
+            provider.setAuthorizationDeadline(deadline);
+        if (deadlineTask != null) deadlineTask.cancel(false);
+        deadlineTask = deadline <= 0 ? null : worker.schedule(this::expireAuthorization,
+            Math.max(0, deadline - SystemClock.elapsedRealtime()), TimeUnit.MILLISECONDS);
+    }
+
+    void expireAuthorization() {
+        if (deadline <= 0 || SystemClock.elapsedRealtime() < deadline) return;
+        generation.incrementAndGet();
+        try { stop(); reason = "lease_expired"; requestSessionPulse(); }
+        catch (Exception ignored) { reason = "native_disconnect_failed"; }
+    }
+
+    void setDesiredConnected(boolean desired) {
+        setDesiredConnected(desired, generation.get());
+    }
+
+    void setDesiredConnected(boolean desired, long expectedGeneration) {
+        boolean saved;
+        synchronized (intentLock) {
+            if (desired && expectedGeneration != generation.get())
+                throw new IllegalStateException("session_cancelled");
+            desiredConnected = desired;
+            saved = getSharedPreferences("connection", MODE_PRIVATE).edit()
+                    .putBoolean("desired_connected", desired).commit();
+            if (!saved) desiredConnected = false;
+        }
+        if (!desiredConnected) {
+            // A storage error must never prevent a local disconnect.
+            try { stop(); }
+            catch (Exception failure) { throw new IllegalStateException("native_disconnect_failed"); }
+            if (activeService != null) activeService.stopSelf();
+        }
+        if (!saved) throw new IllegalStateException("intent_storage_failed");
+        if (desired && activeService == null && VpnService.prepare(this) == null) {
+            android.content.Intent intent = new android.content.Intent(this, GoBackend.VpnService.class);
+            if (android.os.Build.VERSION.SDK_INT >= 26) startForegroundService(intent);
+            else startService(intent);
+        }
+    }
+
+    void cancelNative() {
+        generation.incrementAndGet();
+        TunnelProviderV1 active = provider;
+        if (active != null) active.cancelImmediately();
+    }
+
+    private final Object intentLock = new Object();
+    void cancelDesiredConnection() {
+        cancelNative();
+        synchronized (intentLock) {
+            desiredConnected = false;
+            // Save independently of the native worker, which may be blocked in JNI.
+            getSharedPreferences("connection", MODE_PRIVATE).edit()
+                    .putBoolean("desired_connected", false).apply();
+        }
+    }
+
+    void systemStopped(String why) {
+        cancelNative();
+        reason = why;
+        try { setDesiredConnected(false); } catch (RuntimeException ignored) { }
+        try { stop(); } catch (Exception ignored) { }
+        publishConnectionState();
+    }
+
+    void publishConnectionState() {
+        GoBackend.VpnService service = activeService;
+        if (service == null) return;
+        String state = runtime == null ? "CONNECTING" : runtime.policy.state.name();
+        if ("CONNECTED".equals(state) && !runtime.policy.healthy(SystemClock.elapsedRealtime()))
+            state = "DEGRADED";
+        if (desiredConnected && "DISCONNECTED".equals(state)) state = "RECONNECTING";
+        String label = switch (state) {
+            case "CONNECTED" -> "Соединение проверено";
+            case "WAITING_FOR_NETWORK" -> "Ожидается сеть";
+            case "DISCONNECTED", "ERROR" -> "VPN отключён";
+            default -> "Соединение восстанавливается";
+        };
+        final long notificationGeneration = generation.get();
+        mainThread.post(() -> {
+            if (activeService != service || notificationGeneration != generation.get()) return;
+            var stop = new android.content.Intent(this, GoBackend.VpnService.class)
+                .setAction("org.example.vpnpoc.DISCONNECT");
+            var builder = (android.os.Build.VERSION.SDK_INT >= 26
+                ? new android.app.Notification.Builder(this, "i011")
+                : new android.app.Notification.Builder(this))
+                .setSmallIcon(org.example.vpnclient.R.drawable.ic_vpn)
+                .setContentTitle("DetourVpn").setContentText(label).setOngoing(true)
+                .addAction(android.R.drawable.ic_menu_close_clear_cancel, "Отключить",
+                    android.app.PendingIntent.getService(this, 11, stop,
+                        android.app.PendingIntent.FLAG_IMMUTABLE | android.app.PendingIntent.FLAG_UPDATE_CURRENT));
+            service.startForeground(11, builder.build());
+        });
+    }
     String reason = "";
     @Override public void onCreate() {
         super.onCreate();
+        desiredConnected = getSharedPreferences("connection", MODE_PRIVATE)
+                .getBoolean("desired_connected", false);
         GoBackend.setAlwaysOnCallback(new GoBackend.AlwaysOnCallback() {
             @Override public void alwaysOnTriggered(GoBackend.VpnService service) {
                 startAlwaysOnRecovery(service);
             }
             @Override public void alwaysOnStopped(GoBackend.VpnService service) {
+                worker.execute(() -> {
+                    if (activeService == service) {
+                        activeService = null;
+                        if (runtime != null && runtime.policy.desired) systemStopped("system_stopped");
+                    }
+                });
                 stopAlwaysOnService(service);
+            }
+            @Override public boolean keepAliveRequested() { return desiredConnected; }
+            @Override public void serviceCreated(GoBackend.VpnService service) {
+                worker.execute(() -> { activeService = service; publishConnectionState(); });
+            }
+            @Override public void disconnectRequested(GoBackend.VpnService service) {
+                cancelDesiredConnection();
+                worker.execute(() -> systemStopped("user_disconnected"));
+            }
+            @Override public void permissionRevoked(GoBackend.VpnService service) {
+                cancelDesiredConnection();
+                worker.execute(() -> systemStopped("vpn_permission_revoked"));
             }
         });
         worker.execute(() -> {
@@ -63,12 +226,7 @@ public final class ClientApplication extends Application implements Tunnel {
                         + " failure=" + failure.getClass().getSimpleName());
             }
         });
-        worker.scheduleWithFixedDelay(() -> {
-            if (deadline > 0 && SystemClock.elapsedRealtime() >= deadline) {
-                try { stop(); reason = "lease_expired"; }
-                catch (Exception ignored) { reason = "native_disconnect_failed"; }
-            }
-        }, 250, 250, TimeUnit.MILLISECONDS);
+
     }
 
     void startAlwaysOnRecovery(VpnService service) {
@@ -90,21 +248,32 @@ public final class ClientApplication extends Application implements Tunnel {
                 protectedRelay = ProtectedApiRelay.forApiOrigin(service, origin);
                 recoveryService = service;
 
-                FlutterEngine engine = new FlutterEngine(this);
-                GeneratedPluginRegistrant.registerWith(engine);
-                new MethodChannel(engine.getDartExecutor().getBinaryMessenger(),
-                        "project.vpn/tunnel.v1").setMethodCallHandler(this::handleRecoveryCall);
-                recoveryEngine = engine;
-                String bundle = FlutterInjector.instance().flutterLoader().findAppBundlePath();
-                engine.getDartExecutor().executeDartEntrypoint(
-                        new DartExecutor.DartEntrypoint(bundle, "alwaysOnRecoveryMain"));
+                mainThread.post(() -> {
+                    if (recoveryEngine != null) return;
+                    if (uiEngine != null) {
+                        new MethodChannel(uiEngine.getDartExecutor().getBinaryMessenger(),
+                                "project.vpn/tunnel.v1").invokeMethod("restoreConnection", null);
+                        return;
+                    }
+                    try {
+                        FlutterEngine engine = new FlutterEngine(this);
+                        new MethodChannel(engine.getDartExecutor().getBinaryMessenger(),
+                                "project.vpn/tunnel.v1").setMethodCallHandler(this::handleRecoveryCall);
+                        recoveryEngine = engine;
+                        String bundle = FlutterInjector.instance().flutterLoader().findAppBundlePath();
+                        engine.getDartExecutor().executeDartEntrypoint(
+                                new DartExecutor.DartEntrypoint(bundle, "alwaysOnRecoveryMain"));
+                    } catch (RuntimeException | LinkageError failure) {
+                        worker.execute(this::stopAlwaysOnRecovery);
+                    }
+                });
             } catch (Exception | LinkageError failure) {
                 stopAlwaysOnRecovery();
             }
         });
     }
 
-    private void handleRecoveryCall(MethodCall call, MethodChannel.Result result) {
+    void handleRecoveryCall(MethodCall call, MethodChannel.Result result) {
         if (call.method.equals("bootstrapFailed")) {
             result.success(null);
             worker.execute(this::stopAlwaysOnRecovery);
@@ -114,90 +283,27 @@ public final class ClientApplication extends Application implements Tunnel {
             result.success(null);
             return;
         }
-        if (!java.util.Set.of("protectedRelayRead", "sessionRead", "sessionWrite", "nodeRead",
-                "publicKey", "prove", "permission", "connectWindow", "advanceWindow",
-                "disconnect", "snapshot").contains(call.method)) {
-            result.notImplemented();
-            return;
+        if (!call.method.equals("protectedRelayRead")) {
+            bridge.handle(call, result); return;
         }
-        final long generation = call.method.equals("disconnect")
-                ? this.generation.incrementAndGet() : this.generation.get();
-        final long submittedAt = SystemClock.elapsedRealtime();
         worker.execute(() -> {
             try {
                 Object value = null;
                 switch (call.method) {
                     case "protectedRelayRead":
+                        if (protectedRelay == null && activeService != null) {
+                            String saved = vault.read("session");
+                            if (saved == null) throw new IllegalStateException();
+                            URI origin = URI.create(new org.json.JSONObject(saved).getString("origin"));
+                            protectedRelay = ProtectedApiRelay.forApiOrigin(activeService, origin);
+                            recoveryService = activeService;
+                        }
                         if (protectedRelay == null || recoveryService == null)
                             throw new IllegalStateException();
                         var endpoint = new HashMap<String, Object>();
                         endpoint.put("port", protectedRelay.port());
                         endpoint.put("token", protectedRelay.token());
                         value = endpoint;
-                        break;
-                    case "sessionRead": {
-                        String saved = vault.read("session");
-                        value = saved == null ? null : sessionMap(new org.json.JSONObject(saved));
-                        break;
-                    }
-                    case "sessionWrite": {
-                        Map<String, Object> record = call.argument("value");
-                        vault.write("session", record == null ? null : new org.json.JSONObject(record).toString());
-                        break;
-                    }
-                    case "nodeRead":
-                        value = getSharedPreferences("connection", MODE_PRIVATE)
-                                .getString("selected_node", null);
-                        break;
-                    case "permission":
-                        value = VpnService.prepare(this) == null;
-                        break;
-                    case "publicKey":
-                        value = key.getPublicKey().toBase64();
-                        break;
-                    case "prove":
-                        value = KeyConfirmation.answer(key, call.argument("ephemeralKey"),
-                                call.argument("transcript"));
-                        break;
-                    case "snapshot":
-                        value = snapshot();
-                        break;
-                    case "disconnect":
-                        stop();
-                        break;
-                    case "advanceWindow":
-                        if (generation != this.generation.get() || !provider.isUp())
-                            throw new IllegalStateException();
-                        window.advance(call.argument("connection"), call.argument("runtime"),
-                                ((Number) call.argument("generation")).longValue(),
-                                submittedAt + ((Number) call.argument("remainingMs")).longValue(),
-                                SystemClock.elapsedRealtime());
-                        deadline = window.deadline;
-                        break;
-                    case "connectWindow":
-                        Number duration = call.argument("remainingMs");
-                        if (duration == null || duration.longValue() <= 0 || duration.longValue() > 90000
-                                || generation != this.generation.get() || provider.isUp()
-                                || VpnService.prepare(this) != null)
-                            throw new IllegalStateException();
-                        long end = submittedAt + duration.longValue();
-                        var config = routedConfig(call.argument("config"));
-                        window.start(call.argument("connection"), call.argument("runtime"),
-                                ((Number) call.argument("generation")).longValue(), end,
-                                SystemClock.elapsedRealtime());
-                        deadline = end;
-                        try {
-                            provider.connect(config);
-                            if (generation != this.generation.get()
-                                    || SystemClock.elapsedRealtime() >= deadline) {
-                                stop();
-                                throw new IllegalStateException();
-                            }
-                            reason = "";
-                        } catch (Exception failure) {
-                            stop();
-                            throw failure;
-                        }
                         break;
                     default:
                         throw new IllegalArgumentException();
@@ -222,6 +328,7 @@ public final class ClientApplication extends Application implements Tunnel {
     }
 
     private void stopAlwaysOnRecovery() {
+        setDesiredConnected(false);
         try { stop(); } catch (Exception ignored) { reason = "native_disconnect_failed"; }
         ProtectedApiRelay relay = protectedRelay;
         protectedRelay = null;
@@ -230,7 +337,7 @@ public final class ClientApplication extends Application implements Tunnel {
         recoveryService = null;
         FlutterEngine engine = recoveryEngine;
         recoveryEngine = null;
-        if (engine != null) mainThread.post(engine::destroy);
+        if (engine != null && engine != uiEngine) mainThread.post(engine::destroy);
         if (service != null) service.stopSelf();
     }
 
@@ -246,7 +353,7 @@ public final class ClientApplication extends Application implements Tunnel {
             if (relay != null) relay.close();
             FlutterEngine engine = recoveryEngine;
             recoveryEngine = null;
-            if (engine != null) mainThread.post(engine::destroy);
+            if (engine != null && engine != uiEngine) mainThread.post(engine::destroy);
         });
     }
 
@@ -276,12 +383,17 @@ public final class ClientApplication extends Application implements Tunnel {
     }
 
     void stop() throws Exception {
-        if (provider != null) provider.disconnect();
+        if (provider != null) provider.cancelImmediately();
+        if (runtime != null) runtime.stop(reason);
         deadline = 0;
+        armDeadline();
         window.clear();
+        if (provider != null) provider.disconnect();
+        publishConnectionState();
     }
     Map<String, Object> snapshot() {
         if (provider == null) throw new IllegalStateException();
+        expireAuthorization();
         boolean up = provider.isUp();
         long handshake = up ? provider.lastHandshakeSeconds() : 0;
         long now = System.currentTimeMillis() / 1000;
@@ -306,6 +418,13 @@ public final class ClientApplication extends Application implements Tunnel {
             if (received >= 0) value.put("receivedBytes", received);
         } catch (RuntimeException | LinkageError ignored) { /* Advisory unavailable. */ }
         value.put("reason", reason);
+        if (runtime != null) {
+            value.put("healthConfirmed", runtime.policy.healthy(SystemClock.elapsedRealtime()));
+            value.put("connectionState", runtime.policy.state.name());
+            value.put("desiredConnected", desiredConnected);
+            value.put("sessionGeneration", runtime.policy.generation);
+            value.put("networkGeneration", runtime.policy.networkGeneration);
+        }
         return value;
     }
     @Override public String getName() { return "i013"; }

@@ -19,6 +19,10 @@ val expectedPatchHash = "523e726eb306af84addfa7c2ef6f4e0b6f89c8e4e9db7d015147752
 check(preparedReceipt["patch_sha256"] == expectedPatchHash) {
     "Prepared GoBackend SDK patch hash is stale; prepare a fresh SDK tree matching apps/android/patches/go-only.patch and pass -PawgPreparedDir=<path>"
 }
+val expectedReliabilityHash = "0915c948636fce8888702c8d65874b6842e2ecd5258c07a0d10f706f1f6d3255"
+check(preparedReceipt["reliability_sha256"] == expectedReliabilityHash) {
+    "Prepared reliability patch is stale; prepare a fresh SDK tree"
+}
 android {
     namespace = "org.amnezia.awg.tunnel"
     compileSdk = 36

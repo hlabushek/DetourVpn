@@ -40,4 +40,44 @@ void main() {
       expect(calls, hasLength(3));
     },
   );
+  test('explicit intent is separate from low-level tunnel teardown', () async {
+    final calls = <MethodCall>[];
+    messenger.setMockMethodCallHandler(channel, (call) async {
+      calls.add(call);
+      return null;
+    });
+    final native = PlatformTunnel();
+    await native.setDesiredConnected(true);
+    await native.disconnect();
+    await native.setDesiredConnected(false);
+    expect(calls.map((c) => c.method), [
+      'sessionIntent',
+      'disconnect',
+      'sessionIntent',
+    ]);
+    expect(calls.first.arguments, {'desired': true});
+    expect(calls.last.arguments, {'desired': false});
+  });
+  test(
+    'native negative health never falls back to handshake success',
+    () async {
+      messenger.setMockMethodCallHandler(
+        channel,
+        (call) async => {
+          'up': true,
+          'network': true,
+          'handshakeAge': 0,
+          'remainingMs': 60000,
+          'reason': '',
+          'healthConfirmed': false,
+          'connectionState': 'DEGRADED',
+          'desiredConnected': true,
+        },
+      );
+      final snapshot = await PlatformTunnel().snapshot();
+      expect(snapshot.confirmed, false);
+      expect(snapshot.desiredConnected, true);
+      expect(snapshot.connectionState, 'DEGRADED');
+    },
+  );
 }

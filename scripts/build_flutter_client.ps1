@@ -41,12 +41,14 @@ if ((Get-FileHash -LiteralPath $taskWrapper -Algorithm SHA256).Hash.ToLowerInvar
 if (!(Test-Path -LiteralPath (Join-Path $AndroidSdk 'platforms\android-36\android.jar'))) { throw 'Android SDK 36 missing' }
 $taskTunnelBuildFile = Join-Path $taskRoot 'apps\android\tunnel\build.gradle.kts'
 $taskTunnelBuildText = Get-Content -LiteralPath $taskTunnelBuildFile -Raw
-if ($taskTunnelBuildText -notmatch '(?m)^val expectedPatchHash = "([a-f0-9]{64})"$') {
+if ($taskTunnelBuildText -notmatch '(?m)^val expectedPatchHash = "([a-f0-9]{64})"\r?$') {
     throw 'Could not read the pinned native SDK patch hash from apps/android/tunnel/build.gradle.kts.'
 }
 $taskExpectedPatchHash = $Matches[1]
+if ($taskTunnelBuildText -notmatch '(?m)^val expectedReliabilityHash = "([a-f0-9]{64})"\r?$') { throw 'Missing reliability fingerprint' }
+$taskExpectedReliabilityHash = $Matches[1]
 $taskPrepareScript = Get-Content -LiteralPath (Join-Path $taskRoot 'scripts\prepare_android_poc.py') -Raw
-if ($taskPrepareScript -notmatch '(?m)^REVISION = "([a-f0-9]{40})"$') {
+if ($taskPrepareScript -notmatch '(?m)^REVISION = "([a-f0-9]{40})"\r?$') {
     throw 'Could not read the pinned upstream revision from scripts/prepare_android_poc.py.'
 }
 $taskExpectedSdkRevision = $Matches[1]
@@ -66,6 +68,7 @@ foreach ($taskCandidate in $taskPreparedCandidates) {
     catch { continue }
     if ($taskReceipt.patch_sha256 -ne $taskExpectedPatchHash) { continue }
     if ($taskReceipt.sdk_revision -ne $taskExpectedSdkRevision) { continue }
+    if ($taskReceipt.reliability_sha256 -ne $taskExpectedReliabilityHash) { continue }
     if (!$taskReceipt.source_sha256) { continue }
     $taskCandidateRoot = [IO.Path]::GetFullPath($taskCandidate.FullName).TrimEnd([IO.Path]::DirectorySeparatorChar, [IO.Path]::AltDirectorySeparatorChar)
     $taskCandidatePrefix = $taskCandidateRoot + [IO.Path]::DirectorySeparatorChar
