@@ -67,6 +67,11 @@ FlutterWindow::MessageHandler(HWND hwnd, UINT const message,
     case WM_FONTCHANGE:
       flutter_controller_->engine()->ReloadSystemFonts();
       break;
+    case WM_POWERBROADCAST:
+      // ADR-194: after sleep or hibernation a running tunnel must prove a fresh handshake.
+      if ((wparam == PBT_APMRESUMEAUTOMATIC || wparam == PBT_APMRESUMESUSPEND) && tunnel_channel_)
+        tunnel_channel_->OnSystemResume();
+      break;
   }
 
   return Win32Window::MessageHandler(hwnd, message, wparam, lparam);

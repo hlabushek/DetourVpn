@@ -7,6 +7,7 @@
 #endif
 #include <winsock2.h>
 #include <ws2tcpip.h>
+#include <iphlpapi.h>
 
 #include "system_hooks.h"
 
@@ -73,6 +74,40 @@ std::vector<std::string> ResolveIpv4(const std::string& host) {
   return out;
 }
 
+// ADR-194: identity of the usable physical IPv4 network: every adapter that is up, is not loopback,
+// is not a virtual tunnel (the engine's Wintun adapter included) and has an IPv4 default gateway,
+// as "interface index + gateway" pairs. "" = no usable network. The value is compared in memory by
+// the watchdog and never logged, shown or sent.
+std::string PhysicalNetworkId() {
+  ULONG size = 16 * 1024;
+  std::vector<unsigned char> buffer;
+  ULONG result = ERROR_BUFFER_OVERFLOW;
+  for (int attempt = 0; attempt < 3 && result == ERROR_BUFFER_OVERFLOW; ++attempt) {
+    buffer.resize(size);
+    result = GetAdaptersAddresses(AF_UNSPEC,
+                                  GAA_FLAG_INCLUDE_GATEWAYS | GAA_FLAG_SKIP_ANYCAST | GAA_FLAG_SKIP_MULTICAST |
+                                      GAA_FLAG_SKIP_DNS_SERVER | GAA_FLAG_SKIP_FRIENDLY_NAME,
+                                  nullptr, reinterpret_cast<IP_ADAPTER_ADDRESSES*>(buffer.data()), &size);
+  }
+  if (result != NO_ERROR) return {};
+  std::vector<std::string> entries;
+  for (auto* a = reinterpret_cast<IP_ADAPTER_ADDRESSES*>(buffer.data()); a; a = a->Next) {
+    if (a->OperStatus != IfOperStatusUp || a->IfType == IF_TYPE_SOFTWARE_LOOPBACK ||
+        a->IfType == IF_TYPE_PROP_VIRTUAL || a->IfType == IF_TYPE_TUNNEL)
+      continue;
+    if (a->Description && std::wstring(a->Description).find(L"Wintun") != std::wstring::npos) continue;
+    for (auto* g = a->FirstGatewayAddress; g; g = g->Next) {
+      if (!g->Address.lpSockaddr || g->Address.lpSockaddr->sa_family != AF_INET) continue;
+      const auto* in = reinterpret_cast<const sockaddr_in*>(g->Address.lpSockaddr);
+      entries.push_back(std::to_string(a->IfIndex) + "/" + std::to_string(in->sin_addr.S_un.S_addr));
+    }
+  }
+  std::sort(entries.begin(), entries.end());
+  std::string id;
+  for (const auto& e : entries) id += e + ";";
+  return id;
+}
+
 std::filesystem::path OwnExe() {
   wchar_t buffer[MAX_PATH * 2];
   DWORD n = GetModuleFileNameW(nullptr, buffer, static_cast<DWORD>(std::size(buffer)));
@@ -135,13 +170,13 @@ ControllerHooks DefaultHooks() {
   hooks.engine_dir = hooks.own_exe.parent_path();
   hooks.is_admin = ProcessIsElevated;
   hooks.network_available = InternetReachable;
-  hooks.now_ms = []() {
-    return std::chrono::duration_cast<std::chrono::milliseconds>(
-               std::chrono::steady_clock::now().time_since_epoch())
-        .count();
-  };
+  // ADR-194: GetTickCount64 is monotonic and keeps counting through sleep and hibernation, so a
+  // window deadline cannot outlive its real time across a sleep. (Whether steady_clock, which is
+  // QueryPerformanceCounter, counts sleep is not guaranteed by the documentation.)
+  hooks.now_ms = []() { return static_cast<int64_t>(GetTickCount64()); };
   hooks.unix_seconds = []() { return static_cast<int64_t>(std::time(nullptr)); };
   hooks.resolve_ipv4 = ResolveIpv4;
+  hooks.physical_network = PhysicalNetworkId;
   return hooks;
 }
 

@@ -16,8 +16,13 @@
 #include "handshake_clock.h"
 #include "key_confirmation.h"
 #include "secure_vault.h"
+#include "system_hooks.h"
 #include "tunnel_controller.h"
+#include "tunnel_watchdog.h"
 #include "window_deadline.h"
+
+#include <memory>
+#include <mutex>
 
 namespace fs = std::filesystem;
 using namespace detour;
@@ -207,6 +212,47 @@ void HandshakeClockTests() {
   CHECK(future.AgeSeconds(0, 2200, 62000) == -1);      // reset
 }
 
+// ---- tunnel watchdog (ADR-194, same rules as TunnelWatchdogTest.java) ---------------------------
+
+void WatchdogTests() {
+  using A = TunnelWatchdog::Action;
+  const int64_t S = TunnelWatchdog::kStaleMs;
+  {
+    TunnelWatchdog w;
+    CHECK(w.Decide(0, -1, true) == A::kNone && !w.Running());  // no tunnel
+    w.TunnelUp(1000);
+    CHECK(w.Decide(1000 + S - 1, -1, true) == A::kNone);   // not stale yet
+    CHECK(w.Decide(1000 + S, -1, false) == A::kNone);      // no usable network: wait
+    CHECK(w.Decide(1000 + S, -1, true) == A::kRestart);    // never a handshake for 180 s
+    w.Restarted(1000 + S);
+    CHECK(w.StaleGapMs() == 240000);                        // backoff doubles
+    CHECK(w.Decide(1000 + S + 200000, S + 1000, true) == A::kNone);
+    CHECK(w.Decide(1000 + S + 240000, S + 1000, true) == A::kRestart);
+    w.Restarted(1000 + S + 240000);
+    CHECK(w.Decide(1000 + 2 * S + 600000, 5000, true) == A::kNone);  // fresh handshake
+    CHECK(w.StaleGapMs() == TunnelWatchdog::kStaleGapMs);            // ... resets the backoff
+  }
+  {
+    TunnelWatchdog w;
+    w.TunnelUp(0);
+    w.NetworkChanged(10000);
+    CHECK(w.Decide(10000 + 499, 3000, true) == A::kNone);     // settling
+    CHECK(w.Decide(10000 + 500, 400, true) == A::kNone);      // a handshake after the change: proof
+    w.NetworkChanged(20000);
+    CHECK(w.Decide(20600, 3000, false) == A::kNone);          // waits for a usable network
+    CHECK(w.Decide(20600, 3000, true) == A::kRestart);        // handshake older than the change
+    w.Restarted(20600);
+    CHECK(w.Decide(30000, -1, true) == A::kNone);             // gap since the last restart
+    CHECK(w.Decide(35600, -1, true) == A::kRestart);          // second restart for this change
+    w.Restarted(35600);
+    CHECK(w.Decide(50600, -1, true) == A::kNewLease);         // two restarts, no handshake
+    CHECK(w.Decide(50601, -1, true) == A::kNone);             // the trigger is consumed
+    w.TunnelDown();
+    w.NetworkChanged(60000);                                  // ignored without a tunnel
+    CHECK(!w.NetworkPending());
+  }
+}
+
 // ---- engine process ------------------------------------------------------------------------------------
 
 void StatsParseTests() {
@@ -278,7 +324,8 @@ struct Rig {
   fs::path dir;
   bool admin = true;
   std::unique_ptr<TunnelController> c;
-  explicit Rig(const char* name, bool with_engine = true, bool with_session = true) {
+  explicit Rig(const char* name, bool with_engine = true, bool with_session = true,
+               const std::function<void(ControllerHooks&)>& customize = nullptr) {
     dir = FreshDir(name);
     if (with_engine) {
       fs::copy_file(g_tests_dir / "fake_engine.exe", dir / "detour-engine.exe");
@@ -301,6 +348,7 @@ struct Rig {
     };
     h.start_probe = std::chrono::milliseconds(300);
     h.stop_grace = std::chrono::seconds(5);
+    if (customize) customize(h);
     c = std::make_unique<TunnelController>(h);
     if (with_session) c->WriteSession(TunnelController::Record{{"origin", "https://198.51.100.7"}, {"refresh_token", "t"}});
   }
@@ -427,8 +475,8 @@ void ControllerTests() {
     CHECK(!s.up && s.reason == "lease_expired");
   }
   {
-    // an engine that dies by itself is reported, not hidden
-    Rig r("ctl-dies");
+    // an engine that dies by itself is reported, not hidden (no crash budget: as before ADR-194)
+    Rig r("ctl-dies", true, true, [](ControllerHooks& h) { h.crash_restarts = 0; });
     // The fake engine exits by itself 1.5 s after start (after the controller's 300 ms start probe).
     SetEnvironmentVariableW(L"FAKE_ENGINE_EXIT_MS", L"1500");
     r.c->Connect(kProfile, 60000, std::nullopt);
@@ -437,6 +485,90 @@ void ControllerTests() {
     for (int i = 0; i < 60 && r.c->Snapshot().up; ++i) Sleep(100);
     TunnelSnapshot s = r.c->Snapshot();
     CHECK(!s.up && s.reason == "engine_exited" && s.remaining_ms == 0);
+    CHECK(r.c->RestartsInPlace() == 0);
+  }
+  {
+    // ADR-194: one crash is restarted in place on the same window; the tunnel stays up
+    Rig r("ctl-crash-once");
+    SetEnvironmentVariableW(L"FAKE_ENGINE_EXIT_MS", L"1500");
+    r.c->Connect(kProfile, 60000, grant);
+    SetEnvironmentVariableW(L"FAKE_ENGINE_EXIT_MS", nullptr);  // the restarted engine keeps running
+    for (int i = 0; i < 40 && r.c->RestartsInPlace() == 0; ++i) Sleep(100);
+    TunnelSnapshot s = r.c->Snapshot();
+    CHECK(r.c->RestartsInPlace() == 1 && s.up && s.reason.empty() && s.remaining_ms > 50000);
+    r.c->AdvanceWindow(WindowGrant{"conn-1", "run-1", 2}, 80000);  // the window survived
+    CHECK(r.c->Snapshot().remaining_ms > 60000);
+    r.c->Disconnect();
+    CHECK(!r.c->Snapshot().up);
+  }
+  {
+    // ADR-194: a crash loop is bounded; after the budget the death is reported for a new lease
+    Rig r("ctl-crash-loop");
+    SetEnvironmentVariableW(L"FAKE_ENGINE_EXIT_MS", L"1000");
+    r.c->Connect(kProfile, 60000, grant);
+    for (int i = 0; i < 100 && r.c->Snapshot().up; ++i) Sleep(100);
+    SetEnvironmentVariableW(L"FAKE_ENGINE_EXIT_MS", nullptr);
+    TunnelSnapshot s = r.c->Snapshot();
+    CHECK(!s.up && s.reason == "engine_exited" && r.c->RestartsInPlace() == 2);
+  }
+  {
+    // ADR-194: a VLESS session (no handshake evidence) is never restarted in place
+    VlessRealityProfile v;
+    v.server = "panel.example.test";
+    v.port = 443;
+    v.uuid = "00000000-0000-4000-8000-000000000001";
+    v.flow = "xtls-rprx-vision";
+    v.sni = "www.example.test";
+    v.public_key = std::string(42, 'r') + "A";
+    v.short_id = "0a1b";
+    v.fingerprint = "chrome";
+    Rig r("ctl-vless-crash");
+    SetEnvironmentVariableW(L"FAKE_ENGINE_EXIT_MS", L"1500");
+    r.c->ConnectVless(v, 60000);
+    SetEnvironmentVariableW(L"FAKE_ENGINE_EXIT_MS", nullptr);
+    for (int i = 0; i < 60 && r.c->Snapshot().up; ++i) Sleep(100);
+    TunnelSnapshot s = r.c->Snapshot();
+    CHECK(!s.up && s.reason == "engine_exited" && r.c->RestartsInPlace() == 0);
+  }
+  {
+    // ADR-194: a physical network change, a loss and a resume each restart a running AWG tunnel
+    // in place unless a handshake newer than the change is seen (the fake's is always "3 s ago").
+    auto network = std::make_shared<std::string>("net-a");
+    auto lock = std::make_shared<std::mutex>();
+    Rig r("ctl-network", true, true, [network, lock](ControllerHooks& h) {
+      h.physical_network = [network, lock] {
+        std::lock_guard<std::mutex> g(*lock);
+        return *network;
+      };
+      h.network_poll = std::chrono::milliseconds(50);
+    });
+    auto set_network = [&](const char* id) {
+      std::lock_guard<std::mutex> g(*lock);
+      *network = id;
+    };
+    r.c->Connect(kProfile, 60000, grant);
+    for (int i = 0; i < 30 && r.c->Snapshot().handshake_age < 0; ++i) Sleep(100);  // stats seen
+    Sleep(1000);
+    CHECK(r.c->RestartsInPlace() == 0);  // same network, recent handshake: nothing to do
+    set_network("net-b");
+    for (int i = 0; i < 30 && r.c->RestartsInPlace() == 0; ++i) Sleep(100);
+    CHECK(r.c->RestartsInPlace() == 1 && r.c->Snapshot().up);
+    // The next restart for this change waits for the 15 s gap; a network loss changes nothing.
+    set_network("");
+    Sleep(800);
+    CHECK(r.c->RestartsInPlace() == 1 && r.c->Snapshot().up);
+    r.c->Disconnect();
+    // A resume is a change too (fresh connection, so no gap from the restart above).
+    set_network("net-b");
+    r.c->Connect(kProfile, 60000, grant);
+    for (int i = 0; i < 30 && r.c->Snapshot().handshake_age < 0; ++i) Sleep(100);
+    CHECK(r.c->RestartsInPlace() == 0);
+    r.c->SystemResumed();
+    for (int i = 0; i < 30 && r.c->RestartsInPlace() == 0; ++i) Sleep(100);
+    CHECK(r.c->RestartsInPlace() == 1 && r.c->Snapshot().up);
+    r.c->Disconnect();
+    r.c->SystemResumed();  // no tunnel: ignored
+    CHECK(!r.c->Snapshot().up);
   }
   {
     // ADR-115 panel server (VLESS + Reality); obviously fake values, reserved test names
@@ -491,6 +623,16 @@ int main(int, char** argv) {
   std::puts("window");
   WindowTests();
   HandshakeClockTests();
+  WatchdogTests();
+  {
+    // ADR-194 production hooks: the network identity is stable between two reads (its value is
+    // machine-specific and is not printed), and the clock is monotonic.
+    ControllerHooks h = DefaultHooks();
+    CHECK(h.physical_network && h.physical_network() == h.physical_network());
+    std::printf("physical network: %s\n", h.physical_network().empty() ? "none" : "present");
+    const int64_t a = h.now_ms();
+    CHECK(h.now_ms() >= a);
+  }
   StatsParseTests();
   std::puts("engine");
   EngineTests();

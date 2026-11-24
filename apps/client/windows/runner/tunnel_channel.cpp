@@ -114,6 +114,14 @@ void TunnelChannel::Shutdown() {
   controller_.reset();  // stops the engine
 }
 
+void TunnelChannel::OnSystemResume() {
+  try {
+    if (controller_) controller_->SystemResumed();
+  } catch (const std::exception&) {
+    // A resume signal is advisory; the watchdog's own checks still run.
+  }
+}
+
 void TunnelChannel::Handle(const flutter::MethodCall<EncodableValue>& call,
                            std::unique_ptr<flutter::MethodResult<EncodableValue>> result) {
   static const std::set<std::string> kAllowed = {

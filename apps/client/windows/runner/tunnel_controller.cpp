@@ -73,13 +73,17 @@ void TunnelController::WatchLoop() {
   while (!stopping_) {
     wake_.wait_for(lock, std::chrono::milliseconds(250));
     if (stopping_) break;
-    if (engine_started_ && !engine_.Running()) {
-      // Engine died on its own: the TUN is gone. Clear state so the UI sees "down".
-      reason_ = "engine_exited";
-      StopLocked();
-    } else if (deadline_ > 0 && hooks_.now_ms() >= deadline_) {
+    if (deadline_ > 0 && hooks_.now_ms() >= deadline_) {
       reason_ = "lease_expired";
       StopLocked();
+    } else if (engine_started_ && !engine_.Running()) {
+      EngineExitedLocked();
+    } else if (engine_started_) {
+      try {
+        WatchTickLocked();
+      } catch (const std::exception&) {
+        // A watchdog fault must never take the tunnel down by itself.
+      }
     }
   }
 }
@@ -89,6 +93,97 @@ void TunnelController::StopLocked() {
   engine_started_ = false;
   deadline_ = 0;
   window_.Clear();
+  watchdog_.TunnelDown();
+  restartable_ = false;
+  std::fill(awg_config_.begin(), awg_config_.end(), '\0');
+  awg_config_.clear();
+  awg_policy_ = RoutingPolicy{};
+}
+
+void TunnelController::EngineExitedLocked() {
+  // ADR-194: the engine died on its own (the TUN is gone with it). Restart it in place on the same
+  // window while the crash budget allows; otherwise report "down" so the UI's recovery (a new
+  // lease, ADR-099) takes over. The user's wish to stay connected lives in Dart and is kept.
+  const int64_t now = hooks_.now_ms();
+  const int64_t window = hooks_.crash_window.count();
+  crash_restart_times_.erase(std::remove_if(crash_restart_times_.begin(), crash_restart_times_.end(),
+                                            [&](int64_t at) { return now - at >= window; }),
+                             crash_restart_times_.end());
+  if (restartable_ && static_cast<int>(crash_restart_times_.size()) < hooks_.crash_restarts) {
+    crash_restart_times_.push_back(now);
+    RestartInPlaceLocked("engine_exited");  // on failure it stops with that reason
+    return;
+  }
+  reason_ = "engine_exited";
+  StopLocked();
+}
+
+bool TunnelController::RestartInPlaceLocked(const char* failure_reason) {
+  try {
+    engine_.Stop(hooks_.stop_grace);
+    engine_started_ = false;
+    std::string engine_config = CreateEngineConfig(ParseProfile(awg_config_, PrivateKey()), awg_policy_);
+    LaunchLocked(hooks_.engine_dir / L"detour-engine.exe", engine_config, false);
+    ++restarts_in_place_;
+    return true;
+  } catch (const std::exception&) {
+    // LaunchLocked already stopped on its own failures; a config failure stops here.
+    reason_ = failure_reason;
+    StopLocked();
+    return false;
+  }
+}
+
+void TunnelController::WatchTickLocked() {
+  if (!restartable_) return;  // VLESS (ADR-115): no handshake evidence, so no stall rule
+  const int64_t now = hooks_.now_ms();
+  if (now >= next_network_poll_) {
+    next_network_poll_ = now + hooks_.network_poll.count();
+    if (hooks_.physical_network) {
+      std::string id = hooks_.physical_network();
+      network_usable_ = !id.empty();
+      // A different network, or a network back after a loss: the path may have moved.
+      if (network_usable_ && id != network_id_) watchdog_.NetworkChanged(now);
+      network_id_ = id;
+    }
+  }
+  int64_t age_ms = -1;
+  if (auto stats = engine_.Stats()) {
+    stats_seen_ = true;
+    const int64_t age_s = handshake_clock_.AgeSeconds(stats->last_handshake_unix, hooks_.unix_seconds(), now);
+    if (age_s >= 0) age_ms = age_s * 1000;
+  }
+  // Without peer stats (an engine build without them) the handshake rules would restart a working
+  // tunnel every few minutes, so they stay off; the crash restart above still applies.
+  if (!stats_seen_) return;
+  switch (watchdog_.Decide(now, age_ms, network_usable_)) {
+    case TunnelWatchdog::Action::kRestart:
+      watchdog_.Restarted(now);
+      RestartInPlaceLocked("native_restart_failed");
+      break;
+    case TunnelWatchdog::Action::kNewLease:
+      // Two restarts after a network change got no handshake: give the window up so the UI's
+      // recovery starts a new one (same code as Android's watchdog_new_lease).
+      reason_ = "handshake_not_established";
+      StopLocked();
+      break;
+    case TunnelWatchdog::Action::kNone:
+      break;
+  }
+}
+
+void TunnelController::SystemResumed() {
+  std::lock_guard<std::mutex> lock(mutex_);
+  if (!engine_started_ || !restartable_) return;
+  const int64_t now = hooks_.now_ms();
+  watchdog_.NetworkChanged(now);
+  next_network_poll_ = now;  // re-read the network at the next tick
+  wake_.notify_all();
+}
+
+int TunnelController::RestartsInPlace() {
+  std::lock_guard<std::mutex> lock(mutex_);
+  return restarts_in_place_;
 }
 
 bool TunnelController::Permission() { return hooks_.is_admin(); }
@@ -351,10 +446,10 @@ void TunnelController::Connect(const std::string& config, int64_t remaining_ms,
     throw NativeError("native_engine_unavailable", kGenericMessage);
 
   std::string engine_config;
+  RoutingPolicy policy;
   try {
     Prefs prefs = LoadPrefs();
     AwgProfile profile = ParseProfile(config, PrivateKey());
-    RoutingPolicy policy;
     policy.mode = prefs.mode;
     policy.app_paths = prefs.apps;
     policy.domains = prefs.domains;
@@ -378,12 +473,24 @@ void TunnelController::Connect(const std::string& config, int64_t remaining_ms,
   }
   deadline_ = deadline;
   LaunchLocked(exe, engine_config);
+  // ADR-194: kept only for an in-place restart of this tunnel; cleared by StopLocked.
+  awg_config_ = config;
+  awg_policy_ = std::move(policy);
+  restartable_ = true;
 }
 
-void TunnelController::LaunchLocked(const std::filesystem::path& exe, std::string& engine_config) {
+void TunnelController::LaunchLocked(const std::filesystem::path& exe, std::string& engine_config, bool fresh) {
   reason_.clear();
-  handshake_seen_ = false;  // a new connection: nothing seen yet (kept after stop until here)
-  handshake_clock_ = HandshakeClock{};
+  handshake_clock_ = HandshakeClock{};  // a new engine reports its own handshake values
+  if (fresh) {
+    handshake_seen_ = false;  // a new connection: nothing seen yet (kept after stop until here)
+    stats_seen_ = false;
+    restarts_in_place_ = 0;
+    crash_restart_times_.clear();
+    network_id_ = hooks_.physical_network ? hooks_.physical_network() : std::string();
+    network_usable_ = !hooks_.physical_network || !network_id_.empty();
+    next_network_poll_ = hooks_.now_ms() + hooks_.network_poll.count();
+  }
   try {
     engine_.Start(exe.wstring(), L"run -c stdin", engine_config, true);
     engine_started_ = true;
@@ -406,6 +513,10 @@ void TunnelController::LaunchLocked(const std::filesystem::path& exe, std::strin
   if (hooks_.now_ms() >= deadline_) {
     StopLocked();
     throw NativeError("native_service_state_invalid", kGenericMessage);
+  }
+  if (fresh) {
+    watchdog_ = TunnelWatchdog{};  // a new connection carries no restart history
+    watchdog_.TunnelUp(hooks_.now_ms());
   }
 }
 
@@ -465,9 +576,9 @@ TunnelSnapshot TunnelController::Snapshot() {
   std::lock_guard<std::mutex> lock(mutex_);
   TunnelSnapshot snapshot;
   if (engine_started_ && !engine_.Running()) {
-    // Do not wait for the watcher: report the death together with its reason, and clear state.
-    reason_ = "engine_exited";
-    StopLocked();
+    // Do not wait for the watcher: restart in place (ADR-194) or report the death together with
+    // its reason, so the UI never sees "down" without a reason.
+    EngineExitedLocked();
   }
   snapshot.up = engine_started_ && engine_.Running();
   snapshot.network = hooks_.network_available ? hooks_.network_available() : false;

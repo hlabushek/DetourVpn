@@ -19,6 +19,8 @@ class TunnelChannel {
   // Stops the engine (graceful, then forced) before the window goes away.
   ~TunnelChannel();
   void Shutdown();
+  // ADR-194: the PC resumed from sleep (WM_POWERBROADCAST). Never throws.
+  void OnSystemResume();
 
  private:
   void Handle(const flutter::MethodCall<flutter::EncodableValue>& call,

@@ -47,8 +47,8 @@ target_compile_definitions(${BINARY_NAME} PRIVATE "NOMINMAX")
 # dependencies here.
 target_link_libraries(${BINARY_NAME} PRIVATE flutter flutter_wrapper_app)
 target_link_libraries(${BINARY_NAME} PRIVATE "dwmapi.lib")
-# I-032 native adapter: CNG, DPAPI, shell, COM, sockets, IDNA.
-target_link_libraries(${BINARY_NAME} PRIVATE bcrypt crypt32 shell32 ole32 uuid comdlg32 ws2_32 normaliz)
+# I-032 native adapter: CNG, DPAPI, shell, COM, sockets, IDNA, adapter list (ADR-194).
+target_link_libraries(${BINARY_NAME} PRIVATE bcrypt crypt32 shell32 ole32 uuid comdlg32 ws2_32 normaliz iphlpapi)
 target_include_directories(${BINARY_NAME} PRIVATE "${CMAKE_SOURCE_DIR}")
 
 # Run the Flutter tool portions of the build. This must not be removed.

@@ -1,7 +1,9 @@
 // Native owner of the Windows tunnel (the counterpart of ClientApplication.java). No Flutter types:
 // tunnel_channel.cpp is the thin MethodChannel layer on top, so everything here is unit-testable.
 // The private device key never leaves this class. Beta limits (ADR-095): no kill switch (when the
-// engine dies the TUN disappears), no Always-on.
+// engine dies the TUN disappears; ADR-196 is the unimplemented design), no Always-on. ADR-194: a
+// watchdog restarts a crashed or stalled AWG engine in place and gives up to a new lease after a
+// network change that two restarts did not recover.
 #pragma once
 
 #include <condition_variable>
@@ -19,6 +21,7 @@
 #include "engine_process.h"
 #include "handshake_clock.h"
 #include "secure_vault.h"
+#include "tunnel_watchdog.h"
 #include "window_deadline.h"
 
 namespace detour {
@@ -62,6 +65,13 @@ struct ControllerHooks {
   std::function<std::vector<std::string>(const std::string&)> resolve_ipv4;
   std::chrono::milliseconds start_probe{1500};  // how long Connect waits to see the engine survive
   std::chrono::milliseconds stop_grace{10000};
+  // ADR-194: identity of the usable physical network ("" = none). Compared in memory only, never
+  // logged or sent anywhere. Unset = the watchdog treats the network as usable and never changed.
+  std::function<std::string()> physical_network;
+  std::chrono::milliseconds network_poll{2000};
+  // ADR-194: in-place restarts after an engine crash allowed per crash_window.
+  int crash_restarts = 2;
+  std::chrono::milliseconds crash_window{600000};
 };
 
 class TunnelController {
@@ -86,6 +96,11 @@ class TunnelController {
   void AdvanceWindow(const WindowGrant& grant, int64_t remaining_ms);
   void Disconnect();
   TunnelSnapshot Snapshot();
+  // ADR-194: the PC resumed from sleep or hibernation. Treated like a network change: a running
+  // AWG tunnel must show a handshake newer than this or it is restarted in place.
+  void SystemResumed();
+  // ADR-194, test and diagnostics: in-place restarts done by the watchdog since the last connect.
+  int RestartsInPlace();
 
   std::optional<Record> ReadSession();
   void WriteSession(const std::optional<Record>& value);
@@ -120,7 +135,15 @@ class TunnelController {
   std::vector<std::string> ControlPlaneAddresses();
   void StopLocked();
   // Starts the engine with `engine_config` (wiped afterwards) and waits for the start probe.
-  void LaunchLocked(const std::filesystem::path& exe, std::string& engine_config);
+  // `fresh` = a new connection (resets handshake memory and the watchdog); false = in place.
+  void LaunchLocked(const std::filesystem::path& exe, std::string& engine_config, bool fresh = true);
+  // ADR-194: the engine exited by itself. Restarts it in place within the crash budget, else stops.
+  void EngineExitedLocked();
+  // ADR-194: one watchdog tick for a running AWG tunnel (network poll, stale handshake).
+  void WatchTickLocked();
+  // ADR-194: rebuilds the engine config from the inputs kept at connect and relaunches it.
+  // On failure the tunnel is stopped with `failure_reason`.
+  bool RestartInPlaceLocked(const char* failure_reason);
   void WatchLoop();
   std::string PrivateKey();
 
@@ -135,6 +158,20 @@ class TunnelController {
   bool engine_started_ = false;
   bool handshake_seen_ = false;
   HandshakeClock handshake_clock_;
+
+  // ADR-194: inputs of the running AWG tunnel, kept only to restart it in place. The Dart profile
+  // holds no private key (the vault supplies it); the routing policy is the one built at connect,
+  // so an in-place restart never applies rules saved later (ADR-187). Cleared on stop.
+  std::string awg_config_;
+  RoutingPolicy awg_policy_;
+  bool restartable_ = false;
+  TunnelWatchdog watchdog_;
+  bool stats_seen_ = false;  // the engine reported peer stats on this connection
+  bool network_usable_ = true;
+  std::string network_id_;
+  int64_t next_network_poll_ = 0;
+  std::vector<int64_t> crash_restart_times_;
+  int restarts_in_place_ = 0;
 
   std::condition_variable wake_;
   bool stopping_ = false;
