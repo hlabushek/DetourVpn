@@ -96,6 +96,14 @@ WindowGrant GrantFrom(const EncodableMap* args) {
 
 [[noreturn]] void Bad() { throw NativeError("native_operation_failed", "Операция VPN не выполнена"); }
 
+// ADR-195: optional `apiFallbackHosts` (a list of host names) sent with every connect. Missing =
+// primary origin only, exactly as before; a wrong type is refused like any malformed argument.
+void ApplyApiFallbacks(TunnelController& c, const EncodableMap* args) {
+  auto hosts = GetStrings(args, "apiFallbackHosts");
+  if (!hosts) Bad();
+  c.SetApiFallbacks(*hosts);
+}
+
 }  // namespace
 
 TunnelChannel::TunnelChannel(flutter::BinaryMessenger* messenger)
@@ -150,6 +158,7 @@ void TunnelChannel::Handle(const flutter::MethodCall<EncodableValue>& call,
       auto config = GetString(args, "config");
       auto remaining = GetInt(args, "remainingMs");
       if (!config || !remaining) Bad();
+      ApplyApiFallbacks(c, args);
       if (method == "connectWindow") c.Connect(*config, *remaining, GrantFrom(args));
       else c.Connect(*config, *remaining, std::nullopt);
       result->Success();
@@ -176,6 +185,7 @@ void TunnelChannel::Handle(const flutter::MethodCall<EncodableValue>& call,
       profile.public_key = *public_key;
       profile.short_id = *short_id;
       profile.fingerprint = *fingerprint;
+      ApplyApiFallbacks(c, args);
       c.ConnectVless(profile, *max_ms);
       std::fill(profile.uuid.begin(), profile.uuid.end(), '\0');
       result->Success();

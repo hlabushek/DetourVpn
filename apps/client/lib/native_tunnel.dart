@@ -373,6 +373,17 @@ class PlatformTunnel
   static const channel = MethodChannel('project.vpn/tunnel.v1');
   static const stateChannel = EventChannel('project.vpn/state.v1');
 
+  /// ADR-195: host names of the fallback API origins (ADR-161). The Windows runner routes their
+  /// addresses around the tunnel, as it does for the primary origin; Android excludes the whole
+  /// app instead, so it gets an empty list. Empty = the connect arguments are exactly as before.
+  PlatformTunnel({List<String> apiFallbackHosts = const []})
+    : apiFallbackHosts = List.unmodifiable(apiFallbackHosts);
+  final List<String> apiFallbackHosts;
+
+  Map<String, Object> get _fallbackArgs => apiFallbackHosts.isEmpty
+      ? const {}
+      : {'apiFallbackHosts': apiFallbackHosts};
+
   @override
   Stream<NativeStateEvent> stateEvents() => stateChannel
       .receiveBroadcastStream()
@@ -406,7 +417,11 @@ class PlatformTunnel
 
   @override
   Future<void> connectVless(Map<String, Object> profile, int maxMs) =>
-      channel.invokeMethod<void>('connectVless', {...profile, 'maxMs': maxMs});
+      channel.invokeMethod<void>('connectVless', {
+        ...profile,
+        'maxMs': maxMs,
+        ..._fallbackArgs,
+      });
   Map<String, dynamic> _windowArgs(
     Map<String, dynamic> grant,
     int remainingMs,
@@ -424,6 +439,7 @@ class PlatformTunnel
   ) => channel.invokeMethod<void>('connectWindow', {
     ..._windowArgs(grant, remainingMs),
     'config': config,
+    ..._fallbackArgs,
   });
   @override
   Future<bool> startNativeRenewal(Map<String, Object?> args) async {
@@ -460,6 +476,7 @@ class PlatformTunnel
       channel.invokeMethod<void>('connect', {
         'config': config,
         'remainingMs': remainingMs,
+        ..._fallbackArgs,
       });
   @override
   Future<void> disconnect() => channel.invokeMethod<void>('disconnect');

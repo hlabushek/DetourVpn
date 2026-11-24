@@ -1,6 +1,7 @@
 // Test double for detour-engine.exe: reads stdin to EOF, prints PEER_STATS lines until Ctrl-C.
 // Environment: FAKE_ENGINE_MARKER = file written on graceful exit, FAKE_ENGINE_IGNORE_CTRLC=1 =
-// keep running after Ctrl-C (exercises the forced-termination path), FAKE_ENGINE_NO_HANDSHAKE=1.
+// keep running after Ctrl-C (exercises the forced-termination path), FAKE_ENGINE_NO_HANDSHAKE=1,
+// FAKE_ENGINE_EXIT_MS (crash after N ms), FAKE_ENGINE_CONFIG_OUT (copy of the received config).
 // Not shipped. It is NOT a tunnel and proves nothing about handshake or egress.
 #include <windows.h>
 
@@ -30,9 +31,20 @@ int main() {
     free(ignore);
   }
   SetConsoleCtrlHandler(OnCtrl, TRUE);
-  char buffer[4096];
-  while (fread(buffer, 1, sizeof(buffer), stdin) > 0) {
+  // FAKE_ENGINE_CONFIG_OUT: copy the received config to this file (tests inspect the routing; the
+  // key in it is a throwaway test key).
+  FILE* copy = nullptr;
+  char* copy_path = nullptr;
+  if (_dupenv_s(&copy_path, &n, "FAKE_ENGINE_CONFIG_OUT") == 0 && copy_path) {
+    fopen_s(&copy, copy_path, "wb");
+    free(copy_path);
   }
+  char buffer[4096];
+  size_t got = 0;
+  while ((got = fread(buffer, 1, sizeof(buffer), stdin)) > 0) {
+    if (copy) fwrite(buffer, 1, got, copy);
+  }
+  if (copy) fclose(copy);
   char* no_handshake = nullptr;
   bool silent_handshake = _dupenv_s(&no_handshake, &n, "FAKE_ENGINE_NO_HANDSHAKE") == 0 && no_handshake &&
                           std::string(no_handshake) == "1";

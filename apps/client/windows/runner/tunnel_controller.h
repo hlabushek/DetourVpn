@@ -99,6 +99,10 @@ class TunnelController {
   // ADR-194: the PC resumed from sleep or hibernation. Treated like a network change: a running
   // AWG tunnel must show a handshake newer than this or it is restarted in place.
   void SystemResumed();
+  // ADR-195: host names (or IPv4 literals) of up to two fallback API origins (ADR-161) whose IPv4
+  // addresses also bypass the tunnel, as the primary origin does. Empty = primary only (unchanged).
+  // Throws NativeError(native_config_invalid) when malformed; the stored list is then unchanged.
+  void SetApiFallbacks(const std::vector<std::string>& hosts);
   // ADR-194, test and diagnostics: in-place restarts done by the watchdog since the last connect.
   int RestartsInPlace();
 
@@ -172,6 +176,7 @@ class TunnelController {
   int64_t next_network_poll_ = 0;
   std::vector<int64_t> crash_restart_times_;
   int restarts_in_place_ = 0;
+  std::vector<std::string> api_fallback_hosts_;  // ADR-195
 
   std::condition_variable wake_;
   bool stopping_ = false;

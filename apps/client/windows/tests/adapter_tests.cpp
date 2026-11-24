@@ -571,6 +571,49 @@ void ControllerTests() {
     CHECK(!r.c->Snapshot().up);
   }
   {
+    // ADR-195: fallback API origins bypass the tunnel like the primary; none = primary only.
+    Rig r("ctl-fallbacks", true, true, [](ControllerHooks& h) {
+      h.resolve_ipv4 = [](const std::string& host) {
+        if (host == "api2.example.test") return std::vector<std::string>{"198.51.100.20", "198.51.100.21"};
+        if (host == "bad.example.test") return std::vector<std::string>{"not-an-ip"};
+        return std::vector<std::string>{};
+      };
+    });
+    CHECK(ThrowsCode("native_config_invalid", [&] { r.c->SetApiFallbacks({"a.example.test", "b.example.test", "c.example.test"}); }));
+    CHECK(ThrowsCode("native_config_invalid", [&] { r.c->SetApiFallbacks({"API2.example.test"}); }));
+    CHECK(ThrowsCode("native_config_invalid", [&] { r.c->SetApiFallbacks({"https://api2.example.test"}); }));
+    CHECK(ThrowsCode("native_config_invalid", [&] { r.c->SetApiFallbacks({"api2.example.test", "api2.example.test"}); }));
+    CHECK(ThrowsCode("native_config_invalid", [&] { r.c->SetApiFallbacks({"::1"}); }));
+    fs::path out = r.dir / "config.json";
+    SetEnvironmentVariableW(L"FAKE_ENGINE_CONFIG_OUT", out.c_str());
+    auto read_config = [&] {
+      std::ifstream in(out, std::ios::binary);
+      return std::string((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+    };
+    r.c->Connect(kProfile, 30000, std::nullopt);  // nothing configured: primary only
+    r.c->Disconnect();
+    std::string config = read_config();
+    CHECK(config.find("198.51.100.7/32") != std::string::npos && config.find("198.51.100.20") == std::string::npos);
+    r.c->SetApiFallbacks({"api2.example.test", "203.0.113.5"});
+    r.c->Connect(kProfile, 30000, std::nullopt);
+    r.c->Disconnect();
+    config = read_config();
+    CHECK(config.find("198.51.100.7/32") != std::string::npos && config.find("198.51.100.20/32") != std::string::npos &&
+          config.find("198.51.100.21/32") != std::string::npos && config.find("203.0.113.5/32") != std::string::npos);
+    // A fallback that does not resolve (or resolves to junk) is skipped; the primary still connects.
+    r.c->SetApiFallbacks({"dead.example.test", "bad.example.test"});
+    r.c->Connect(kProfile, 30000, std::nullopt);
+    CHECK(r.c->Snapshot().up);
+    r.c->Disconnect();
+    config = read_config();
+    CHECK(config.find("198.51.100.7/32") != std::string::npos && config.find("not-an-ip") == std::string::npos);
+    r.c->SetApiFallbacks({});  // back to primary only
+    r.c->Connect(kProfile, 30000, std::nullopt);
+    r.c->Disconnect();
+    CHECK(read_config().find("198.51.100.20") == std::string::npos);
+    SetEnvironmentVariableW(L"FAKE_ENGINE_CONFIG_OUT", nullptr);
+  }
+  {
     // ADR-115 panel server (VLESS + Reality); obviously fake values, reserved test names
     VlessRealityProfile v;
     v.server = "panel.example.test";

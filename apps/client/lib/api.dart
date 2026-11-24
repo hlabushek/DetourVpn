@@ -48,6 +48,12 @@ List<Uri> parseFallbackOrigins(String value) {
   return [for (final part in parts) Uri.parse(part)];
 }
 
+/// ADR-195: host names of the fallback origins in [Api.origins] (the primary is first and is
+/// excluded), lower-case, in order. The Windows runner routes these hosts around the tunnel.
+List<String> fallbackApiHosts(List<Uri> origins) => [
+  for (final origin in origins.skip(1)) origin.host.toLowerCase(),
+];
+
 /// No logging, redirects, disk cache, certificate override or release HTTP mode.
 class Api implements TunnelApi {
   /// [fallbacks] (ADR-161): up to two more https origins of the same API, tried in order when

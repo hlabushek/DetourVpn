@@ -421,12 +421,42 @@ std::vector<std::string> TunnelController::ControlPlaneAddresses() {
   host = host.substr(0, host.find_first_of("/:?#"));
   if (host.empty() || host.find_first_of("[]@ ") != std::string::npos)
     throw NativeError("native_config_invalid", kGenericMessage);
-  if (IsIpv4Literal(host)) return {host};
-  std::vector<std::string> resolved = hooks_.resolve_ipv4(host);
-  if (resolved.empty() || resolved.size() > 8) throw NativeError("native_config_invalid", kGenericMessage);
-  for (const auto& ip : resolved)
-    if (!IsIpv4Literal(ip)) throw NativeError("native_config_invalid", kGenericMessage);
-  return resolved;
+  std::vector<std::string> addresses;
+  if (IsIpv4Literal(host)) {
+    addresses.push_back(host);
+  } else {
+    addresses = hooks_.resolve_ipv4(host);
+    if (addresses.empty() || addresses.size() > 8) throw NativeError("native_config_invalid", kGenericMessage);
+    for (const auto& ip : addresses)
+      if (!IsIpv4Literal(ip)) throw NativeError("native_config_invalid", kGenericMessage);
+  }
+  // ADR-195: fallback origins bypass the tunnel too, so the API stays reachable through them when
+  // the primary host or the tunnel fails. Best effort: a fallback that does not resolve now (or
+  // answers with something unusable) is skipped; it never blocks a connect the primary allows.
+  for (const auto& fallback : api_fallback_hosts_) {
+    std::vector<std::string> found;
+    if (IsIpv4Literal(fallback)) {
+      found.push_back(fallback);
+    } else {
+      found = hooks_.resolve_ipv4(fallback);
+      if (found.size() > 8) found.clear();
+      if (std::any_of(found.begin(), found.end(), [](const std::string& ip) { return !IsIpv4Literal(ip); }))
+        found.clear();
+    }
+    for (const auto& ip : found)
+      if (std::find(addresses.begin(), addresses.end(), ip) == addresses.end()) addresses.push_back(ip);
+  }
+  return addresses;
+}
+
+void TunnelController::SetApiFallbacks(const std::vector<std::string>& hosts) {
+  if (hosts.size() > 2) throw NativeError("native_config_invalid", kGenericMessage);
+  std::set<std::string> seen;
+  for (const auto& host : hosts)
+    if (!(IsIpv4Literal(host) || IsLowerDnsName(host)) || !seen.insert(host).second)
+      throw NativeError("native_config_invalid", kGenericMessage);
+  std::lock_guard<std::mutex> lock(mutex_);
+  api_fallback_hosts_ = hosts;
 }
 
 void TunnelController::Connect(const std::string& config, int64_t remaining_ms,

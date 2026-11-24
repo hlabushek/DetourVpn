@@ -11,11 +11,15 @@
 
 namespace detour {
 
+constexpr size_t kMaxApiIpv4 = 24;
+
 struct RoutingPolicy {
   std::string mode;                   // "all" | "exclude" | "include"
   std::vector<std::string> app_paths;  // absolute .exe paths (Windows), max 63
   std::vector<std::string> domains;    // "example.ru" / "*.example.ru", max 128
-  std::vector<std::string> api_ipv4;   // control-plane addresses that always go direct, 1..8
+  // Control-plane addresses that always go direct, 1..kMaxApiIpv4: up to 8 for the primary API
+  // origin and up to 8 for each of at most two fallback origins (ADR-195).
+  std::vector<std::string> api_ipv4;
   // ADR-106: tunnel DNS chosen by the user. Empty = the server profile DNS (default); otherwise
   // exactly one of the listed resolvers (same list as DnsChoice.java and dns_choice.dart).
   std::string dns_server;
@@ -23,6 +27,9 @@ struct RoutingPolicy {
 
 // True only for a listed resolver: 1.1.1.1, 8.8.8.8, 94.140.14.14, 9.9.9.9.
 bool IsDnsChoice(const std::string& server);
+
+// Lowercase DNS name with at least two labels and an alphabetic TLD (no IP literals).
+bool IsLowerDnsName(const std::string& name);
 
 // Absolute drive-letter path to an .exe, without control characters, "..", slashes or ADS colons.
 bool IsValidAppPath(const std::string& path);

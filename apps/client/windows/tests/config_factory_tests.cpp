@@ -239,6 +239,13 @@ void ConfigRejections() {
   p = Policy("exclude");
   p.api_ipv4 = {"example.org"};
   CHECK(bad("routing_policy_invalid", p));
+  // ADR-195: primary plus two fallback origins, up to 8 addresses each.
+  p = Policy("exclude");
+  p.api_ipv4.clear();
+  for (int i = 0; i < 24; ++i) p.api_ipv4.push_back("198.51.100." + std::to_string(i + 1));
+  CHECK(Has(Make(p), "198.51.100.24/32"));
+  p.api_ipv4.push_back("198.51.100.25");
+  CHECK(bad("routing_policy_invalid", p));
   p = Policy("exclude");
   for (int i = 0; i < 64; ++i) p.app_paths.push_back("C:\\a\\app" + std::to_string(i) + ".exe");
   CHECK(bad("routing_policy_invalid", p));                         // > 63 apps

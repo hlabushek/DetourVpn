@@ -68,7 +68,7 @@ bool IsDnsChoiceValue(const std::string& server) {
 void ValidatePolicy(const RoutingPolicy& policy) {
   const std::string& mode = policy.mode;
   if ((mode != "all" && mode != "exclude" && mode != "include") || policy.app_paths.size() > 63 ||
-      policy.domains.size() > 128 || policy.api_ipv4.empty() || policy.api_ipv4.size() > 8 ||
+      policy.domains.size() > 128 || policy.api_ipv4.empty() || policy.api_ipv4.size() > kMaxApiIpv4 ||
       (mode == "include" && policy.app_paths.empty() && policy.domains.empty()))
     Fail("routing_policy_invalid");
   if (std::set<std::string>(policy.domains.begin(), policy.domains.end()).size() !=
@@ -240,6 +240,8 @@ bool IsFingerprint(const std::string& fp) {
 bool IsValidAppPath(const std::string& path) { return ValidAppPath(path); }
 
 bool IsDnsChoice(const std::string& server) { return IsDnsChoiceValue(server); }
+
+bool IsLowerDnsName(const std::string& name) { return IsDnsName(name); }
 
 std::string CreateEngineConfig(const AwgProfile& profile, const RoutingPolicy& policy) {
   ValidatePolicy(policy);

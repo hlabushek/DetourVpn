@@ -47,7 +47,13 @@ void main() {
   runApp(
     VpnApp(
       api: api,
-      native: PlatformTunnel(),
+      // ADR-195: Windows routes only listed API hosts around the tunnel, so it needs the
+      // fallbacks too; Android excludes the whole app from its VPN (ADR-132).
+      native: PlatformTunnel(
+        apiFallbackHosts: isWindowsClient && api != null
+            ? fallbackApiHosts(api.origins)
+            : const [],
+      ),
       // Window-tunnel builds (the signed beta) are Android too: only Windows lacks the updater.
       updates: isWindowsClient ? null : const PlatformUpdateNative(),
     ),
