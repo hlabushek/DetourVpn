@@ -25,7 +25,7 @@ final class UpdateSignature {
      * {@code UPDATE_SIGNING_PUBLIC_KEY} in services/api/src/vpn_api/app_update.py (a test pins it).
      * Empty = no key generated yet (scripts/app_update_keygen.py), so every manifest is refused.
      */
-    static final String PUBLIC_KEY_B64 = "Y9b9HwC1Ch4Ee7TO+7n5si0NcpC1putqR7D7RNQjHTs=";
+    static final String PUBLIC_KEY_B64 = "N8vv9JWkQT+WW2+t055fIEq1kTjK9uYb3197MOIHEu8=";
 
     static final int MIN_API = 33;
     static final int MAX_PAYLOAD_BYTES = 16 * 1024;
