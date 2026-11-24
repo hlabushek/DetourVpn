@@ -12,13 +12,13 @@ State before you start (prepared without secrets):
 
 ## 0. Script to use
 
-There is **no `release_app_beta37.ps1`**. The closest script is `scripts/release_app_beta34.ps1`
-(two stages: signed APK + phone install, then `-PublishOnly`). It has its version constants hard
-coded, so make a local copy and change only these lines:
+**Updated 2026-11-25:** `scripts/release_app_beta37.ps1` now exists (commit `0711d19`). Its
+constants were checked against this table: version `0.1.0-beta.37`, code `37`, old `0.1.0-beta.36+36`,
+window `3600`, output `ProjectVpn\updates\beta37`. It parses, and it has not been run. Use it directly; do not
+copy beta34 again. The table below is kept as the record of what the copy changed.
 
-```powershell
-Copy-Item .\scripts\release_app_beta34.ps1 .\scripts\release_app_beta37.ps1
-```
+The copy was made from `scripts/release_app_beta34.ps1` (two stages: signed APK + phone install, then
+`-PublishOnly`). The constants are hard coded, so the table lists what differs:
 
 In `scripts\release_app_beta37.ps1` change:
 

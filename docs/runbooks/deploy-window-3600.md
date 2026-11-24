@@ -14,8 +14,13 @@ Status: **prepared, not deployed.** Nothing on any beta host has been changed.
 ## Gate 0: local tests (done, 2026-11-17)
 `uv run --frozen --python 3.13 pytest` on the six window test files: **69 passed, 48 skipped.**
 The skipped tests need `VPN_TEST_DATABASE_URL` (real PostgreSQL). They have **not** run yet.
+
+**Gate 0 re-run, 2026-11-25 (update):** the eight `services/api/tests/test_window_*.py` files were run
+against a disposable local PostgreSQL (`scripts/test_with_postgres.py`, `VPN_TEST_POSTGRES_BIN` pointing at
+the portable PostgreSQL 17 binaries): **95 passed, 0 skipped, 0 errors.** The earlier 2 errors came from the
+binaries path, not from the code. This covers the database tests, but not a real staging or beta database.
 Two stale assertions were updated (901 s / 900 001 ms now expect rejection at 3601 s / 3 600 001 ms).
-Those edits are uncommitted in the working tree.
+Those edits were committed in `93cec66` (2026-11-17).
 
 ## Verified current state (read-only, 2026-11-17)
 The scripts' defaults (`--baseline-rev ddf1320`) are wrong for this change: that would deploy 112

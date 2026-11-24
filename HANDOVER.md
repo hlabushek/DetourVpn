@@ -10,9 +10,9 @@
   `services/node-agent/window_gate.py`, OpenAPI). Deployment is NOT confirmed: `docs/runbooks/deploy-window-3600.md`
   says "prepared, not deployed". The client (beta.36/37) already asks for 3600 s, so a server still on 900 s
   would refuse those requests. Verify before any tester build.
-- Test status conflict: an older line here said the window tests were not run. `docs/runbooks/deploy-window-3600.md`
-  Gate 0 (2026-11-17) reports 69 passed and 48 skipped (the skipped ones need `VPN_TEST_DATABASE_URL`).
-  The full set has not been run since.
+- Window tests: 2026-11-25 run of the eight `services/api/tests/test_window_*.py` files against a disposable
+  local PostgreSQL 17.11 gave **95 passed, 0 skipped**. This is the database-backed check that was skipped on
+  2026-11-17 (`deploy-window-3600.md`, Gate 0 re-run). It is not a staging or beta database check.
 - Open TODOs, rechecked in code on 2026-11-24 (all still OPEN): health-probe URL is `none`
   (`AndroidManifest.xml`), the `bind_refused` routing decision is not recorded (`TunnelProbeRunner.java`,
   ADR-148), the restart order after `restartInPlace` / `setUnderlyingNetworks` has no device check
