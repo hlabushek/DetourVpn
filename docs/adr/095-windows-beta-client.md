@@ -72,7 +72,9 @@ by the owner (stage 5). Until then the gate uses an Android-labelled throwaway d
 control client does.
 
 ### Disabled on Windows
-Always-on and "Работа в фоне" (battery) are hidden. No kill switch. Rules, domains and app paths stay
+Always-on and "Работа в фоне" (battery) are hidden. No kill switch (ADR-196 records a WFP design
+that is not implemented; when the engine dies or restarts, traffic can go direct until it is back).
+No tray mode (ADR-194). Rules, domains and app paths stay
 local. An in-app DoH/ECH client or a cached answer can hide a name, so a domain rule is not guaranteed
 (ADR-079). The beta limits in ADR-090 are otherwise unchanged. Payments, referrals, iOS and Linux stay
 disabled.

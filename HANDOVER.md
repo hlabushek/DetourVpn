@@ -278,7 +278,7 @@ nothing ran on a node or on the managed database.
   `.cache/i-004/portable/pgsql/bin`, the backup/restore fixtures run and pass.
 
 ## Rules for the next agent
-- One phase at a time, with one ADR per phase in `docs/adr/` (next free number: 194).
+- One phase at a time, with one ADR per phase in `docs/adr/` (next free number: 197).
 - Commit locally with the owner's OK. No push.
 - No `flutter build`, no `gradlew assemble`, no release or deploy scripts, no adb or device tests,
   and no server changes without explicit approval.

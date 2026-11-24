@@ -229,7 +229,11 @@ channel.
 ## Known beta limitations
 
 - Unsigned exe, no auto-update.
-- No kill switch, no Always-on.
+- No kill switch (ADR-196 is a design only), no Always-on, no tray mode (ADR-194). The acceptance
+  item "with the engine killed, traffic does not go direct" is therefore **not met**: the
+  watchdog restarts a crashed engine in place (ADR-194), but traffic can go direct until it is up.
+- Watchdog, network-change and sleep/resume recovery (ADR-194) and fallback API bypass (ADR-195)
+  are unit-tested against a fake engine only; not verified on a real PC.
 - x64 only.
 - Domain rules are not guaranteed with in-app DoH/ECH or cached answers
   (ADR-079).
