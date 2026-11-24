@@ -6,7 +6,21 @@
 - A local signed APK `0.1.0-beta.37` exists (`docs/evidence/i-030-beta-apk-20261124T160159087Z-52aeb38e.json`):
   metadata and signature passed, install and distribution not verified. Whether
   `scripts/run_overnight_build.ps1` was run is unknown; the 2026-11-17 "not run yet" note may be out of date.
-- Phase 3.1 (server window 3600 s): deployment status not checked here.
+- Phase 3.1 (server window 3600 s): 3600 is in the code (`services/api/src/vpn_api/tunnels/v3_contracts.py`,
+  `services/node-agent/window_gate.py`, OpenAPI). Deployment is NOT confirmed: `docs/runbooks/deploy-window-3600.md`
+  says "prepared, not deployed". The client (beta.36/37) already asks for 3600 s, so a server still on 900 s
+  would refuse those requests. Verify before any tester build.
+- Test status conflict: an older line here said the window tests were not run. `docs/runbooks/deploy-window-3600.md`
+  Gate 0 (2026-11-17) reports 69 passed and 48 skipped (the skipped ones need `VPN_TEST_DATABASE_URL`).
+  The full set has not been run since.
+- Open TODOs, rechecked in code on 2026-11-24 (all still OPEN): health-probe URL is `none`
+  (`AndroidManifest.xml`), the `bind_refused` routing decision is not recorded (`TunnelProbeRunner.java`,
+  ADR-148), the restart order after `restartInPlace` / `setUnderlyingNetworks` has no device check
+  (`ClientApplication.restartTunnel`), and no owner sign-off on the Play exact-alarm policy (`NativeRenewer.java`).
+- No device evidence for phases 0 to 6 exists after 2026-11-17.
+- `scripts/run_overnight_build.ps1`: unknown whether it ran. The `sdk-go-only-c6-20261117` tree exists
+  (prepared 2026-11-17), and a signed APK receipt `0.1.0-beta.34` was made about two hours later
+  (`docs/evidence/i-030-beta-apk-20261117T193240985Z-2410c412.json`). That receipt does not record which SDK tree was used.
 - Next free ADR number: at least 198 (ADR-197 exists).
 - Windows beta progress is in `docs/issues/I-032-windows-beta.md` (updated 2026-11-24).
 
