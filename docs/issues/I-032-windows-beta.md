@@ -234,8 +234,12 @@ channel.
   real firewall, no leak test yet. The acceptance item "with the engine killed, traffic does not
   go direct" stays **not met until the owner's leak test (ADR-196) passes**. With the setting off
   (the default), traffic can go direct until a restarted engine is up (ADR-194).
-- No Always-on, no tray mode (ADR-194). Dead-peer probe (A-03) still needs an owner-provided
-  project health URL.
+- No Always-on, no tray mode (ADR-194). Tray mode (W-02, tray part) is **deferred to beta.38**:
+  hiding the window would keep the VPN running with no visible state while the only gap
+  protection (the kill switch) is not leak-tested and off by default; it should follow the
+  ADR-196 leak test. Closing the window still stops the VPN.
+- Dead-peer probe (A-03) still needs an owner-provided project-owned HTTPS health endpoint; none
+  is invented (Android `DEAD_PEER_PROBE_URL` stays `none`).
 - Watchdog, network-change and sleep/resume recovery (ADR-194) and fallback API bypass (ADR-195)
   are unit-tested against a fake engine only; not verified on a real PC.
 - x64 only.
