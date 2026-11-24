@@ -1,7 +1,6 @@
 # ADR-181 — Indexes for the window hot paths (migration 0029)
 
-**Status:** accepted. Migration `0029_window_hot_path_indexes`, model declarations and tests in
-the working tree, uncommitted. **Not applied to the managed database.**
+**Status:** accepted. Migration `0029_window_hot_path_indexes`, model declarations and tests committed. **Not applied to the managed database.**
 
 ## Context
 `LedgerService.held_lots` filters `peer_window_allocations` by `user_id`, which had no index, so

@@ -1,6 +1,6 @@
 # ADR-186 — A user disconnect is not shown as a revoke error when the server accepts it
 
-**Status:** accepted. Code in the working tree, uncommitted. Not on a phone yet.
+**Status:** accepted. Code committed. Not on a phone yet.
 
 ## Context
 After a user tapped «Отключить VPN», the app showed the warning `revoke_unconfirmed` (diagnostic

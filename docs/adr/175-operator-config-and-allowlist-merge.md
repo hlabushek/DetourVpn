@@ -1,6 +1,6 @@
 # ADR-175 — Host identifiers leave the repository; the node allowlist is merged, not replaced
 
-**Status:** accepted. Code and tests in the working tree, uncommitted. **Not run against any host.**
+**Status:** accepted. Code and tests committed. **Not run against any host.**
 
 ## Context
 - **M9.** `scripts/restore_primary_api.sh` and `scripts/activate_beta_caddy_allowlist.ps1`

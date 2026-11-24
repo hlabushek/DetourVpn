@@ -1,6 +1,6 @@
 # ADR-173 — One connection's bad data does not stop the node's poll
 
-**Status:** accepted. Code and PostgreSQL tests in the working tree, uncommitted. **Not deployed.**
+**Status:** accepted. Code and PostgreSQL tests committed. **Not deployed.**
 
 ## Context
 `poll_windows` handled the whole node in one transaction. One unknown or foreign receipt

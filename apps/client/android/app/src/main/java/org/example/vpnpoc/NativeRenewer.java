@@ -8,18 +8,26 @@ import android.net.VpnService;
 import android.os.PowerManager;
 import android.os.SystemClock;
 import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.HttpURLConnection;
+import java.net.InetAddress;
+import java.net.SocketTimeoutException;
 import java.net.URI;
 import java.net.URL;
+import java.net.UnknownHostException;
 import java.nio.charset.StandardCharsets;
 import java.util.Map;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import org.json.JSONObject;
 
 /**
@@ -335,6 +343,45 @@ final class NativeRenewer {
         }
     }
 
+    /** Test seam for {@link #resolveWithin}; production passes {@code InetAddress::getAllByName}. */
+    interface Resolver { InetAddress[] resolve(String host) throws Exception; }
+
+    /**
+     * Daemon threads for bounded DNS lookups. A lookup that outlives its bound is abandoned on its
+     * thread (the platform resolver cannot be interrupted) and ends with the resolver's own timeout.
+     */
+    private static final ExecutorService DNS = Executors.newCachedThreadPool(r -> {
+        Thread t = new Thread(r, "detourvpn-renew-dns");
+        t.setDaemon(true);
+        return t;
+    });
+
+    /**
+     * A-05: resolves {@code host} on a separate thread and waits at most {@code timeoutMs}, so a
+     * hanging DNS lookup cannot hold the renewer thread past the call deadline. Timeout and lookup
+     * failure are IOExceptions (transient: the window decides). The answer itself is not used to
+     * connect; the following connect resolves again and normally hits the platform cache.
+     */
+    static InetAddress[] resolveWithin(String host, long timeoutMs, Resolver resolver)
+            throws IOException, InterruptedException {
+        if (timeoutMs <= 0) throw new SocketTimeoutException("dns_timeout");
+        Future<InetAddress[]> lookup = DNS.submit(() -> resolver.resolve(host));
+        try {
+            InetAddress[] found = lookup.get(timeoutMs, TimeUnit.MILLISECONDS);
+            if (found == null || found.length == 0) throw new UnknownHostException("dns_empty");
+            return found;
+        } catch (TimeoutException slow) {
+            lookup.cancel(true);
+            throw new SocketTimeoutException("dns_timeout");
+        } catch (ExecutionException failed) {
+            if (failed.getCause() instanceof IOException) throw (IOException) failed.getCause();
+            throw new IOException("dns_failed");
+        } catch (InterruptedException stopped) {
+            lookup.cancel(true);
+            throw stopped;
+        }
+    }
+
     private Response call(State s, String method, String suffix, JSONObject body) throws Exception {
         String path = "/api/v1/window-tunnels/" + s.plan.connection + suffix;
         // ADR-140: under Lockdown only a protect()ed socket leaves; otherwise the app's own
@@ -354,14 +401,18 @@ final class NativeRenewer {
             default:
                 break;
         }
+        // A-05: the DNS step shares the CALL_DEADLINE_MS budget with the HTTP exchange below.
+        long started = SystemClock.elapsedRealtime();
+        resolveWithin(s.origin.getHost(), CALL_DEADLINE_MS, InetAddress::getAllByName);
+        long left = Math.max(1, CALL_DEADLINE_MS - (SystemClock.elapsedRealtime() - started));
         String base = s.origin.toString().replaceAll("/+$", "");
         URL url = new URL(base + path);
         HttpURLConnection connection = (HttpURLConnection) url.openConnection();
         // ADR-165 item 2: the per-read timeouts alone let a slow-dripping answer hold the renewer
-        // thread past the window's end. The watchdog disconnects after an overall deadline. It
-        // cannot interrupt a DNS lookup already in progress; that step stays unbounded here.
+        // thread past the window's end. The watchdog disconnects after the overall deadline; the
+        // DNS lookup was bounded above (A-05) and its time is taken out of this budget.
         ScheduledFuture<?> deadline = WATCHDOG.schedule(connection::disconnect,
-                CALL_DEADLINE_MS, TimeUnit.MILLISECONDS);
+                left, TimeUnit.MILLISECONDS);
         try {
             connection.setInstanceFollowRedirects(false);
             connection.setUseCaches(false);

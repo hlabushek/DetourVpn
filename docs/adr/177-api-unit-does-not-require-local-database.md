@@ -1,6 +1,6 @@
 # ADR-177 — The beta API unit does not hard-require the local database unit
 
-**Status:** accepted. Unit text and test in the working tree, uncommitted. **Not installed on
+**Status:** accepted. Unit text and test committed. **Not installed on
 any host.**
 
 ## Context

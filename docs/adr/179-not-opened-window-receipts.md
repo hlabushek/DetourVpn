@@ -1,7 +1,6 @@
 # ADR-179 — A gate that never opened releases the budget hold ("not_opened" receipts)
 
-**Status:** accepted. Code, migration `0028_window_not_opened_receipts` and tests in the working
-tree, uncommitted. **Not deployed; the migration was not applied to the managed database.**
+**Status:** accepted. Code, migration `0028_window_not_opened_receipts` and tests committed. **Not deployed; the migration was not applied to the managed database.**
 
 ## Context
 The node wrote an `unknown` receipt whenever it could not measure a window, including windows

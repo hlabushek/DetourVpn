@@ -27,6 +27,7 @@ const _reportableErrors = <String>{
   'native_service_state_invalid',
   'native_start_failed',
   'native_state_unknown',
+  'native_timeout',
   'native_unavailable',
   'network_unavailable',
   'permission_denied',

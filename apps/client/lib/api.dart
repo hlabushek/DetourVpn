@@ -241,12 +241,14 @@ class Api implements TunnelApi {
       await forgetSession();
       throw const ClientError('session_expired');
     }
+    if (epoch != _sessionEpoch) throw const ClientError('session_expired');
+    final access = value['access_token'];
+    final refresh = value['refresh_token'];
+    // A malformed 2xx answer is retryable: the durable token stays and the session is kept.
+    if (access is! String || refresh is! String) {
+      throw const ClientError('invalid_response');
+    }
     try {
-      if (epoch != _sessionEpoch) throw const ClientError('session_expired');
-      final access = value['access_token'];
-      final refresh = value['refresh_token'];
-      if (access is! String || refresh is! String)
-        throw const ClientError('invalid_response');
       await _persist({'origin': origin.toString(), 'refresh_token': refresh});
       if (epoch != _sessionEpoch) throw const ClientError('session_expired');
       _access = access;

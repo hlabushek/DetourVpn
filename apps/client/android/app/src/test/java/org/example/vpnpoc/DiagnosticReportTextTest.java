@@ -40,6 +40,11 @@ public class DiagnosticReportTextTest {
                 "native_down", "native_secret", null, null, null, null, "general"));
     }
 
+    @Test public void nativeTimeoutCodeIsAccepted() {
+        String text = DiagnosticReportText.format("native_timeout", "unknown");
+        assertEquals(true, text.contains("Код: native_timeout"));
+    }
+
     @Test public void rejectsFreeTextContextAndHints() {
         assertThrows(IllegalArgumentException.class, () -> DiagnosticReportText.format(
                 "native_down", "tunnel_monitor", null, "12345s", null, null, "general"));

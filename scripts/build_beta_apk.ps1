@@ -5,6 +5,8 @@ param(
     [Parameter(Mandatory = $true)]
     [ValidatePattern('^https://[^\s/?#]+/?$')]
     [string]$ApiOrigin,
+    # ADR-161: up to two https fallback origins of the same API, comma-separated (empty = none).
+    [string]$ApiFallbackOrigins = '',
     [ValidateSet('android-arm64', 'android-arm64,android-x64')]
     [string]$TargetPlatforms = 'android-arm64',
     [switch]$PhysicalTestBuild,
@@ -49,6 +51,7 @@ if (!$IsolatedPowerShell) {
         '-WindowSeconds', $WindowSeconds,
         '-IsolatedPowerShell'
     )
+    if ($ApiFallbackOrigins) { $isolatedArguments += @('-ApiFallbackOrigins', $ApiFallbackOrigins) }
     if ($PhysicalTestBuild) { $isolatedArguments += '-PhysicalTestBuild' }
     $priorProcessModulePath = [Environment]::GetEnvironmentVariable('PSModulePath', 'Process')
     $minimalSystemModulePaths = @(
@@ -218,6 +221,7 @@ try {
     # client builder so a beta APK cannot silently target closed v2 admission.
     $buildParameters.WindowTunnels = $true
     $buildParameters.WindowSeconds = $WindowSeconds
+    if ($ApiFallbackOrigins) { $buildParameters.ApiFallbackOrigins = $ApiFallbackOrigins }
     if ($PhysicalTestBuild) { $buildParameters.PhysicalTestBuild = $true }
     & (Join-Path $PSScriptRoot 'build_flutter_client.ps1') @buildParameters
     if ($LASTEXITCODE -ne 0) { throw 'Signed Android build did not complete successfully.' }

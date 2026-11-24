@@ -301,7 +301,8 @@ std::string TunnelController::Dns() {
 
 std::string TunnelController::WriteDns(const std::string& server) {
   std::lock_guard<std::mutex> lock(mutex_);
-  if (engine_started_ || deadline_ != 0) throw Generic();  // like split: never while connected
+  // Like split (ADR-187): allowed while connected. Only the stored choice changes; the running
+  // engine keeps the DNS of the config built at its connect, and the next connect reads these prefs.
   if (!server.empty() && !IsDnsChoice(server)) throw Generic();
   Prefs prefs = LoadPrefs();
   prefs.dns = server;
@@ -339,7 +340,8 @@ void TunnelController::Connect(const std::string& config, int64_t remaining_ms,
   const int64_t submitted = hooks_.now_ms();
   const bool renewable = grant.has_value();
   auto state_error = []() { return NativeError("native_service_state_invalid", kGenericMessage); };
-  if (remaining_ms <= 0 || remaining_ms > (renewable ? 90000 : 60000) || engine_started_ || deadline_ != 0)
+  if (remaining_ms <= 0 || remaining_ms > (renewable ? WindowDeadline::kMaxMs : 60000) || engine_started_ ||
+      deadline_ != 0)
     throw state_error();
   if (renewable && (grant->connection.empty() || grant->runtime.empty())) throw state_error();
   if (!hooks_.is_admin()) throw NativeError("native_permission_error", kGenericMessage);
@@ -381,6 +383,7 @@ void TunnelController::Connect(const std::string& config, int64_t remaining_ms,
 void TunnelController::LaunchLocked(const std::filesystem::path& exe, std::string& engine_config) {
   reason_.clear();
   handshake_seen_ = false;  // a new connection: nothing seen yet (kept after stop until here)
+  handshake_clock_ = HandshakeClock{};
   try {
     engine_.Start(exe.wstring(), L"run -c stdin", engine_config, true);
     engine_started_ = true;
@@ -442,7 +445,8 @@ void TunnelController::ConnectVless(const VlessRealityProfile& profile, int64_t 
 void TunnelController::AdvanceWindow(const WindowGrant& grant, int64_t remaining_ms) {
   std::lock_guard<std::mutex> lock(mutex_);
   const int64_t now = hooks_.now_ms();
-  if (!engine_started_ || !engine_.Running() || remaining_ms <= 0 || remaining_ms > 90000)
+  if (!engine_started_ || !engine_.Running() || remaining_ms <= 0 ||
+      remaining_ms > WindowDeadline::kMaxMs)
     throw NativeError("native_service_state_invalid", kGenericMessage);
   try {
     window_.Advance(grant.connection, grant.runtime, grant.generation, now + remaining_ms, now);
@@ -472,9 +476,11 @@ TunnelSnapshot TunnelController::Snapshot() {
     if (auto stats = engine_.Stats()) {
       const auto age = std::chrono::steady_clock::now() - stats->received_at;
       if (age < std::chrono::seconds(5)) {  // stale counters never confirm a handshake
-        int64_t now = hooks_.unix_seconds();
-        if (stats->last_handshake_unix > 0 && stats->last_handshake_unix <= now) {
-          snapshot.handshake_age = now - stats->last_handshake_unix;
+        // W-06 (ADR-160): monotonic age; the wall clock is read only for a new handshake value.
+        const int64_t handshake_age =
+            handshake_clock_.AgeSeconds(stats->last_handshake_unix, hooks_.unix_seconds(), hooks_.now_ms());
+        if (handshake_age >= 0) {
+          snapshot.handshake_age = handshake_age;
           handshake_seen_ = true;
         }
         snapshot.traffic_bytes = stats->rx_bytes + stats->tx_bytes;

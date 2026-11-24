@@ -17,6 +17,7 @@
 
 #include "config_factory.h"
 #include "engine_process.h"
+#include "handshake_clock.h"
 #include "secure_vault.h"
 #include "window_deadline.h"
 
@@ -76,7 +77,7 @@ class TunnelController {
   std::string PublicKey();
   std::string Prove(const std::string& ephemeral_key, const std::string& transcript);
 
-  // `grant` set = renewable window (<= 90 s), unset = plain connect (<= 60 s).
+  // `grant` set = renewable window (<= WindowDeadline::kMaxMs, 3600 s), unset = plain connect (<= 60 s).
   void Connect(const std::string& config, int64_t remaining_ms, const std::optional<WindowGrant>& grant);
   // ADR-115: a panel server (VLESS + Reality). No window: the session ends at `max_ms`
   // (at most kMaxVlessMs) or on Disconnect. Same routing, DNS and error codes as Connect.
@@ -100,7 +101,8 @@ class TunnelController {
   // Returns the canonical domain list. Throws NativeError (domain_invalid, domain_duplicate, ...).
   std::vector<std::string> WriteSplit(const std::string& mode, const std::vector<std::string>& apps,
                                       const std::vector<std::string>& domains);
-  // ADR-106: "" = profile DNS. WriteDns refuses while connected; applies at the next connect.
+  // ADR-106: "" = profile DNS. WriteDns is allowed while connected (ADR-187 rule); applies at the
+  // next connect, the running engine is not touched.
   std::string Dns();
   std::string WriteDns(const std::string& server);
 
@@ -132,6 +134,7 @@ class TunnelController {
   std::optional<std::string> key_cache_;
   bool engine_started_ = false;
   bool handshake_seen_ = false;
+  HandshakeClock handshake_clock_;
 
   std::condition_variable wake_;
   bool stopping_ = false;

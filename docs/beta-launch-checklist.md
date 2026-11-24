@@ -41,7 +41,7 @@
 | Независимое измерение egress | ⬜ протокол есть (`beta-lte-first-connection-analysis-20261108.md`), не запускался |
 | Failover A/B (I-019) | ✅ ограниченный drill 2026-11-01; автоматического failover нет |
 | Полный аудит DNS/IPv6 | 🟡 снят с личного чекпоинта (ADR-072), общий release-аудит не принят |
-| Always-on, Lockdown, kill switch | ⬜ не обещаем; в релизном манифесте отключены |
+| Always-on, Lockdown, kill switch | ⬜ не обещаем; в релизном манифесте Always-on включён (`supportsAlwaysOn = "true"`), но работа не гарантируется |
 
 ## 4. Операции и бэкапы
 

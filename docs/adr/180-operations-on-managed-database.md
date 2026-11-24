@@ -1,6 +1,6 @@
 # ADR-180 — Backups and maintenance may target the managed database (verify-full only)
 
-**Status:** accepted. Code, unit files (repo only) and tests in the working tree, uncommitted.
+**Status:** accepted. Code, unit files (repo only) and tests committed.
 **Not deployed; no backup was taken from the managed database.**
 
 ## Context

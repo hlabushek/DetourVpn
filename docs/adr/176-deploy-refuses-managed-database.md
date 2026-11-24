@@ -1,6 +1,6 @@
 # ADR-176 — The beta deploy script refuses a primary that reads the managed database
 
-**Status:** accepted. Code and tests in the working tree, uncommitted. **Not run against any host.**
+**Status:** accepted. Code and tests committed. **Not run against any host.**
 
 ## Context
 `scripts/deploy_beta_api_latest.py` takes its schema backup (`pg_dump` by `docker exec`), its

@@ -1,6 +1,6 @@
 # ADR-182 — Link-code redeem takes the beta invite before the user row
 
-**Status:** accepted. Code and a PostgreSQL test in the working tree, uncommitted. **Not
+**Status:** accepted. Code and a PostgreSQL test committed. **Not
 deployed.** A separate ADR (not an ADR-167 amendment): ADR-167 is about window connections; this
 pair is about invites.
 

@@ -13,6 +13,7 @@
 #include <thread>
 
 #include "engine_process.h"
+#include "handshake_clock.h"
 #include "key_confirmation.h"
 #include "secure_vault.h"
 #include "tunnel_controller.h"
@@ -179,10 +180,31 @@ void WindowTests() {
   w.Clear();
   CHECK(Throws<std::logic_error>([&] { w.Advance("a", "r", 2, 100000, 30000); }));  // stopped
   WindowDeadline v;
-  CHECK(Throws<std::logic_error>([&] { v.Start("a", "r", 1, 90001, 0); }));
+  CHECK(Throws<std::logic_error>([&] { v.Start("a", "r", 1, WindowDeadline::kMaxMs + 1, 0); }));
+  WindowDeadline longer;  // W-04: the ADR-150 long window is accepted, as on Android
+  longer.Start("a", "r", 1, WindowDeadline::kMaxMs, 0);
+  CHECK(Throws<std::logic_error>([&] { longer.Advance("a", "r", 2, 30000 + WindowDeadline::kMaxMs + 1, 30000); }));
+  longer.Advance("a", "r", 2, 30000 + WindowDeadline::kMaxMs, 30000);
+  CHECK(longer.deadline == 30000 + WindowDeadline::kMaxMs);
   v.Start("a", "r", 1, 80000, 0);
   CHECK(Throws<std::logic_error>([&] { v.Advance("a", "r", 2, 80000, 30000); }));  // not increasing
   CHECK(Throws<std::logic_error>([&] { v.Start("a", "r", 1, 80000, 0); }));        // double start
+}
+
+// ---- handshake clock (W-06, vectors in the spirit of HandshakeClockTest.java) ---------------------
+
+void HandshakeClockTests() {
+  HandshakeClock clock;
+  CHECK(clock.AgeSeconds(0, 1000, 50000) == -1);       // no handshake yet
+  CHECK(clock.AgeSeconds(997, 1000, 50000) == 3);      // first sight: anchored once
+  CHECK(clock.AgeSeconds(997, 900, 52000) == 5);       // wall clock stepped back 100 s: still monotonic
+  CHECK(clock.AgeSeconds(997, 9000, 53000) == 6);      // wall clock stepped forward: not stale
+  CHECK(clock.AgeSeconds(1100, 1102, 54000) == 2);     // a new handshake re-anchors
+  HandshakeClock future;
+  CHECK(future.AgeSeconds(2000, 1000, 50000) == -1);   // in the future at first sight: unknown
+  CHECK(future.AgeSeconds(2000, 3000, 60000) == -1);   // stays unknown until the next handshake
+  CHECK(future.AgeSeconds(2100, 2101, 61000) == 1);
+  CHECK(future.AgeSeconds(0, 2200, 62000) == -1);      // reset
 }
 
 // ---- engine process ------------------------------------------------------------------------------------
@@ -346,7 +368,8 @@ void ControllerTests() {
     Rig r("ctl-start");
     CHECK(ThrowsCode("native_service_state_invalid", [&] { r.c->Connect(kProfile, 0, std::nullopt); }));
     CHECK(ThrowsCode("native_service_state_invalid", [&] { r.c->Connect(kProfile, 60001, std::nullopt); }));
-    CHECK(ThrowsCode("native_service_state_invalid", [&] { r.c->Connect(kProfile, 90001, grant); }));
+    CHECK(ThrowsCode("native_service_state_invalid",
+                     [&] { r.c->Connect(kProfile, WindowDeadline::kMaxMs + 1, grant); }));
     r.admin = false;
     CHECK(ThrowsCode("native_permission_error", [&] { r.c->Connect(kProfile, 30000, std::nullopt); }));
     r.admin = true;
@@ -379,7 +402,10 @@ void ControllerTests() {
     // ADR-187: split rules are stored while up; the running tunnel is not touched.
     r.c->WriteSplit("all", {}, {});
     CHECK(r.c->SplitMode() == "all" && r.c->Snapshot().up);
-    CHECK(ThrowsCode("native_operation_failed", [&] { r.c->WriteDns("1.1.1.1"); }));                   // locked while up
+    // DNS follows the same rule: stored while up, validated, the running tunnel is not touched.
+    CHECK(r.c->WriteDns("1.1.1.1") == "1.1.1.1" && r.c->Dns() == "1.1.1.1" && r.c->Snapshot().up);
+    CHECK(ThrowsCode("native_operation_failed", [&] { r.c->WriteDns("10.0.0.1"); }));
+    CHECK(r.c->Dns() == "1.1.1.1");
     r.c->AdvanceWindow(WindowGrant{"conn-1", "run-1", 2}, 80000);
     CHECK(r.c->Snapshot().remaining_ms > 60000);
     CHECK(ThrowsCode("native_service_state_invalid", [&] { r.c->AdvanceWindow(WindowGrant{"other", "run-1", 3}, 80000); }));
@@ -440,10 +466,10 @@ void ControllerTests() {
     r.c->ConnectVless(v, TunnelController::kMaxVlessMs);
     TunnelSnapshot s = r.c->Snapshot();
     CHECK(s.up && s.remaining_ms > 60000 && s.remaining_ms <= TunnelController::kMaxVlessMs);
-    // One tunnel at a time, either kind; settings stay locked while up.
+    // One tunnel at a time, either kind; DNS is stored while up (applies at the next connect).
     CHECK(ThrowsCode("native_service_state_invalid", [&] { r.c->ConnectVless(v, 60000); }));
     CHECK(ThrowsCode("native_service_state_invalid", [&] { r.c->Connect(kProfile, 30000, grant); }));
-    CHECK(ThrowsCode("native_operation_failed", [&] { r.c->WriteDns("1.1.1.1"); }));
+    CHECK(r.c->WriteDns("1.1.1.1") == "1.1.1.1" && r.c->Snapshot().up);
     r.c->Disconnect();
     s = r.c->Snapshot();
     CHECK(!s.up && s.remaining_ms == 0);
@@ -464,6 +490,7 @@ int main(int, char** argv) {
   VaultTests();
   std::puts("window");
   WindowTests();
+  HandshakeClockTests();
   StatsParseTests();
   std::puts("engine");
   EngineTests();

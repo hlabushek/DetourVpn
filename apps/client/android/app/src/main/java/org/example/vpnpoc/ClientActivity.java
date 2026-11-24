@@ -389,8 +389,8 @@ public final class ClientActivity extends FlutterActivity {
                         break;
                     }
                     case "dnsWrite": {
-                        // Like split settings: only while the tunnel is off; applied on next connect.
-                        if (app.provider.isUp() || app.deadline != 0) throw new IllegalStateException();
+                        // Like split settings (ADR-187): allowed while connected. Only the stored choice
+                        // changes; routedConfig reads it at the next connect, the running tunnel keeps its DNS.
                         String requestedDns = call.argument("server");
                         String canonicalDns = DnsChoice.canonicalOrNull(requestedDns);
                         if (!getSharedPreferences("routing", MODE_PRIVATE).edit()

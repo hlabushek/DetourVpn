@@ -1,6 +1,6 @@
 # ADR-184 — Overall deadline for a native renewal HTTP call (ADR-165 item 2)
 
-**Status:** accepted. Code in the working tree, uncommitted. **Not built into an APK, not run on a phone.**
+**Status:** accepted. Code committed. **Not built into an APK, not run on a phone.**
 
 ## Context
 `NativeRenewer.call` uses `HttpURLConnection` with a 10 s connect and a 10 s read timeout. Those

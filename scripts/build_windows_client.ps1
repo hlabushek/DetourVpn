@@ -3,6 +3,8 @@ param(
     # Defaults to the pinned SDK used for Android, else the repository's .cache copy.
     [string]$FlutterSdk = '',
     [string]$ApiOrigin = 'https://193.68.88.239',
+    # ADR-161: up to two https fallback origins of the same API, comma-separated (empty = none).
+    [string]$ApiFallbackOrigins = '',
     # ADR-084: 16 MiB window; the API accepts 64 KiB..64 MiB per window.
     [ValidateRange(65536, 67108864)]
     [int]$WindowBudgetBytes = 16777216,
@@ -108,8 +110,10 @@ Step 'flutter build windows --release'
 Push-Location -LiteralPath $snapshot
 try {
     $lockBefore = Hash (Join-Path $snapshot 'pubspec.lock')
+    $windowsDefines = @()
+    if ($ApiFallbackOrigins) { $windowsDefines += "--dart-define=VPN_API_FALLBACK_ORIGINS=$ApiFallbackOrigins" }
     & $flutter build windows --release --dart-define=VPN_API_ORIGIN=$ApiOrigin `
-        --dart-define=VPN_WINDOW_TUNNELS=true --dart-define=VPN_WINDOW_BUDGET_BYTES=$WindowBudgetBytes
+        --dart-define=VPN_WINDOW_TUNNELS=true --dart-define=VPN_WINDOW_BUDGET_BYTES=$WindowBudgetBytes @windowsDefines
     if ($LASTEXITCODE -ne 0) { throw 'Flutter Windows release build failed.' }
     if ((Hash (Join-Path $snapshot 'pubspec.lock')) -ne $lockBefore) { throw 'The release build changed the enforced pub lockfile.' }
 } finally { Pop-Location }

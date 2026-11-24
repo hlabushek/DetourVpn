@@ -19,7 +19,7 @@ Not run by the agents; the owner runs it. It has not been executed yet, so its f
 unverified.
 
 - Branch: `claude/connection-reliability` (worktree `.claude/worktrees/fixes-before-beta-0eeeba`),
-  not pushed.
+  pushed and in sync with `origin/claude/connection-reliability`.
 - Phases 0 and 1: commit `1fdbbf4`, ADR-144 (`docs/adr/144-native-connection-state-and-single-owner.md`).
 - Phase 2 (initial connect hardening): commit `b5766b1`, ADR-145
   (`docs/adr/145-initial-connect-hardening.md`).
@@ -73,7 +73,7 @@ unverified.
   - Play Store exact-alarm and `systemExempted` policy check (ADR-147, manifest,
     `NativeRenewer.schedule`).
 
-## Tester bug fixes and audit (2026-11-21, autonomous run, committed locally, not pushed)
+## Tester bug fixes and audit (2026-11-21, autonomous run, committed and pushed)
 Every entry is **build/unit-test verified only**: no APK, no Gradle, no device. Java results are
 the javac + JUnit substitute below (against the c6 SDK tree), not a Gradle pass.
 - **ADR-151** (UI kept «Восстановление связи» ~20 s after the handshake): commit `<pending>`. Native
@@ -123,7 +123,7 @@ the javac + JUnit substitute below (against the c6 SDK tree), not a Gradle pass.
   server while the last catalog refresh failed; handshake ages were wall-clock based.
 
 ## Known-issue fixes, API high availability and paranoid audit (2026-11-21 night run)
-Autonomous run, committed locally, not pushed. Every entry is **unit-test verified only**: no APK,
+Autonomous run, committed and pushed. Every entry is **unit-test verified only**: no APK,
 no Gradle, no device, no real network or API failover. A commit's own SHA is filled in by the next
 commit (a commit cannot contain its own hash).
 - **ADR-158** (cold start erased the session on a read error): commit `5eac2dd`.
@@ -178,7 +178,7 @@ commit (a commit cannot contain its own hash).
   steps, real multi-origin failover and DNS, real API outages, node behaviour for an offline resume
   on the same lease, libbox.
 
-## Server and node audit fixes (2026-11-23, NOT committed, not pushed, not deployed)
+## Server and node audit fixes (2026-11-23, committed and pushed, not deployed)
 From the 2026-11-22 audit. Each entry is verified by local tests only (pytest on a temporary
 local PostgreSQL via `scripts/test_with_postgres.py`); nothing was deployed or run on a node.
 The two backup/restore fixtures in `test_window_service.py` and `test_window_funding.py` error
@@ -186,8 +186,8 @@ here because the portable PostgreSQL has no `pg_dump` (`postgres_tool_missing`),
 - **ADR-168** (C2, node stuck with more than 32 due commands): `poll_windows` answers at most
   32 commands (revokes first, then nearest deadline); the rest follow on the next poll.
   Contract unchanged. Tests: `test_audit_stage2_poll_commands.py` + window tests.
-- Commits were refused by the permission system on 2026-11-23, so ADR-168 and every entry
-  below are in the working tree only, uncommitted, for the owner to review and commit.
+- Commits were refused by the permission system on 2026-11-23; ADR-168 and every entry
+  below have since been committed (verified with `git log`).
 - **ADR-169** (H1, node daemon crashed on native errors and closed every gate): per-command
   containment in `tick()`, parse errors become `RuntimeFault`, the main loop retries every
   non-fatal error and exits only after 3 consecutive core identity failures. Unit unchanged.
@@ -216,8 +216,8 @@ here because the portable PostgreSQL has no `pg_dump` (`postgres_tool_missing`),
   the managed-database deadlocks (no log text). Test: `test_audit_stage2_lock_order.py`.
 - The six entries above were committed by the owner (`2d13129` … `13edbee`).
 
-## Remaining audit items (2026-11-23, stage 4, NOT committed, not deployed)
-Working tree only; the owner commits item by item. Local tests only (temporary PostgreSQL);
+## Remaining audit items (2026-11-23, stage 4, committed, not deployed)
+Committed (commit 66ead57 and later). Local tests only (temporary PostgreSQL);
 nothing ran on a node or on the managed database.
 - **Stale node-tooling tests** (no ADR): `test_beta_node_provisioning_cli.py` and
   `test_connect_beta_node.py` still expected the loopback-only checks that `1a4d252` (ADR-166)
@@ -278,7 +278,7 @@ nothing ran on a node or on the managed database.
   `.cache/i-004/portable/pgsql/bin`, the backup/restore fixtures run and pass.
 
 ## Rules for the next agent
-- One phase at a time, with one ADR per phase in `docs/adr/` (next free number: 184).
+- One phase at a time, with one ADR per phase in `docs/adr/` (next free number: 191).
 - Commit locally with the owner's OK. No push.
 - No `flutter build`, no `gradlew assemble`, no release or deploy scripts, no adb or device tests,
   and no server changes without explicit approval.
@@ -419,3 +419,7 @@ What was **not** run or verified:
 - ApiOrigin is passed as a parameter for Build; no local settings file.
 - Not automated on purpose: git commit/push, backend deploy and migrations 0028/0029, node rollout.
 - Parsed only. Not run.
+
+## ADR-186 — no warning for an accepted disconnect
+
+- Disconnect showed `revoke_unconfirmed` every time, because the server answers the DELETE with `revoke_pending` (202). The warning now appears only when the DELETE call fails. See docs/adr/186-disconnect-is-not_an_error.md. Tests: 362 passed, analyze clean (ASCII copy). Not on a phone.

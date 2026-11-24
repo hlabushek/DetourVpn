@@ -1,6 +1,6 @@
 # ADR-185 — Dart-side timeouts on native channel calls (ADR-165 item 1)
 
-**Status:** accepted. Code in the working tree, uncommitted. **Not built into an APK, not run on a
+**Status:** accepted. Code committed. **Not built into an APK, not run on a
 phone or on Windows.**
 
 ## Context

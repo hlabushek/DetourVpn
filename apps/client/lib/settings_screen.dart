@@ -139,7 +139,7 @@ class SettingsScreen extends StatelessWidget {
     } on PlatformException {
       messenger.showSnackBar(
         const SnackBar(
-          content: Text('Не удалось сохранить DNS. Выключите VPN и повторите.'),
+          content: Text('Не удалось сохранить DNS. Повторите позже.'),
         ),
       );
     }

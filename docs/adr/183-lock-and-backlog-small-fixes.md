@@ -1,6 +1,6 @@
 # ADR-183 — Three small lock and backlog fixes (audit L3, L4, L5)
 
-**Status:** accepted. Code and tests in the working tree, uncommitted. **Not deployed.**
+**Status:** accepted. Code and tests committed. **Not deployed.**
 
 ## L3 — first use is marked before the request takes locks
 `authenticate()` called `_mark_used` (its own short transaction on a second pooled connection)

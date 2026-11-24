@@ -285,6 +285,36 @@ void main() {
   );
 
   test(
+    'a 2xx refresh answer without tokens is retryable and keeps the session',
+    () async {
+      final store = MemoryStore()
+        ..value = {
+          'origin': 'http://127.0.0.1:18766',
+          'refresh_token': 'TEST ONLY OLD',
+        };
+      final server = await HttpServer.bind('127.0.0.1', 18766);
+      server.listen((request) async {
+        request.response.statusCode = 200;
+        request.response.write(jsonEncode({'unexpected': 'TEST ONLY'}));
+        await request.response.close();
+      });
+      final api = Api(Uri.parse('http://127.0.0.1:18766'), store: store);
+      addTearDown(() async {
+        api.close();
+        await server.close(force: true);
+      });
+      await expectLater(
+        api.restoreSession(),
+        throwsA(
+          isA<ClientError>().having((e) => e.code, 'code', 'invalid_response'),
+        ),
+      );
+      expect(store.writes, isEmpty);
+      expect(store.value!['refresh_token'], 'TEST ONLY OLD');
+    },
+  );
+
+  test(
     'history cursor query is sent intact; other queries are rejected',
     () async {
       final server = await HttpServer.bind('127.0.0.1', 18766);

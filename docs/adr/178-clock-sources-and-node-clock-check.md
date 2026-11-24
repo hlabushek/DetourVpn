@@ -1,6 +1,6 @@
 # ADR-178 — One clock for admission and node liveness; node clocks are checked at install
 
-**Status:** accepted. Code and tests in the working tree, uncommitted. **Not run against any host.**
+**Status:** accepted. Code and tests committed. **Not run against any host.**
 
 ## Context
 - **M8.** `verify_and_consume` set `node.last_seen_at` from the API host's clock, while

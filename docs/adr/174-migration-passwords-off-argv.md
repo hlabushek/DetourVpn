@@ -1,6 +1,6 @@
 # ADR-174 — The Neon migration keeps passwords off the command line
 
-**Status:** accepted. Code and tests in the working tree, uncommitted. **Not run on any host.**
+**Status:** accepted. Code and tests committed. **Not run on any host.**
 
 ## Context
 `scripts/migrate_db_to_neon.sh` passed `SOURCE_DATABASE_URL` and `TARGET_DATABASE_URL`, both with

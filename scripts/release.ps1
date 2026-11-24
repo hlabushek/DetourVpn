@@ -5,6 +5,8 @@ param(
     [string]$Stage,
     # Beta API origin, for example https://host. Needed for Build.
     [string]$ApiOrigin = '',
+    # ADR-161: up to two https fallback origins of the same API, comma-separated (empty = none).
+    [string]$ApiFallbackOrigins = '',
     # Lowest version code that may still run. 1 = nobody is forced to update.
     [int]$MinSupportedVersionCode = 1,
     [switch]$NoInstall
@@ -23,7 +25,9 @@ if ($dirty.Count -gt 0) { throw 'Stop: uncommitted changes. Commit them first, s
 
 if ($Stage -eq 'Build') {
     if ($ApiOrigin -notmatch '^https://[^\s/?#]+$') { throw 'Pass -ApiOrigin https://<host> (HTTPS origin, no path).' }
-    & (Join-Path $root 'scripts\build_beta_apk.ps1') -ApiOrigin $ApiOrigin -WindowSeconds 900
+    $betaArguments = @{ ApiOrigin = $ApiOrigin; WindowSeconds = 900 }
+    if ($ApiFallbackOrigins) { $betaArguments.ApiFallbackOrigins = $ApiFallbackOrigins }
+    & (Join-Path $root 'scripts\build_beta_apk.ps1') @betaArguments
     if ($LASTEXITCODE -ne 0) { throw 'FAILED: build_beta_apk.ps1' }
     $apk = Join-Path $root 'apps\client\build\app\outputs\flutter-apk\app-release.apk'
     if (-not $NoInstall) {

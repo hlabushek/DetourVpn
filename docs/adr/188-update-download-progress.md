@@ -1,6 +1,6 @@
 # ADR-188 — Update download progress, cancel and re-install (refines ADR-107)
 
-**Status:** accepted. Code in the working tree, uncommitted. **Not built into an APK, not run on a
+**Status:** accepted. Code committed. **Not built into an APK, not run on a
 phone.**
 
 ## Context

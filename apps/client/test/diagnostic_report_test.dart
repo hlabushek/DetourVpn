@@ -219,6 +219,12 @@ void main() {
     );
   });
 
+  test('native_timeout is an allowlisted error code', () {
+    final report = DiagnosticReport.fromError('native_timeout', 'native_init');
+    expect(report.errorCode, 'native_timeout');
+    expect(report.text, contains('Код: native_timeout'));
+  });
+
   test('context values outside the fixed sets are dropped', () {
     final report = DiagnosticReport.fromError(
       'native_down',
