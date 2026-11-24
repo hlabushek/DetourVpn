@@ -2175,4 +2175,5 @@ const _nativeStartErrorCodes = <String>{
   'native_permission_error',
   'native_service_state_invalid',
   'native_start_failed',
+  'kill_switch_failed', // ADR-196 (Windows)
 };

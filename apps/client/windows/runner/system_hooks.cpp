@@ -18,11 +18,13 @@
 
 #include <algorithm>
 #include <chrono>
+#include <cstring>
 #include <ctime>
 #include <filesystem>
 #include <map>
 
 #include "config_factory.h"
+#include "kill_switch.h"
 
 namespace detour {
 namespace {
@@ -108,6 +110,32 @@ std::string PhysicalNetworkId() {
   return id;
 }
 
+// ADR-196: LUID of the adapter that carries the TUN's fixed IPv6 ULA (config_factory.h), i.e. the
+// engine's tunnel adapter. Nothing when no such adapter exists. Never logged.
+std::optional<uint64_t> TunnelLuid() {
+  in6_addr wanted{};
+  if (InetPtonA(AF_INET6, kTunIpv6Ula, &wanted) != 1) return std::nullopt;
+  ULONG size = 16 * 1024;
+  std::vector<unsigned char> buffer;
+  ULONG result = ERROR_BUFFER_OVERFLOW;
+  for (int attempt = 0; attempt < 3 && result == ERROR_BUFFER_OVERFLOW; ++attempt) {
+    buffer.resize(size);
+    result = GetAdaptersAddresses(AF_INET6,
+                                  GAA_FLAG_SKIP_ANYCAST | GAA_FLAG_SKIP_MULTICAST | GAA_FLAG_SKIP_DNS_SERVER |
+                                      GAA_FLAG_SKIP_FRIENDLY_NAME,
+                                  nullptr, reinterpret_cast<IP_ADAPTER_ADDRESSES*>(buffer.data()), &size);
+  }
+  if (result != NO_ERROR) return std::nullopt;
+  for (auto* a = reinterpret_cast<IP_ADAPTER_ADDRESSES*>(buffer.data()); a; a = a->Next) {
+    for (auto* u = a->FirstUnicastAddress; u; u = u->Next) {
+      if (!u->Address.lpSockaddr || u->Address.lpSockaddr->sa_family != AF_INET6) continue;
+      const auto* in = reinterpret_cast<const sockaddr_in6*>(u->Address.lpSockaddr);
+      if (std::memcmp(&in->sin6_addr, &wanted, sizeof(wanted)) == 0) return a->Luid.Value;
+    }
+  }
+  return std::nullopt;
+}
+
 std::filesystem::path OwnExe() {
   wchar_t buffer[MAX_PATH * 2];
   DWORD n = GetModuleFileNameW(nullptr, buffer, static_cast<DWORD>(std::size(buffer)));
@@ -177,6 +205,9 @@ ControllerHooks DefaultHooks() {
   hooks.unix_seconds = []() { return static_cast<int64_t>(std::time(nullptr)); };
   hooks.resolve_ipv4 = ResolveIpv4;
   hooks.physical_network = PhysicalNetworkId;
+  // ADR-196: the real firewall backend. Created lazily, and only when the setting is on.
+  hooks.kill_switch_backend = CreateWfpKillSwitchBackend;
+  hooks.tunnel_luid = TunnelLuid;
   return hooks;
 }
 

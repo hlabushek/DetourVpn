@@ -96,7 +96,7 @@ std::string BuildConfig(const RoutingPolicy& policy, const TunnelSpec& spec, Jso
   const std::string& mode = policy.mode;
   // TUN: a local ULA address makes Windows route ::/0 into the TUN, where IPv6 is rejected below.
   std::vector<std::string> tun_addresses = spec.tun_addresses;
-  tun_addresses.push_back("fdfe:dcba:9876::1/126");
+  tun_addresses.push_back(std::string(kTunIpv6Ula) + "/126");
   Json tun;
   tun.Put("type", "tun").Put("tag", "tun-in").Put("address", StringArray(tun_addresses));
   tun.Put("mtu", spec.mtu).Put("auto_route", true).Put("strict_route", true);

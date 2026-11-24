@@ -4,6 +4,7 @@
 // tests prove adapter logic only, not a tunnel handshake, egress or routing.
 #include "win_headers.h"
 
+#include <atomic>
 #include <chrono>
 #include <cstdio>
 #include <filesystem>
@@ -15,6 +16,7 @@
 #include "engine_process.h"
 #include "handshake_clock.h"
 #include "key_confirmation.h"
+#include "kill_switch.h"
 #include "secure_vault.h"
 #include "system_hooks.h"
 #include "tunnel_controller.h"
@@ -320,9 +322,108 @@ const char* kProfile =
     "[Peer]\nPublicKey = AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=\nEndpoint = 192.0.2.1:51901\n"
     "AllowedIPs = 0.0.0.0/0\nPersistentKeepalive = 25\n";
 
+// TEST DOUBLE for the Windows Filtering Platform (ADR-196). Records the call sequence; never
+// touches the real firewall. Proves the controller's sequencing only, not that WFP blocks a leak.
+struct FakeFirewall {
+  std::vector<std::string> calls;
+  bool fail_apply = false;
+  bool fail_sweep = false;
+  int backends = 0;
+  std::optional<KillSwitchRules> installed;
+};
+
+class FakeBackend : public KillSwitchBackend {
+ public:
+  explicit FakeBackend(std::shared_ptr<FakeFirewall> fw) : fw_(std::move(fw)) { ++fw_->backends; }
+  bool RemoveLeftovers() override {
+    fw_->calls.push_back("sweep");
+    return !fw_->fail_sweep;
+  }
+  bool Apply(const KillSwitchRules& rules) override {
+    fw_->calls.push_back("apply");
+    if (fw_->fail_apply) return false;
+    fw_->installed = rules;
+    return true;
+  }
+  void Remove() override {
+    fw_->calls.push_back("remove");
+    fw_->installed.reset();
+  }
+
+ private:
+  std::shared_ptr<FakeFirewall> fw_;
+};
+
+KillSwitch::Factory FakeFactory(const std::shared_ptr<FakeFirewall>& fw) {
+  return [fw]() -> std::unique_ptr<KillSwitchBackend> { return std::make_unique<FakeBackend>(fw); };
+}
+
+void KillSwitchTests() {
+  // Leftover sweep selection: only our provider's filters, never another's or provider-less ones.
+  ProviderKey ours{}, theirs{};
+  ours[0] = 1;
+  theirs[0] = 2;
+  std::vector<FilterEntry> all = {{10, ours}, {11, theirs}, {12, std::nullopt}, {13, ours}};
+  CHECK(OwnedFilterIds(all, ours) == std::vector<uint64_t>({10, 13}));
+  CHECK(OwnedFilterIds({{11, theirs}, {12, std::nullopt}}, ours).empty());
+
+  KillSwitchRules rules;
+  rules.engine_exe = L"C:\\app\\detour-engine.exe";
+  rules.own_exe = L"C:\\app\\DetourVpn.exe";
+  rules.api_ipv4 = {"198.51.100.7"};
+  {
+    // Sequencing: sweep before the first apply, identical rules not re-applied, update in place,
+    // release removes once, a second release makes no call.
+    auto fw = std::make_shared<FakeFirewall>();
+    KillSwitch ks(FakeFactory(fw));
+    ks.Release();
+    CHECK(fw->calls.empty() && fw->backends == 0);  // nothing engaged: no backend at all
+    CHECK(ks.Engage(rules) && ks.engaged());
+    CHECK(ks.Engage(rules));
+    KillSwitchRules with_tun = rules;
+    with_tun.tunnel_luid = 7;
+    CHECK(ks.Engage(with_tun) && fw->installed && fw->installed->tunnel_luid == 7);
+    ks.Release();
+    ks.Release();
+    CHECK(!ks.engaged() && !fw->installed);
+    CHECK(fw->calls == std::vector<std::string>({"sweep", "apply", "apply", "remove"}));
+  }
+  {
+    // A failed first apply leaves nothing half-installed; a failed sweep never applies.
+    auto fw = std::make_shared<FakeFirewall>();
+    fw->fail_apply = true;
+    KillSwitch ks(FakeFactory(fw));
+    CHECK(!ks.Engage(rules) && !ks.engaged());
+    CHECK(fw->calls == std::vector<std::string>({"sweep", "apply", "remove"}));
+    auto fw2 = std::make_shared<FakeFirewall>();
+    fw2->fail_sweep = true;
+    KillSwitch ks2(FakeFactory(fw2));
+    CHECK(!ks2.Engage(rules) && fw2->calls == std::vector<std::string>({"sweep"}));
+    KillSwitch none;  // no backend at all
+    CHECK(!none.Engage(rules) && !none.engaged());
+  }
+  {
+    // A failed update keeps the previous block (fail closed) and reports false.
+    auto fw = std::make_shared<FakeFirewall>();
+    KillSwitch ks(FakeFactory(fw));
+    CHECK(ks.Engage(rules));
+    fw->fail_apply = true;
+    KillSwitchRules other = rules;
+    other.tunnel_luid = 9;
+    CHECK(!ks.Engage(other) && ks.engaged() && ks.rules() == rules && fw->installed == rules);
+  }
+  {
+    // Destruction removes an active block.
+    auto fw = std::make_shared<FakeFirewall>();
+    { KillSwitch ks(FakeFactory(fw)); ks.Engage(rules); }
+    CHECK(fw->calls.back() == "remove" && !fw->installed);
+  }
+}
+
 struct Rig {
   fs::path dir;
   bool admin = true;
+  ControllerHooks hooks;
   std::unique_ptr<TunnelController> c;
   explicit Rig(const char* name, bool with_engine = true, bool with_session = true,
                const std::function<void(ControllerHooks&)>& customize = nullptr) {
@@ -349,6 +450,7 @@ struct Rig {
     h.start_probe = std::chrono::milliseconds(300);
     h.stop_grace = std::chrono::seconds(5);
     if (customize) customize(h);
+    hooks = h;
     c = std::make_unique<TunnelController>(h);
     if (with_session) c->WriteSession(TunnelController::Record{{"origin", "https://198.51.100.7"}, {"refresh_token", "t"}});
   }
@@ -358,6 +460,135 @@ struct Rig {
     fs::remove_all(dir, ec);
   }
 };
+
+// ADR-196 through the controller, with the fake firewall (TEST DOUBLE) and the fake engine.
+void ControllerKillSwitchTests() {
+  WindowGrant grant{"conn-1", "run-1", 1};
+  auto luid_value = std::make_shared<std::atomic<uint64_t>>(0);  // 0 = no tunnel adapter
+  auto with_fake = [luid_value](const std::shared_ptr<FakeFirewall>& fw, int crash_restarts) {
+    return [fw, luid_value, crash_restarts](ControllerHooks& h) {
+      h.kill_switch_backend = FakeFactory(fw);
+      h.tunnel_luid = [luid_value]() -> std::optional<uint64_t> {
+        uint64_t v = luid_value->load();
+        if (v == 0) return std::nullopt;
+        return v;
+      };
+      h.crash_restarts = crash_restarts;
+    };
+  };
+  {
+    // Setting OFF (the default): connect, engine death, disconnect, end of intent and app close
+    // never call the backend, and no backend is even created.
+    auto fw = std::make_shared<FakeFirewall>();
+    {
+      Rig r("ks-off", true, true, with_fake(fw, 0));
+      CHECK(!r.c->KillSwitchEnabled());
+      SetEnvironmentVariableW(L"FAKE_ENGINE_EXIT_MS", L"1000");
+      r.c->Connect(kProfile, 60000, grant);
+      SetEnvironmentVariableW(L"FAKE_ENGINE_EXIT_MS", nullptr);
+      for (int i = 0; i < 50 && r.c->Snapshot().up; ++i) Sleep(100);
+      CHECK(r.c->Snapshot().reason == "engine_exited" && !r.c->KillSwitchActive());
+      r.c->Disconnect();
+      r.c->EndIntent();
+      CHECK(r.c->WriteKillSwitch(false) == false);
+    }
+    CHECK(fw->calls.empty() && fw->backends == 0);
+  }
+  {
+    // ON: persisted; block before the engine; tunnel permit follows the adapter; kept through an
+    // engine death and a plain Disconnect (recovery); removed by the end of intent.
+    auto fw = std::make_shared<FakeFirewall>();
+    luid_value->store(0);
+    Rig r("ks-on", true, true, with_fake(fw, 0));
+    CHECK(r.c->WriteKillSwitch(true) && r.c->KillSwitchEnabled());
+    CHECK(fw->calls.empty());  // storing the setting does not touch the firewall
+    {
+      std::ifstream in(r.dir / "prefs.txt");
+      std::string text((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+      CHECK(text.find("kill_switch\t1") != std::string::npos);
+    }
+    // A new process with the setting on sweeps our leftovers at startup.
+    r.c.reset();
+    r.c = std::make_unique<TunnelController>(r.hooks);
+    CHECK(r.c->KillSwitchEnabled() && fw->calls == std::vector<std::string>({"sweep"}));
+    SetEnvironmentVariableW(L"FAKE_ENGINE_EXIT_MS", L"2500");
+    r.c->Connect(kProfile, 60000, grant);
+    SetEnvironmentVariableW(L"FAKE_ENGINE_EXIT_MS", nullptr);
+    CHECK(fw->calls == std::vector<std::string>({"sweep", "apply"}));  // no second sweep
+    CHECK(fw->installed && fw->installed->api_ipv4 == std::vector<std::string>({"198.51.100.7"}) &&
+          fw->installed->engine_exe == r.dir / L"detour-engine.exe" &&
+          fw->installed->own_exe == r.dir / L"DetourVpn.exe" && !fw->installed->tunnel_luid);
+    luid_value->store(42);  // the engine's adapter appears
+    for (int i = 0; i < 20 && !(fw->installed && fw->installed->tunnel_luid); ++i) Sleep(100);
+    CHECK(fw->installed && fw->installed->tunnel_luid == 42u);
+    luid_value->store(0);
+    for (int i = 0; i < 60 && r.c->Snapshot().up; ++i) Sleep(100);  // the engine dies by itself
+    CHECK(r.c->Snapshot().reason == "engine_exited");
+    CHECK(r.c->KillSwitchActive() && fw->installed && !fw->installed->tunnel_luid);  // still blocked
+    r.c->Disconnect();
+    CHECK(r.c->KillSwitchActive() && fw->installed);  // recovery's stop keeps the block
+    r.c->EndIntent();
+    CHECK(!r.c->KillSwitchActive() && !fw->installed && fw->calls.back() == "remove");
+    const size_t after = fw->calls.size();
+    r.c->EndIntent();  // nothing engaged: no call
+    CHECK(fw->calls.size() == after);
+  }
+  {
+    // During the gap names are never resolved through the system resolver: a reconnect reuses the
+    // addresses resolved before the block.
+    auto fw = std::make_shared<FakeFirewall>();
+    auto lookups = std::make_shared<std::atomic<int>>(0);
+    Rig r("ks-dns", true, false, [&](ControllerHooks& h) {
+      with_fake(fw, 0)(h);
+      h.resolve_ipv4 = [lookups](const std::string& host) {
+        ++*lookups;
+        return host == "api.example.test" ? std::vector<std::string>{"198.51.100.9"} : std::vector<std::string>{};
+      };
+    });
+    r.c->WriteSession(TunnelController::Record{{"origin", "https://api.example.test"}, {"refresh_token", "t"}});
+    r.c->WriteKillSwitch(true);
+    r.c->Connect(kProfile, 30000, std::nullopt);
+    CHECK(lookups->load() == 1 && fw->installed && fw->installed->api_ipv4 == std::vector<std::string>({"198.51.100.9"}));
+    r.c->Disconnect();  // a gap: the block stays
+    r.c->Connect(kProfile, 30000, std::nullopt);
+    CHECK(lookups->load() == 1 && r.c->Snapshot().up && r.c->KillSwitchActive());
+    r.c->Disconnect();
+    // Turning the setting off removes the block at once.
+    CHECK(!r.c->WriteKillSwitch(false) && !r.c->KillSwitchActive() && !fw->installed);
+  }
+  {
+    // Failure reporting: the backend refuses -> kill_switch_failed, no engine, nothing installed.
+    auto fw = std::make_shared<FakeFirewall>();
+    fw->fail_apply = true;
+    Rig r("ks-fail", true, true, with_fake(fw, 0));
+    r.c->WriteKillSwitch(true);
+    CHECK(ThrowsCode("kill_switch_failed", [&] { r.c->Connect(kProfile, 30000, grant); }));
+    CHECK(!r.c->Snapshot().up && !r.c->KillSwitchActive() && !fw->installed);
+    CHECK(fw->calls.back() == "remove");
+    // No backend at all (e.g. WFP unavailable) with the setting on: also refused.
+    Rig none("ks-none");
+    none.c->WriteKillSwitch(true);
+    CHECK(ThrowsCode("kill_switch_failed", [&] { none.c->Connect(kProfile, 30000, std::nullopt); }));
+    CHECK(!none.c->Snapshot().up);
+  }
+  {
+    // The tunnel adapter cannot be permitted while up -> the tunnel stops with kill_switch_failed.
+    auto fw = std::make_shared<FakeFirewall>();
+    luid_value->store(0);
+    Rig r("ks-luid-fail", true, true, with_fake(fw, 0));
+    r.c->WriteKillSwitch(true);
+    r.c->Connect(kProfile, 60000, grant);
+    fw->fail_apply = true;
+    luid_value->store(77);
+    for (int i = 0; i < 30 && r.c->Snapshot().up; ++i) Sleep(100);
+    TunnelSnapshot s = r.c->Snapshot();
+    CHECK(!s.up && s.reason == "kill_switch_failed" && r.c->KillSwitchActive());  // still blocked
+    luid_value->store(0);
+    // App close removes the block.
+    r.c.reset();
+    CHECK(fw->calls.back() == "remove" && !fw->installed);
+  }
+}
 
 void ControllerTests() {
   const std::string transcript = "project-vpn:key-confirmation:v1:01234567890123456789012345678901:" +
@@ -649,6 +880,7 @@ void ControllerTests() {
     s = r.c->Snapshot();
     CHECK(!s.up && s.remaining_ms == 0);
   }
+  ControllerKillSwitchTests();
 }
 
 }  // namespace
@@ -679,6 +911,8 @@ int main(int, char** argv) {
   StatsParseTests();
   std::puts("engine");
   EngineTests();
+  std::puts("kill switch (fake backend)");
+  KillSwitchTests();
   std::puts("controller");
   ControllerTests();
   std::printf("%d checks, %d failures\n", g_checks, g_failures);

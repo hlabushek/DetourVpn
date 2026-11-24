@@ -4,12 +4,69 @@ import 'package:flutter/services.dart';
 import 'app_update.dart';
 import 'connection.dart';
 import 'dns_choice.dart';
+import 'kill_switch_setting.dart';
 import 'orbit_widgets.dart';
 import 'platform_info.dart';
 import 'split_apps.dart';
 import 'ui/components.dart';
 import 'ui/motion.dart';
 import 'window_connection.dart';
+
+/// ADR-196: the Windows kill-switch toggle. Reads the native value (default off) and writes it
+/// back; a failed write keeps the previous value and says so.
+class KillSwitchRow extends StatefulWidget {
+  const KillSwitchRow({super.key, this.setting = const KillSwitchSetting()});
+  final KillSwitchSetting setting;
+
+  @override
+  State<KillSwitchRow> createState() => _KillSwitchRowState();
+}
+
+class _KillSwitchRowState extends State<KillSwitchRow> {
+  bool _enabled = false;
+  bool _loading = true;
+  bool _saving = false;
+
+  @override
+  void initState() {
+    super.initState();
+    widget.setting.read().then((value) {
+      if (mounted) {
+        setState(() {
+          _enabled = value;
+          _loading = false;
+        });
+      }
+    });
+  }
+
+  Future<void> _set(bool value) async {
+    final messenger = ScaffoldMessenger.of(context);
+    setState(() => _saving = true);
+    try {
+      final saved = await widget.setting.write(value);
+      if (mounted) setState(() => _enabled = saved);
+    } on PlatformException {
+      messenger.showSnackBar(
+        const SnackBar(
+          content: Text('Не удалось сохранить настройку. Повторите позже.'),
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) => SwitchListTile.adaptive(
+    key: const ValueKey('kill-switch'),
+    secondary: const Icon(Icons.block_outlined),
+    title: const Text(KillSwitchSetting.title),
+    subtitle: Text(killSwitchSubtitle(_enabled)),
+    value: _enabled,
+    onChanged: _loading || _saving ? null : _set,
+  );
+}
 
 /// The only place for device-local settings (opened from the gear).
 class SettingsScreen extends StatelessWidget {
@@ -208,6 +265,11 @@ class SettingsScreen extends StatelessWidget {
             enabled: !c.busy && !c.hasLease,
             onTap: () => _openDnsChoice(context),
           ),
+          // ADR-196: Windows kill switch, default off.
+          if (isWindowsClient) ...[
+            const SizedBox(height: 12),
+            const KillSwitchRow(),
+          ],
           // Android battery optimisation: not applicable on Windows (ADR-095).
           if (!isWindowsClient) ...[
             const SizedBox(height: 12),
@@ -291,7 +353,7 @@ class SettingsScreen extends StatelessWidget {
               if (isWindowsClient) ...[
                 const SizedBox(height: 8),
                 Text(
-                  'Windows-версия: нужны права администратора. Аварийной блокировки нет — если VPN остановится, трафик пойдёт напрямую. Always-on не поддерживается.',
+                  'Windows-версия: нужны права администратора. Блокировка трафика при обрыве выключена по умолчанию и ещё не проверена на утечки; без неё при остановке VPN трафик пойдёт напрямую. Always-on не поддерживается.',
                   style: text.bodySmall,
                 ),
               ],

@@ -229,9 +229,13 @@ channel.
 ## Known beta limitations
 
 - Unsigned exe, no auto-update.
-- No kill switch (ADR-196 is a design only), no Always-on, no tray mode (ADR-194). The acceptance
-  item "with the engine killed, traffic does not go direct" is therefore **not met**: the
-  watchdog restarts a crashed engine in place (ADR-194), but traffic can go direct until it is up.
+- Kill switch (W-01, ADR-196): implemented as an opt-in WFP block, setting «Блокировать трафик при
+  обрыве», **default off**. Unit-tested with a fake firewall backend only; never run against the
+  real firewall, no leak test yet. The acceptance item "with the engine killed, traffic does not
+  go direct" stays **not met until the owner's leak test (ADR-196) passes**. With the setting off
+  (the default), traffic can go direct until a restarted engine is up (ADR-194).
+- No Always-on, no tray mode (ADR-194). Dead-peer probe (A-03) still needs an owner-provided
+  project health URL.
 - Watchdog, network-change and sleep/resume recovery (ADR-194) and fallback API bypass (ADR-195)
   are unit-tested against a fake engine only; not verified on a real PC.
 - x64 only.

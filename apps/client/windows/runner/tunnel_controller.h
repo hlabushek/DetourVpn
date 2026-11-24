@@ -1,9 +1,10 @@
 // Native owner of the Windows tunnel (the counterpart of ClientApplication.java). No Flutter types:
 // tunnel_channel.cpp is the thin MethodChannel layer on top, so everything here is unit-testable.
-// The private device key never leaves this class. Beta limits (ADR-095): no kill switch (when the
-// engine dies the TUN disappears; ADR-196 is the unimplemented design), no Always-on. ADR-194: a
-// watchdog restarts a crashed or stalled AWG engine in place and gives up to a new lease after a
-// network change that two restarts did not recover.
+// The private device key never leaves this class. Beta limits (ADR-095): no Always-on. ADR-196: an
+// optional kill switch (setting, default off) blocks non-tunnel traffic while the user wants the
+// VPN, including the gaps when the engine is dead or restarting. ADR-194: a watchdog restarts a
+// crashed or stalled AWG engine in place and gives up to a new lease after a network change that
+// two restarts did not recover.
 #pragma once
 
 #include <condition_variable>
@@ -20,6 +21,7 @@
 #include "config_factory.h"
 #include "engine_process.h"
 #include "handshake_clock.h"
+#include "kill_switch.h"
 #include "secure_vault.h"
 #include "tunnel_watchdog.h"
 #include "window_deadline.h"
@@ -72,6 +74,12 @@ struct ControllerHooks {
   // ADR-194: in-place restarts after an engine crash allowed per crash_window.
   int crash_restarts = 2;
   std::chrono::milliseconds crash_window{600000};
+  // ADR-196: creates the firewall backend (called lazily, only when the setting is on). Unset =
+  // no backend: with the setting on, Connect fails with kill_switch_failed.
+  KillSwitch::Factory kill_switch_backend;
+  // ADR-196: LUID of the engine's TUN adapter, if it exists now. Unset = never found (the block
+  // then keeps tunnel traffic blocked too: fail closed).
+  std::function<std::optional<uint64_t>()> tunnel_luid;
 };
 
 class TunnelController {
@@ -125,10 +133,21 @@ class TunnelController {
   std::string Dns();
   std::string WriteDns(const std::string& server);
 
+  // ADR-196: "Блокировать трафик при обрыве". Default off. Turning it on applies at the next
+  // connect; turning it off removes an active block at once (the user's escape hatch).
+  bool KillSwitchEnabled();
+  bool WriteKillSwitch(bool enabled);
+  // ADR-196: the user no longer wants the VPN (disconnect, sign-out, a failure nobody retries).
+  // Removes the block. A plain Disconnect does not: recovery stops the engine between attempts.
+  void EndIntent();
+  // Test and diagnostics: the block is installed now.
+  bool KillSwitchActive();
+
  private:
   struct Prefs {
     std::string node, mode = "exclude", last_mode, dns;
     std::vector<std::string> apps, domains;
+    bool kill_switch = false;
   };
 
   Prefs LoadPrefs() const;
@@ -150,6 +169,11 @@ class TunnelController {
   bool RestartInPlaceLocked(const char* failure_reason);
   void WatchLoop();
   std::string PrivateKey();
+  // ADR-196: engages the block for a connect when the setting is on (throws kill_switch_failed).
+  void EngageForConnectLocked(bool enabled, const std::vector<std::string>& api_ipv4);
+  // ADR-196: keeps the tunnel-adapter permit in step with the running engine.
+  void TrackTunnelLocked();
+  std::vector<std::string> ResolveApiHost(const std::string& host);
 
   ControllerHooks hooks_;
   SecureVault vault_;
@@ -177,6 +201,11 @@ class TunnelController {
   std::vector<int64_t> crash_restart_times_;
   int restarts_in_place_ = 0;
   std::vector<std::string> api_fallback_hosts_;  // ADR-195
+  // ADR-196: the block, and the API addresses resolved before it (memory only, never logged).
+  // While the block is on, names are never sent to the system resolver: these are reused.
+  KillSwitch kill_switch_;
+  std::map<std::string, std::vector<std::string>> known_api_;
+  int64_t next_luid_poll_ = 0;
 
   std::condition_variable wake_;
   bool stopping_ = false;

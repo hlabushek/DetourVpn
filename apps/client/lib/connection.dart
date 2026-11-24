@@ -118,6 +118,9 @@ String messageFor(String code) => switch (code) {
   'network_unavailable' || 'api_unavailable' =>
     'Нет связи с API. Проверьте сеть и повторите. Состояние узла не подтверждено.',
   'native_unavailable' => 'VPN-движок недоступен. Проверьте сборку приложения.',
+  // ADR-196 (Windows): the firewall block could not be installed or follow the tunnel.
+  'kill_switch_failed' =>
+    'Не удалось включить блокировку трафика при обрыве (фильтр Windows). VPN не подключён, чтобы трафик не пошёл напрямую. Нажмите «Подключить» ещё раз или выключите эту настройку в «Настройках».',
   // ADR-139: the automatic recovery budget is spent; nothing retries until the user taps.
   'recovery_exhausted' =>
     'Не удалось восстановить подключение: автоматические попытки закончились, VPN остановлен. Проверьте сеть (Wi-Fi или мобильный интернет) и нажмите «Подключить». Если не помогает, выберите другой сервер.',

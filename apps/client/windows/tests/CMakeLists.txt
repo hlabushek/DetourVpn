@@ -24,9 +24,12 @@ endif()
 # Native adapter (no Flutter types): CNG, DPAPI, engine process, controller.
 add_library(detour_adapter STATIC
   ${RUNNER}/key_confirmation.cpp ${RUNNER}/secure_vault.cpp ${RUNNER}/engine_process.cpp
-  ${RUNNER}/tunnel_controller.cpp ${RUNNER}/system_hooks.cpp)
+  ${RUNNER}/tunnel_controller.cpp ${RUNNER}/system_hooks.cpp ${RUNNER}/kill_switch.cpp
+  ${RUNNER}/kill_switch_wfp.cpp)
 target_include_directories(detour_adapter PUBLIC ${RUNNER})
-target_link_libraries(detour_adapter PUBLIC detour_config bcrypt crypt32 shell32 ole32 uuid comdlg32 ws2_32 iphlpapi)
+# fwpuclnt: the WFP backend is compiled and linked (DefaultHooks names it) but the tests never call
+# it; they inject a fake KillSwitchBackend and never change the real firewall.
+target_link_libraries(detour_adapter PUBLIC detour_config bcrypt crypt32 shell32 ole32 uuid comdlg32 ws2_32 iphlpapi fwpuclnt)
 if(MSVC)
   target_compile_options(detour_adapter PRIVATE /W4 /WX /utf-8 /permissive-)
 endif()

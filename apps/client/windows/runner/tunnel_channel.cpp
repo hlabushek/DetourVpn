@@ -136,7 +136,8 @@ void TunnelChannel::Handle(const flutter::MethodCall<EncodableValue>& call,
       "permission", "publicKey", "prove", "connect", "connectWindow", "advanceWindow", "disconnect",
       "snapshot", "sessionRead", "sessionWrite", "pendingLoginRead", "pendingLoginWrite", "splitRead",
       "splitModeRead", "splitLastModeRead", "splitWrite", "splitDomainsRead", "apps", "nodeRead",
-      "nodeWrite", "openLogin", "capabilities", "pickApp", "dnsRead", "dnsWrite", "connectVless"};
+      "nodeWrite", "openLogin", "capabilities", "pickApp", "dnsRead", "dnsWrite", "connectVless",
+      "killSwitchRead", "killSwitchWrite", "setIntent"};
   const std::string& method = call.method_name();
   if (!controller_ || !kAllowed.count(method)) {
     result->NotImplemented();
@@ -231,6 +232,20 @@ void TunnelChannel::Handle(const flutter::MethodCall<EncodableValue>& call,
       auto server = GetString(args, "server");
       if (!server) Bad();
       result->Success(EncodableValue(c.WriteDns(*server)));
+    } else if (method == "killSwitchRead") {
+      result->Success(EncodableValue(c.KillSwitchEnabled()));
+    } else if (method == "killSwitchWrite") {
+      // ADR-196: a bool only; anything else is refused and nothing is stored.
+      const EncodableValue* enabled = Field(args, "enabled");
+      if (!enabled || !std::holds_alternative<bool>(*enabled)) Bad();
+      result->Success(EncodableValue(c.WriteKillSwitch(std::get<bool>(*enabled))));
+    } else if (method == "setIntent") {
+      // ADR-124 / ADR-196: Dart ends the user's wish with {connected: false}; that removes the
+      // kill-switch block. {connected: true} needs nothing here (Connect starts it).
+      const EncodableValue* connected = Field(args, "connected");
+      if (!connected || !std::holds_alternative<bool>(*connected)) Bad();
+      if (!std::get<bool>(*connected)) c.EndIntent();
+      result->Success();
     } else if (method == "splitRead") {
       result->Success(StringList(c.SplitApps()));
     } else if (method == "splitDomainsRead") {

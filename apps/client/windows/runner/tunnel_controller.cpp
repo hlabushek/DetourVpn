@@ -54,7 +54,10 @@ std::vector<std::string> TunnelController::Capabilities() {
 }
 
 TunnelController::TunnelController(ControllerHooks hooks)
-    : hooks_(std::move(hooks)), vault_(hooks_.vault_dir) {
+    : hooks_(std::move(hooks)), vault_(hooks_.vault_dir), kill_switch_(hooks_.kill_switch_backend) {
+  // ADR-196: startup sweep of rules a previous process of ours left (our provider key only). With
+  // the setting off the firewall is never called.
+  if (LoadPrefs().kill_switch) kill_switch_.Sweep();
   watcher_ = std::thread([this]() { WatchLoop(); });
 }
 
@@ -63,6 +66,7 @@ TunnelController::~TunnelController() {
     std::lock_guard<std::mutex> lock(mutex_);
     stopping_ = true;
     StopLocked();
+    kill_switch_.Release();  // the app is closing: never leave a block behind
   }
   wake_.notify_all();
   if (watcher_.joinable()) watcher_.join();
@@ -79,6 +83,8 @@ void TunnelController::WatchLoop() {
     } else if (engine_started_ && !engine_.Running()) {
       EngineExitedLocked();
     } else if (engine_started_) {
+      TrackTunnelLocked();
+      if (!engine_started_) continue;  // the block could not follow the tunnel: stopped
       try {
         WatchTickLocked();
       } catch (const std::exception&) {
@@ -86,6 +92,68 @@ void TunnelController::WatchLoop() {
       }
     }
   }
+}
+
+void TunnelController::TrackTunnelLocked() {
+  if (!kill_switch_.engaged() || !hooks_.tunnel_luid) return;
+  const int64_t now = hooks_.now_ms();
+  const auto& applied = *kill_switch_.rules();
+  // Poll often until the new adapter is permitted, then once a second to follow a change.
+  if (applied.tunnel_luid && now < next_luid_poll_) return;
+  next_luid_poll_ = now + 1000;
+  std::optional<uint64_t> luid;
+  try {
+    luid = hooks_.tunnel_luid();
+  } catch (const std::exception&) {
+    return;
+  }
+  if (!luid || luid == applied.tunnel_luid) return;
+  KillSwitchRules rules = applied;
+  rules.tunnel_luid = luid;
+  if (!kill_switch_.Engage(rules)) {
+    // The tunnel cannot be permitted, so it is useless behind the block: report it plainly. The
+    // UI's recovery treats this as terminal and ends the intent, which removes the block.
+    reason_ = "kill_switch_failed";
+    StopLocked();
+  }
+}
+
+void TunnelController::EngageForConnectLocked(bool enabled, const std::vector<std::string>& api_ipv4) {
+  if (!enabled) {
+    kill_switch_.Release();  // no backend call when nothing is engaged
+    return;
+  }
+  KillSwitchRules rules;
+  rules.engine_exe = hooks_.engine_dir / L"detour-engine.exe";
+  rules.own_exe = hooks_.own_exe;
+  rules.api_ipv4 = api_ipv4;
+  if (!kill_switch_.Engage(rules))
+    throw NativeError("kill_switch_failed",
+                      "Не удалось включить блокировку трафика при обрыве. VPN не подключён.");
+}
+
+bool TunnelController::KillSwitchEnabled() {
+  std::lock_guard<std::mutex> lock(mutex_);
+  return LoadPrefs().kill_switch;
+}
+
+bool TunnelController::WriteKillSwitch(bool enabled) {
+  std::lock_guard<std::mutex> lock(mutex_);
+  Prefs prefs = LoadPrefs();
+  prefs.kill_switch = enabled;
+  SavePrefs(prefs);
+  if (!enabled) kill_switch_.Release();
+  return prefs.kill_switch;
+}
+
+void TunnelController::EndIntent() {
+  std::lock_guard<std::mutex> lock(mutex_);
+  kill_switch_.Release();
+}
+
+bool TunnelController::KillSwitchActive() {
+  std::lock_guard<std::mutex> lock(mutex_);
+  return kill_switch_.engaged();
 }
 
 void TunnelController::StopLocked() {
@@ -98,6 +166,14 @@ void TunnelController::StopLocked() {
   std::fill(awg_config_.begin(), awg_config_.end(), '\0');
   awg_config_.clear();
   awg_policy_ = RoutingPolicy{};
+  // ADR-196: the block stays while the user still wants the VPN (recovery follows); only the
+  // permit for the adapter that just went away is dropped. A failure keeps the old rules: the
+  // stale permit names an interface that no longer exists, so nothing leaks through it.
+  if (kill_switch_.engaged() && kill_switch_.rules()->tunnel_luid) {
+    KillSwitchRules rules = *kill_switch_.rules();
+    rules.tunnel_luid.reset();
+    kill_switch_.Engage(rules);
+  }
 }
 
 void TunnelController::EngineExitedLocked() {
@@ -290,6 +366,7 @@ TunnelController::Prefs TunnelController::LoadPrefs() const {
       prefs.apps.push_back(value);
     else if (key == "domain" && seen_domains.insert(value).second) prefs.domains.push_back(value);
     else if (key == "dns" && IsDnsChoice(value)) prefs.dns = value;  // anything else = default
+    else if (key == "kill_switch") prefs.kill_switch = value == "1";  // ADR-196: anything else = off
   }
   return prefs;
 }
@@ -302,6 +379,7 @@ void TunnelController::SavePrefs(const Prefs& prefs) const {
   for (const auto& app : prefs.apps) text += "app\t" + app + "\n";
   for (const auto& domain : prefs.domains) text += "domain\t" + domain + "\n";
   if (!prefs.dns.empty()) text += "dns\t" + prefs.dns + "\n";
+  if (prefs.kill_switch) text += "kill_switch\t1\n";
   std::error_code ec;
   std::filesystem::create_directories(hooks_.prefs_path.parent_path(), ec);
   std::filesystem::path temp = hooks_.prefs_path;
@@ -425,7 +503,7 @@ std::vector<std::string> TunnelController::ControlPlaneAddresses() {
   if (IsIpv4Literal(host)) {
     addresses.push_back(host);
   } else {
-    addresses = hooks_.resolve_ipv4(host);
+    addresses = ResolveApiHost(host);
     if (addresses.empty() || addresses.size() > 8) throw NativeError("native_config_invalid", kGenericMessage);
     for (const auto& ip : addresses)
       if (!IsIpv4Literal(ip)) throw NativeError("native_config_invalid", kGenericMessage);
@@ -438,7 +516,7 @@ std::vector<std::string> TunnelController::ControlPlaneAddresses() {
     if (IsIpv4Literal(fallback)) {
       found.push_back(fallback);
     } else {
-      found = hooks_.resolve_ipv4(fallback);
+      found = ResolveApiHost(fallback);
       if (found.size() > 8) found.clear();
       if (std::any_of(found.begin(), found.end(), [](const std::string& ip) { return !IsIpv4Literal(ip); }))
         found.clear();
@@ -447,6 +525,18 @@ std::vector<std::string> TunnelController::ControlPlaneAddresses() {
       if (std::find(addresses.begin(), addresses.end(), ip) == addresses.end()) addresses.push_back(ip);
   }
   return addresses;
+}
+
+std::vector<std::string> TunnelController::ResolveApiHost(const std::string& host) {
+  // ADR-196: while the block is on, a name is never sent to the system resolver (fail closed):
+  // only addresses resolved before the block are used, and the rules already permit them.
+  if (kill_switch_.engaged()) {
+    auto it = known_api_.find(host);
+    return it == known_api_.end() ? std::vector<std::string>{} : it->second;
+  }
+  std::vector<std::string> found = hooks_.resolve_ipv4(host);
+  if (!found.empty()) known_api_[host] = found;
+  return found;
 }
 
 void TunnelController::SetApiFallbacks(const std::vector<std::string>& hosts) {
@@ -477,8 +567,10 @@ void TunnelController::Connect(const std::string& config, int64_t remaining_ms,
 
   std::string engine_config;
   RoutingPolicy policy;
+  bool protect = false;
   try {
     Prefs prefs = LoadPrefs();
+    protect = prefs.kill_switch;
     AwgProfile profile = ParseProfile(config, PrivateKey());
     policy.mode = prefs.mode;
     policy.app_paths = prefs.apps;
@@ -496,6 +588,8 @@ void TunnelController::Connect(const std::string& config, int64_t remaining_ms,
 
   const int64_t deadline = submitted + remaining_ms;
   if (hooks_.now_ms() >= deadline) throw state_error();
+  // ADR-196: the block goes in before the engine starts, so there is no unprotected start-up.
+  EngageForConnectLocked(protect, policy.api_ipv4);
   try {
     if (renewable) window_.Start(grant->connection, grant->runtime, grant->generation, deadline, hooks_.now_ms());
   } catch (const std::logic_error&) {
@@ -562,14 +656,18 @@ void TunnelController::ConnectVless(const VlessRealityProfile& profile, int64_t 
     throw NativeError("native_engine_unavailable", kGenericMessage);
 
   std::string engine_config;
+  bool protect = false;
+  std::vector<std::string> api_ipv4;
   try {
     Prefs prefs = LoadPrefs();
+    protect = prefs.kill_switch;
     RoutingPolicy policy;
     policy.mode = prefs.mode;
     policy.app_paths = prefs.apps;
     policy.domains = prefs.domains;
     policy.api_ipv4 = ControlPlaneAddresses();
     policy.dns_server = prefs.dns;
+    api_ipv4 = policy.api_ipv4;
     engine_config = CreateVlessEngineConfig(profile, policy);
   } catch (const NativeError&) {
     throw;
@@ -578,6 +676,7 @@ void TunnelController::ConnectVless(const VlessRealityProfile& profile, int64_t 
   } catch (const std::exception&) {
     throw NativeError("native_io_error", kGenericMessage);
   }
+  EngageForConnectLocked(protect, api_ipv4);  // ADR-196, before the engine starts
   // No quota window: the panel meters its own client. The deadline only bounds one session.
   deadline_ = submitted + max_ms;
   LaunchLocked(exe, engine_config);

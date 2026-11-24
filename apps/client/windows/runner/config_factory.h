@@ -13,6 +13,9 @@ namespace detour {
 
 constexpr size_t kMaxApiIpv4 = 24;
 
+// The TUN's fixed IPv6 ULA (both engines). ADR-196: the kill switch finds the tunnel adapter by it.
+constexpr const char* kTunIpv6Ula = "fdfe:dcba:9876::1";
+
 struct RoutingPolicy {
   std::string mode;                   // "all" | "exclude" | "include"
   std::vector<std::string> app_paths;  // absolute .exe paths (Windows), max 63

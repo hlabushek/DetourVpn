@@ -18,18 +18,23 @@ observed. The Windows zip is unsigned.
   - Window deadlines now use a clock that counts sleep.
 - **Fallback API origins bypass the tunnel** (ADR-195, W-05). Windows now routes the configured
   fallback API hosts directly, as Android does. Without fallbacks, nothing changes.
+- **Optional kill switch** (ADR-196, W-01): setting «Блокировать трафик при обрыве», **off by
+  default**. When on, a Windows Filtering Platform block (dynamic session, removed by Windows if the
+  app exits or crashes) stops all non-tunnel traffic while the VPN is wanted, including engine
+  crashes and restarts; only the engine, the tunnel, loopback, DHCP and the app's API addresses
+  are allowed, and no DNS outside the tunnel. If the block cannot be installed, the VPN does not
+  start (`kill_switch_failed`). **Not leak-tested**; unit-tested with a fake backend only.
 
 ## Docs
 
 - ADR-194 (Windows watchdog, network change, sleep/resume; why the dead-peer probe stays off on
-  Windows; tray mode deferred), ADR-195 (fallback API bypass), ADR-196 (kill switch design, **not
-  implemented**). ADR-095 and I-032 limits updated.
+  Windows; tray mode deferred), ADR-195 (fallback API bypass), ADR-196 (kill switch: implemented,
+  not leak-tested; owner test plan). ADR-095 and I-032 limits updated.
 
 ## Known gaps, not in this release
 
-- **No kill switch on Windows** (W-01). ADR-196 has the WFP design. Implementing it needs an
-  owner-authorised test on a real PC and a decision on DNS during a gap. When the engine dies or
-  restarts, traffic can go direct until it is up again.
+- **Kill switch not verified** (W-01). Off by default until the owner's leak test (ADR-196) passes.
+  With it off, when the engine dies or restarts, traffic can go direct until it is up again.
 - **No tray mode on Windows** (W-02, tray part). Closing the window still stops the VPN.
 - **Dead-peer probe is inert** (A-03) on Android and absent on Windows. No project-owned health URL
   exists. On Windows the stall rule is the 180 s stale-handshake restart.
