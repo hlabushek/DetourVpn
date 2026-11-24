@@ -1,7 +1,17 @@
 # I-032 — Windows beta client
 
-**Status:** plan approved by the owner on 2026-11-10. Nothing implemented yet.
-ADR-095 (to be written in stage 0) amends ADR-090, which lists Windows clients
+**Status (updated 2026-11-24):** plan approved by the owner on 2026-11-10. Implementation
+has started; the earlier "Nothing implemented yet" line was out of date.
+- Done in commits on 2026-11-24: optional WFP kill switch, default off (W-01, `df5c0c1`);
+  watchdog restarts a crashed or stalled engine in place (`79d1c47`); fallback API origins
+  routed around the tunnel (W-05, `e745d6e`); kill switch design doc (ADR-196, `ab66e17`);
+  beta.37 draft notes; tray mode deferred to beta.38 (`47cc02a`).
+- `services/api/src/vpn_api/devices.py` already accepts `platform` = `"android"` or `"windows"`.
+- ADR-095 (`docs/adr/095-windows-beta-client.md`) exists; its status was not re-checked here.
+- Not verified: no Windows physical Connect, no signed Windows artifact, no server-side peer
+  status check.
+
+Original plan text (2026-11-10). ADR-095 amends ADR-090, which lists Windows clients
 as disabled during beta.
 
 ## Context

@@ -1,5 +1,15 @@
 # Handover — connection survivability plan
 
+**Status update 2026-11-24 (added on top of the 2026-11-17 text below, which is unchanged):**
+- The phase commits (1fdbbf4 to 5f1af00) are still in history. Still **not verified on a device**;
+  no device evidence was found after 2026-11-17.
+- A local signed APK `0.1.0-beta.37` exists (`docs/evidence/i-030-beta-apk-20261124T160159087Z-52aeb38e.json`):
+  metadata and signature passed, install and distribution not verified. Whether
+  `scripts/run_overnight_build.ps1` was run is unknown; the 2026-11-17 "not run yet" note may be out of date.
+- Phase 3.1 (server window 3600 s): deployment status not checked here.
+- Next free ADR number: at least 198 (ADR-197 exists).
+- Windows beta progress is in `docs/issues/I-032-windows-beta.md` (updated 2026-11-24).
+
 **Where we are:** Phases 0 to 6 are **CODE COMPLETE** and committed locally (ADR-144 to
 ADR-149), plus the Phase 4 test gaps (`fd7ad24`). **The plan is NOT verified on a device.** There
 was no APK build, no Gradle run of any kind, no device or phone run, and no Google Play policy
