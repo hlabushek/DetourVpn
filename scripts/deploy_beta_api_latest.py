@@ -164,9 +164,13 @@ test "$(ready)" = 200
 if [ "$mode" = local ]; then
 test "$(docker inspect --format '{{.State.Health.Status}}' detourvpn-beta-postgres-1)" = healthy
 fi
-test "$(q)" = __BEFORE__
+cur="$(q)"
+already_migrated=0
+# Managed database already at the target revision (migrated earlier): skip the migration, deploy the code only.
+if [ "$mode" = managed ] && [ "$cur" = __AFTER__ ]; then already_migrated=1; echo revision_before=__AFTER__ already_migrated=1
+else test "$cur" = __BEFORE__; fi
 # ADR-197: a pending managed migration needs a role that can act as table owner; never another credential.
-if [ "$mode" = managed ] && [ __BEFORE__ != __AFTER__ ]; then
+if [ "$mode" = managed ] && [ "$already_migrated" = 0 ]; then
 test "$(mdb can-migrate)" = yes || { echo refused=managed_role_cannot_migrate; exit 1; }
 fi
 test "$(df -Pk / | awk 'NR==2{print $4}')" -gt 1000000
@@ -236,7 +240,9 @@ LIST
 while read -r want rel; do [ -z "$rel" ] && continue; test "$(sha256sum "$root/$rel" | cut -d ' ' -f1)" = "$want"; done <<'LIST'
 __INSTALLED__
 LIST
-if [ "$mode" = managed ]; then
+if [ "$already_migrated" = 1 ]; then
+echo migrate_skipped=already_at_target >"$backup/migrate.out"
+elif [ "$mode" = managed ]; then
 # ADR-197: upgrade to the exact target, then alembic check; any failure stops and rolls the code back.
 mdb upgrade __AFTER__ >"$backup/migrate.out" 2>&1 || { echo migrate_unit_failed=1; echo migrate_out="$(tr '\n' ' ' < "$backup/migrate.out" | cut -c1-400)"; false; }
 else
