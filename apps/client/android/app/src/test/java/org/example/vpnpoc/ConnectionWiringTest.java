@@ -73,6 +73,35 @@ public class ConnectionWiringTest {
         assertTrue(body(app, "Map<String, Object> snapshot()").contains("handshakeClock.ageSeconds("));
     }
 
+    /**
+     * ADR-146 (overnight A4): after a restart in place the underlying network is set only after
+     * the new interface exists (restartInPlace first, then the stale flag, then applyUnderlying),
+     * and a flag that could not be applied yet is retried by the next watch tick. Static order
+     * check only: whether establish() really clears the underlying network needs a device.
+     */
+    @Test public void theUnderlyingNetworkIsSetAfterTheRestartInPlace() throws Exception {
+        String app = source("ClientApplication.java");
+        String restart = body(app, "private void restartTunnel()");
+        int inPlace = restart.indexOf("provider.restartInPlace()");
+        int stale = restart.indexOf("underlyingStale = true");
+        int apply = restart.indexOf("applyUnderlying()");
+        int failed = restart.indexOf("catch (");
+        assertTrue("restart in place first", inPlace >= 0 && stale > inPlace);
+        assertTrue("then the underlying network", apply > stale);
+        assertTrue("both inside the try, before the fail-closed catch", failed > apply);
+        assertTrue("one restart per call", inPlace == restart.lastIndexOf("provider.restartInPlace()"));
+        String begin = body(app, "void beginWindow()");
+        assertTrue("a new window sets it too",
+                begin.indexOf("underlyingStale = true") >= 0
+                        && begin.indexOf("applyUnderlying()") > begin.indexOf("underlyingStale = true"));
+        String watch = body(app, "private void watchTunnel()");
+        assertTrue("a stale flag is retried on the next tick", watch.contains("applyUnderlying()"));
+        String applyBody = body(app, "private void applyUnderlying()");
+        assertTrue("never cleared while the tunnel is down",
+                applyBody.indexOf("!tunnelUpNow()") >= 0
+                        && applyBody.indexOf("!tunnelUpNow()") < applyBody.indexOf("underlyingStale = false"));
+    }
+
     /** ADR-155: a failed native init is retried before UI calls and before a restore engine. */
     @Test public void aFailedNativeInitIsRetriedBeforeItIsNeeded() throws Exception {
         String app = source("ClientApplication.java");
