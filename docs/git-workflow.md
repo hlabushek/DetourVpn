@@ -35,7 +35,7 @@ Build from a clean folder on a committed, pushed commit. The report must show no
 
 ## Current state (snapshot, 2026-11-27, from `git log` and `scripts/git_state.py`; the owner updates it when the line changes)
 
-- **Current line of work:** `claude/connection-reliability`. On origin: `d6f9cb6` (beta.37 release console). Locally ahead by the 2026-11-27 overnight commits (`f27bfe3` .. `ecd15e4`, plus the commit that updates this section); **not pushed**. Start new work from here.
+- **Current line of work:** `claude/connection-reliability`. On origin: `d6f9cb6` (beta.37 release console). Locally ahead by the 2026-11-27 overnight commits (from `f27bfe3`; the full list is in `docs/overnight/MORNING_REPORT_2026-11-27.md`); **not pushed**. Start new work from here.
 - **`main`:** at `ae27e37` (project instructions for versions, worktrees and builds). It is an ancestor of `claude/connection-reliability`, which is 12 commits ahead of it. Merging further into `main` is an owner decision.
 - **`codex/i025-android-windows`:** the main folder (`9b0bbc0`). It holds unsaved Android reliability changes (15 changed, 15 untracked) and 10 commits not on origin. Do not commit, push, or reset it without the owner's go-ahead.
 - **Rescue branch:** `backup/android-reliability-snapshot-2026-11-12` (commit `4538bb0`). It keeps the 12 November Android snapshot. Not pushed. `codex/i025-android-windows` is fully inside it.
