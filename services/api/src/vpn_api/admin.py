@@ -4,7 +4,7 @@ import re
 import secrets
 from datetime import timedelta
 from threading import BoundedSemaphore
-from typing import Annotated, Literal
+from typing import Annotated, Any, Literal
 from uuid import UUID
 
 from cryptography.exceptions import InvalidKey
@@ -43,6 +43,7 @@ from vpn_api.db.models import (
     User,
     VPNNode,
 )
+from vpn_api.nodes.catalog import HEARTBEAT_SECONDS
 from vpn_api.panel_sources import PanelLinkError, parse_vless_reality
 from vpn_api.quota.contracts import MAX_BYTES, LedgerCommand, QuotaError
 from vpn_api.quota.service import LedgerService
@@ -113,6 +114,32 @@ class AdminWindowStatus(BaseModel):
     latest_connection_state: Literal["pending", "active", "revoke_pending", "closed"] | None
     non_closed_connection_count: int = Field(ge=0)
     reserved_bytes: int = Field(ge=0)
+
+
+class AdminHealthSummary(BaseModel):
+    """ADR-200: owner health panel. Aggregate counts only: no identifiers, names, addresses or
+    per-user rows."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    users_active: int = Field(ge=0)
+    users_pending: int = Field(ge=0)
+    users_disabled: int = Field(ge=0)
+    devices_active: int = Field(ge=0)
+    devices_revoked: int = Field(ge=0)
+    nodes_active: int = Field(ge=0)
+    nodes_disabled: int = Field(ge=0)
+    nodes_active_heartbeat_fresh: int = Field(ge=0)
+    connections_pending: int = Field(ge=0)
+    connections_active: int = Field(ge=0)
+    connections_revoke_pending: int = Field(ge=0)
+    tunnels_not_revoked: int = Field(ge=0)
+    commands_unacknowledged: int = Field(ge=0)
+    commands_stalled: int = Field(ge=0)
+
+
+#: ADR-200: an unacknowledged peer command older than this counts as stalled (same as /nodes).
+HEALTH_STALLED_COMMAND_SECONDS = 90
 
 
 class AdminService:
@@ -726,6 +753,60 @@ def user_window_status(user_id: UUID, admin: Admin, access: Access) -> AdminWind
             latest_connection_state=latest_state,
             non_closed_connection_count=non_closed,
             reserved_bytes=quota.reserved_bytes,
+        )
+
+
+@router.get("/health-summary", response_model=AdminHealthSummary)
+def health_summary(admin: Admin, access: Access) -> AdminHealthSummary:
+    """ADR-200: read-only aggregate counts for the owner. Takes no locks and changes nothing."""
+    with transaction(admin.engine) as session:
+        admin.authenticate(session, access)
+        now = database_now(session)
+
+        def grouped(column: Any, *where: Any) -> dict[str, int]:
+            stmt = select(column, func.count()).group_by(column)
+            if where:
+                stmt = stmt.where(*where)
+            return {str(key): int(count) for key, count in session.execute(stmt)}
+
+        def count(model: Any, *where: Any) -> int:
+            return int(session.scalar(select(func.count()).select_from(model).where(*where)) or 0)
+
+        users = grouped(User.status)
+        nodes = grouped(VPNNode.status)
+        connections = grouped(PeerConnection.state, PeerConnection.state != "closed")
+        pending = (
+            select(func.count())
+            .select_from(PeerCommand)
+            .join(Tunnel, Tunnel.id == PeerCommand.tunnel_id)
+            .where(
+                PeerCommand.acknowledged_at.is_(None),
+                PeerCommand.peer_version == Tunnel.peer_version,
+                Tunnel.state != "revoked",
+            )
+        )
+        stalled_before = now - timedelta(seconds=HEALTH_STALLED_COMMAND_SECONDS)
+        return AdminHealthSummary(
+            users_active=users.get("active", 0),
+            users_pending=users.get("pending", 0),
+            users_disabled=users.get("disabled", 0),
+            devices_active=count(Device, Device.revoked_at.is_(None)),
+            devices_revoked=count(Device, Device.revoked_at.is_not(None)),
+            nodes_active=nodes.get("active", 0),
+            nodes_disabled=nodes.get("disabled", 0),
+            nodes_active_heartbeat_fresh=count(
+                VPNNode,
+                VPNNode.status == "active",
+                VPNNode.last_seen_at >= now - timedelta(seconds=HEARTBEAT_SECONDS),
+            ),
+            connections_pending=connections.get("pending", 0),
+            connections_active=connections.get("active", 0),
+            connections_revoke_pending=connections.get("revoke_pending", 0),
+            tunnels_not_revoked=count(Tunnel, Tunnel.state != "revoked"),
+            commands_unacknowledged=int(session.scalar(pending) or 0),
+            commands_stalled=int(
+                session.scalar(pending.where(PeerCommand.created_at <= stalled_before)) or 0
+            ),
         )
 
 

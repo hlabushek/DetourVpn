@@ -112,6 +112,100 @@
         "title": "AdminChange",
         "type": "object"
       },
+      "AdminHealthSummary": {
+        "additionalProperties": false,
+        "description": "ADR-200: owner health panel. Aggregate counts only: no identifiers, names, addresses or\nper-user rows.",
+        "properties": {
+          "commands_stalled": {
+            "minimum": 0.0,
+            "title": "Commands Stalled",
+            "type": "integer"
+          },
+          "commands_unacknowledged": {
+            "minimum": 0.0,
+            "title": "Commands Unacknowledged",
+            "type": "integer"
+          },
+          "connections_active": {
+            "minimum": 0.0,
+            "title": "Connections Active",
+            "type": "integer"
+          },
+          "connections_pending": {
+            "minimum": 0.0,
+            "title": "Connections Pending",
+            "type": "integer"
+          },
+          "connections_revoke_pending": {
+            "minimum": 0.0,
+            "title": "Connections Revoke Pending",
+            "type": "integer"
+          },
+          "devices_active": {
+            "minimum": 0.0,
+            "title": "Devices Active",
+            "type": "integer"
+          },
+          "devices_revoked": {
+            "minimum": 0.0,
+            "title": "Devices Revoked",
+            "type": "integer"
+          },
+          "nodes_active": {
+            "minimum": 0.0,
+            "title": "Nodes Active",
+            "type": "integer"
+          },
+          "nodes_active_heartbeat_fresh": {
+            "minimum": 0.0,
+            "title": "Nodes Active Heartbeat Fresh",
+            "type": "integer"
+          },
+          "nodes_disabled": {
+            "minimum": 0.0,
+            "title": "Nodes Disabled",
+            "type": "integer"
+          },
+          "tunnels_not_revoked": {
+            "minimum": 0.0,
+            "title": "Tunnels Not Revoked",
+            "type": "integer"
+          },
+          "users_active": {
+            "minimum": 0.0,
+            "title": "Users Active",
+            "type": "integer"
+          },
+          "users_disabled": {
+            "minimum": 0.0,
+            "title": "Users Disabled",
+            "type": "integer"
+          },
+          "users_pending": {
+            "minimum": 0.0,
+            "title": "Users Pending",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "users_active",
+          "users_pending",
+          "users_disabled",
+          "devices_active",
+          "devices_revoked",
+          "nodes_active",
+          "nodes_disabled",
+          "nodes_active_heartbeat_fresh",
+          "connections_pending",
+          "connections_active",
+          "connections_revoke_pending",
+          "tunnels_not_revoked",
+          "commands_unacknowledged",
+          "commands_stalled"
+        ],
+        "title": "AdminHealthSummary",
+        "type": "object"
+      },
       "AdminLogin": {
         "additionalProperties": false,
         "properties": {
@@ -2985,6 +3079,103 @@
           }
         ],
         "summary": "Beta Invites",
+        "tags": [
+          "administration"
+        ]
+      }
+    },
+    "/api/admin/v1/health-summary": {
+      "get": {
+        "description": "ADR-200: read-only aggregate counts for the owner. Takes no locks and changes nothing.",
+        "operationId": "health_summary_api_admin_v1_health_summary_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminHealthSummary"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Health Summary",
         "tags": [
           "administration"
         ]
