@@ -33,12 +33,13 @@ Build from a clean folder on a committed, pushed commit. The report must show no
 2. Push the branch if the work must survive: `git push -u origin <branch>`.
 3. Run `python scripts/git_state.py` and confirm there is no `UNSAVED` or `NOT PUSHED` line for the branch you used.
 
-## Current state (snapshot, 2026-11-24; the owner updates it when the line changes)
+## Current state (snapshot, 2026-11-27, from `git log` and `scripts/git_state.py`; the owner updates it when the line changes)
 
-- **Current line of work:** `claude/connection-reliability` (commit `aedf5fd`, pushed to origin). Start new work from here.
-- **`main`:** still the initial import (`c001d3d`). It does not contain the current work. Merging into it is an owner decision.
-- **`codex/i025-android-windows`:** the main folder. It holds unsaved Android reliability changes and 10 commits not on origin. Do not commit, push, or reset it without the owner's go-ahead.
-- **Rescue branch:** `backup/android-reliability-snapshot-2026-11-12` (commit `4538bb0`). It keeps the 12 November Android snapshot that was not on any branch. Not pushed.
+- **Current line of work:** `claude/connection-reliability`. On origin: `d6f9cb6` (beta.37 release console). Locally ahead by the 2026-11-27 overnight commits (`f27bfe3` .. `ecd15e4`, plus the commit that updates this section); **not pushed**. Start new work from here.
+- **`main`:** at `ae27e37` (project instructions for versions, worktrees and builds). It is an ancestor of `claude/connection-reliability`, which is 12 commits ahead of it. Merging further into `main` is an owner decision.
+- **`codex/i025-android-windows`:** the main folder (`9b0bbc0`). It holds unsaved Android reliability changes (15 changed, 15 untracked) and 10 commits not on origin. Do not commit, push, or reset it without the owner's go-ahead.
+- **Rescue branch:** `backup/android-reliability-snapshot-2026-11-12` (commit `4538bb0`). It keeps the 12 November Android snapshot. Not pushed. `codex/i025-android-windows` is fully inside it.
+- **Other local-only branches:** `candidate/api-3600-plus-audit` (`c0d134e`, checked out in a session scratchpad worktree, 12 commits, no remote), `candidate/api-3600-min` (fully inside the previous one), `wip/i025-android-reliability-20261124` (2 commits, no remote). None is pushed.
 - **Removed on 2026-11-24:** duplicate and empty worktrees and branches, and build caches. Copies are in `C:\Users\JetGame\DetourVpn-cleanup-backup-2026-11-24\`.
 
 If `scripts/git_state.py` disagrees with this section, trust the script and update this section.
