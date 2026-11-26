@@ -65,7 +65,8 @@ final class TunnelProbeRunner {
         // TODO(device, ADR-148/149): this probe may NEVER run on Android. The app excludes its own
         // package from its VPN (ADR-132), and Android may refuse to bind a socket of an excluded
         // UID to the VPN network, so every probe would end here as bind_refused. Needs a device
-        // check and a routing decision before the probe is relied on.
+        // check and a routing decision before the probe is relied on. The routing options and the
+        // proposed decision (keep the probe off for now) are in ADR-198; owner decision pending.
         // TODO(owner, ADR-148/149): the probe URL (manifest DEAD_PEER_PROBE_URL) is still "none";
         // a real project-owned https health endpoint is needed before the probe runs at all.
         try (DatagramSocket check = new DatagramSocket()) {
