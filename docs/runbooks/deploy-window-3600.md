@@ -1,6 +1,8 @@
 # Runbook: deploy the 3600 s access window (ADR-147, Phase 3.1)
 
-Status: **prepared, not deployed.** Nothing on any beta host has been changed.
+Status: **deployed, verified read-only on 2026-11-27** (see "Verified 2026-11-27" below).
+The rollout order in this runbook was not followed; the owner's deployment is in place and the checks
+below confirm the state of each host. The earlier "prepared, not deployed" text is kept for history.
 
 ## What changes
 - API: `MAX_WINDOW_SECONDS` 900 → 3600 (`services/api/src/vpn_api/tunnels/v3_contracts.py`),
@@ -10,6 +12,28 @@ Status: **prepared, not deployed.** Nothing on any beta host has been changed.
   `beta_slot_bootstrap.py`).
 - Source commit: `8d46858` (Phase 3). The API and node changes have no database migration.
   The rollout scripts still treat this as an API deploy, so they run the same way.
+
+## Verified 2026-11-27 (read-only, owner-run checks)
+Checks run by the owner on each host. No host names or addresses are recorded here.
+
+| Component | Constant or hash | File time | Service started | Result |
+|---|---|---|---|---|
+| API | `MAX_WINDOW_SECONDS = 3600` | 2026-11-23 | 2026-11-26 | OK, running code is 3600 |
+| Node 1 (Helsinki, inferred by elimination) | `window_gate.py` matches `HEAD` | 2026-11-23 18:38:19 UTC | 18:38:21 UTC | OK |
+| Node 2 (Germany) | `window_gate.py` matches `HEAD` | 2026-11-23 18:40:27 UTC | 18:40:31 UTC | OK |
+| Node 3 (Netherlands) | `window_gate.py` matches `HEAD` | 2026-11-23 19:09:21 UTC | 19:09:24 UTC | OK |
+| Node 4 (Poland) | `window_gate.py` matches `HEAD` | 2026-11-23 19:47:32 UTC | 19:47:35 UTC | OK |
+
+- Nodes: `update_beta_node_agent --check-baseline --baseline-rev HEAD` reports `match` for all
+  six agent files on all four nodes.
+- Restart: on every node the agent service started a few seconds after `window_gate.py` changed,
+  so the running process uses the new code.
+- Not checked: the database migration state; the admin panel view; a real phone connection.
+- Open, unrelated to the window: `detourvpn-backup-mirror.service` is in `failed` state on node 1.
+
+Decision (rule from `docs/overnight/A7_WINDOW_3600_CHECK.md`): all components are at 3600 s and
+restarted after the change, so Phase 3.1 is deployed. A phone connection test is still required
+before a tester build.
 
 ## Gate 0: local tests (done, 2026-11-17)
 `uv run --frozen --python 3.13 pytest` on the six window test files: **69 passed, 48 skipped.**

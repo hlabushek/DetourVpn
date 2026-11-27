@@ -6,10 +6,10 @@
 - A local signed APK `0.1.0-beta.37` exists (`docs/evidence/i-030-beta-apk-20261124T160159087Z-52aeb38e.json`):
   metadata and signature passed, install and distribution not verified. Whether
   `scripts/run_overnight_build.ps1` was run is unknown; the 2026-11-17 "not run yet" note may be out of date.
-- Phase 3.1 (server window 3600 s): 3600 is in the code (`services/api/src/vpn_api/tunnels/v3_contracts.py`,
-  `services/node-agent/window_gate.py`, OpenAPI). Deployment is NOT confirmed: `docs/runbooks/deploy-window-3600.md`
-  says "prepared, not deployed". The client (beta.36/37) already asks for 3600 s, so a server still on 900 s
-  would refuse those requests. Verify before any tester build.
+- Phase 3.1 (server window 3600 s): **deployed and verified read-only on 2026-11-27.** API constant is 3600,
+  and all four nodes run agent files that match `HEAD` (3600). On each node and on the API the service started
+  after the file changed. Details: `docs/runbooks/deploy-window-3600.md` ("Verified 2026-11-27"). A phone connection
+  test is still required before a tester build.
 - Window tests: 2026-11-25 run of the eight `services/api/tests/test_window_*.py` files against a disposable
   local PostgreSQL 17.11 gave **95 passed, 0 skipped**. This is the database-backed check that was skipped on
   2026-11-17 (`deploy-window-3600.md`, Gate 0 re-run). It is not a staging or beta database check.
