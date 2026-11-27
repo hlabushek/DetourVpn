@@ -1,8 +1,12 @@
 # Handover — connection survivability plan
 
 **Status update 2026-11-24 (added on top of the 2026-11-17 text below, which is unchanged):**
-- The phase commits (1fdbbf4 to 5f1af00) are still in history. Still **not verified on a device**;
-  no device evidence was found after 2026-11-17.
+- The phase commits (1fdbbf4 to 5f1af00) are still in history.
+- **Owner report, 2026-11-27 (not reviewed by the agent, no logs attached):** phone checklist
+  (`docs/overnight/A5_PHONE_CHECKLIST.md`) phases 1–5 reported as passed; phase 6 not run, owner
+  declined it. Open: item 5.2 (`probe_*` lines, ADR-198 decision input) needs a special test build and was
+  not run, so ADR-198 is still open. Item 4.2 (restart order, A4) is covered only if the owner recorded
+  `underlying_set` after each `watchdog_restart`; confirm with the owner's logs.
 - A local signed APK `0.1.0-beta.37` exists (`docs/evidence/i-030-beta-apk-20261124T160159087Z-52aeb38e.json`):
   metadata and signature passed, install and distribution not verified. Whether
   `scripts/run_overnight_build.ps1` was run is unknown; the 2026-11-17 "not run yet" note may be out of date.
